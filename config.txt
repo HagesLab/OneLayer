@@ -1,0 +1,5 @@
+# Warning: This config file must remain in the same directory as the executable. The simulator will not load properly without it!
+# Directories
+Initial:    "Initial"
+Data:"Data"
+Analysis: " Analysis"
