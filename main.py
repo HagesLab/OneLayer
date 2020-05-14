@@ -212,6 +212,9 @@ class Notebook:
         self.root.title(title)
         self.notebook = tk.ttk.Notebook(self.root)
 
+        # Attempt to create a default config.txt file, if no config.txt can be found
+        self.gen_default_config_file()
+
         # List of default directories for most I/O operations
         self.get_default_dirs()
 
@@ -339,6 +342,17 @@ class Notebook:
 
     def toggle_fullscreen(self):
         self.root.attributes('-fullscreen', not self.root.attributes('-fullscreen'))
+        return
+
+    def gen_default_config_file(self):
+        if not os.path.isfile("config.txt"):
+            print("Could not find config.txt; generating default...")
+            with open("config.txt", 'w+') as ofstream:
+                ofstream.write("# Directories\n")
+                ofstream.write("Initial: \"Initial\"\n")
+                ofstream.write("Data: \"Data\"\n")
+                ofstream.write("Analysis: \"Analysis\"\n")
+
         return
     
     def get_default_dirs(self):
