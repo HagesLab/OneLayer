@@ -12,7 +12,7 @@ Sf: 1e-2
 Sb: 1e-2
 Temperature: 300
 Rel-Permitivity: 10
-Ext_E-Field: 0.5
+Ext_E-Field: 0
 Theta: 0.3
 Alpha: 2.5
 Delta: 0.2
