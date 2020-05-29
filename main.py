@@ -180,8 +180,8 @@ class Plot_State:
 class I_Set:
     # I_Sets are similar to Data_Sets but store exclusively the integrated data generated from Data_Sets
     def __init__(self, I_data, grid_x, params_dict, type, filename):
-        self.I_data = I_data    # This is usually PL
-        self.grid_x = grid_x    # This is usually time
+        self.I_data = I_data    # This is usually PL values
+        self.grid_x = grid_x    # This is usually time values
         self.params_dict = params_dict
         self.type = type
         self.filename = filename
@@ -194,7 +194,10 @@ class I_Group:
     # A batch of I_sets generated from the same Integrate operation
     def __init__(self):
         self.I_sets = {}
-        self.type = "None"
+        self.type = "None"      # This is usually "PL"
+        self.mode = ""
+        self.x_param = "None"   # This is usually "Time"
+        self.global_gridx = None    # In some modes of operation every I_Set will have the same grid_x
         return
 
     def set_type(self, new_type):
@@ -323,7 +326,7 @@ class Notebook:
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.file_menu.add_command(label="Manage Initial Condition Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete IC files", initialdir=self.default_dirs["Initial"]))
         self.file_menu.add_command(label="Manage Data Files", command=partial(tk.filedialog.askdirectory, title="This window does not open anything - Use this window to move or delete data files",initialdir=self.default_dirs["Data"]))
-        self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, filetypes=[("Text files","*.txt")], title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
+        self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, filetypes=[("csv (comma-separated-values)","*.csv")], title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
         self.file_menu.add_command(label="Exit", command=self.root.quit)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
@@ -2135,10 +2138,16 @@ class Notebook:
                 self.write(self.analysis_status, "Integration cancelled")
                 return
             print("Selected param {}".format(self.xaxis_param))
+            self.I_plot.x_param = self.xaxis_param
+
+        else:
+            self.I_plot.x_param = "Time"
             
         # Clean up the I_plot and prepare to integrate given selections
         # A lot of the following is a data transfer between the sending active_datagroup and the receiving I_plot
         self.I_plot.clear()
+        self.I_plot.mode = self.PL_mode
+        self.I_plot.global_gridx = None
 
         active_datagroup = active_plot.datagroup
         n = active_datagroup.get_maxnumtsteps()
@@ -2229,7 +2238,8 @@ class Notebook:
                 xaxis_label = self.xaxis_param + " [WIP]"
 
             elif self.PL_mode == "Over Time":
-                grid_xaxis = np.linspace(0, total_time, n + 1)
+                self.I_plot.global_gridx = np.linspace(0, total_time, n + 1)
+                grid_xaxis = -1 # A dummy value for the I_Set constructor
                 xaxis_label = "Time [ns]"
 
             self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename))
@@ -2247,13 +2257,13 @@ class Notebook:
         plot.ylabel(self.I_plot.type)
         plot.title("Total {} from {} nm to {} nm".format(self.I_plot.type, self.integration_lbound, self.integration_ubound))
 
-        for tag in self.I_plot.I_sets:
+        for key in self.I_plot.I_sets:
 
             if self.PL_mode == "Current Time Step":
-                plot.scatter(self.I_plot.I_sets[tag].grid_x, self.I_plot.I_sets[tag].I_data, label=self.I_plot.I_sets[tag].tag())
+                plot.scatter(self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
 
             elif self.PL_mode == "Over Time":
-                plot.plot(self.I_plot.I_sets[tag].grid_x, self.I_plot.I_sets[tag].I_data, label=self.I_plot.I_sets[tag].tag())
+                plot.plot(self.I_plot.global_gridx, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
                 
         plot.legend()
         plot.tight_layout()
@@ -2544,7 +2554,7 @@ class Notebook:
         return
 
 	# Repositions HICs in their list
-	# HICs are applied sequentially, so this CAN affect what the initial condition looks like
+	# HICs are applied sequentially and do overwrite each other, so this CAN affect what the initial condition looks like
     def moveup_HIC(self):
         currentSelectionIndex = self.HIC_listbox.curselection()[0]
         
@@ -2966,8 +2976,20 @@ class Notebook:
 
         if plot_ID == -1:
             if self.I_plot.size() == 0: return
-            paired_data = np.vstack((self.grid_xaxis, self.PL)).transpose()
-            header = "t,".join([label + "," for label in self.legend_labels])
+            if self.I_plot.mode == "Current Time Step": 
+                paired_data = [[self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data] for key in self.I_plot.I_sets]
+
+                # TODO: Write both of these values with their units
+                header = "{}, {}".format(self.I_plot.x_param, self.I_plot.type)
+
+            else:
+                raw_data = np.array([self.I_plot.I_sets[key].I_data for key in self.I_plot.I_sets])
+                grid_x = np.reshape(self.I_plot.global_gridx, (1,self.I_plot.global_gridx.__len__()))
+                paired_data = np.concatenate((grid_x, raw_data), axis=0).T
+                header = "Time [ns],"
+                for key in self.I_plot.I_sets:
+                    header += self.I_plot.I_sets[key].tag().replace("Δ", "") + ","
+
         else:
             if self.analysis_plots[plot_ID].datagroup.size() == 0: return
             paired_data = self.analysis_plots[plot_ID].datagroup.build()
