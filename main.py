@@ -24,6 +24,9 @@ from functools import partial # This lets us pass params to functions called by 
 import finite
 import csv
 
+import pandas as pd # For bayesim compatibility
+import bayesim.hdf5io as dd
+
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
 class Initial_Condition:
     # Object containing group of parameters used to create heuristic initial conditions
@@ -294,6 +297,13 @@ class Notebook:
         self.EIC_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
+        self.bay_params = {"Mu_N":tk.BooleanVar(), "Mu_P":tk.BooleanVar(), "N0":tk.BooleanVar(), "P0":tk.BooleanVar(),
+                        "B":tk.BooleanVar(), "Tau_N":tk.BooleanVar(), "Tau_P":tk.BooleanVar(), "Sf":tk.BooleanVar(), \
+                        "Sb":tk.BooleanVar(), "Temperature":tk.BooleanVar(), "Rel-Permitivity":tk.BooleanVar(), \
+                        "Theta":tk.BooleanVar(), "Alpha":tk.BooleanVar(), "Delta":tk.BooleanVar(), "Frac-Emitted":tk.BooleanVar()}
+        
+        self.bay_mode = tk.StringVar(value="model")
+
         # Flags and containers for IC arrays
         self.HIC_list = []
         self.IC_file_list = None
@@ -326,7 +336,7 @@ class Notebook:
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.file_menu.add_command(label="Manage Initial Condition Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete IC files", initialdir=self.default_dirs["Initial"]))
         self.file_menu.add_command(label="Manage Data Files", command=partial(tk.filedialog.askdirectory, title="This window does not open anything - Use this window to move or delete data files",initialdir=self.default_dirs["Data"]))
-        self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, filetypes=[("csv (comma-separated-values)","*.csv")], title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
+        self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
         self.file_menu.add_command(label="Exit", command=self.root.quit)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
@@ -351,6 +361,7 @@ class Notebook:
         self.change_axis_popup_isopen = False
         self.plotter_popup_isopen = False
         self.IC_carry_popup_isopen = False
+        self.bayesim_popup_isopen = False
 
         self.root.config(menu=self.menu_bar)
         self.add_tab_inputs()
@@ -893,7 +904,7 @@ class Notebook:
         self.main3_export_button = tk.Button(self.main3_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=-1))
         self.main3_export_button.grid(row=1,column=1, padx=(0,5))
 
-        self.main3_bayesim_button = tk.Button(self.main3_toolbar_frame, text="Bayesim", command=partial(self.export_for_bayesim))
+        self.main3_bayesim_button = tk.Button(self.main3_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
         self.main3_bayesim_button.grid(row=1,column=2,padx=(0,5))
 
         self.analysis_status = tk.Text(self.tab_analyze, width=28,height=3)
@@ -1397,9 +1408,128 @@ class Notebook:
         except OSError as oops:
             self.write(self.analysis_status, "IC file not created")
             
-        except FloatingPointError:
+        except:
             print("Error #511: Failed to close IC carry popup.")
 
+        return
+
+    def do_bayesim_popup(self):
+        if self.I_plot.size() == 0: return
+
+        if not self.bayesim_popup_isopen:
+
+            self.bay_popup = tk.Toplevel(self.root)
+
+            self.bay_title_label1 = tk.ttk.Label(self.bay_popup, text="Bayesim Tool", style="Header.TLabel")
+            self.bay_title_label1.grid(row=0,column=0)
+
+            self.bay_text1 = tk.Message(self.bay_popup, text=
+                                        "Select \"Observation\" to save each curve as an experimentally observed data set or " +
+                                        "Model to combine all curves into a single model set.", width=320)
+            self.bay_text1.grid(row=1,column=0)
+
+            self.bay_text2 = tk.Message(self.bay_popup, text=
+                                        "\"Observation\" data can be used to test Bayesim setups.", width=320)
+            self.bay_text2.grid(row=2,column=0)
+
+            self.bay_text3 = tk.Message(self.bay_popup, text=
+                                        "Select system parameters to be included in the model.", width=320)
+            self.bay_text3.grid(row=5,column=0)
+
+            self.bay_line_separator = tk.ttk.Separator(self.bay_popup, orient="vertical", style="Grey Bar.TSeparator")
+            self.bay_line_separator.grid(row=0,rowspan=30,column=1,padx=(6,6),sticky="ns")
+
+            self.bay_title_label2 = tk.ttk.Label(self.bay_popup, text="\"Observation\" or Model?", style="Header.TLabel")
+            self.bay_title_label2.grid(row=0,column=2,columnspan=4)
+
+            self.bay_obs_mode = tk.ttk.Radiobutton(self.bay_popup, variable=self.bay_mode, value="obs")
+            self.bay_obs_mode.grid(row=1,column=2)
+
+            self.bay_obs_header = tk.Label(self.bay_popup, text="\"Observation\"")
+            self.bay_obs_header.grid(row=1,column=3)
+
+            self.bay_mod_mode = tk.ttk.Radiobutton(self.bay_popup, variable=self.bay_mode, value="model")
+            self.bay_mod_mode.grid(row=2,column=2)
+
+            self.bay_mod_header = tk.Label(self.bay_popup, text="Model")
+            self.bay_mod_header.grid(row=2,column=3)
+
+            self.bay_title_label3 = tk.ttk.Label(self.bay_popup, text="Model Params", style="Header.TLabel")
+            self.bay_title_label3.grid(row=4,column=2,columnspan=4)
+
+            self.bay_mun_check = tk.Checkbutton(self.bay_popup, text="Mu_N", variable=self.bay_params["Mu_N"], onvalue=True, offvalue=False)
+            self.bay_mun_check.grid(row=5,column=2, padx=(19,0))
+
+            self.bay_mup_check = tk.Checkbutton(self.bay_popup, text="Mu_P", variable=self.bay_params["Mu_P"], onvalue=True, offvalue=False)
+            self.bay_mup_check.grid(row=6,column=2, padx=(17,0))
+
+            self.bay_n0_check = tk.Checkbutton(self.bay_popup, text="N0", variable=self.bay_params["N0"], onvalue=True, offvalue=False)
+            self.bay_n0_check.grid(row=7,column=2, padx=(3,0))
+
+            self.bay_p0_check = tk.Checkbutton(self.bay_popup, text="P0", variable=self.bay_params["P0"], onvalue=True, offvalue=False)
+            self.bay_p0_check.grid(row=8,column=2)
+
+            self.bay_B_check = tk.Checkbutton(self.bay_popup, text="B", variable=self.bay_params["B"], onvalue=True, offvalue=False)
+            self.bay_B_check.grid(row=5,column=3, padx=(0,2))
+
+            self.bay_taun_check = tk.Checkbutton(self.bay_popup, text="Tau_N", variable=self.bay_params["Tau_N"], onvalue=True, offvalue=False)
+            self.bay_taun_check.grid(row=6,column=3, padx=(24,0))
+
+            self.bay_taup_check = tk.Checkbutton(self.bay_popup, text="Tau_P", variable=self.bay_params["Tau_P"], onvalue=True, offvalue=False)
+            self.bay_taup_check.grid(row=7,column=3, padx=(23,0))
+
+            self.bay_sf_check = tk.Checkbutton(self.bay_popup, text="Sf", variable=self.bay_params["Sf"], onvalue=True, offvalue=False)
+            self.bay_sf_check.grid(row=8,column=3, padx=(1,0))
+
+            self.bay_sb_check = tk.Checkbutton(self.bay_popup, text="Sb", variable=self.bay_params["Sb"], onvalue=True, offvalue=False)
+            self.bay_sb_check.grid(row=5,column=4, padx=(0,40))
+
+            self.bay_temperature_check = tk.Checkbutton(self.bay_popup, text="Temperature", variable=self.bay_params["Temperature"], onvalue=True, offvalue=False)
+            self.bay_temperature_check.grid(row=6,column=4, padx=(14,0))
+
+            self.bay_relperm_check = tk.Checkbutton(self.bay_popup, text="Rel-Permitivity", variable=self.bay_params["Rel-Permitivity"], onvalue=True, offvalue=False)
+            self.bay_relperm_check.grid(row=7,column=4, padx=(24,0))
+
+            self.bay_theta_check = tk.Checkbutton(self.bay_popup, text="Theta", variable=self.bay_params["Theta"], onvalue=True, offvalue=False)
+            self.bay_theta_check.grid(row=8,column=4, padx=(0,25))
+
+            self.bay_alpha_check = tk.Checkbutton(self.bay_popup, text="Alpha", variable=self.bay_params["Alpha"], onvalue=True, offvalue=False)
+            self.bay_alpha_check.grid(row=5,column=5, padx=(0,26))
+
+            self.bay_delta_check = tk.Checkbutton(self.bay_popup, text="Delta", variable=self.bay_params["Delta"], onvalue=True, offvalue=False)
+            self.bay_delta_check.grid(row=6,column=5, padx=(0,30))
+
+            self.bay_fm_check = tk.Checkbutton(self.bay_popup, text="Frac-Emitted", variable=self.bay_params["Frac-Emitted"], onvalue=True, offvalue=False)
+            self.bay_fm_check.grid(row=7,column=5, padx=(10,0))
+
+            self.bay_continue_button = tk.Button(self.bay_popup, text="Continue", command=partial(self.on_bayesim_popup_close, continue_=True))
+            self.bay_continue_button.grid(row=20,column=3)
+
+            self.bay_popup.protocol("WM_DELETE_WINDOW", partial(self.on_bayesim_popup_close, continue_=False))
+            self.bay_popup.grab_set()
+            self.bayesim_popup_isopen = True
+            return
+
+        else:
+            print("Error #600: Opened more than one Bayesim popup at a time")
+
+        return
+
+    def on_bayesim_popup_close(self, continue_=False):
+        try:
+            if continue_:
+                print("Mode: {}".format(self.bay_mode.get()))
+                for key in self.bay_params:
+                    print("{}: {}".format(key, self.bay_params[key].get()))
+
+                self.export_for_bayesim()
+
+            self.bay_popup.destroy()
+            print("Bayesim popup closed")
+            self.bayesim_popup_isopen = False
+
+        except:
+            print("Error #601: Failed to close Bayesim popup")
         return
     ## Data File Readers for simulation and analysis tabs
 
@@ -2982,7 +3112,7 @@ class Notebook:
                 # TODO: Write both of these values with their units
                 header = "{}, {}".format(self.I_plot.x_param, self.I_plot.type)
 
-            else:
+            else: # if self.I_plot.mode == "Over Time"
                 raw_data = np.array([self.I_plot.I_sets[key].I_data for key in self.I_plot.I_sets])
                 grid_x = np.reshape(self.I_plot.global_gridx, (1,self.I_plot.global_gridx.__len__()))
                 paired_data = np.concatenate((grid_x, raw_data), axis=0).T
@@ -3014,7 +3144,24 @@ class Notebook:
 
     def export_for_bayesim(self):
         if self.I_plot.size() == 0: return
-        paired_data = np.vstack((self.grid_xaxis, self.PL)).transpose()
+            
+        if (self.I_plot.mode == "Over Time"):
+            if self.bay_mode.get() == "model":
+                for key in self.I_plot.I_sets:
+                    raw_data = self.I_plot.I_sets[key].I_data
+                    grid_x = self.I_plot.global_gridx
+                    unc = raw_data * 0.01
+                    full_data = np.vstack((grid_x, raw_data, unc)).T
+                    full_data = pd.DataFrame.from_records(data=full_data,columns=['time', self.I_plot.type, 'uncertainty'])
+                    
+                    #FIXME: dd.save has no visible file overwrite handler
+                    # If the file name already exists, dd.save will simply not save anything
+                    dd.save("{}//{}.h5".format(self.default_dirs["PL"], self.I_plot.I_sets[key].tag()), full_data)
+
+        else:
+            print("WIP =(")
+
+        self.write(self.analysis_status, "Bayesim export complete")
         return
 
 nb = Notebook("ted")
