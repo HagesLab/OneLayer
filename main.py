@@ -2284,9 +2284,10 @@ class Notebook:
         counter = 0
         # Integrate for EACH dataset in chosen datagroup
         for tag in active_datagroup.datasets:
-            
-            # Unpack needed params from the dictionary
             data_filename = active_datagroup.datasets[tag].filename
+            print("Now integrating {}".format(data_filename))
+
+            # Unpack needed params from the dictionaries of params
             dx = active_datagroup.datasets[tag].params_dict["dx"]
             total_length = active_datagroup.datasets[tag].params_dict["Thickness"]
             total_time = active_datagroup.datasets[tag].params_dict["Total-Time"]
@@ -3150,7 +3151,7 @@ class Notebook:
                 for key in self.I_plot.I_sets:  # For each curve on the integration plot
                     raw_data = self.I_plot.I_sets[key].I_data
                     grid_x = self.I_plot.global_gridx   # grid_x refers to what is on the x-axis, which in this case is technically 'time'
-                    unc = raw_data * 0.01
+                    unc = raw_data * 0.1
                     full_data = np.vstack((grid_x, raw_data, unc)).T
                     full_data = pd.DataFrame.from_records(data=full_data,columns=['time', self.I_plot.type, 'uncertainty'])
                     
@@ -3171,7 +3172,7 @@ class Notebook:
 
                     for param in active_bay_params:
                         param_column = np.ones((1,raw_data.__len__())) * self.I_plot.I_sets[key].params_dict[param] * self.convert_out_dict[param]
-                        paired_data = np.concatenate((paired_data, param_column), axis=0)
+                        paired_data = np.concatenate((param_column, paired_data), axis=0)
 
                     paired_data = paired_data.T
 
@@ -3182,9 +3183,12 @@ class Notebook:
                     else:
                         full_data = np.concatenate((full_data, paired_data), axis=0)
 
-                panda_columns = ['time', self.I_plot.type]
+                panda_columns = []
                 for param in active_bay_params:
-                    panda_columns.append(param)
+                    panda_columns.insert(0,param)
+
+                panda_columns.append('time')
+                panda_columns.append(self.I_plot.type)
 
                 full_data = pd.DataFrame.from_records(data=full_data, columns=panda_columns)
                 
