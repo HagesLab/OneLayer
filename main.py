@@ -3146,10 +3146,10 @@ class Notebook:
         if self.I_plot.size() == 0: return
             
         if (self.I_plot.mode == "Over Time"):
-            if self.bay_mode.get() == "model":
-                for key in self.I_plot.I_sets:
+            if self.bay_mode.get() == "obs":
+                for key in self.I_plot.I_sets:  # For each curve on the integration plot
                     raw_data = self.I_plot.I_sets[key].I_data
-                    grid_x = self.I_plot.global_gridx
+                    grid_x = self.I_plot.global_gridx   # grid_x refers to what is on the x-axis, which in this case is technically 'time'
                     unc = raw_data * 0.01
                     full_data = np.vstack((grid_x, raw_data, unc)).T
                     full_data = pd.DataFrame.from_records(data=full_data,columns=['time', self.I_plot.type, 'uncertainty'])
@@ -3158,6 +3158,42 @@ class Notebook:
                     # If the file name already exists, dd.save will simply not save anything
                     dd.save("{}//{}.h5".format(self.default_dirs["PL"], self.I_plot.I_sets[key].tag()), full_data)
 
+            elif self.bay_mode.get() == "model":
+                active_bay_params = []
+                for key in self.bay_params:
+                    if self.bay_params[key].get(): active_bay_params.append(key)
+
+                is_first = True
+                for key in self.I_plot.I_sets:
+                    raw_data = self.I_plot.I_sets[key].I_data
+                    grid_x = self.I_plot.global_gridx
+                    paired_data = np.vstack((grid_x, raw_data))
+
+                    for param in active_bay_params:
+                        param_column = np.ones((1,raw_data.__len__())) * self.I_plot.I_sets[key].params_dict[param] * self.convert_out_dict[param]
+                        paired_data = np.concatenate((paired_data, param_column), axis=0)
+
+                    paired_data = paired_data.T
+
+                    if is_first:
+                        full_data = paired_data
+                        is_first = False
+
+                    else:
+                        full_data = np.concatenate((full_data, paired_data), axis=0)
+
+                panda_columns = ['time', self.I_plot.type]
+                for param in active_bay_params:
+                    panda_columns.append(param)
+
+                full_data = pd.DataFrame.from_records(data=full_data, columns=panda_columns)
+                
+                new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
+                if new_filename == "": return
+
+                if not new_filename.endswith(".h5"): new_filename += ".h5"
+
+                dd.save(new_filename, full_data)
         else:
             print("WIP =(")
 
