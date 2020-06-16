@@ -31,7 +31,7 @@ def toCoord(i,dx, is_edge=False):
     absLowerBound = dx / 2 if not is_edge else 0
     return (absLowerBound + i * dx)
 
-def ode_nanowire(full_path_name,file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, recycle_photons=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, E_field_ext=0, init_N=0, init_P=0, init_E_field=0, init_Ec=0, init_Chi=0):
+def ode_nanowire(full_path_name,file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, recycle_photons=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, E_field_ext=0, init_N=0, init_P=0, init_E_field=0, init_Ec=0, init_Chi=0, write_output=True):
     ## Problem statement:
     # Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
     # Space step size is dx, time step is dt
@@ -79,32 +79,46 @@ def ode_nanowire(full_path_name,file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_p
     dChidz[0] = (init_Chi[1] - init_Chi[0]) / dx
     dChidz[m] = (init_Chi[m] - init_Chi[m-1]) / dx
 
-    print("do_ss was {}".format(do_ss))
-    ## Prep output files
+    if write_output:
+        ## Prep output files
 
-    with tables.open_file(full_path_name + "\\" + file_name_base + "-n.h5", mode='a') as ofstream_N, \
-        tables.open_file(full_path_name + "\\" + file_name_base + "-p.h5", mode='a') as ofstream_P, \
-        tables.open_file(full_path_name + "\\" + file_name_base + "-E_field.h5", mode='a') as ofstream_E_field:
-        array_N = ofstream_N.root.N
-        array_P = ofstream_P.root.P
-        array_E_field = ofstream_E_field.root.E_field
+        with tables.open_file(full_path_name + "\\" + file_name_base + "-n.h5", mode='a') as ofstream_N, \
+            tables.open_file(full_path_name + "\\" + file_name_base + "-p.h5", mode='a') as ofstream_P, \
+            tables.open_file(full_path_name + "\\" + file_name_base + "-E_field.h5", mode='a') as ofstream_E_field:
+            array_N = ofstream_N.root.N
+            array_P = ofstream_P.root.P
+            array_E_field = ofstream_E_field.root.E_field
 
-        ## Do n time steps
+            ## Do n time steps
+            tSteps = np.linspace(0, n*dt, n+1)
+            data, error_data = intg.odeint(odefuncs.dydt, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
+                tfirst=True, full_output=True, hmax=1.0)
+            array_N.append(data[1:,0:m])
+            array_P.append(data[1:,m:2*(m)])
+            array_E_field.append(data[1:,2*(m):])
+
+        return error_data
+
+    else:
+        ## Do n time steps without writing to output files
         tSteps = np.linspace(0, n*dt, n+1)
         data, error_data = intg.odeint(odefuncs.dydt, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
             tfirst=True, full_output=True, hmax=1.0)
-        array_N.append(data[1:,0:m])
-        array_P.append(data[1:,m:2*(m)])
-        array_E_field.append(data[1:,2*(m):])
 
-    return error_data
+        array_N = data[:,0:m]
+        array_P = data[:,m:2*(m)]
 
-def propagatingPL(file_name_base, lower, upper, dx, min, max, B, n0, p0, alphaCof, thetaCof, delta_frac, fracEmitted):
+        return array_N, array_P, error_data
+
+def propagatingPL(file_name_base, lower, upper, dx, min, max, B, n0, p0, alphaCof, thetaCof, delta_frac, fracEmitted, radrec_fromfile=True, rad_rec=0):
     #note: first dimension is time, second dimension is space
-    # Always rounds down when converting from coordinate to index; therefore, some corrections to the integration will be needed
-    with tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
-        tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
-        radRec = B * ((n0 + np.array(ifstream_N.root.N)) * (p0 + np.array(ifstream_P.root.P)) - n0 * p0)
+    if radrec_fromfile:
+        with tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
+            tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
+            radRec = B * ((n0 + np.array(ifstream_N.root.N)) * (p0 + np.array(ifstream_P.root.P)) - n0 * p0)
+
+    else:
+        radRec = rad_rec
 
     i = toIndex(lower, dx, max)
     j = toIndex(upper, dx, max)
