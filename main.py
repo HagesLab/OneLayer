@@ -24,6 +24,9 @@ from functools import partial # This lets us pass params to functions called by 
 import finite
 import csv
 
+import pandas as pd # For bayesim compatibility
+import bayesim.hdf5io as dd
+
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
 class Initial_Condition:
     # Object containing group of parameters used to create heuristic initial conditions
@@ -177,6 +180,53 @@ class Plot_State:
             self.time_index = self.datagroup.get_maxnumtsteps()
         return
 
+class I_Set:
+    # I_Sets are similar to Data_Sets but store exclusively the integrated data generated from Data_Sets
+    def __init__(self, I_data, grid_x, params_dict, type, filename):
+        self.I_data = I_data    # This is usually PL values
+        self.grid_x = grid_x    # This is usually time values
+        self.params_dict = params_dict
+        self.type = type
+        self.filename = filename
+        return
+
+    def tag(self):
+        return self.filename + "_" + self.type
+
+class I_Group:
+    # A batch of I_sets generated from the same Integrate operation
+    def __init__(self):
+        self.I_sets = {}
+        self.type = "None"      # This is usually "PL"
+        self.mode = ""
+        self.x_param = "None"   # This is usually "Time"
+        self.global_gridx = None    # In some modes of operation every I_Set will have the same grid_x
+        return
+
+    def set_type(self, new_type):
+        self.type = new_type
+        return
+
+    def add(self, new_set):
+        if (len(self.I_sets) == 0): # Allow the first set in to set the type restriction
+           self.type = new_set.type
+
+        # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong
+        if (self.type == new_set.type):
+            self.I_sets[new_set.tag] = new_set
+
+        return
+
+    def get_maxval(self):
+        return np.amax([np.amax(self.I_sets[tag].I_data) for tag in self.I_sets])
+
+    def size(self):
+        return len(self.I_sets)
+
+    def clear(self):
+        self.I_sets.clear()
+        return
+
 def extract_values(string, delimiter):
     # Converts a string with deliimiters into a list of values
 	# E.g. "100,200,300" with "," delimiter becomes [100,200,300]
@@ -247,6 +297,13 @@ class Notebook:
         self.EIC_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
+        self.bay_params = {"Mu_N":tk.BooleanVar(), "Mu_P":tk.BooleanVar(), "N0":tk.BooleanVar(), "P0":tk.BooleanVar(),
+                        "B":tk.BooleanVar(), "Tau_N":tk.BooleanVar(), "Tau_P":tk.BooleanVar(), "Sf":tk.BooleanVar(), \
+                        "Sb":tk.BooleanVar(), "Temperature":tk.BooleanVar(), "Rel-Permitivity":tk.BooleanVar(), \
+                        "Theta":tk.BooleanVar(), "Alpha":tk.BooleanVar(), "Delta":tk.BooleanVar(), "Frac-Emitted":tk.BooleanVar()}
+        
+        self.bay_mode = tk.StringVar(value="model")
+
         # Flags and containers for IC arrays
         self.HIC_list = []
         self.IC_file_list = None
@@ -268,19 +325,18 @@ class Notebook:
         
         # Helpers, flags, and containers for analysis plots
         self.analysis_plots = [Plot_State(ID=0), Plot_State(ID=1)]
+        self.I_plot = I_Group()
         self.data_var = tk.StringVar()
         self.fetch_PLmode = tk.StringVar()
         self.yaxis_type = tk.StringVar()
         self.xaxis_type = tk.StringVar()
-
-        self.PL = None
 
         self.menu_bar = tk.Menu(self.notebook)
 
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.file_menu.add_command(label="Manage Initial Condition Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete IC files", initialdir=self.default_dirs["Initial"]))
         self.file_menu.add_command(label="Manage Data Files", command=partial(tk.filedialog.askdirectory, title="This window does not open anything - Use this window to move or delete data files",initialdir=self.default_dirs["Data"]))
-        self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, filetypes=[("Text files","*.txt")], title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
+        self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
         self.file_menu.add_command(label="Exit", command=self.root.quit)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
@@ -305,6 +361,7 @@ class Notebook:
         self.change_axis_popup_isopen = False
         self.plotter_popup_isopen = False
         self.IC_carry_popup_isopen = False
+        self.bayesim_popup_isopen = False
 
         self.root.config(menu=self.menu_bar)
         self.add_tab_inputs()
@@ -847,6 +904,9 @@ class Notebook:
         self.main3_export_button = tk.Button(self.main3_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=-1))
         self.main3_export_button.grid(row=1,column=1, padx=(0,5))
 
+        self.main3_bayesim_button = tk.Button(self.main3_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
+        self.main3_bayesim_button.grid(row=1,column=2,padx=(0,5))
+
         self.analysis_status = tk.Text(self.tab_analyze, width=28,height=3)
         self.analysis_status.grid(row=20,rowspan=3,column=3,columnspan=1)
         self.analysis_status.configure(state="disabled")
@@ -1124,7 +1184,7 @@ class Notebook:
     def do_change_axis_popup(self, plot_ID):
         # Don't open if no data plotted
         if plot_ID == -1:
-            if self.PL is None: return
+            if self.I_plot.size() == 0: return
 
         else:
             if self.analysis_plots[plot_ID].datagroup.size() == 0: return
@@ -1348,9 +1408,128 @@ class Notebook:
         except OSError as oops:
             self.write(self.analysis_status, "IC file not created")
             
-        except FloatingPointError:
+        except:
             print("Error #511: Failed to close IC carry popup.")
 
+        return
+
+    def do_bayesim_popup(self):
+        if self.I_plot.size() == 0: return
+
+        if not self.bayesim_popup_isopen:
+
+            self.bay_popup = tk.Toplevel(self.root)
+
+            self.bay_title_label1 = tk.ttk.Label(self.bay_popup, text="Bayesim Tool", style="Header.TLabel")
+            self.bay_title_label1.grid(row=0,column=0)
+
+            self.bay_text1 = tk.Message(self.bay_popup, text=
+                                        "Select \"Observation\" to save each curve as an experimentally observed data set or " +
+                                        "Model to combine all curves into a single model set.", width=320)
+            self.bay_text1.grid(row=1,column=0)
+
+            self.bay_text2 = tk.Message(self.bay_popup, text=
+                                        "\"Observation\" data can be used to test Bayesim setups.", width=320)
+            self.bay_text2.grid(row=2,column=0)
+
+            self.bay_text3 = tk.Message(self.bay_popup, text=
+                                        "Select system parameters to be included in the model.", width=320)
+            self.bay_text3.grid(row=5,column=0)
+
+            self.bay_line_separator = tk.ttk.Separator(self.bay_popup, orient="vertical", style="Grey Bar.TSeparator")
+            self.bay_line_separator.grid(row=0,rowspan=30,column=1,padx=(6,6),sticky="ns")
+
+            self.bay_title_label2 = tk.ttk.Label(self.bay_popup, text="\"Observation\" or Model?", style="Header.TLabel")
+            self.bay_title_label2.grid(row=0,column=2,columnspan=4)
+
+            self.bay_obs_mode = tk.ttk.Radiobutton(self.bay_popup, variable=self.bay_mode, value="obs")
+            self.bay_obs_mode.grid(row=1,column=2)
+
+            self.bay_obs_header = tk.Label(self.bay_popup, text="\"Observation\"")
+            self.bay_obs_header.grid(row=1,column=3)
+
+            self.bay_mod_mode = tk.ttk.Radiobutton(self.bay_popup, variable=self.bay_mode, value="model")
+            self.bay_mod_mode.grid(row=2,column=2)
+
+            self.bay_mod_header = tk.Label(self.bay_popup, text="Model")
+            self.bay_mod_header.grid(row=2,column=3)
+
+            self.bay_title_label3 = tk.ttk.Label(self.bay_popup, text="Model Params", style="Header.TLabel")
+            self.bay_title_label3.grid(row=4,column=2,columnspan=4)
+
+            self.bay_mun_check = tk.Checkbutton(self.bay_popup, text="Mu_N", variable=self.bay_params["Mu_N"], onvalue=True, offvalue=False)
+            self.bay_mun_check.grid(row=5,column=2, padx=(19,0))
+
+            self.bay_mup_check = tk.Checkbutton(self.bay_popup, text="Mu_P", variable=self.bay_params["Mu_P"], onvalue=True, offvalue=False)
+            self.bay_mup_check.grid(row=6,column=2, padx=(17,0))
+
+            self.bay_n0_check = tk.Checkbutton(self.bay_popup, text="N0", variable=self.bay_params["N0"], onvalue=True, offvalue=False)
+            self.bay_n0_check.grid(row=7,column=2, padx=(3,0))
+
+            self.bay_p0_check = tk.Checkbutton(self.bay_popup, text="P0", variable=self.bay_params["P0"], onvalue=True, offvalue=False)
+            self.bay_p0_check.grid(row=8,column=2)
+
+            self.bay_B_check = tk.Checkbutton(self.bay_popup, text="B", variable=self.bay_params["B"], onvalue=True, offvalue=False)
+            self.bay_B_check.grid(row=5,column=3, padx=(0,2))
+
+            self.bay_taun_check = tk.Checkbutton(self.bay_popup, text="Tau_N", variable=self.bay_params["Tau_N"], onvalue=True, offvalue=False)
+            self.bay_taun_check.grid(row=6,column=3, padx=(24,0))
+
+            self.bay_taup_check = tk.Checkbutton(self.bay_popup, text="Tau_P", variable=self.bay_params["Tau_P"], onvalue=True, offvalue=False)
+            self.bay_taup_check.grid(row=7,column=3, padx=(23,0))
+
+            self.bay_sf_check = tk.Checkbutton(self.bay_popup, text="Sf", variable=self.bay_params["Sf"], onvalue=True, offvalue=False)
+            self.bay_sf_check.grid(row=8,column=3, padx=(1,0))
+
+            self.bay_sb_check = tk.Checkbutton(self.bay_popup, text="Sb", variable=self.bay_params["Sb"], onvalue=True, offvalue=False)
+            self.bay_sb_check.grid(row=5,column=4, padx=(0,40))
+
+            self.bay_temperature_check = tk.Checkbutton(self.bay_popup, text="Temperature", variable=self.bay_params["Temperature"], onvalue=True, offvalue=False)
+            self.bay_temperature_check.grid(row=6,column=4, padx=(14,0))
+
+            self.bay_relperm_check = tk.Checkbutton(self.bay_popup, text="Rel-Permitivity", variable=self.bay_params["Rel-Permitivity"], onvalue=True, offvalue=False)
+            self.bay_relperm_check.grid(row=7,column=4, padx=(24,0))
+
+            self.bay_theta_check = tk.Checkbutton(self.bay_popup, text="Theta", variable=self.bay_params["Theta"], onvalue=True, offvalue=False)
+            self.bay_theta_check.grid(row=8,column=4, padx=(0,25))
+
+            self.bay_alpha_check = tk.Checkbutton(self.bay_popup, text="Alpha", variable=self.bay_params["Alpha"], onvalue=True, offvalue=False)
+            self.bay_alpha_check.grid(row=5,column=5, padx=(0,26))
+
+            self.bay_delta_check = tk.Checkbutton(self.bay_popup, text="Delta", variable=self.bay_params["Delta"], onvalue=True, offvalue=False)
+            self.bay_delta_check.grid(row=6,column=5, padx=(0,30))
+
+            self.bay_fm_check = tk.Checkbutton(self.bay_popup, text="Frac-Emitted", variable=self.bay_params["Frac-Emitted"], onvalue=True, offvalue=False)
+            self.bay_fm_check.grid(row=7,column=5, padx=(10,0))
+
+            self.bay_continue_button = tk.Button(self.bay_popup, text="Continue", command=partial(self.on_bayesim_popup_close, continue_=True))
+            self.bay_continue_button.grid(row=20,column=3)
+
+            self.bay_popup.protocol("WM_DELETE_WINDOW", partial(self.on_bayesim_popup_close, continue_=False))
+            self.bay_popup.grab_set()
+            self.bayesim_popup_isopen = True
+            return
+
+        else:
+            print("Error #600: Opened more than one Bayesim popup at a time")
+
+        return
+
+    def on_bayesim_popup_close(self, continue_=False):
+        try:
+            if continue_:
+                print("Mode: {}".format(self.bay_mode.get()))
+                for key in self.bay_params:
+                    print("{}: {}".format(key, self.bay_params[key].get()))
+
+                self.export_for_bayesim()
+
+            self.bay_popup.destroy()
+            print("Bayesim popup closed")
+            self.bayesim_popup_isopen = False
+
+        except:
+            print("Error #601: Failed to close Bayesim popup")
         return
     ## Data File Readers for simulation and analysis tabs
 
@@ -1993,6 +2172,7 @@ class Notebook:
             #    self.update_data_plots(int(self.n * i / self.numPartitions), self.numPartitions > 20)
                 #self.update_err_plots()
 
+            # TODO: Why don't we just pass in the whole dictionary and let ode_nanowire extract the values?
             if self.check_ignore_recycle.get():
                 error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
                                                  temp_sim_dict["Mu_N"], temp_sim_dict["Mu_P"], temp_sim_dict["Temperature"], temp_sim_dict["N0"], temp_sim_dict["P0"], 
@@ -2068,6 +2248,7 @@ class Notebook:
         active_plot = self.analysis_plots[plot_ID]
         if active_plot.datagroup.datasets.__len__() == 0: return
 
+        # Collect instructions from user using a series of popup windows
         self.do_integration_popup()
         self.root.wait_window(self.integration_popup) # Pause here until popup is closed
         if self.PL_mode == "":
@@ -2087,18 +2268,26 @@ class Notebook:
                 self.write(self.analysis_status, "Integration cancelled")
                 return
             print("Selected param {}".format(self.xaxis_param))
+            self.I_plot.x_param = self.xaxis_param
+
+        else:
+            self.I_plot.x_param = "Time"
             
-        # Select which data group to calculate PL for
-        
+        # Clean up the I_plot and prepare to integrate given selections
+        # A lot of the following is a data transfer between the sending active_datagroup and the receiving I_plot
+        self.I_plot.clear()
+        self.I_plot.mode = self.PL_mode
+        self.I_plot.global_gridx = None
+
         active_datagroup = active_plot.datagroup
         n = active_datagroup.get_maxnumtsteps()
-        self.PL = np.zeros((active_datagroup.size(), int(n)+1))
-        self.legend_labels = []
         counter = 0
         # Integrate for EACH dataset in chosen datagroup
         for tag in active_datagroup.datasets:
-            
             data_filename = active_datagroup.datasets[tag].filename
+            print("Now integrating {}".format(data_filename))
+
+            # Unpack needed params from the dictionaries of params
             dx = active_datagroup.datasets[tag].params_dict["dx"]
             total_length = active_datagroup.datasets[tag].params_dict["Thickness"]
             total_time = active_datagroup.datasets[tag].params_dict["Total-Time"]
@@ -2111,6 +2300,7 @@ class Notebook:
             theta = active_datagroup.datasets[tag].params_dict["Theta"]
             delta = active_datagroup.datasets[tag].params_dict["Delta"]
             frac_emitted = active_datagroup.datasets[tag].params_dict["Frac-Emitted"]
+
             if self.PL_mode == "Current Time Step":
                 show_index = active_datagroup.datasets[tag].show_index
                
@@ -2135,17 +2325,17 @@ class Notebook:
             if (active_datagroup.datasets[tag].type == "ΔN"):
                 with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
                     data = ifstream_N.root.N
-                    self.PL[counter] = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
             
             elif (active_datagroup.datasets[tag].type == "ΔP"):
                 with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                     data = ifstream_P.root.P
-                    self.PL[counter] = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
 
             elif (active_datagroup.datasets[tag].type == "E-field"):
                 with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
                     data = ifstream_E_field.root.E_field
-                    self.PL[counter] = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
 
             elif (active_datagroup.datasets[tag].type == "RR"):
                 with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
@@ -2154,7 +2344,7 @@ class Notebook:
                     temp_P = np.array(ifstream_P.root.P)
 
                     data = B_param * (temp_N + n0) * (temp_P + p0) - n0 * p0
-                    self.PL[counter] = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
 
             elif (active_datagroup.datasets[tag].type == "NRR"):
                 with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
@@ -2162,44 +2352,51 @@ class Notebook:
                     temp_N = np.array(ifstream_N.root.N)
                     temp_P = np.array(ifstream_P.root.P)
                     data = ((temp_N + n0) * (temp_P + p0) - n0 * p0) / (tauN * (temp_P + p0) + tauP * (temp_N + n0))
-                    self.PL[counter] = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
 
-            # TODO: Replace finite.propagatingPL with finite.integrate, as integrate should be compatible with PL data
             else:
-                self.PL[counter] = finite.propagatingPL(data_filename, self.integration_lbound, self.integration_ubound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted)
+                I_data = finite.propagatingPL(data_filename, self.integration_lbound, self.integration_ubound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted)
             
-            
-            self.legend_labels.append(data_filename)
+
+            if self.PL_mode == "Current Time Step":
+                # FIXME: We don't need to integrate everything just to extract a single time step
+                # Change the integration procedure above to work only with the needed data
+                I_data = I_data[show_index]
+
+                # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
+                grid_xaxis = float(active_datagroup.datasets[tag].params_dict[self.xaxis_param] * self.convert_out_dict[self.xaxis_param])
+
+                xaxis_label = self.xaxis_param + " [WIP]"
+
+            elif self.PL_mode == "Over Time":
+                self.I_plot.global_gridx = np.linspace(0, total_time, n + 1)
+                grid_xaxis = -1 # A dummy value for the I_Set constructor
+                xaxis_label = "Time [ns]"
+
+            self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename))
+
             counter += 1
             self.write(self.analysis_status, "Integration: {} of {} complete".format(counter, active_datagroup.size()))
 
-        if self.PL_mode == "Current Time Step":
-            data = self.PL[:,show_index]
-
-            # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
-            self.grid_xaxis = np.array([float(active_datagroup.datasets[tag].params_dict[self.xaxis_param] * self.convert_out_dict[self.xaxis_param]) for tag in active_datagroup.datasets])
-            
-            xaxis_label = self.xaxis_param + " [WIP]"
-        elif self.PL_mode == "Over Time":
-            data = self.PL
-            self.grid_xaxis = np.linspace(0, total_time, n + 1)
-            xaxis_label = "Time [ns]"
             
         plot.figure(9)
         plot.clf()
         plot.yscale('log')
-        plot.ylim(np.amax(data) * 1e-12, np.amax(data) * 10)
+        max = self.I_plot.get_maxval()
+        plot.ylim(max * 1e-12, max * 10)
         plot.xlabel(xaxis_label)
-        plot.ylabel(active_datagroup.type)
-        plot.title("Total {} from {} nm to {} nm".format(active_datagroup.type, self.integration_lbound, self.integration_ubound))
-        if self.PL_mode == "Current Time Step":
-            if (np.amax(self.grid_xaxis) / np.amin(self.grid_xaxis) > 10): plot.xscale('log')
-            else: plot.xscale('linear')
-            plot.scatter(self.grid_xaxis, data)
-        elif self.PL_mode == "Over Time":
-            for i in range(self.PL.__len__()):
-                plot.plot(self.grid_xaxis, data[i], label=self.legend_labels[i])
-            plot.legend()
+        plot.ylabel(self.I_plot.type)
+        plot.title("Total {} from {} nm to {} nm".format(self.I_plot.type, self.integration_lbound, self.integration_ubound))
+
+        for key in self.I_plot.I_sets:
+
+            if self.PL_mode == "Current Time Step":
+                plot.scatter(self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
+
+            elif self.PL_mode == "Over Time":
+                plot.plot(self.I_plot.global_gridx, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
+                
+        plot.legend()
         plot.tight_layout()
         self.main_fig3.canvas.draw()
         
@@ -2211,24 +2408,30 @@ class Notebook:
 
     def reset_IC(self):
         # Clears and uninitializes all fields and saved data on IC tab
-        
-        for key in self.sys_param_entryboxes_dict:
-            self.enter(self.sys_param_entryboxes_dict[key], "")
+        cleared_items = ""
+        if self.check_reset_params.get():
+            for key in self.sys_param_entryboxes_dict:
+                self.enter(self.sys_param_entryboxes_dict[key], "")
 
-        self.thickness = None
-        self.dx = None
-        self.init_N = None
-        self.init_P = None
-        self.init_Ec = None
-        self.init_Chi = None
-        self.IC_grid_is_set = False
-        plot.figure(1)
-        plot.clf()
-        self.init_canvas_NP.draw()
-        plot.figure(2)
-        plot.clf()
-        self.init_fig_ec.canvas.draw()
-        self.write(self.ICtab_status, "All parameters and IC arrays cleared")
+            cleared_items += " Params,"
+
+        if self.check_reset_inits.get():
+            self.thickness = None
+            self.dx = None
+            self.init_N = None
+            self.init_P = None
+            self.init_Ec = None
+            self.init_Chi = None
+            self.IC_grid_is_set = False
+            plot.figure(1)
+            plot.clf()
+            self.init_canvas_NP.draw()
+            plot.figure(2)
+            plot.clf()
+            self.init_fig_ec.canvas.draw()
+            cleared_items += " Inits"
+
+        self.write(self.ICtab_status, "Cleared:{}".format(cleared_items))
         return
 
     def check_IC_initialized(self):
@@ -2482,7 +2685,7 @@ class Notebook:
         return
 
 	# Repositions HICs in their list
-	# HICs are applied sequentially, so this CAN affect what the initial condition looks like
+	# HICs are applied sequentially and do overwrite each other, so this CAN affect what the initial condition looks like
     def moveup_HIC(self):
         currentSelectionIndex = self.HIC_listbox.curselection()[0]
         
@@ -2903,9 +3106,21 @@ class Notebook:
     def export_plot(self, plot_ID):
 
         if plot_ID == -1:
-            if self.PL is None: return
-            paired_data = np.vstack((self.grid_xaxis, self.PL)).transpose()
-            header = "t,".join([label + "," for label in self.legend_labels])
+            if self.I_plot.size() == 0: return
+            if self.I_plot.mode == "Current Time Step": 
+                paired_data = [[self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data] for key in self.I_plot.I_sets]
+
+                # TODO: Write both of these values with their units
+                header = "{}, {}".format(self.I_plot.x_param, self.I_plot.type)
+
+            else: # if self.I_plot.mode == "Over Time"
+                raw_data = np.array([self.I_plot.I_sets[key].I_data for key in self.I_plot.I_sets])
+                grid_x = np.reshape(self.I_plot.global_gridx, (1,self.I_plot.global_gridx.__len__()))
+                paired_data = np.concatenate((grid_x, raw_data), axis=0).T
+                header = "Time [ns],"
+                for key in self.I_plot.I_sets:
+                    header += self.I_plot.I_sets[key].tag().replace("Δ", "") + ","
+
         else:
             if self.analysis_plots[plot_ID].datagroup.size() == 0: return
             paired_data = self.analysis_plots[plot_ID].datagroup.build()
@@ -2926,6 +3141,67 @@ class Notebook:
             except PermissionError:
                 self.write(self.analysis_status, "Error: unable to access PL export destination")
         
+        return
+
+    def export_for_bayesim(self):
+        if self.I_plot.size() == 0: return
+            
+        if (self.I_plot.mode == "Over Time"):
+            if self.bay_mode.get() == "obs":
+                for key in self.I_plot.I_sets:  # For each curve on the integration plot
+                    raw_data = self.I_plot.I_sets[key].I_data
+                    grid_x = self.I_plot.global_gridx   # grid_x refers to what is on the x-axis, which in this case is technically 'time'
+                    unc = raw_data * 0.1
+                    full_data = np.vstack((grid_x, raw_data, unc)).T
+                    full_data = pd.DataFrame.from_records(data=full_data,columns=['time', self.I_plot.type, 'uncertainty'])
+                    
+                    #FIXME: dd.save has no visible file overwrite handler
+                    # If the file name already exists, dd.save will simply not save anything
+                    dd.save("{}//{}.h5".format(self.default_dirs["PL"], self.I_plot.I_sets[key].tag()), full_data)
+
+            elif self.bay_mode.get() == "model":
+                active_bay_params = []
+                for key in self.bay_params:
+                    if self.bay_params[key].get(): active_bay_params.append(key)
+
+                is_first = True
+                for key in self.I_plot.I_sets:
+                    raw_data = self.I_plot.I_sets[key].I_data
+                    grid_x = self.I_plot.global_gridx
+                    paired_data = np.vstack((grid_x, raw_data))
+
+                    for param in active_bay_params:
+                        param_column = np.ones((1,raw_data.__len__())) * self.I_plot.I_sets[key].params_dict[param] * self.convert_out_dict[param]
+                        paired_data = np.concatenate((param_column, paired_data), axis=0)
+
+                    paired_data = paired_data.T
+
+                    if is_first:
+                        full_data = paired_data
+                        is_first = False
+
+                    else:
+                        full_data = np.concatenate((full_data, paired_data), axis=0)
+
+                panda_columns = []
+                for param in active_bay_params:
+                    panda_columns.insert(0,param)
+
+                panda_columns.append('time')
+                panda_columns.append(self.I_plot.type)
+
+                full_data = pd.DataFrame.from_records(data=full_data, columns=panda_columns)
+                
+                new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
+                if new_filename == "": return
+
+                if not new_filename.endswith(".h5"): new_filename += ".h5"
+
+                dd.save(new_filename, full_data)
+        else:
+            print("WIP =(")
+
+        self.write(self.analysis_status, "Bayesim export complete")
         return
 
 nb = Notebook("ted")
