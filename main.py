@@ -13,6 +13,7 @@ import matplotlib.pylab as plot
 import matplotlib.backends.backend_tkagg as tkagg
 from scipy import integrate as intg
 
+import tkinter.filedialog
 import tkinter as tk
 from tkinter import ttk # ttk is a sort of expansion pack to Tkinter, featuring additional elements and features.
 import time
