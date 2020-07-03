@@ -229,7 +229,7 @@ class I_Group:
         return
 
 def extract_values(string, delimiter):
-    # Converts a string with deliimiters into a list of values
+    # Converts a string with deliimiters into a list of float values
 	# E.g. "100,200,300" with "," delimiter becomes [100,200,300]
     values = []
     substring = string
@@ -250,6 +250,13 @@ def check_valid_filename(file_name):
         return False
 
     return True
+
+def tips(string, new_length):
+    if string.__len__() > new_length * 2:
+        return string[:new_length] + "..." + string[-new_length:]
+
+    else:
+        return string
 
 class Notebook:
 	# This is somewhat Java-like: everything about the GUI exists inside a class
@@ -329,6 +336,7 @@ class Notebook:
         self.I_plot = I_Group()
         self.data_var = tk.StringVar()
         self.fetch_PLmode = tk.StringVar()
+        self.fetch_intg_mode = tk.StringVar()
         self.yaxis_type = tk.StringVar()
         self.xaxis_type = tk.StringVar()
 
@@ -980,7 +988,7 @@ class Notebook:
         except:
             print("Error #103: Failed to close batch popup.")
 
-        return
+        returnOver
 
     def do_plotter_popup(self, plot_ID):
         if not self.plotter_popup_isopen:
@@ -1043,16 +1051,16 @@ class Notebook:
         if not self.integration_popup_isopen:
             self.integration_popup = tk.Toplevel(self.root)
 
-            self.integration_title_label = tk.ttk.Label(self.integration_popup, text="Select an integration mode", style="Header.TLabel")
+            self.integration_title_label = tk.ttk.Label(self.integration_popup, text="Select which time steps to integrate over", style="Header.TLabel")
             self.integration_title_label.grid(row=1,column=0,columnspan=3)
 
-            self.overtime = tk.ttk.Radiobutton(self.integration_popup, variable=self.fetch_PLmode, value='Over Time')
+            self.overtime = tk.ttk.Radiobutton(self.integration_popup, variable=self.fetch_PLmode, value='All time steps')
             self.overtime.grid(row=2,column=0)
 
-            self.overtime_label = tk.Label(self.integration_popup, text="Over Time")
+            self.overtime_label = tk.Label(self.integration_popup, text="All time steps")
             self.overtime_label.grid(row=2,column=1)
 
-            self.currentTS = tk.ttk.Radiobutton(self.integration_popup, variable=self.fetch_PLmode, value='Current Time Step')
+            self.currentTS = tk.ttk.Radiobutton(self.integration_popup, variable=self.fetch_PLmode, value='Current time step')
             self.currentTS.grid(row=3,column=0)
 
             self.currentTS_label = tk.Label(self.integration_popup, text="Current Time Step")
@@ -1092,26 +1100,56 @@ class Notebook:
 
             self.integration_getbounds_popup = tk.Toplevel(self.root)
 
-            self.integration_getbounds_title_label = tk.ttk.Label(self.integration_getbounds_popup, text="Enter bounds of integration [nm]", style="Header.TLabel")
-            self.integration_getbounds_title_label.grid(row=0,column=0,columnspan=3)
+            self.single_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, variable=self.fetch_intg_mode, value='single')
+            self.single_intg.grid(row=0,column=0, rowspan=3)
+
+            self.single_intg_label = tk.ttk.Label(self.integration_getbounds_popup, text="Single integral", style="Header.TLabel")
+            self.single_intg_label.grid(row=0,column=1, rowspan=3, padx=(0,20))
+
+            self.integration_getbounds_title_label = tk.ttk.Label(self.integration_getbounds_popup, text="Enter bounds of integration [nm]")
+            self.integration_getbounds_title_label.grid(row=0,column=2,columnspan=4)
 
             self.lower = tk.Label(self.integration_getbounds_popup, text="Lower bound: x=")
-            self.lower.grid(row=1,column=0)
+            self.lower.grid(row=1,column=2)
 
             self.integration_lbound_entry = tk.Entry(self.integration_getbounds_popup, width=9)
-            self.integration_lbound_entry.grid(row=2,column=0)
+            self.integration_lbound_entry.grid(row=2,column=2)
 
             self.upper = tk.Label(self.integration_getbounds_popup, text="Upper bound: x=")
-            self.upper.grid(row=1,column=2)
+            self.upper.grid(row=1,column=5)
 
             self.integration_ubound_entry = tk.Entry(self.integration_getbounds_popup, width=9)
-            self.integration_ubound_entry.grid(row=2,column=2)
+            self.integration_ubound_entry.grid(row=2,column=5)
+
+            self.hline1_separator = tk.ttk.Separator(self.integration_getbounds_popup, orient="horizontal", style="Grey Bar.TSeparator")
+            self.hline1_separator.grid(row=3,column=0,columnspan=30, pady=(10,10), sticky="ew")
+
+            self.multi_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, variable=self.fetch_intg_mode, value='multiple')
+            self.multi_intg.grid(row=4,column=0, rowspan=3)
+
+            self.multi_intg_label = tk.ttk.Label(self.integration_getbounds_popup, text="Multiple integrals", style="Header.TLabel")
+            self.multi_intg_label.grid(row=4,column=1, rowspan=3, padx=(0,20))
+
+            self.integration_center_label = tk.Label(self.integration_getbounds_popup, text="Centers [nm]: ")
+            self.integration_center_label.grid(row=5,column=2)
+
+            self.integration_center_entry = tk.Entry(self.integration_getbounds_popup, width=30)
+            self.integration_center_entry.grid(row=5,column=3,columnspan=3)
+
+            self.integration_width_label = tk.Label(self.integration_getbounds_popup, text="Width [nm]: +/- ")
+            self.integration_width_label.grid(row=6,column=2)
+
+            self.integration_width_entry = tk.Entry(self.integration_getbounds_popup, width=9)
+            self.integration_width_entry.grid(row=6,column=3)
+
+            self.hline2_separator = tk.ttk.Separator(self.integration_getbounds_popup, orient="horizontal", style="Grey Bar.TSeparator")
+            self.hline2_separator.grid(row=7,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
             self.integration_getbounds_continue_button = tk.Button(self.integration_getbounds_popup, text="Continue", command=partial(self.on_integration_getbounds_popup_close, continue_=True))
-            self.integration_getbounds_continue_button.grid(row=3,column=1)
+            self.integration_getbounds_continue_button.grid(row=8,column=5)
 
             self.integration_getbounds_status = tk.Text(self.integration_getbounds_popup, width=24,height=2)
-            self.integration_getbounds_status.grid(row=4,rowspan=2,column=0,columnspan=3)
+            self.integration_getbounds_status.grid(row=8,rowspan=2,column=0,columnspan=5)
             self.integration_getbounds_status.configure(state="disabled")
 
             self.integration_getbounds_popup.protocol("WM_DELETE_WINDOW", partial(self.on_integration_getbounds_popup_close, continue_=False))
@@ -1122,21 +1160,53 @@ class Notebook:
         return
 
     def on_integration_getbounds_popup_close(self, continue_=False):
+        # Read in the pairs of integration bounds as-is
+        # Checking if they make sense is do_Integrate()'s job
         try:
             if continue_:
-                self.integration_lbound = float(self.integration_lbound_entry.get())
-                self.integration_ubound = float(self.integration_ubound_entry.get())
-                if (self.integration_lbound > self.integration_ubound):
-                    raise ValueError
+                self.integration_bounds = []
+                if self.fetch_intg_mode.get() == "single":
+                    print("Single integral")
+                    lbound = float(self.integration_lbound_entry.get())
+                    ubound = float(self.integration_ubound_entry.get())
+                    if (lbound > ubound):
+                        raise KeyError("Error: upper bound too small")
+
+                    self.integration_bounds.append([lbound, ubound])
+                    
+
+                elif self.fetch_intg_mode.get() == "multiple":
+                    print("Multiple integrals")
+                    if self.integration_center_entry.get() == "Aboma":
+                        centers = [0,2200,3400,5200,6400,7200,8600,10000]
+
+                    else:
+                        centers = list(set(extract_values(self.integration_center_entry.get(), ' ')))
+
+                    width = float(self.integration_width_entry.get())
+
+                    if width < 0: raise KeyError("Error: width must be non-negative")
+
+                    for center in centers:
+                        self.integration_bounds.append([center - width, center + width])
+
+                else:
+                    raise KeyError("Select \"Single\" or \"Multiple\"")
+
+                print("Over: {}".format(self.integration_bounds))
+
+            else:
+                self.write(self.analysis_status, "Integration cancelled")
 
             self.integration_getbounds_popup.destroy()
             print("PL getbounds popup closed")
             self.integration_getbounds_popup_isopen = False
 
-        except ValueError:
-            self.write(self.integration_getbounds_status, "Error: Invalid bounds")
-        except OSError as uh_oh:
+        except (OSError, KeyError) as uh_oh:
             self.write(self.integration_getbounds_status, uh_oh)
+
+        except:
+            self.write(self.integration_getbounds_status, "Error: missing or invalid paramters")
 
         return
 
@@ -2217,24 +2287,6 @@ class Notebook:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
             for param in temp_sim_dict:
                 ofstream.write("{}: {}\n".format(param, (temp_sim_dict[param] * self.convert_out_dict[param])))
-            #ofstream.write("Mu_N: " + str(self.mu_N * ((1e-7) ** 2) / (1e-9)) + "\n")
-            #ofstream.write("Mu_P: " + str(self.mu_P * ((1e-7) ** 2) / (1e-9)) + "\n")
-            #ofstream.write("N0: " + str(self.n0 * ((1e7) ** 3)) + "\n")
-            #ofstream.write("P0: " + str(self.p0 * ((1e7) ** 3)) + "\n")
-            #ofstream.write("Thickness: " + str(self.thickness) + "\n")
-            #ofstream.write("dx: " + str(self.dx) + "\n")
-            #ofstream.write("B: " + str(self.B_param * ((1e-7) ** 3) / (1e-9)) + "\n")
-            #ofstream.write("Tau_N: " + str(self.tauNeg) + "\n")
-            #ofstream.write("Tau_P: " + str(self.tauPos) + "\n")
-            #ofstream.write("Sf: " + str(self.sf * (1e-7) / (1e-9)) + "\n")
-            #ofstream.write("Sb: " + str(self.sb * (1e-7) / (1e-9)) + "\n")
-            #ofstream.write("Temperature: " + str(self.temperature) + "\n")
-            #ofstream.write("Rel-Permitivity: " + str(self.rel_permitivity) + "\n")
-            #ofstream.write("Ext_E-Field: " + str(self.ext_E_field * 1e3) + "\n")
-            #ofstream.write("Theta: " + str(self.thetaCof * 1e7) + "\n")
-            #ofstream.write("Alpha: " + str(self.alphaCof * 1e7) + "\n")
-            #ofstream.write("Delta: " + str(self.delta_frac) + "\n")
-            #ofstream.write("Frac-Emitted: " + str(self.fracEmitted) + "\n")
 
             # The following params are exclusive to metadata files
             ofstream.write("Total-Time: " + str(self.simtime) + "\n")
@@ -2258,9 +2310,6 @@ class Notebook:
 
         self.do_integration_getbounds_popup()
         self.root.wait_window(self.integration_getbounds_popup)
-        if self.integration_lbound == "":
-            self.write(self.analysis_status, "Integration cancelled")
-            return
 
         if self.PL_mode == "Current Time Step":
             self.do_PL_xaxis_popup()
@@ -2304,12 +2353,18 @@ class Notebook:
 
             if self.PL_mode == "Current Time Step":
                 show_index = active_datagroup.datasets[tag].show_index
-               
-            if (self.integration_ubound > total_length):
-                self.integration_ubound = total_length
 
-            if (self.integration_lbound < 0):
-                self.integration_lbound = 0
+            # Clean up any bounds that extend past the confines of the system
+
+            for bounds in self.integration_bounds:
+               
+                if (bounds[1] > total_length):
+                    bounds[1] = total_length
+
+                if (bounds[0] < 0):
+                    bounds[0] = 0
+
+            print("Bounds after cleanup: {}".format(self.integration_bounds))
 
             #if (self.integration_lbound_entry.get() == "f"):
             #    self.PL = np.zeros((boundList.__len__(), int(n) + 1))
@@ -2322,62 +2377,62 @@ class Notebook:
             #        self.PL[i] = finite.propagatingPL(data_filename, boundList[i] - 500, boundList[i] + 500, dx, 0, total_length - dx, B_param, n0, p0, alpha, theta, delta, frac_emitted)
             #        if boundList[i] == 0:
             #            self.PL[i] *= 2
-
-            if (active_datagroup.datasets[tag].type == "ΔN"):
-                with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
-                    data = ifstream_N.root.N
-                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+            for bounds in self.integration_bounds:
+                if (active_datagroup.datasets[tag].type == "ΔN"):
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
+                        data = ifstream_N.root.N
+                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
             
-            elif (active_datagroup.datasets[tag].type == "ΔP"):
-                with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                    data = ifstream_P.root.P
-                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+                elif (active_datagroup.datasets[tag].type == "ΔP"):
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
+                        data = ifstream_P.root.P
+                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
 
-            elif (active_datagroup.datasets[tag].type == "E-field"):
-                with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
-                    data = ifstream_E_field.root.E_field
-                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+                elif (active_datagroup.datasets[tag].type == "E-field"):
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
+                        data = ifstream_E_field.root.E_field
+                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
 
-            elif (active_datagroup.datasets[tag].type == "RR"):
-                with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
-                    tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                    temp_N = np.array(ifstream_N.root.N)
-                    temp_P = np.array(ifstream_P.root.P)
+                elif (active_datagroup.datasets[tag].type == "RR"):
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
+                        tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
+                        temp_N = np.array(ifstream_N.root.N)
+                        temp_P = np.array(ifstream_P.root.P)
 
-                    data = B_param * (temp_N + n0) * (temp_P + p0) - n0 * p0
-                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+                        data = B_param * (temp_N + n0) * (temp_P + p0) - n0 * p0
+                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
 
-            elif (active_datagroup.datasets[tag].type == "NRR"):
-                with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
-                    tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                    temp_N = np.array(ifstream_N.root.N)
-                    temp_P = np.array(ifstream_P.root.P)
-                    data = ((temp_N + n0) * (temp_P + p0) - n0 * p0) / (tauN * (temp_P + p0) + tauP * (temp_N + n0))
-                    I_data = finite.integrate(data, self.integration_lbound, self.integration_ubound, dx, total_length)
+                elif (active_datagroup.datasets[tag].type == "NRR"):
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
+                        tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
+                        temp_N = np.array(ifstream_N.root.N)
+                        temp_P = np.array(ifstream_P.root.P)
+                        data = ((temp_N + n0) * (temp_P + p0) - n0 * p0) / (tauN * (temp_P + p0) + tauP * (temp_N + n0))
+                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
 
-            else:
-                I_data = finite.propagatingPL(data_filename, self.integration_lbound, self.integration_ubound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted)
+                else:
+                    I_data = finite.propagatingPL(data_filename, bounds[0], bounds[1], dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted)
             
 
-            if self.PL_mode == "Current Time Step":
-                # FIXME: We don't need to integrate everything just to extract a single time step
-                # Change the integration procedure above to work only with the needed data
-                I_data = I_data[show_index]
+                if self.PL_mode == "Current Time Step":
+                    # FIXME: We don't need to integrate everything just to extract a single time step
+                    # Change the integration procedure above to work only with the needed data
+                    I_data = I_data[show_index]
 
-                # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
-                grid_xaxis = float(active_datagroup.datasets[tag].params_dict[self.xaxis_param] * self.convert_out_dict[self.xaxis_param])
+                    # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
+                    grid_xaxis = float(active_datagroup.datasets[tag].params_dict[self.xaxis_param] * self.convert_out_dict[self.xaxis_param])
 
-                xaxis_label = self.xaxis_param + " [WIP]"
+                    xaxis_label = self.xaxis_param + " [WIP]"
 
-            elif self.PL_mode == "Over Time":
-                self.I_plot.global_gridx = np.linspace(0, total_time, n + 1)
-                grid_xaxis = -1 # A dummy value for the I_Set constructor
-                xaxis_label = "Time [ns]"
+                elif self.PL_mode == "All time steps":
+                    self.I_plot.global_gridx = np.linspace(0, total_time, n + 1)
+                    grid_xaxis = -1 # A dummy value for the I_Set constructor
+                    xaxis_label = "Time [ns]"
 
-            self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename))
+                self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(bounds[0]) + "_to_" + str(bounds[1])))
 
-            counter += 1
-            self.write(self.analysis_status, "Integration: {} of {} complete".format(counter, active_datagroup.size()))
+                counter += 1
+                self.write(self.analysis_status, "Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
 
             
         plot.figure(9)
@@ -2394,7 +2449,7 @@ class Notebook:
             if self.PL_mode == "Current Time Step":
                 plot.scatter(self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
 
-            elif self.PL_mode == "Over Time":
+            elif self.PL_mode == "All time steps":
                 plot.plot(self.I_plot.global_gridx, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
                 
         plot.legend()
@@ -3114,7 +3169,7 @@ class Notebook:
                 # TODO: Write both of these values with their units
                 header = "{}, {}".format(self.I_plot.x_param, self.I_plot.type)
 
-            else: # if self.I_plot.mode == "Over Time"
+            else: # if self.I_plot.mode == "All time steps"
                 raw_data = np.array([self.I_plot.I_sets[key].I_data for key in self.I_plot.I_sets])
                 grid_x = np.reshape(self.I_plot.global_gridx, (1,self.I_plot.global_gridx.__len__()))
                 paired_data = np.concatenate((grid_x, raw_data), axis=0).T
@@ -3147,7 +3202,7 @@ class Notebook:
     def export_for_bayesim(self):
         if self.I_plot.size() == 0: return
             
-        if (self.I_plot.mode == "Over Time"):
+        if (self.I_plot.mode == "All time steps"):
             if self.bay_mode.get() == "obs":
                 for key in self.I_plot.I_sets:  # For each curve on the integration plot
                     raw_data = self.I_plot.I_sets[key].I_data
