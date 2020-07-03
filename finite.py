@@ -177,7 +177,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
 
     i = toIndex(l_bound, dx, max)
     j = toIndex(u_bound, dx, max)
-    if l_bound == u_bound: j += 1
+    #if l_bound == u_bound: j += 1
     m = int(max / dx)
 
     # i and j here illustrate a problem - we would love to integrate from "l_bound" to "u_bound" exactly, but we only have a discrete list of values with spacing dx.
@@ -192,7 +192,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
 
     # We may need an extra node if the u_bound bound extends beyond the radius of the highest node - in the above example, we can calculate the portion from x = 50 to x = 60 using PL[j = 2], 
     # but we would need the node at x = 70 to calculate the portion from x = 60 to x = 65 (using PL[3]).
-    need_extra_node = u_bound > toCoord(j, dx) + dx / 2
+    need_extra_node = u_bound > toCoord(j, dx) + dx / 2 or l_bound == u_bound
 
     distance = np.linspace(0, max - dx, m)
 
@@ -245,7 +245,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
         PL_base = fracEmitted * radRec[:,i] + intg.trapz(combined_weight[0] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * radRec[:,i] + \
             intg.trapz(combined_weight2[0] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * radRec[:,i]
 
-        if l_bound >= toCoord(i, dx) + dx / 2:
+        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == max:
             PL_plusOne = fracEmitted * radRec[:,i+1] + intg.trapz(combined_weight[1] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * radRec[:,i+1] + \
                 intg.trapz(combined_weight2[1] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * radRec[:,i+1]
         
