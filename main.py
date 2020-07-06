@@ -202,6 +202,10 @@ class I_Group:
         self.mode = ""
         self.x_param = "None"   # This is usually "Time"
         self.global_gridx = None    # In some modes of operation every I_Set will have the same grid_x
+        self.xaxis_type = 'linear'
+        self.yaxis_type = 'log'
+        self.xlim = (-1,-1)
+        self.ylim = (-1,-1)
         return
 
     def set_type(self, new_type):
@@ -988,7 +992,7 @@ class Notebook:
         except:
             print("Error #103: Failed to close batch popup.")
 
-        returnOver
+        return
 
     def do_plotter_popup(self, plot_ID):
         if not self.plotter_popup_isopen:
@@ -1063,7 +1067,7 @@ class Notebook:
             self.currentTS = tk.ttk.Radiobutton(self.integration_popup, variable=self.fetch_PLmode, value='Current time step')
             self.currentTS.grid(row=3,column=0)
 
-            self.currentTS_label = tk.Label(self.integration_popup, text="Current Time Step")
+            self.currentTS_label = tk.Label(self.integration_popup, text="Current time step")
             self.currentTS_label.grid(row=3,column=1)
 
             self.integration_continue_button =  tk.Button(self.integration_popup, text="Continue", command=partial(self.on_integration_popup_close, continue_=True))
@@ -1130,7 +1134,7 @@ class Notebook:
             self.multi_intg_label = tk.ttk.Label(self.integration_getbounds_popup, text="Multiple integrals", style="Header.TLabel")
             self.multi_intg_label.grid(row=4,column=1, rowspan=3, padx=(0,20))
 
-            self.integration_center_label = tk.Label(self.integration_getbounds_popup, text="Centers [nm]: ")
+            self.integration_center_label = tk.Label(self.integration_getbounds_popup, text="Enter space-separated e.g. (100 200 300...) Centers [nm]: ")
             self.integration_center_label.grid(row=5,column=2)
 
             self.integration_center_entry = tk.Entry(self.integration_getbounds_popup, width=30)
@@ -1339,6 +1343,16 @@ class Notebook:
                 self.enter(self.xubound, self.analysis_plots[plot_ID].xlim[1])
                 self.enter(self.ylbound, self.analysis_plots[plot_ID].ylim[0])
                 self.enter(self.yubound, self.analysis_plots[plot_ID].ylim[1])
+                self.xaxis_type.set(self.analysis_plots[plot_ID].xaxis_type)
+                self.yaxis_type.set(self.analysis_plots[plot_ID].yaxis_type)
+
+            else:
+                self.enter(self.xlbound, self.I_plot.xlim[0])
+                self.enter(self.xubound, self.I_plot.xlim[1])
+                self.enter(self.ylbound, self.I_plot.ylim[0])
+                self.enter(self.yubound, self.I_plot.ylim[1])
+                self.xaxis_type.set(self.I_plot.xaxis_type)
+                self.yaxis_type.set(self.I_plot.yaxis_type)
 
             self.change_axis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_change_axis_popup_close, plot_ID, continue_=False))
             self.change_axis_popup.grab_set()
@@ -1385,6 +1399,9 @@ class Notebook:
                 if not (plot_ID == -1):
                     self.analysis_plots[plot_ID].ylim = (bounds[2], bounds[3])
                     self.analysis_plots[plot_ID].xlim = (bounds[0], bounds[1])
+                else:
+                    self.I_plot.ylim = (bounds[2], bounds[3])
+                    self.I_plot.xlim = (bounds[0], bounds[1])
 
                 if plot_ID == -1:
                     self.main_fig3.canvas.draw()
@@ -1915,6 +1932,7 @@ class Notebook:
         active_plot.xlim = (0, active_plot.datagroup.get_max_x())
         active_plot.ylim = (active_plot.datagroup.get_maxval() * 1e-11, active_plot.datagroup.get_maxval() * 10)
         active_plot.xaxis_type = 'linear'
+        active_plot.yaxis_type = 'log'
         self.data_plot(plot_ID, clear_plot=True)
         return
 
@@ -2016,6 +2034,7 @@ class Notebook:
                         intg.trapz(combined_weight2[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * rad_rec[p]
 
                 active_datagroup.datasets[tag].data = PL_base
+                active_datagroup.datasets[tag].show_index = active_show_index
 
         else:
             self.write(self.analysis_status, "Error #107: Data group has an invalid datatype")
@@ -2311,7 +2330,7 @@ class Notebook:
         self.do_integration_getbounds_popup()
         self.root.wait_window(self.integration_getbounds_popup)
 
-        if self.PL_mode == "Current Time Step":
+        if self.PL_mode == "Current time step":
             self.do_PL_xaxis_popup()
             self.root.wait_window(self.PL_xaxis_popup)
             if self.xaxis_param == "":
@@ -2351,7 +2370,7 @@ class Notebook:
             delta = active_datagroup.datasets[tag].params_dict["Delta"]
             frac_emitted = active_datagroup.datasets[tag].params_dict["Frac-Emitted"]
 
-            if self.PL_mode == "Current Time Step":
+            if self.PL_mode == "Current time step":
                 show_index = active_datagroup.datasets[tag].show_index
 
             # Clean up any bounds that extend past the confines of the system
@@ -2414,7 +2433,7 @@ class Notebook:
                     I_data = finite.propagatingPL(data_filename, bounds[0], bounds[1], dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted)
             
 
-                if self.PL_mode == "Current Time Step":
+                if self.PL_mode == "Current time step":
                     # FIXME: We don't need to integrate everything just to extract a single time step
                     # Change the integration procedure above to work only with the needed data
                     I_data = I_data[show_index]
@@ -2437,24 +2456,32 @@ class Notebook:
             
         plot.figure(9)
         plot.clf()
-        plot.yscale('log')
+        
         max = self.I_plot.get_maxval()
-        plot.ylim(max * 1e-12, max * 10)
+        
+        self.I_plot.xaxis_type = 'linear'
+        self.I_plot.yaxis_type = 'log'
+        self.I_plot.ylim = max * 1e-12, max * 10
+
+        plot.yscale(self.I_plot.yaxis_type)
+        plot.ylim(self.I_plot.ylim)
         plot.xlabel(xaxis_label)
         plot.ylabel(self.I_plot.type)
         plot.title("Total {} from {} nm to {} nm".format(self.I_plot.type, self.integration_lbound, self.integration_ubound))
 
         for key in self.I_plot.I_sets:
 
-            if self.PL_mode == "Current Time Step":
+            if self.PL_mode == "Current time step":
                 plot.scatter(self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
 
             elif self.PL_mode == "All time steps":
                 plot.plot(self.I_plot.global_gridx, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
+                self.I_plot.xlim = (0, np.amax(self.I_plot.global_gridx))
                 
         plot.legend()
         plot.tight_layout()
         self.main_fig3.canvas.draw()
+        
         
         self.write(self.analysis_status, "Integration complete")
 
@@ -3163,7 +3190,7 @@ class Notebook:
 
         if plot_ID == -1:
             if self.I_plot.size() == 0: return
-            if self.I_plot.mode == "Current Time Step": 
+            if self.I_plot.mode == "Current time step": 
                 paired_data = [[self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data] for key in self.I_plot.I_sets]
 
                 # TODO: Write both of these values with their units
