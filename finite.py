@@ -297,11 +297,12 @@ def integrate(base_data, l_bound, u_bound, dx, max):
     j = toIndex(u_bound, dx, max)
     m = int(max / dx)
 
-    need_extra_node = u_bound > toCoord(j, dx) + dx / 2
+    need_extra_node = u_bound > toCoord(j, dx) + dx / 2 or l_bound == u_bound
 
     if (l_bound == u_bound):
         I_base = base_data[:,i]
-        I_plus_one = base_data[:,i+1]
+        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == max:
+            I_plus_one = base_data[:,i+1]
 
         if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == max:
             I_data = (I_base + I_plus_one) / 2
