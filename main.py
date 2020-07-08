@@ -1,7 +1,7 @@
 #################################################
 # Transient Electron Dynamics Simulator
 # Model photoluminescent behavior in one-dimensional nanowire
-# Last modified: Dec. 28, 2019
+# Last modified: July 8, 2020
 # Author: Calvin Fai, Charles Hages
 # Contact:
 ################################################# 
@@ -163,6 +163,7 @@ class Plot_State:
         self.time_index = 0
         self.datagroup = Data_Group(ID)
         self.data_filenames = []
+        self.display_legend = True
         return
 
     def remove_duplicate_filenames(self):
@@ -206,6 +207,7 @@ class I_Group:
         self.yaxis_type = 'log'
         self.xlim = (-1,-1)
         self.ylim = (-1,-1)
+        self.display_legend = True
         return
 
     def set_type(self, new_type):
@@ -303,6 +305,7 @@ class Notebook:
         self.check_do_ss = tk.BooleanVar()
         self.check_reset_params = tk.BooleanVar()
         self.check_reset_inits = tk.BooleanVar()
+        self.check_display_legend = tk.BooleanVar()
 
         self.init_shape_selection = tk.StringVar()
         self.init_var_selection = tk.StringVar()
@@ -1330,11 +1333,14 @@ class Notebook:
             self.yubound = tk.Entry(self.yframe, width=9)
             self.yubound.grid(row=4,column=1)
 
+            self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Display legend?", variable=self.check_display_legend, onvalue=True, offvalue=False)
+            self.toggle_legend_checkbutton.grid(row=2,column=0,columnspan=2)
+
             self.change_axis_continue_button = tk.Button(self.change_axis_popup, text="Continue", command=partial(self.on_change_axis_popup_close, plot_ID, continue_=True))
-            self.change_axis_continue_button.grid(row=2,column=0,columnspan=2)
+            self.change_axis_continue_button.grid(row=3,column=0,columnspan=2)
 
             self.change_axis_status = tk.Text(self.change_axis_popup, width=24,height=2)
-            self.change_axis_status.grid(row=3,rowspan=2,column=0,columnspan=2)
+            self.change_axis_status.grid(row=4,rowspan=2,column=0,columnspan=2)
             self.change_axis_status.configure(state="disabled")
 
             # Set the default values in the entry boxes to be the current options of the plot (in case the user only wants to make a few changes)
@@ -1345,6 +1351,7 @@ class Notebook:
                 self.enter(self.yubound, self.analysis_plots[plot_ID].ylim[1])
                 self.xaxis_type.set(self.analysis_plots[plot_ID].xaxis_type)
                 self.yaxis_type.set(self.analysis_plots[plot_ID].yaxis_type)
+                if self.analysis_plots[plot_ID].display_legend: self.toggle_legend_checkbutton.select()
 
             else:
                 self.enter(self.xlbound, self.I_plot.xlim[0])
@@ -1353,6 +1360,7 @@ class Notebook:
                 self.enter(self.yubound, self.I_plot.ylim[1])
                 self.xaxis_type.set(self.I_plot.xaxis_type)
                 self.yaxis_type.set(self.I_plot.yaxis_type)
+                if self.I_plot.display_legend: self.toggle_legend_checkbutton.select()
 
             self.change_axis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_change_axis_popup_close, plot_ID, continue_=False))
             self.change_axis_popup.grab_set()
@@ -1368,45 +1376,45 @@ class Notebook:
                 if self.xlbound.get() == "" or self.xubound.get() == "" or self.ylbound.get() == "" or self.yubound.get() == "": raise ValueError("Error: missing bounds")
                 bounds = [float(self.xlbound.get()), float(self.xubound.get()), float(self.ylbound.get()), float(self.yubound.get())]
             
-                if plot_ID == -1:
-                    plot.figure(9)
-                else:
+                if not (plot_ID == -1):
                     plot.figure(self.analysis_plots[plot_ID].fig_ID)
+                    
+                else:
+                    plot.figure(9)
 
                 # Set plot axis params and save in corresponding plot state object, if the selected plot has such an object
-                if self.yaxis_type.get() == "log": 
-                    plot.yscale('log')
-                    if not (plot_ID == -1):
-                        self.analysis_plots[plot_ID].yaxis_type = 'log'
-                else: 
-                    plot.yscale('linear')
-                    if not (plot_ID == -1):
-                        self.analysis_plots[plot_ID].yaxis_type = 'linear'
+                plot.yscale(self.yaxis_type.get())
+                plot.xscale(self.xaxis_type.get())
 
-                if self.xaxis_type.get() == "log": 
-                    plot.xscale('log')
-                    if not (plot_ID == -1):
-                        self.analysis_plots[plot_ID].xaxis_type = 'log'
-
-                else: 
-                    plot.xscale('linear')
-                    if not (plot_ID == -1):
-                        self.analysis_plots[plot_ID].xaxis_type = 'linear'
-        
                 plot.ylim(bounds[2], bounds[3])
                 plot.xlim(bounds[0], bounds[1])
 
+                if self.check_display_legend.get():
+                    plot.legend()
+                else:
+                    plot.legend('', frameon=False)
+
+                plot.tight_layout()
+
                 if not (plot_ID == -1):
+                    self.analysis_plots[plot_ID].plot_obj.canvas.draw()
+                    
+                else:
+                    self.main_fig3.canvas.draw()
+
+                # Save these params to pre-populate the popup the next time it's opened
+                if not (plot_ID == -1):
+                    self.analysis_plots[plot_ID].yaxis_type = self.yaxis_type.get()
+                    self.analysis_plots[plot_ID].xaxis_type = self.xaxis_type.get()
                     self.analysis_plots[plot_ID].ylim = (bounds[2], bounds[3])
                     self.analysis_plots[plot_ID].xlim = (bounds[0], bounds[1])
+                    self.analysis_plots[plot_ID].display_legend = self.check_display_legend.get()
                 else:
+                    self.I_plot.yaxis_type = self.yaxis_type.get()
+                    self.I_plot.xaxis_type = self.xaxis_type.get()
                     self.I_plot.ylim = (bounds[2], bounds[3])
                     self.I_plot.xlim = (bounds[0], bounds[1])
-
-                if plot_ID == -1:
-                    self.main_fig3.canvas.draw()
-                else:
-                    self.analysis_plots[plot_ID].plot_obj.canvas.draw()
+                    self.I_plot.display_legend = self.check_display_legend.get()
 
             self.change_axis_popup.destroy()
             print("PL change axis popup closed")
@@ -2317,6 +2325,8 @@ class Notebook:
         return
 
     def do_Integrate(self, plot_ID):
+        self.write(self.analysis_status, "")
+
         active_plot = self.analysis_plots[plot_ID]
         if active_plot.datagroup.datasets.__len__() == 0: return
 
@@ -2451,7 +2461,7 @@ class Notebook:
                 self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(bounds[0]) + "_to_" + str(bounds[1])))
 
                 counter += 1
-                self.write(self.analysis_status, "Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
+                print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
 
             
         plot.figure(9)
@@ -2481,7 +2491,6 @@ class Notebook:
         plot.legend()
         plot.tight_layout()
         self.main_fig3.canvas.draw()
-        
         
         self.write(self.analysis_status, "Integration complete")
 
