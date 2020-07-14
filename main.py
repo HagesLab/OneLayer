@@ -234,6 +234,15 @@ class I_Group:
         self.I_sets.clear()
         return
 
+class Flag:
+    # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
+    # but we interact with the checkbutton using the actual tk.CheckButton() element
+    # So wrap both of those together in a single object and call it a day
+    def __init__(self, tk_element, tk_var, value=0):
+        self.tk_element = tk_element
+        self.tk_var = tk_var
+        self.value = value
+
 def extract_values(string, delimiter):
     # Converts a string with deliimiters into a list of float values
 	# E.g. "100,200,300" with "," delimiter becomes [100,200,300]
@@ -301,7 +310,7 @@ class Notebook:
                                 "Delta": 1, "Frac-Emitted": 1}
 
         # Tkinter elements require special variables to extract user input
-        self.check_ignore_recycle = tk.BooleanVar()
+        self.check_ignore_recycle = tk.IntVar()
         self.check_do_ss = tk.BooleanVar()
         self.check_reset_params = tk.BooleanVar()
         self.check_reset_inits = tk.BooleanVar()
@@ -567,39 +576,42 @@ class Notebook:
         self.alpha_entry = tk.Entry(self.tab_inputs, width=9)
         self.alpha_entry.grid(row=17,column=1)
 
+        self.ignore_recycle_checkbutton = tk.Checkbutton(self.tab_inputs, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
+        self.ignore_recycle_checkbutton.grid(row=18,column=0)
+
         self.delta_label = tk.Label(self.tab_inputs, text="Delta Frac.")
-        self.delta_label.grid(row=18,column=0)
+        self.delta_label.grid(row=19,column=0)
 
         self.delta_entry = tk.Entry(self.tab_inputs, width=9)
-        self.delta_entry.grid(row=18,column=1)
+        self.delta_entry.grid(row=19,column=1)
 
         self.frac_emitted_label = tk.Label(self.tab_inputs, text="Frac. Emitted (0 to 1)")
-        self.frac_emitted_label.grid(row=19,column=0)
+        self.frac_emitted_label.grid(row=20,column=0)
 
         self.frac_emitted_entry = tk.Entry(self.tab_inputs, width=9)
-        self.frac_emitted_entry.grid(row=19,column=1)
+        self.frac_emitted_entry.grid(row=20,column=1)
 
         self.steps_head = tk.ttk.Label(self.tab_inputs, text="Resolution Setting", style="Header.TLabel")
-        self.steps_head.grid(row=20,column=0,columnspan=2)
+        self.steps_head.grid(row=21,column=0,columnspan=2)
 
         self.dx_label = tk.Label(self.tab_inputs, text="Space step size [nm]")
-        self.dx_label.grid(row=21,column=0)
+        self.dx_label.grid(row=22,column=0)
 
         self.dx_entry = tk.Entry(self.tab_inputs, width=9)
-        self.dx_entry.grid(row=21,column=1)
+        self.dx_entry.grid(row=22,column=1)
 
         self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=6)
-        self.ICtab_status.grid(row=22, rowspan=4, column=0, columnspan=2)
+        self.ICtab_status.grid(row=23, rowspan=4, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
 
         self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset System Parameters", variable=self.check_reset_params, onvalue=True, offvalue=False)
-        self.reset_params_checkbutton.grid(row=26,column=0)
-
-        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset Initial Distributions", variable=self.check_reset_inits, onvalue=True, offvalue=False)
         self.reset_params_checkbutton.grid(row=27,column=0)
 
+        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset Initial Distributions", variable=self.check_reset_inits, onvalue=True, offvalue=False)
+        self.reset_params_checkbutton.grid(row=28,column=0)
+
         self.reset_IC_button = tk.Button(self.tab_inputs, text="Reset", command=self.reset_IC)
-        self.reset_IC_button.grid(row=28,column=0, columnspan=2)
+        self.reset_IC_button.grid(row=29,column=0, columnspan=2)
 
         self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", style="Grey Bar.TSeparator")
         self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
@@ -753,6 +765,8 @@ class Notebook:
                                           "Sf":self.Sf_entry, "Sb":self.Sb_entry, "Temperature":self.temperature_entry, "Rel-Permitivity":self.rel_permitivity_entry, "Ext_E-Field":self.ext_efield_entry,
                                           "Theta":self.theta_entry, "Alpha":self.alpha_entry, "Delta":self.delta_entry, "Frac-Emitted":self.frac_emitted_entry, "dx":self.dx_entry}
 
+        self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle)}
+
         self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Excit-Wavelength":self.Exc_entry, "Eg":self.Eg_entry, "Inj-Cof":self.Inj_entry}
 
         # Attach sub-frames to input tab and input tab to overall notebook
@@ -779,9 +793,6 @@ class Notebook:
 
         self.dt_entry = tk.Entry(self.tab_simulate, width=9)
         self.dt_entry.grid(row=3,column=1)
-
-        self.ignore_recycle_checkbutton = tk.Checkbutton(self.tab_simulate, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=True, offvalue=False)
-        self.ignore_recycle_checkbutton.grid(row=4,column=0)
 
         self.do_ss_checkbutton = tk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=True, offvalue=False)
         self.do_ss_checkbutton.grid(row=5,column=0)
@@ -2302,6 +2313,8 @@ class Notebook:
                 self.read_TS(data_file_name, int(self.n * i / 5))
                 self.update_data_plots(self.n, do_clear_plots=False)
 
+            time.sleep(3)
+            self.write(self.status, "Simulations complete")
             
         except FloatingPointError:
             self.write(self.status, "Overflow detected - calculation aborted")
@@ -2508,6 +2521,7 @@ class Notebook:
             cleared_items += " Params,"
 
         if self.check_reset_inits.get():
+            self.deleteall_HIC()
             self.thickness = None
             self.dx = None
             self.init_N = None
@@ -3033,6 +3047,10 @@ class Notebook:
                 for key in self.sys_param_entryboxes_dict:
                     ofstream.write(key + ": " + str(self.sys_param_entryboxes_dict[key].get()) + "\n")
 
+                ofstream.write("$ System Flags:\n")
+                for key in self.sys_flag_dict:
+                    ofstream.write(key + ": " + str(self.sys_flag_dict[key].tk_var.get()) + "\n")
+
                 ofstream.write("$ Initial Conditions: (Nodes) x, N, P\n")
                 for i in range(self.init_x.__len__()):
                     ofstream.write("{:.8e}\t{:.8e}\t{:.8e}\n".format(self.init_x[i], self.init_N[i], self.init_P[i]))
@@ -3066,6 +3084,8 @@ class Notebook:
                                           "Thickness":0, "B":0, "Tau_N":0, "Tau_P":0,
                                           "Sf":0, "Sb":0, "Temperature":0, "Rel-Permitivity":0, "Ext_E-Field":0,
                                           "Theta":0, "Alpha":0, "Delta":0, "Frac-Emitted":0, "dx":0}
+
+                flag_values_dict = {"ignore_alpha":0}
                 node_init_list = []
                 edge_init_list = []
                 initFlag = 0
@@ -3083,8 +3103,9 @@ class Notebook:
                     elif "$ System Parameters" in line:
                         continue
 
-                    # This flag occurs two times in a typical IC file; first to denote node initial conditions and then to denote edge initial conditions.
-                    elif "$ Initial Conditions:" in line:
+                    # There are four "$" flags in an IC file: "System Parameters", "System Flags", "Node Initial Conditions", and "Edge Initial Conditions"
+                    # each corresponding to a different part of the initial state of the system
+                    elif "$ Initial Conditions:" in line or "$ System Flags:" in line:
                         initFlag += 1
 
                     elif (initFlag == 0):
@@ -3092,10 +3113,14 @@ class Notebook:
                         init_param_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
 
                     elif (initFlag == 1):
+                        line = line.strip('\n')
+                        flag_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+
+                    elif (initFlag == 2):
                         if ('j' in line): raise OSError("Error: unable to read complex value in {}".format(self.IC_file_name)) # If complex arg detected
                         node_init_list.append(line.strip('\n'))
 
-                    elif (initFlag == 2):
+                    elif (initFlag == 3):
                         if ('j' in line): raise OSError("Error: unable to read complex value in {}".format(self.IC_file_name)) # If complex arg detected
                         edge_init_list.append(line.strip('\n'))
 
@@ -3108,6 +3133,11 @@ class Notebook:
 
         for key in init_param_values_dict:
             self.enter(self.sys_param_entryboxes_dict[key], init_param_values_dict[key])
+
+        for key in flag_values_dict:
+            self.sys_flag_dict[key].value = int(flag_values_dict[key])
+            if (self.sys_flag_dict[key].value): self.sys_flag_dict[key].tk_var.set(1)
+            else: self.sys_flag_dict[key].tk_var.set(0)
 
         # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and ICs that were generated using the Initial tab
         for key in self.analytical_entryboxes_dict:
