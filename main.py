@@ -316,6 +316,10 @@ class Notebook:
         self.check_reset_inits = tk.BooleanVar()
         self.check_display_legend = tk.BooleanVar()
 
+        self.calculate_init_material_expfactor = tk.IntVar()
+        self.AIC_stim_mode = tk.StringVar()
+        self.AIC_gen_power_mode = tk.StringVar()
+
         self.init_shape_selection = tk.StringVar()
         self.init_var_selection = tk.StringVar()
         self.EIC_var_selection = tk.StringVar()
@@ -620,41 +624,170 @@ class Notebook:
 
         # An empty GUI element is used to force the analytical IC elements into the correct position.
         # Note that self.tab_analytical_init is a sub-frame attached to the overall self.tab_inputs
+        # Normally, the first element of a frame like self.tab_analytical_init would start at row=0, column=0
+        # instead of column=2. Starting at column=2 is NOT A TYPO. self.tab_analytical_init is attached to
+        # the notebook self.tab_inputs, so it inherits the first two columns of self.tab_inputs.
         self.spacing_box1 = tk.Label(self.tab_analytical_init, text="")
-        self.spacing_box1.grid(row=0,rowspan=4,column=0,columnspan=3, padx=(500,0))
+        self.spacing_box1.grid(row=0,rowspan=4,column=2, padx=(300,0))
 
         self.AIC_head = tk.ttk.Label(self.tab_analytical_init, text="Analytical Init. Cond.", style="Header.TLabel")
-        self.AIC_head.grid(row=0,column=3)
+        self.AIC_head.grid(row=0,column=3,columnspan=3)
 
-        self.A0_label = tk.Label(self.tab_analytical_init, text="A0 [cm^-1]")
-        self.A0_label.grid(row=1,column=3)
+        # A sub-frame attached to a sub-frame
+        # With these we can group related elements into a common region
+        self.material_param_frame = tk.Frame(master=self.tab_analytical_init, highlightbackground="black", highlightthicknes=1)
+        self.material_param_frame.grid(row=1,column=3)
 
-        self.A0_entry = tk.Entry(self.tab_analytical_init, width=9)
-        self.A0_entry.grid(row=1,column=4)
+        self.material_param_label = tk.Label(self.material_param_frame, text="Material Params - Select One")
+        self.material_param_label.grid(row=0,column=0,columnspan=4)
 
-        self.Exc_label = tk.Label(self.tab_analytical_init, text="Excit. Wavelength [nm]")
-        self.Exc_label.grid(row=2,column=3)
+        self.hline1_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline1_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.Exc_entry = tk.Entry(self.tab_analytical_init, width=9)
-        self.Exc_entry.grid(row=2,column=4)
+        self.calc_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.calculate_init_material_expfactor, value=1)
+        self.calc_AIC_expfactor.grid(row=2,column=0)
 
-        self.Eg_label = tk.Label(self.tab_analytical_init, text="Eg [eV]")
-        self.Eg_label.grid(row=3,column=3)
+        self.calc_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 1")
+        self.calc_AIC_expfactor_label.grid(row=2,column=1)
 
-        self.Eg_entry = tk.Entry(self.tab_analytical_init, width=9)
-        self.Eg_entry.grid(row=3,column=4)
+        self.A0_label = tk.Label(self.material_param_frame, text="A0 [cm^-1]")
+        self.A0_label.grid(row=2,column=2)
 
-        self.Inj_label = tk.Label(self.tab_analytical_init, text="Injection Cof. [cm^-3]")
-        self.Inj_label.grid(row=4,column=3)
+        self.A0_entry = tk.Entry(self.material_param_frame, width=9)
+        self.A0_entry.grid(row=2,column=3)
 
-        self.Inj_entry = tk.Entry(self.tab_analytical_init, width=9)
-        self.Inj_entry.grid(row=4,column=4)
+        self.Eg_label = tk.Label(self.material_param_frame, text="Eg [eV]")
+        self.Eg_label.grid(row=3,column=2)
+
+        self.Eg_entry = tk.Entry(self.material_param_frame, width=9)
+        self.Eg_entry.grid(row=3,column=3)
+
+        self.direct_AIC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.AIC_stim_mode, value="direct")
+        self.direct_AIC_stim.grid(row=4,column=2)
+
+        self.direct_AIC_stim_label = tk.Label(self.material_param_frame,text="Direct")
+        self.direct_AIC_stim_label.grid(row=4,column=3)
+
+        self.indirect_AIC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.AIC_stim_mode, value="indirect")
+        self.indirect_AIC_stim.grid(row=5,column=2)
+
+        self.indirect_AIC_stim_label = tk.Label(self.material_param_frame,text="Indirect")
+        self.indirect_AIC_stim_label.grid(row=5,column=3)
+
+        self.hline2_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline2_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
+
+        self.enter_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.calculate_init_material_expfactor, value=0)
+        self.enter_AIC_expfactor.grid(row=7,column=0)
+
+        self.enter_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 2")
+        self.enter_AIC_expfactor_label.grid(row=7,column=1)
+
+        self.AIC_expfactor_label = tk.Label(self.material_param_frame, text="α")
+        self.AIC_expfactor_label.grid(row=8,column=2)
+
+        self.AIC_expfactor_entry = tk.Entry(self.material_param_frame, width=9)
+        self.AIC_expfactor_entry.grid(row=8,column=3)
+
+
+        self.pulse_laser_frame = tk.Frame(master=self.tab_analytical_init, highlightbackground="black", highlightthicknes=1)
+        self.pulse_laser_frame.grid(row=1,column=4, padx=(20,0))
+
+        self.pulse_laser_label = tk.Label(self.pulse_laser_frame, text="Pulse Laser Params")
+        self.pulse_laser_label.grid(row=0,column=0,columnspan=4)
+
+        self.hline3_separator = tk.ttk.Separator(self.pulse_laser_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline3_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
+
+        self.pulse_freq_label = tk.Label(self.pulse_laser_frame, text="Pulse frequency [1/s]")
+        self.pulse_freq_label.grid(row=2,column=2)
+
+        self.pulse_freq_entry = tk.Entry(self.pulse_laser_frame, width=9)
+        self.pulse_freq_entry.grid(row=2,column=3)
+
+        self.pulse_wavelength_label = tk.Label(self.pulse_laser_frame, text="Wavelength [nm]")
+        self.pulse_wavelength_label.grid(row=3,column=2)
+
+        self.pulse_wavelength_entry = tk.Entry(self.pulse_laser_frame, width=9)
+        self.pulse_wavelength_entry.grid(row=3,column=3)
+
+        self.gen_power_param_frame = tk.Frame(master=self.tab_analytical_init, highlightbackground="black", highlightthicknes=1)
+        self.gen_power_param_frame.grid(row=1,column=5, padx=(20,0))
+
+        self.gen_power_param_label = tk.Label(self.gen_power_param_frame, text="Generation/Power Params - Select One")
+        self.gen_power_param_label.grid(row=0,column=0,columnspan=4)
+
+        self.hline4_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline4_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
+
+        self.power_spot = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.AIC_gen_power_mode, value="power-spot")
+        self.power_spot.grid(row=2,column=0)
+
+        self.power_spot_label = tk.Label(self.gen_power_param_frame, text="Option 1")
+        self.power_spot_label.grid(row=2,column=1)
+
+        self.power_label = tk.Label(self.gen_power_param_frame, text="Power [uW]")
+        self.power_label.grid(row=2,column=2)
+
+        self.power_entry = tk.Entry(self.gen_power_param_frame, width=9)
+        self.power_entry.grid(row=2,column=3)
+
+        self.spotsize_label = tk.Label(self.gen_power_param_frame, text="Spot size [nm]")
+        self.spotsize_label.grid(row=3,column=2)
+
+        self.spotsize_entry = tk.Entry(self.gen_power_param_frame, width=9)
+        self.spotsize_entry.grid(row=3,column=3)
+
+        self.hline5_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline5_separator.grid(row=4,column=0,columnspan=30, pady=(5,5), sticky="ew")
+
+        self.power_density_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.AIC_gen_power_mode, value="density")
+        self.power_density_rb.grid(row=5,column=0)
+
+        self.power_density_rb_label = tk.Label(self.gen_power_param_frame,text="Option 2")
+        self.power_density_rb_label.grid(row=5,column=1)
+
+        self.power_density_label = tk.Label(self.gen_power_param_frame, text="Power Density [uW/nm]")
+        self.power_density_label.grid(row=5,column=2)
+
+        self.power_density_entry = tk.Entry(self.gen_power_param_frame, width=9)
+        self.power_density_entry.grid(row=5,column=3)
+
+        self.hline6_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline6_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
+
+        self.max_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.AIC_gen_power_mode, value="max-gen")
+        self.max_gen_rb.grid(row=7,column=0)
+
+        self.max_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 3")
+        self.max_gen_rb_label.grid(row=7,column=1)
+
+        self.max_gen_label = tk.Label(self.gen_power_param_frame, text="Max Generation")
+        self.max_gen_label.grid(row=7,column=2)
+
+        self.max_gen_entry = tk.Entry(self.gen_power_param_frame, width=9)
+        self.max_gen_entry.grid(row=7,column=3)
+
+        self.hline7_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline7_separator.grid(row=8,column=0,columnspan=30, pady=(5,5), sticky="ew")
+
+        self.total_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.AIC_gen_power_mode, value="total-gen")
+        self.total_gen_rb.grid(row=9,column=0)
+
+        self.total_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 4")
+        self.total_gen_rb_label.grid(row=9,column=1)
+
+        self.total_gen_label = tk.Label(self.gen_power_param_frame, text="Total Generation")
+        self.total_gen_label.grid(row=9,column=2)
+
+        self.total_gen_entry = tk.Entry(self.gen_power_param_frame, width=9)
+        self.total_gen_entry.grid(row=9,column=3)
 
         self.load_AIC_button = tk.Button(self.tab_analytical_init, text="Generate Initial Condition", command=self.add_AIC)
-        self.load_AIC_button.grid(row=5,column=3,columnspan=2)
+        self.load_AIC_button.grid(row=2,column=3,columnspan=3)
 
         self.AIC_description = tk.Message(self.tab_analytical_init, text="The Analytical Initial Condition uses four numerical parameters to generate an initial carrier distribution based on an exponential equation.", width=320)
-        self.AIC_description.grid(row=6,column=3,columnspan=2)
+        self.AIC_description.grid(row=3,column=3,columnspan=3)
         
         ## Heuristic Initial Condition(HIC):
 
@@ -767,7 +900,7 @@ class Notebook:
 
         self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle)}
 
-        self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Excit-Wavelength":self.Exc_entry, "Eg":self.Eg_entry, "Inj-Cof":self.Inj_entry}
+        self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry}
 
         # Attach sub-frames to input tab and input tab to overall notebook
         self.tab_inputs.add(self.tab_analytical_init, text="Analytical Init. Cond.")
@@ -1139,8 +1272,8 @@ class Notebook:
             self.integration_ubound_entry = tk.Entry(self.integration_getbounds_popup, width=9)
             self.integration_ubound_entry.grid(row=2,column=5)
 
-            self.hline1_separator = tk.ttk.Separator(self.integration_getbounds_popup, orient="horizontal", style="Grey Bar.TSeparator")
-            self.hline1_separator.grid(row=3,column=0,columnspan=30, pady=(10,10), sticky="ew")
+            self.hline8_separator = tk.ttk.Separator(self.integration_getbounds_popup, orient="horizontal", style="Grey Bar.TSeparator")
+            self.hline8_separator.grid(row=3,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
             self.multi_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, variable=self.fetch_intg_mode, value='multiple')
             self.multi_intg.grid(row=4,column=0, rowspan=3)
@@ -1160,8 +1293,8 @@ class Notebook:
             self.integration_width_entry = tk.Entry(self.integration_getbounds_popup, width=9)
             self.integration_width_entry.grid(row=6,column=3)
 
-            self.hline2_separator = tk.ttk.Separator(self.integration_getbounds_popup, orient="horizontal", style="Grey Bar.TSeparator")
-            self.hline2_separator.grid(row=7,column=0,columnspan=30, pady=(10,10), sticky="ew")
+            self.hline9_separator = tk.ttk.Separator(self.integration_getbounds_popup, orient="horizontal", style="Grey Bar.TSeparator")
+            self.hline9_separator.grid(row=7,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
             self.integration_getbounds_continue_button = tk.Button(self.integration_getbounds_popup, text="Continue", command=partial(self.on_integration_getbounds_popup_close, continue_=True))
             self.integration_getbounds_continue_button.grid(row=8,column=5)
@@ -2579,6 +2712,7 @@ class Notebook:
         return
 
     def add_AIC(self):
+        ## TODO: Redo this for new AIC function
         # Read AIC parameters and plot when relevant button pressed
         try:
             self.set_init_x()
@@ -2998,7 +3132,7 @@ class Notebook:
                                           "Thickness":self.thickness_entry, "B":self.B_entry, "Tau_N":self.tauN_entry, "Tau_P":self.tauP_entry,
                                           "Sf":self.Sf_entry, "Sb":self.Sb_entry, "Temperature":self.temperature_entry, "Rel-Permitivity":self.rel_permitivity_entry, 
                                           "Theta":self.theta_entry, "Alpha":self.alpha_entry, "Delta":self.delta_entry, "Frac-Emitted":self.frac_emitted_entry, "dx":self.dx_entry, 
-                                          "A0":self.A0_entry, "Excit-Wavelength":self.Exc_entry, "Eg":self.Eg_entry, "Inj-Cof":self.Inj_entry}
+                                          "A0":self.A0_entry, "Eg":self.Eg_entry}
 
         try:
             for batch_value in batch_values:
