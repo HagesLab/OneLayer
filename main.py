@@ -650,13 +650,13 @@ class Notebook:
         self.calc_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 1")
         self.calc_AIC_expfactor_label.grid(row=2,column=1)
 
-        self.A0_label = tk.Label(self.material_param_frame, text="A0 [cm^-1]")
+        self.A0_label = tk.Label(self.material_param_frame, text="A0 [WIP]")
         self.A0_label.grid(row=2,column=2)
 
         self.A0_entry = tk.Entry(self.material_param_frame, width=9)
         self.A0_entry.grid(row=2,column=3)
 
-        self.Eg_label = tk.Label(self.material_param_frame, text="Eg [eV]")
+        self.Eg_label = tk.Label(self.material_param_frame, text="Eg [WIP]")
         self.Eg_label.grid(row=3,column=2)
 
         self.Eg_entry = tk.Entry(self.material_param_frame, width=9)
@@ -683,7 +683,7 @@ class Notebook:
         self.enter_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 2")
         self.enter_AIC_expfactor_label.grid(row=7,column=1)
 
-        self.AIC_expfactor_label = tk.Label(self.material_param_frame, text="α")
+        self.AIC_expfactor_label = tk.Label(self.material_param_frame, text="α [WIP]")
         self.AIC_expfactor_label.grid(row=8,column=2)
 
         self.AIC_expfactor_entry = tk.Entry(self.material_param_frame, width=9)
@@ -732,7 +732,7 @@ class Notebook:
         self.power_entry = tk.Entry(self.gen_power_param_frame, width=9)
         self.power_entry.grid(row=2,column=3)
 
-        self.spotsize_label = tk.Label(self.gen_power_param_frame, text="Spot size [nm]")
+        self.spotsize_label = tk.Label(self.gen_power_param_frame, text="Spot size [nm^2]")
         self.spotsize_label.grid(row=3,column=2)
 
         self.spotsize_entry = tk.Entry(self.gen_power_param_frame, width=9)
@@ -1121,7 +1121,7 @@ class Notebook:
 
             self.create_batch_button = tk.Button(self.batch_popup, text="Create Batch", command=self.create_batch_init)
             self.create_batch_button.grid(row=3,column=3, padx=(130,0))
-			
+
             ## Temporarily disable the main window while this popup is active
             self.batch_popup.protocol("WM_DELETE_WINDOW", self.on_batch_popup_close)
             self.batch_popup.grab_set()
@@ -2691,7 +2691,7 @@ class Notebook:
 	# to fit to the same spatial mesh, which can get messed up if the user changes the mesh while editing initial conditions.
     def set_init_x(self):
         if self.IC_grid_is_set and (float(self.thickness_entry.get()) != self.thickness or float(self.dx_entry.get()) != self.dx):
-            raise Exception("Error: Thickness or space step size has been altered")
+            raise Exception("Error: Thickness or space step size has been altered - reset the initial condition to use new space mesh")
 
         self.thickness = float(self.thickness_entry.get())
         self.dx = float(self.dx_entry.get())
@@ -2727,36 +2727,117 @@ class Notebook:
 
         # Flush HICs, as AIC will overwrite the entire spatial mesh
         self.deleteall_HIC(False)
-        try: A0 = float(self.A0_entry.get()) * (1e-7)         # [cm^-1] to [nm^-1]
-        except ValueError:
-            A0 = 0
-            self.write(self.ICtab_status, "Error: missing or invalid A0")
-            self.enter(self.A0_entry, 0)
+
+        # Check for valid option choices
+        AIC_options = {"long_expfactor":self.calculate_init_material_expfactor.get(), 
+                     "incidence":self.AIC_stim_mode.get(),
+                     "power_mode":self.AIC_gen_power_mode.get()}
+        try:
+            if AIC_options["long_expfactor"] == '' or AIC_options["power_mode"] == '':
+                raise ValueError("Error: select material param and power generation options ")
+        except ValueError as oops:
+            self.write(self.ICtab_status, oops)
             return
 
-        try: Eg = float(self.Eg_entry.get())                  # [eV]
+        print(AIC_options)
+        
+        # Establish constants; calculate alpha
+        # FIXME: Units
+        h = 6.626e-34   # [J/s]
+        c = 2.997e8     # [m/s]
+
+        try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm^-1]
         except ValueError:
-            Eg = 0
-            self.write(self.ICtab_status, "Error: missing or invalid Eg")
-            self.enter(self.Eg_entry, 0)
+            self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
             return
 
-        try: Exc = float(self.Exc_entry.get())                # [nm]
-        except ValueError:
-            Exc = 1
-            self.write(self.ICtab_status, "Error: missing or invalid Excitation Wavelength")
-            self.enter(self.Exc_entry, 1)
-            return
+        if (AIC_options["long_expfactor"]):
+            try: A0 = float(self.A0_entry.get())         # [?]
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing or invalid A0")
+                return
 
-        try: Inj = float(self.Inj_entry.get()) * ((1e-7) ** 3)# [cm^-3] to [nm^-3]
-        except ValueError:
-            Inj = 0
-            self.write(self.ICtab_status, "Error: missing or invalid Inj")
-            self.enter(self.Inj_entry, 0)
+            try: Eg = float(self.Eg_entry.get())                  # [?]
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing or invalid Eg")
+                return
+
+            if AIC_options["incidence"] == "direct":
+                alpha = A0 * (h * c / wavelength - Eg) ** 0.5
+
+            elif AIC_options["incidence"] == "indirect":
+                alpha = A0 * (h * c / wavelength - Eg) ** 2
+
+            else:
+                self.write(self.ICtab_status, "An unexpected error occurred while calculating the material params")
+                return
+
+        else:
+            try: alpha = float(self.AIC_expfactor_entry.get())
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing or invalid α")
+                return
+
+        if (AIC_options["power_mode"] == "power-spot"):
+            try: 
+                power = float(self.power_entry.get())
+                spotsize = float(self.spotsize_entry.get())
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing power or spot size")
+                return
+
+            if (self.pulse_freq_entry.get() == "cw"):
+                freq = 1
+            else:
+                try:
+                    freq = float(self.pulse_freq_entry.get())
+
+                except ValueError:
+                    self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
+                    return
+
+            self.init_N = power / (spotsize * freq * h * c * wavelength) * alpha * np.exp(-alpha * self.init_x)
+        
+        elif (AIC_options["power_mode"] == "density"):
+            try: power_density = float(self.power_density_entry.get())
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing power density")
+                return
+
+            if (self.pulse_freq_entry.get() == "cw"):
+                freq = 1
+            else:
+                try:
+                    freq = float(self.pulse_freq_entry.get())
+
+                except ValueError:
+                    self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
+                    return
+
+            self.init_N = power_density / (freq * h * c * wavelength) * alpha * np.exp(-alpha * self.init_x)
+        
+        elif (AIC_options["power_mode"] == "max-gen"):
+            try: max_gen = float(self.max_gen_entry.get())
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing max gen")
+                return
+
+            self.init_N = max_gen * np.exp(-alpha * self.init_x)
+        
+
+        elif (AIC_options["power_mode"] == "total-gen"):
+            try: total_gen = float(self.total_gen_entry.get())
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing total gen")
+                return
+
+            self.init_N = (total_gen * alpha * np.exp(alpha * self.thickness)) / (np.exp(alpha * self.thickness) - 1) * np.exp(-alpha * self.init_x)
+        
+        else:
+            self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
 
         ## Assuming that the initial distributions of holes and electrons are identical
-        self.init_N = finite.do_AIC(A0, Eg, Exc, Inj, self.init_x)
         self.init_P = self.init_N
         self.update_IC_plot()
         return
@@ -3128,6 +3209,8 @@ class Notebook:
             self.write(self.batch_status, "Error: {} folder already exists".format(batch_dir_name))
             return
 
+        # Separate the AIC params from this
+        # And consider replacing with self.sys_param_entryboxes_dict
         appended_sys_param_entryboxes_dict = {"Mu_N":self.N_mobility_entry, "Mu_P":self.P_mobility_entry, "N0":self.n0_entry, "P0":self.p0_entry, 
                                           "Thickness":self.thickness_entry, "B":self.B_entry, "Tau_N":self.tauN_entry, "Tau_P":self.tauP_entry,
                                           "Sf":self.Sf_entry, "Sb":self.Sb_entry, "Temperature":self.temperature_entry, "Rel-Permitivity":self.rel_permitivity_entry, 
@@ -3136,6 +3219,8 @@ class Notebook:
 
         try:
             for batch_value in batch_values:
+                # TODO: update this for batchable AIC
+                # This may require updating the IC with self.add_AIC()
                 self.enter(appended_sys_param_entryboxes_dict[self.batch_param.get()], str(batch_value))
                 # For whatever reason, tk.filedialog.asksaveasfilename will automatically append .txt to the file name before passing to self.write_init_file(). 
                 # This behavior is NOT done by default, so here the .txt is manually appended to the file name.
