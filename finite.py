@@ -1,8 +1,8 @@
 #################################################
 # Wrapper functions for calculations, as well as
-# non-differential equation calculations
-# The differential equations are located in odefuncs.py, while
-# these do the rest of the math
+# non-differential equation calculations.
+# The differential equations are located in odefuncs.py, 
+# while these do the rest of the math.
 ################################################# 
 
 import tables
@@ -23,13 +23,37 @@ def toIndex(x,dx, absUpperBound, is_edge=False):
 
     return int((x - absLowerBound) / dx)
 
-def do_AIC(A0, Eg, Exc, Inj, x_array):
-    return odefuncs.AIC(A0, Eg, Exc, Inj, x_array)
+def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, h=6.626e-34, c=2.997e8):
+    # h and c are Planck's const and speed of light, respectively. These default to common units but
+    # they may be passed in with different units.
+    return (power / (spotsize * freq * h * c * wavelength) * alpha * np.exp(-alpha * x_array))
 
+def pulse_laser_powerdensity(power_density, freq, wavelength, alpha, x_array, h=6.626e-34, c=2.997e8):
+    return (power_density / (freq * h * c * wavelength) * alpha * np.exp(-alpha * x_array))
+
+def pulse_laser_maxgen(max_gen, alpha, x_array, h=6.626e-34, c=2.997e8):
+    return (max_gen * np.exp(-alpha * x_array))
+
+def pulse_laser_totalgen(total_gen, total_length, alpha, x_array, h=6.626e-34, c=2.997e8):
+    return ((total_gen * alpha * np.exp(alpha * total_length)) / (np.exp(alpha * total_length) - 1) * np.exp(-alpha * x_array))
 
 def toCoord(i,dx, is_edge=False):
     absLowerBound = dx / 2 if not is_edge else 0
     return (absLowerBound + i * dx)
+
+def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0):
+    distance = np.linspace(0, m*dx, m)
+    distance_matrix = np.zeros((m, m))
+    lf_distance_matrix = np.zeros((m, m)) # Account for "other half" of a symmetric system
+
+    # Each row in distance_matrix represents the weight function centered around a different position
+    for i in range(0,m):
+        distance_matrix[i] = np.concatenate((np.flip(distance[0:i+1], 0), distance[1:m - i]))
+        lf_distance_matrix[i] = distance + (i * dx)
+    
+    combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * (np.exp(-(alphaCof + thetaCof) * distance_matrix) + np.exp(-(alphaCof + thetaCof) * lf_distance_matrix))
+    #combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * np.exp(-(alphaCof + thetaCof) * distance_matrix) 
+    return combined_weight
 
 def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, recycle_photons=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, E_field_ext=0, init_N=0, init_P=0, init_E_field=0, init_Ec=0, init_Chi=0, write_output=True):
     ## Problem statement:
@@ -59,7 +83,7 @@ def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_
 
     ## Generate a weight distribution needed for photon recycle term if photon recycle is being considered
     if recycle_photons:
-        combined_weight = odefuncs.gen_weight_distribution(m, dx, alphaCof, thetaCof, delta_frac, fracEmitted)
+        combined_weight = gen_weight_distribution(m, dx, alphaCof, thetaCof, delta_frac, fracEmitted)
     else:
         combined_weight = 0
 

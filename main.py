@@ -511,92 +511,92 @@ class Notebook:
         self.p0_entry = tk.Entry(self.tab_inputs, width=9)
         self.p0_entry.grid(row=5,column=1)
 
-        self.thickness_label = tk.Label(self.tab_inputs, text="Thickness (nm)")
-        self.thickness_label.grid(row=6,column=0)
-
-        self.thickness_entry = tk.Entry(self.tab_inputs, width=9)
-        self.thickness_entry.grid(row=6,column=1)
-
         self.B_label = tk.Label(self.tab_inputs, text="B (cm^3 / s)")
-        self.B_label.grid(row=7,column=0)
+        self.B_label.grid(row=6,column=0)
 
         self.B_entry = tk.Entry(self.tab_inputs, width=9)
-        self.B_entry.grid(row=7,column=1)
+        self.B_entry.grid(row=6,column=1)
 
         self.tauN_label = tk.Label(self.tab_inputs, text="Tau_n (ns)")
-        self.tauN_label.grid(row=8, column=0)
+        self.tauN_label.grid(row=7, column=0)
 
         self.tauN_entry = tk.Entry(self.tab_inputs, width=9)
-        self.tauN_entry.grid(row=8, column=1)
+        self.tauN_entry.grid(row=7, column=1)
 
         self.tauP_label = tk.Label(self.tab_inputs, text="Tau_p (ns)")
-        self.tauP_label.grid(row=9, column=0)
+        self.tauP_label.grid(row=8, column=0)
 
         self.tauP_entry = tk.Entry(self.tab_inputs, width=9)
-        self.tauP_entry.grid(row=9, column=1)
+        self.tauP_entry.grid(row=8, column=1)
 
         self.Sf_label = tk.Label(self.tab_inputs, text="Sf (cm / s)")
-        self.Sf_label.grid(row=10, column=0)
+        self.Sf_label.grid(row=9, column=0)
 
         self.Sf_entry = tk.Entry(self.tab_inputs, width=9)
-        self.Sf_entry.grid(row=10, column=1)
+        self.Sf_entry.grid(row=9, column=1)
 
         self.Sb_label = tk.Label(self.tab_inputs, text="Sb (cm / s)")
-        self.Sb_label.grid(row=11, column=0)
+        self.Sb_label.grid(row=10, column=0)
 
         self.Sb_entry = tk.Entry(self.tab_inputs, width=9)
-        self.Sb_entry.grid(row=11, column=1)
+        self.Sb_entry.grid(row=10, column=1)
 
         self.temperature_label = tk.Label(self.tab_inputs, text="Temperature (K)")
-        self.temperature_label.grid(row=12, column=0)
+        self.temperature_label.grid(row=11, column=0)
 
         self.temperature_entry = tk.Entry(self.tab_inputs, width=9)
-        self.temperature_entry.grid(row=12, column=1)
+        self.temperature_entry.grid(row=11, column=1)
 
         self.rel_permitivity_label = tk.Label(self.tab_inputs, text="Rel. Permitivity")
-        self.rel_permitivity_label.grid(row=13, column=0)
+        self.rel_permitivity_label.grid(row=12, column=0)
 
         self.rel_permitivity_entry = tk.Entry(self.tab_inputs, width=9)
-        self.rel_permitivity_entry.grid(row=13, column=1)
+        self.rel_permitivity_entry.grid(row=12, column=1)
 
         self.ext_efield_label = tk.Label(self.tab_inputs, text="External E-field [V/um]")
-        self.ext_efield_label.grid(row=14,column=0)
+        self.ext_efield_label.grid(row=13,column=0)
 
         self.ext_efield_entry = tk.Entry(self.tab_inputs, width=9)
-        self.ext_efield_entry.grid(row=14,column=1)
+        self.ext_efield_entry.grid(row=13,column=1)
 
         self.special_var_head = tk.ttk.Label(self.tab_inputs, text="Photon behavior parameters", style="Header.TLabel")
-        self.special_var_head.grid(row=15,column=0,columnspan=2)
+        self.special_var_head.grid(row=14,column=0,columnspan=2)
 
         self.theta_label = tk.Label(self.tab_inputs, text="Theta Cof. [cm^-1]")
-        self.theta_label.grid(row=16,column=0)
+        self.theta_label.grid(row=15,column=0)
 
         self.theta_entry = tk.Entry(self.tab_inputs, width=9)
-        self.theta_entry.grid(row=16,column=1)
+        self.theta_entry.grid(row=15,column=1)
 
         self.alpha_label = tk.Label(self.tab_inputs, text="Alpha Cof. [cm^-1]")
-        self.alpha_label.grid(row=17,column=0)
+        self.alpha_label.grid(row=16,column=0)
 
         self.alpha_entry = tk.Entry(self.tab_inputs, width=9)
-        self.alpha_entry.grid(row=17,column=1)
+        self.alpha_entry.grid(row=16,column=1)
 
         self.ignore_recycle_checkbutton = tk.Checkbutton(self.tab_inputs, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
-        self.ignore_recycle_checkbutton.grid(row=18,column=0)
+        self.ignore_recycle_checkbutton.grid(row=17,column=0)
 
         self.delta_label = tk.Label(self.tab_inputs, text="Delta Frac.")
-        self.delta_label.grid(row=19,column=0)
+        self.delta_label.grid(row=18,column=0)
 
         self.delta_entry = tk.Entry(self.tab_inputs, width=9)
-        self.delta_entry.grid(row=19,column=1)
+        self.delta_entry.grid(row=18,column=1)
 
         self.frac_emitted_label = tk.Label(self.tab_inputs, text="Frac. Emitted (0 to 1)")
-        self.frac_emitted_label.grid(row=20,column=0)
+        self.frac_emitted_label.grid(row=19,column=0)
 
         self.frac_emitted_entry = tk.Entry(self.tab_inputs, width=9)
-        self.frac_emitted_entry.grid(row=20,column=1)
+        self.frac_emitted_entry.grid(row=19,column=1)
 
         self.steps_head = tk.ttk.Label(self.tab_inputs, text="Resolution Setting", style="Header.TLabel")
-        self.steps_head.grid(row=21,column=0,columnspan=2)
+        self.steps_head.grid(row=20,column=0,columnspan=2)
+
+        self.thickness_label = tk.Label(self.tab_inputs, text="Thickness (nm)")
+        self.thickness_label.grid(row=21,column=0)
+
+        self.thickness_entry = tk.Entry(self.tab_inputs, width=9)
+        self.thickness_entry.grid(row=21,column=1)
 
         self.dx_label = tk.Label(self.tab_inputs, text="Space step size [nm]")
         self.dx_label.grid(row=22,column=0)
@@ -2644,16 +2644,16 @@ class Notebook:
 
     ## Initial Condition Managers
 
-    def reset_IC(self):
+    def reset_IC(self, force=False):
         # Clears and uninitializes all fields and saved data on IC tab
         cleared_items = ""
-        if self.check_reset_params.get():
+        if self.check_reset_params.get() or force:
             for key in self.sys_param_entryboxes_dict:
                 self.enter(self.sys_param_entryboxes_dict[key], "")
 
             cleared_items += " Params,"
 
-        if self.check_reset_inits.get():
+        if self.check_reset_inits.get() or force:
             self.deleteall_HIC()
             self.thickness = None
             self.dx = None
@@ -2661,7 +2661,7 @@ class Notebook:
             self.init_P = None
             self.init_Ec = None
             self.init_Chi = None
-            self.IC_grid_is_set = False
+            self.set_thickness_and_dx_entryboxes(state='unlock')
             plot.figure(1)
             plot.clf()
             self.init_canvas_NP.draw()
@@ -2687,11 +2687,25 @@ class Notebook:
 
         return
 
-	# This is a patch of a consistency issue involving initial conditions - we require different variables of a single initial condition
-	# to fit to the same spatial mesh, which can get messed up if the user changes the mesh while editing initial conditions.
+	## This is a patch of a consistency issue involving initial conditions - we require different variables of a single initial condition
+	## to fit to the same spatial mesh, which can get messed up if the user changes the mesh while editing initial conditions.
+
+    # First, implement a way to temporarily remove the user's ability to change variables associated with the spatial mesh
+    def set_thickness_and_dx_entryboxes(self, state):
+        if state =='lock':
+            self.thickness_entry.configure(state='disabled')
+            self.dx_entry.configure(state='disabled')
+
+        elif state =='unlock':
+            self.thickness_entry.configure(state='normal')
+            self.dx_entry.configure(state='normal')
+
+        return
+
+    # Second, create a function that generates and locks in new spatial meshes. A new mesh can only be generated when the previous mesh is discarded using reset_IC().
     def set_init_x(self):
-        if self.IC_grid_is_set and (float(self.thickness_entry.get()) != self.thickness or float(self.dx_entry.get()) != self.dx):
-            raise Exception("Error: Thickness or space step size has been altered - reset the initial condition to use new space mesh")
+        #if (float(self.thickness_entry.get()) != self.thickness or float(self.dx_entry.get()) != self.dx):
+        #    raise Exception("Error: Thickness or space step size has been altered - reset the initial condition to use new space mesh")
 
         self.thickness = float(self.thickness_entry.get())
         self.dx = float(self.dx_entry.get())
@@ -2708,7 +2722,7 @@ class Notebook:
             
         self.init_x = np.linspace(self.dx / 2,self.thickness - self.dx / 2, int(0.5 + self.thickness / self.dx))
         self.init_x_edges = np.linspace(0, self.thickness, int(0.5 + self.thickness / self.dx) + 1)
-        self.IC_grid_is_set = True
+        self.set_thickness_and_dx_entryboxes(state='lock')
         return
 
     def add_AIC(self):
@@ -2725,9 +2739,6 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-        # Flush HICs, as AIC will overwrite the entire spatial mesh
-        self.deleteall_HIC(False)
-
         # Check for valid option choices
         AIC_options = {"long_expfactor":self.calculate_init_material_expfactor.get(), 
                      "incidence":self.AIC_stim_mode.get(),
@@ -2739,8 +2750,6 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-        print(AIC_options)
-        
         # Establish constants; calculate alpha
         # FIXME: Units
         h = 6.626e-34   # [J/s]
@@ -2769,7 +2778,7 @@ class Notebook:
                 alpha = A0 * (h * c / wavelength - Eg) ** 2
 
             else:
-                self.write(self.ICtab_status, "An unexpected error occurred while calculating the material params")
+                self.write(self.ICtab_status, "Select \"direct\" or \"indirect\"")
                 return
 
         else:
@@ -2796,7 +2805,7 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.init_N = power / (spotsize * freq * h * c * wavelength) * alpha * np.exp(-alpha * self.init_x)
+            self.init_N = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, self.init_x)
         
         elif (AIC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get())
@@ -2814,7 +2823,7 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.init_N = power_density / (freq * h * c * wavelength) * alpha * np.exp(-alpha * self.init_x)
+            self.init_N = finite.pulse_laser_powerdensity(power_density, freq, wavelength, alpha, self.init_x)
         
         elif (AIC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get())
@@ -2822,7 +2831,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
-            self.init_N = max_gen * np.exp(-alpha * self.init_x)
+            self.init_N = finite.pulse_laser_maxgen(max_gen, alpha, self.init_x, h=6.626e-34, c=2.997e8)
         
 
         elif (AIC_options["power_mode"] == "total-gen"):
@@ -2831,11 +2840,14 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
-            self.init_N = (total_gen * alpha * np.exp(alpha * self.thickness)) / (np.exp(alpha * self.thickness) - 1) * np.exp(-alpha * self.init_x)
+            self.init_N = finite.pulse_laser_totalgen(total_gen, self.thickness, alpha, self.init_x)
         
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
+
+        # Flush HICs, as AIC will overwrite the entire spatial mesh
+        self.deleteall_HIC(False)
 
         ## Assuming that the initial distributions of holes and electrons are identical
         self.init_P = self.init_N
@@ -3350,6 +3362,13 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
+        # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and ICs that were generated using the Initial tab
+        for key in self.analytical_entryboxes_dict:
+            self.enter(self.analytical_entryboxes_dict[key], "")
+
+        self.reset_IC(force=True)
+
+        # Enter saved params into boxes
         for key in init_param_values_dict:
             self.enter(self.sys_param_entryboxes_dict[key], init_param_values_dict[key])
 
@@ -3357,12 +3376,6 @@ class Notebook:
             self.sys_flag_dict[key].value = int(flag_values_dict[key])
             if (self.sys_flag_dict[key].value): self.sys_flag_dict[key].tk_var.set(1)
             else: self.sys_flag_dict[key].tk_var.set(0)
-
-        # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and ICs that were generated using the Initial tab
-        for key in self.analytical_entryboxes_dict:
-            self.enter(self.analytical_entryboxes_dict[key], "")
-
-        self.deleteall_HIC(False)
 
         try:
             self.set_init_x()
@@ -3387,59 +3400,66 @@ class Notebook:
 
         # Process the sorted node_init_list entries TWO at a time, filling all relevant IC arrays with linear-interpolated values.
         # We could use a much less complex one-value-at-a-time reader, but those methods usually lose out on linear interpolation ability
-        for i in range(0, node_init_list.__len__() - 1):
-            try:
-                first_valueset = extract_values(node_init_list[i], '\t') #[x1, N(x1), P(x1)]
-                second_valueset = extract_values(node_init_list[i+1], '\t') #[x2, N(x2), P(x2)]
-            except ValueError:
-                self.write(self.ICtab_status, "Warning: Unusual IC File content")
-                warning_flag = True
-
-            intermediate_x_indices = np.arange(finite.toIndex(first_valueset[0], self.dx, self.thickness, is_edge=False), finite.toIndex(second_valueset[0], self.dx, self.thickness, is_edge=False) + 1, 1)
-
-            for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
+        try:
+            for i in range(0, node_init_list.__len__() - 1):
                 try:
-                    self.init_N[j] = first_valueset[1] + (finite.toCoord(j, self.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
-                except:
-                    self.init_N[j] = 0
+                    first_valueset = extract_values(node_init_list[i], '\t') #[x1, N(x1), P(x1)]
+                    second_valueset = extract_values(node_init_list[i+1], '\t') #[x2, N(x2), P(x2)]
+                except ValueError:
+                    self.write(self.ICtab_status, "Warning: Unusual IC File content")
+                    warning_flag = True
+
+                intermediate_x_indices = np.arange(finite.toIndex(first_valueset[0], self.dx, self.thickness, is_edge=False), finite.toIndex(second_valueset[0], self.dx, self.thickness, is_edge=False) + 1, 1)
+
+                for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
+                    try:
+                        self.init_N[j] = first_valueset[1] + (finite.toCoord(j, self.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
+                    except:
+                        self.init_N[j] = 0
                         
-                try:
-                    self.init_P[j] = first_valueset[2] + (finite.toCoord(j, self.dx) - first_valueset[0]) * (second_valueset[2] - first_valueset[2]) / (second_valueset[0] - first_valueset[0])
-                except:
-                    self.init_P[j] = 0
+                    try:
+                        self.init_P[j] = first_valueset[2] + (finite.toCoord(j, self.dx) - first_valueset[0]) * (second_valueset[2] - first_valueset[2]) / (second_valueset[0] - first_valueset[0])
+                    except:
+                        self.init_P[j] = 0
+
+        
              #END LOOP
         #END LOOP
             
         # Now do the same for edge_init_list
-        for i in range(0, edge_init_list.__len__() - 1):
-            try:
-                first_valueset = extract_values(edge_init_list[i], '\t') #[x1, E(x1), Eg(x1), Chi(x1)]
-                second_valueset = extract_values(edge_init_list[i+1], '\t') #[x2, E(x2), Eg(x2), Chi(x2)]
-            except ValueError:
-                self.write(self.ICtab_status, "Warning: Unusual IC File content")
-                warning_flag = True
-
-            intermediate_x_indices = np.arange(finite.toIndex(first_valueset[0], self.dx, self.thickness, is_edge=True), finite.toIndex(second_valueset[0], self.dx, self.thickness, is_edge=True) + 1, 1)
-
-            for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
+            for i in range(0, edge_init_list.__len__() - 1):
                 try:
-                    self.init_E_field[j] = first_valueset[1] + (finite.toCoord(j, self.dx, True) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
-                except:
-                    self.init_E_field[j] = 0
+                    first_valueset = extract_values(edge_init_list[i], '\t') #[x1, E(x1), Eg(x1), Chi(x1)]
+                    second_valueset = extract_values(edge_init_list[i+1], '\t') #[x2, E(x2), Eg(x2), Chi(x2)]
+                except ValueError:
+                    self.write(self.ICtab_status, "Warning: Unusual IC File content")
+                    warning_flag = True
 
-                try:
-                    self.init_Ec[j] = first_valueset[2] + (finite.toCoord(j, self.dx, True) - first_valueset[0]) * (second_valueset[2] - first_valueset[2]) / (second_valueset[0] - first_valueset[0])
-                except:
-                    self.init_Ec[j] = 0
+                intermediate_x_indices = np.arange(finite.toIndex(first_valueset[0], self.dx, self.thickness, is_edge=True), finite.toIndex(second_valueset[0], self.dx, self.thickness, is_edge=True) + 1, 1)
+
+                for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
+                    try:
+                        self.init_E_field[j] = first_valueset[1] + (finite.toCoord(j, self.dx, True) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
+                    except:
+                        self.init_E_field[j] = 0
+
+                    try:
+                        self.init_Ec[j] = first_valueset[2] + (finite.toCoord(j, self.dx, True) - first_valueset[0]) * (second_valueset[2] - first_valueset[2]) / (second_valueset[0] - first_valueset[0])
+                    except:
+                        self.init_Ec[j] = 0
                         
-                try:
-                    self.init_Chi[j] = first_valueset[3] + (finite.toCoord(j, self.dx, True) - first_valueset[0]) * (second_valueset[3] - first_valueset[3]) / (second_valueset[0] - first_valueset[0])
-                except:
-                    self.init_Chi[j] = 0
+                    try:
+                        self.init_Chi[j] = first_valueset[3] + (finite.toCoord(j, self.dx, True) - first_valueset[0]) * (second_valueset[3] - first_valueset[3]) / (second_valueset[0] - first_valueset[0])
+                    except:
+                        self.init_Chi[j] = 0
 
-        self.update_IC_plot()
+        except IndexError:
+            self.write(self.ICtab_status, "Warning: could not fit IC distribution into system with thickness {}".format(self.thickness))
+            warning_flag = True
 
-        self.write(self.ICtab_status, "IC file loaded successfully")
+        self.update_IC_plot(warn=warning_flag)
+
+        if not warning_flag: self.write(self.ICtab_status, "IC file loaded successfully")
         return
 
     # Data I/O
