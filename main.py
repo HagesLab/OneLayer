@@ -341,7 +341,7 @@ class Notebook:
         self.init_Ec = None
         self.init_Chi = None
         self.IC_file_name = ""
-        self.IC_grid_is_set = False
+        self.IC_is_AIC = False
 
         self.sim_N = None
         self.sim_P = None
@@ -483,6 +483,9 @@ class Notebook:
 
         self.save_ICfile_button = tk.Button(self.tab_inputs, text="Save", command=self.save_ICfile)
         self.save_ICfile_button.grid(row=0,column=1, padx=(0,30), pady=(24,0))
+
+        #self.DEBUG_BUTTON = tk.Button(self.tab_inputs, text="debug", command=self.DEBUG)
+        #self.DEBUG_BUTTON.grid(row=0,column=0,columnspan=2, pady=(24,0))
 
         self.system_params_head = tk.ttk.Label(self.tab_inputs, text="System Parameters",style="Header.TLabel")
         self.system_params_head.grid(row=1, column=0,columnspan=2)
@@ -900,7 +903,9 @@ class Notebook:
 
         self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle)}
 
-        self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry}
+        self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "AIC_expfactor":self.AIC_expfactor_entry, "Pulse_Freq":self.pulse_freq_entry, 
+                                           "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
+                                           "Max_Gen":self.max_gen_entry, "Total_Gen":self.total_gen_entry}
 
         # Attach sub-frames to input tab and input tab to overall notebook
         self.tab_inputs.add(self.tab_analytical_init, text="Analytical Init. Cond.")
@@ -1075,6 +1080,14 @@ class Notebook:
         self.notebook.add(self.tab_analyze, text="Analyze")
         return
 
+    def DEBUG(self):
+        self.enter(self.AIC_expfactor_entry, "0.004")
+        self.enter(self.max_gen_entry, "20")
+        self.enter(self.pulse_freq_entry, "1")
+        self.enter(self.pulse_wavelength_entry, "520")
+        print("IC_IS_AIC = {}".format(self.IC_is_AIC))
+        return
+
     ## Functions to create popups and manage
 
     def do_batch_popup(self):
@@ -1101,8 +1114,19 @@ class Notebook:
             self.batch_param_label = tk.Label(self.batch_popup, text="Select Batch Parameter:")
             self.batch_param_label.grid(row=0,column=1)
 
-            self.batch_param_select = tk.OptionMenu(self.batch_popup, self.batch_param, "Mu_N", "Mu_P", "N0", "P0", "B", "Tau_N", "Tau_P", \
-                "Sf", "Sb", "Temperature", "Theta", "Alpha", "Delta", "Frac-Emitted")
+            # Contextually-dependent options for batchable params
+            if self.IC_is_AIC:
+                self.batch_param_select = tk.OptionMenu(self.batch_popup, self.batch_param, *[key for key in self.sys_param_entryboxes_dict.keys() if not (key == "Thickness" or key == "dx")], 
+                                                        *[key for key in self.analytical_entryboxes_dict.keys() if not (
+                                                            (self.calculate_init_material_expfactor.get() and (key == "AIC_expfactor")) or
+                                                            (not self.calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
+                                                            (self.AIC_gen_power_mode.get() == "power-spot" and (key == "Power_Density" or key == "Max_Gen" or key == "Total_Gen")) or
+                                                            (self.AIC_gen_power_mode.get() == "density" and (key == "Power" or key == "Spotsize" or key == "Max_Gen" or key == "Total_Gen")) or
+                                                            (self.AIC_gen_power_mode.get() == "max-gen" and (key == "Power" or key == "Spotsize" or key == "Power_Density" or key == "Total_Gen")) or
+                                                            (self.AIC_gen_power_mode.get() == "total-gen" and (key == "Power_Density" or key == "Power" or key == "Spotsize" or key == "Max_Gen"))
+                                                            )])
+            else:
+                self.batch_param_select = tk.OptionMenu(self.batch_popup, self.batch_param, *[key for key in self.sys_param_entryboxes_dict.keys() if not (key == "Thickness" or key == "dx")])
             self.batch_param_select.grid(row=0,column=2)
 
             self.batch_param_entry = tk.Entry(self.batch_popup, width=80)
@@ -2655,6 +2679,7 @@ class Notebook:
 
         if self.check_reset_inits.get() or force:
             self.deleteall_HIC()
+            self.IC_is_AIC = False
             self.thickness = None
             self.dx = None
             self.init_N = None
@@ -2726,7 +2751,6 @@ class Notebook:
         return
 
     def add_AIC(self):
-        ## TODO: Redo this for new AIC function
         # Read AIC parameters and plot when relevant button pressed
         try:
             self.set_init_x()
@@ -2749,6 +2773,9 @@ class Notebook:
         except ValueError as oops:
             self.write(self.ICtab_status, oops)
             return
+
+        # Flush HICs, as AIC will overwrite the entire spatial mesh
+        self.deleteall_HIC(False)
 
         # Establish constants; calculate alpha
         # FIXME: Units
@@ -2846,12 +2873,10 @@ class Notebook:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
 
-        # Flush HICs, as AIC will overwrite the entire spatial mesh
-        self.deleteall_HIC(False)
-
         ## Assuming that the initial distributions of holes and electrons are identical
         self.init_P = self.init_N
         self.update_IC_plot()
+        self.IC_is_AIC = True
         return
 
     ## Special functions for Heuristic Init:
@@ -3014,6 +3039,7 @@ class Notebook:
         self.HIC_list.append(newInitCond)
         self.HIC_listbox.insert(self.HIC_list.__len__() - 1, newInitCond.get())
         self.recalc_HIC()
+        self.IC_is_AIC = False
         self.update_IC_plot()
         return
 
@@ -3096,7 +3122,7 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
            
-        temp_IC_values = np.zeros(int(0.5 + self.thickness / self.dx))
+        temp_IC_values = np.zeros(int(0.5 + self.thickness / self.dx)) if not is_edge else np.zeros(int(0.5 + self.thickness / self.dx) + 1)
 
         try:
             IC_values_list.sort(key = lambda x:float(x[0:x.find('\t')]))
@@ -3139,6 +3165,7 @@ class Notebook:
         elif (IC_type == "chi"):
             self.init_Chi = np.copy(temp_IC_values)
 
+        self.IC_is_AIC = False
         self.update_IC_plot(warn=warning_flag)
         return
 
@@ -3221,19 +3248,23 @@ class Notebook:
             self.write(self.batch_status, "Error: {} folder already exists".format(batch_dir_name))
             return
 
-        # Separate the AIC params from this
-        # And consider replacing with self.sys_param_entryboxes_dict
-        appended_sys_param_entryboxes_dict = {"Mu_N":self.N_mobility_entry, "Mu_P":self.P_mobility_entry, "N0":self.n0_entry, "P0":self.p0_entry, 
-                                          "Thickness":self.thickness_entry, "B":self.B_entry, "Tau_N":self.tauN_entry, "Tau_P":self.tauP_entry,
-                                          "Sf":self.Sf_entry, "Sb":self.Sb_entry, "Temperature":self.temperature_entry, "Rel-Permitivity":self.rel_permitivity_entry, 
-                                          "Theta":self.theta_entry, "Alpha":self.alpha_entry, "Delta":self.delta_entry, "Frac-Emitted":self.frac_emitted_entry, "dx":self.dx_entry, 
-                                          "A0":self.A0_entry, "Eg":self.Eg_entry}
+        appended_sys_param_entryboxes_dict = dict(self.sys_param_entryboxes_dict)
+
+        if self.IC_is_AIC:
+            # dict.update(dict2) adds the contents of dict2 to dict, overwriting values in dict if needed
+            appended_sys_param_entryboxes_dict.update(dict(self.analytical_entryboxes_dict))
 
         try:
             for batch_value in batch_values:
-                # TODO: update this for batchable AIC
-                # This may require updating the IC with self.add_AIC()
                 self.enter(appended_sys_param_entryboxes_dict[self.batch_param.get()], str(batch_value))
+                
+                # It turns out that the previous batch tool did not actually support differing IC distributions, only
+                # different parameter sets with the same IC distribution. To make IC distributions batchable, we
+                # simply call a function to calculate the new IC every time a new parameter that changes the IC is entered
+
+                # So far this only applies to the AIC
+                if self.IC_is_AIC:
+                    self.add_AIC()
                 # For whatever reason, tk.filedialog.asksaveasfilename will automatically append .txt to the file name before passing to self.write_init_file(). 
                 # This behavior is NOT done by default, so here the .txt is manually appended to the file name.
                 self.write_init_file("{}\\{}\\{}{:.0e}.txt".format(self.default_dirs["Initial"], batch_dir_name, self.batch_param.get(),batch_value))
