@@ -23,19 +23,19 @@ def toIndex(x,dx, absUpperBound, is_edge=False):
 
     return int((x - absLowerBound) / dx)
 
-def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, h=6.626e-34, c=2.997e8):
-    # h and c are Planck's const and speed of light, respectively. These default to common units but
+def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
+    # h and c are Planck's const and speed of light, respectively. These default to common units [J*s] and [m/s] but
     # they may be passed in with different units.
-    return (power / (spotsize * freq * h * c * wavelength) * alpha * np.exp(-alpha * x_array))
+    return (power / (spotsize * freq * hc / wavelength) * alpha * np.exp(-alpha * x_array))
 
-def pulse_laser_powerdensity(power_density, freq, wavelength, alpha, x_array, h=6.626e-34, c=2.997e8):
-    return (power_density / (freq * h * c * wavelength) * alpha * np.exp(-alpha * x_array))
+def pulse_laser_powerdensity(power_density, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
+    return (power_density / (freq * hc / wavelength) * alpha * np.exp(-alpha * x_array))
 
-def pulse_laser_maxgen(max_gen, alpha, x_array, h=6.626e-34, c=2.997e8):
+def pulse_laser_maxgen(max_gen, alpha, x_array, hc=6.626e-34*2.997e8):
     return (max_gen * np.exp(-alpha * x_array))
 
-def pulse_laser_totalgen(total_gen, total_length, alpha, x_array, h=6.626e-34, c=2.997e8):
-    return ((total_gen * alpha * np.exp(alpha * total_length)) / (np.exp(alpha * total_length) - 1) * np.exp(-alpha * x_array))
+def pulse_laser_totalgen(total_gen, total_length, alpha, x_array, hc=6.626e-34*2.997e8):
+    return ((total_gen * total_length * alpha * np.exp(alpha * total_length)) / (np.exp(alpha * total_length) - 1) * np.exp(-alpha * x_array))
 
 def toCoord(i,dx, is_edge=False):
     absLowerBound = dx / 2 if not is_edge else 0

@@ -484,8 +484,8 @@ class Notebook:
         self.save_ICfile_button = tk.Button(self.tab_inputs, text="Save", command=self.save_ICfile)
         self.save_ICfile_button.grid(row=0,column=1, padx=(0,30), pady=(24,0))
 
-        #self.DEBUG_BUTTON = tk.Button(self.tab_inputs, text="debug", command=self.DEBUG)
-        #self.DEBUG_BUTTON.grid(row=0,column=0,columnspan=2, pady=(24,0))
+        self.DEBUG_BUTTON = tk.Button(self.tab_inputs, text="debug", command=self.DEBUG)
+        self.DEBUG_BUTTON.grid(row=0,column=0,columnspan=2, pady=(24,0))
 
         self.system_params_head = tk.ttk.Label(self.tab_inputs, text="System Parameters",style="Header.TLabel")
         self.system_params_head.grid(row=1, column=0,columnspan=2)
@@ -653,13 +653,13 @@ class Notebook:
         self.calc_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 1")
         self.calc_AIC_expfactor_label.grid(row=2,column=1)
 
-        self.A0_label = tk.Label(self.material_param_frame, text="A0 [WIP]")
+        self.A0_label = tk.Label(self.material_param_frame, text="A0 [cm^-1 eV^-γ]")
         self.A0_label.grid(row=2,column=2)
 
         self.A0_entry = tk.Entry(self.material_param_frame, width=9)
         self.A0_entry.grid(row=2,column=3)
 
-        self.Eg_label = tk.Label(self.material_param_frame, text="Eg [WIP]")
+        self.Eg_label = tk.Label(self.material_param_frame, text="Eg [eV]")
         self.Eg_label.grid(row=3,column=2)
 
         self.Eg_entry = tk.Entry(self.material_param_frame, width=9)
@@ -668,13 +668,13 @@ class Notebook:
         self.direct_AIC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.AIC_stim_mode, value="direct")
         self.direct_AIC_stim.grid(row=4,column=2)
 
-        self.direct_AIC_stim_label = tk.Label(self.material_param_frame,text="Direct")
+        self.direct_AIC_stim_label = tk.Label(self.material_param_frame,text="Direct (γ=1/2)")
         self.direct_AIC_stim_label.grid(row=4,column=3)
 
         self.indirect_AIC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.AIC_stim_mode, value="indirect")
         self.indirect_AIC_stim.grid(row=5,column=2)
 
-        self.indirect_AIC_stim_label = tk.Label(self.material_param_frame,text="Indirect")
+        self.indirect_AIC_stim_label = tk.Label(self.material_param_frame,text="Indirect (γ=2)")
         self.indirect_AIC_stim_label.grid(row=5,column=3)
 
         self.hline2_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
@@ -686,7 +686,7 @@ class Notebook:
         self.enter_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 2")
         self.enter_AIC_expfactor_label.grid(row=7,column=1)
 
-        self.AIC_expfactor_label = tk.Label(self.material_param_frame, text="α [WIP]")
+        self.AIC_expfactor_label = tk.Label(self.material_param_frame, text="α [cm^-1]")
         self.AIC_expfactor_label.grid(row=8,column=2)
 
         self.AIC_expfactor_entry = tk.Entry(self.material_param_frame, width=9)
@@ -702,7 +702,7 @@ class Notebook:
         self.hline3_separator = tk.ttk.Separator(self.pulse_laser_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline3_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.pulse_freq_label = tk.Label(self.pulse_laser_frame, text="Pulse frequency [1/s]")
+        self.pulse_freq_label = tk.Label(self.pulse_laser_frame, text="Pulse frequency [kHz]")
         self.pulse_freq_label.grid(row=2,column=2)
 
         self.pulse_freq_entry = tk.Entry(self.pulse_laser_frame, width=9)
@@ -735,7 +735,7 @@ class Notebook:
         self.power_entry = tk.Entry(self.gen_power_param_frame, width=9)
         self.power_entry.grid(row=2,column=3)
 
-        self.spotsize_label = tk.Label(self.gen_power_param_frame, text="Spot size [nm^2]")
+        self.spotsize_label = tk.Label(self.gen_power_param_frame, text="Spot size [cm^2]")
         self.spotsize_label.grid(row=3,column=2)
 
         self.spotsize_entry = tk.Entry(self.gen_power_param_frame, width=9)
@@ -750,7 +750,7 @@ class Notebook:
         self.power_density_rb_label = tk.Label(self.gen_power_param_frame,text="Option 2")
         self.power_density_rb_label.grid(row=5,column=1)
 
-        self.power_density_label = tk.Label(self.gen_power_param_frame, text="Power Density [uW/nm]")
+        self.power_density_label = tk.Label(self.gen_power_param_frame, text="Power Density [uW/cm^2]")
         self.power_density_label.grid(row=5,column=2)
 
         self.power_density_entry = tk.Entry(self.gen_power_param_frame, width=9)
@@ -765,7 +765,7 @@ class Notebook:
         self.max_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 3")
         self.max_gen_rb_label.grid(row=7,column=1)
 
-        self.max_gen_label = tk.Label(self.gen_power_param_frame, text="Max Generation")
+        self.max_gen_label = tk.Label(self.gen_power_param_frame, text="Max Generation [carr/cm^3]")
         self.max_gen_label.grid(row=7,column=2)
 
         self.max_gen_entry = tk.Entry(self.gen_power_param_frame, width=9)
@@ -780,7 +780,7 @@ class Notebook:
         self.total_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 4")
         self.total_gen_rb_label.grid(row=9,column=1)
 
-        self.total_gen_label = tk.Label(self.gen_power_param_frame, text="Total Generation")
+        self.total_gen_label = tk.Label(self.gen_power_param_frame, text="Total Generation [carr/cm^3]")
         self.total_gen_label.grid(row=9,column=2)
 
         self.total_gen_entry = tk.Entry(self.gen_power_param_frame, width=9)
@@ -789,7 +789,7 @@ class Notebook:
         self.load_AIC_button = tk.Button(self.tab_analytical_init, text="Generate Initial Condition", command=self.add_AIC)
         self.load_AIC_button.grid(row=2,column=3,columnspan=3)
 
-        self.AIC_description = tk.Message(self.tab_analytical_init, text="The Analytical Initial Condition uses four numerical parameters to generate an initial carrier distribution based on an exponential equation.", width=320)
+        self.AIC_description = tk.Message(self.tab_analytical_init, text="The Analytical Initial Condition uses the above numerical parameters to generate an initial carrier distribution based on an exponential decay equation.", width=320)
         self.AIC_description.grid(row=3,column=3,columnspan=3)
         
         ## Heuristic Initial Condition(HIC):
@@ -2779,45 +2779,49 @@ class Notebook:
 
         # Establish constants; calculate alpha
         # FIXME: Units
-        h = 6.626e-34   # [J/s]
+        h = 6.626e-34   # [J*s]
         c = 2.997e8     # [m/s]
-
-        try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm^-1]
+        hc_evnm = h * c * 6.241e18 * 1e9    # [J*m] to [eV*nm]
+        hc_nm = h * c * 1e9     # [J*m] to [J*nm] 
+        try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
         except ValueError:
             self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
             return
 
         if (AIC_options["long_expfactor"]):
-            try: A0 = float(self.A0_entry.get())         # [?]
+            try: A0 = float(self.A0_entry.get())         # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
             except ValueError:
                 self.write(self.ICtab_status, "Error: missing or invalid A0")
                 return
 
-            try: Eg = float(self.Eg_entry.get())                  # [?]
+            try: Eg = float(self.Eg_entry.get())                  # [eV]
             except ValueError:
                 self.write(self.ICtab_status, "Error: missing or invalid Eg")
                 return
 
             if AIC_options["incidence"] == "direct":
-                alpha = A0 * (h * c / wavelength - Eg) ** 0.5
+                alpha = A0 * (hc_evnm / wavelength - Eg) ** 0.5     # [cm^-1]
 
             elif AIC_options["incidence"] == "indirect":
-                alpha = A0 * (h * c / wavelength - Eg) ** 2
+                alpha = A0 * (hc_evnm / wavelength - Eg) ** 2
 
             else:
                 self.write(self.ICtab_status, "Select \"direct\" or \"indirect\"")
                 return
 
         else:
-            try: alpha = float(self.AIC_expfactor_entry.get())
+            try: 
+                alpha = float(self.AIC_expfactor_entry.get()) # [cm^-1]
             except ValueError:
                 self.write(self.ICtab_status, "Error: missing or invalid α")
                 return
 
+        alpha_nm = alpha * 1e-7 # [cm^-1] to [nm^-1]
+
         if (AIC_options["power_mode"] == "power-spot"):
             try: 
-                power = float(self.power_entry.get())
-                spotsize = float(self.spotsize_entry.get())
+                power = float(self.power_entry.get()) * 1e-6  # [uJ/s] to [J/s]
+                spotsize = float(self.spotsize_entry.get()) * ((1e7) ** 2)     # [cm^2] to [nm^2]
             except ValueError:
                 self.write(self.ICtab_status, "Error: missing power or spot size")
                 return
@@ -2826,16 +2830,16 @@ class Notebook:
                 freq = 1
             else:
                 try:
-                    freq = float(self.pulse_freq_entry.get())
+                    freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
 
                 except ValueError:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.init_N = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, self.init_x)
+            self.init_N = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.init_x, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "density"):
-            try: power_density = float(self.power_density_entry.get())
+            try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
             except ValueError:
                 self.write(self.ICtab_status, "Error: missing power density")
                 return
@@ -2844,30 +2848,30 @@ class Notebook:
                 freq = 1
             else:
                 try:
-                    freq = float(self.pulse_freq_entry.get())
+                    freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
 
                 except ValueError:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.init_N = finite.pulse_laser_powerdensity(power_density, freq, wavelength, alpha, self.init_x)
+            self.init_N = finite.pulse_laser_powerdensity(power_density, freq, wavelength, alpha_nm, self.init_x, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "max-gen"):
-            try: max_gen = float(self.max_gen_entry.get())
+            try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
             except ValueError:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
-            self.init_N = finite.pulse_laser_maxgen(max_gen, alpha, self.init_x, h=6.626e-34, c=2.997e8)
+            self.init_N = finite.pulse_laser_maxgen(max_gen, alpha_nm, self.init_x)
         
 
         elif (AIC_options["power_mode"] == "total-gen"):
-            try: total_gen = float(self.total_gen_entry.get())
+            try: total_gen = float(self.total_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
             except ValueError:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
-            self.init_N = finite.pulse_laser_totalgen(total_gen, self.thickness, alpha, self.init_x)
+            self.init_N = finite.pulse_laser_totalgen(total_gen, self.thickness, alpha_nm, self.init_x)
         
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
@@ -3176,16 +3180,16 @@ class Notebook:
         plot.clf()
         plot.yscale('log')
 
-        max_N = np.amax(self.init_N)
-        max_P = np.amax(self.init_P)
+        max_N = np.amax(self.init_N) * ((1e7) ** 3)
+        max_P = np.amax(self.init_P) * ((1e7) ** 3)
         largest_initValue = max(max_N, max_P)
         plot.ylim((largest_initValue + 1e-30) * 1e-12, (largest_initValue + 1e-30) * 1e4)
 
-        plot.plot(self.init_x, self.init_N, label="delta_N")
-        plot.plot(self.init_x, self.init_P, label="delta_P")
+        plot.plot(self.init_x, self.init_N * ((1e7) ** 3), label="delta_N") # [per nm^3] to [per cm^3]
+        plot.plot(self.init_x, self.init_P * ((1e7) ** 3), label="delta_P")
 
         plot.xlabel("x [nm]")
-        plot.ylabel("ΔN, ΔP [per nm^-3]")
+        plot.ylabel("ΔN, ΔP [per cm^-3]")
         plot.title("Initial ΔN, ΔP Distribution")
         plot.legend()
         plot.tight_layout()
