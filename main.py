@@ -311,6 +311,7 @@ class Notebook:
 
         # Tkinter elements require special variables to extract user input
         self.check_ignore_recycle = tk.IntVar()
+        self.check_symmetric = tk.IntVar()
         self.check_do_ss = tk.BooleanVar()
         self.check_reset_params = tk.BooleanVar()
         self.check_reset_inits = tk.BooleanVar()
@@ -577,48 +578,54 @@ class Notebook:
         self.alpha_entry = tk.Entry(self.tab_inputs, width=9)
         self.alpha_entry.grid(row=16,column=1)
 
-        self.ignore_recycle_checkbutton = tk.Checkbutton(self.tab_inputs, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
-        self.ignore_recycle_checkbutton.grid(row=17,column=0)
-
         self.delta_label = tk.Label(self.tab_inputs, text="Delta Frac.")
-        self.delta_label.grid(row=18,column=0)
+        self.delta_label.grid(row=17,column=0)
 
         self.delta_entry = tk.Entry(self.tab_inputs, width=9)
-        self.delta_entry.grid(row=18,column=1)
+        self.delta_entry.grid(row=17,column=1)
 
         self.frac_emitted_label = tk.Label(self.tab_inputs, text="Frac. Emitted (0 to 1)")
-        self.frac_emitted_label.grid(row=19,column=0)
+        self.frac_emitted_label.grid(row=18,column=0)
 
         self.frac_emitted_entry = tk.Entry(self.tab_inputs, width=9)
-        self.frac_emitted_entry.grid(row=19,column=1)
+        self.frac_emitted_entry.grid(row=18,column=1)
+
+        self.flags_head = tk.ttk.Label(self.tab_inputs, text="Flags", style="Header.TLabel")
+        self.flags_head.grid(row=19,column=0,columnspan=2)
+
+        self.ignore_recycle_checkbutton = tk.Checkbutton(self.tab_inputs, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
+        self.ignore_recycle_checkbutton.grid(row=20,column=0)
+
+        self.symmetry_checkbutton = tk.Checkbutton(self.tab_inputs, text="Symmetric system?", variable=self.check_symmetric, onvalue=1, offvalue=0)
+        self.symmetry_checkbutton.grid(row=21,column=0)
 
         self.steps_head = tk.ttk.Label(self.tab_inputs, text="Resolution Setting", style="Header.TLabel")
-        self.steps_head.grid(row=20,column=0,columnspan=2)
+        self.steps_head.grid(row=22,column=0,columnspan=2)
 
         self.thickness_label = tk.Label(self.tab_inputs, text="Thickness (nm)")
-        self.thickness_label.grid(row=21,column=0)
+        self.thickness_label.grid(row=23,column=0)
 
         self.thickness_entry = tk.Entry(self.tab_inputs, width=9)
-        self.thickness_entry.grid(row=21,column=1)
+        self.thickness_entry.grid(row=23,column=1)
 
         self.dx_label = tk.Label(self.tab_inputs, text="Space step size [nm]")
-        self.dx_label.grid(row=22,column=0)
+        self.dx_label.grid(row=24,column=0)
 
         self.dx_entry = tk.Entry(self.tab_inputs, width=9)
-        self.dx_entry.grid(row=22,column=1)
+        self.dx_entry.grid(row=24,column=1)
 
-        self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=6)
-        self.ICtab_status.grid(row=23, rowspan=4, column=0, columnspan=2)
+        self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=4)
+        self.ICtab_status.grid(row=25, rowspan=2, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
 
         self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset System Parameters", variable=self.check_reset_params, onvalue=True, offvalue=False)
-        self.reset_params_checkbutton.grid(row=27,column=0)
+        self.reset_params_checkbutton.grid(row=27, column=0)
 
         self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset Initial Distributions", variable=self.check_reset_inits, onvalue=True, offvalue=False)
         self.reset_params_checkbutton.grid(row=28,column=0)
 
         self.reset_IC_button = tk.Button(self.tab_inputs, text="Reset", command=self.reset_IC)
-        self.reset_IC_button.grid(row=29,column=0, columnspan=2)
+        self.reset_IC_button.grid(row=29, column=0, columnspan=2)
 
         self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", style="Grey Bar.TSeparator")
         self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
@@ -880,19 +887,19 @@ class Notebook:
         self.init_fig_NP = plot.figure(1, figsize=(4.85,3))
         self.init_canvas_NP = tkagg.FigureCanvasTkAgg(self.init_fig_NP, master=self.tab_inputs)
         self.init_NP_plotwidget = self.init_canvas_NP.get_tk_widget()
-        self.init_NP_plotwidget.grid(row=17,column=3,rowspan=10,columnspan=2)
+        self.init_NP_plotwidget.grid(row=17,column=3,rowspan=12,columnspan=2)
 
         self.np_toolbar_frame = tk.Frame(master=self.tab_inputs)
-        self.np_toolbar_frame.grid(row=28,column=3,columnspan=2)
+        self.np_toolbar_frame.grid(row=29,column=3,columnspan=2)
         self.np_toolbar = tkagg.NavigationToolbar2Tk(self.init_canvas_NP, self.np_toolbar_frame)
 
         self.init_fig_ec = plot.figure(2, figsize=(4.85,3))
         self.init_canvas_ec = tkagg.FigureCanvasTkAgg(self.init_fig_ec, master=self.tab_inputs)
         self.init_ec_plotwidget = self.init_canvas_ec.get_tk_widget()
-        self.init_ec_plotwidget.grid(row=17,column=5,rowspan=10,columnspan=2)
+        self.init_ec_plotwidget.grid(row=17,column=5,rowspan=12,columnspan=2)
 
         self.ec_toolbar_frame = tk.Frame(master=self.tab_inputs)
-        self.ec_toolbar_frame.grid(row=28,column=5,columnspan=2)
+        self.ec_toolbar_frame.grid(row=29,column=5,columnspan=2)
         self.ec_toolbar = tkagg.NavigationToolbar2Tk(self.init_canvas_ec, self.ec_toolbar_frame)
 
         # Dictionaries of parameter entry boxes
@@ -901,7 +908,8 @@ class Notebook:
                                           "Sf":self.Sf_entry, "Sb":self.Sb_entry, "Temperature":self.temperature_entry, "Rel-Permitivity":self.rel_permitivity_entry, "Ext_E-Field":self.ext_efield_entry,
                                           "Theta":self.theta_entry, "Alpha":self.alpha_entry, "Delta":self.delta_entry, "Frac-Emitted":self.frac_emitted_entry, "dx":self.dx_entry}
 
-        self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle)}
+        self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle),
+                              "symmetric_system":Flag(self.symmetry_checkbutton, self.check_symmetric)}
 
         self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "AIC_expfactor":self.AIC_expfactor_entry, "Pulse_Freq":self.pulse_freq_entry, 
                                            "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
@@ -1081,11 +1089,7 @@ class Notebook:
         return
 
     def DEBUG(self):
-        self.enter(self.AIC_expfactor_entry, "0.004")
-        self.enter(self.max_gen_entry, "20")
-        self.enter(self.pulse_freq_entry, "1")
-        self.enter(self.pulse_wavelength_entry, "520")
-        print("IC_IS_AIC = {}".format(self.IC_is_AIC))
+        print("check_symmetric = {}".format(self.check_symmetric.get()))
         return
 
     ## Functions to create popups and manage
@@ -3185,8 +3189,16 @@ class Notebook:
         largest_initValue = max(max_N, max_P)
         plot.ylim((largest_initValue + 1e-30) * 1e-12, (largest_initValue + 1e-30) * 1e4)
 
-        plot.plot(self.init_x, self.init_N * ((1e7) ** 3), label="delta_N") # [per nm^3] to [per cm^3]
-        plot.plot(self.init_x, self.init_P * ((1e7) ** 3), label="delta_P")
+
+        if self.sys_flag_dict["symmetric_system"].value:
+            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_N), self.init_N), axis=0) * ((1e7) ** 3), label="delta_N") # [per nm^3] to [per cm^3]
+            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_P), self.init_P), axis=0) * ((1e7) ** 3), label="delta_P")
+            
+            ymin, ymax = plot.gca().get_ylim()
+            plot.fill([-self.init_x[-1], 0, 0, -self.init_x[-1]], [ymin, ymin, ymax, ymax], 'b', alpha=0.1, edgecolor='r')
+        else:
+            plot.plot(self.init_x, self.init_N * ((1e7) ** 3), label="delta_N") # [per nm^3] to [per cm^3]
+            plot.plot(self.init_x, self.init_P * ((1e7) ** 3), label="delta_P")
 
         plot.xlabel("x [nm]")
         plot.ylabel("ΔN, ΔP [per cm^-3]")
@@ -3351,7 +3363,7 @@ class Notebook:
                                           "Sf":0, "Sb":0, "Temperature":0, "Rel-Permitivity":0, "Ext_E-Field":0,
                                           "Theta":0, "Alpha":0, "Delta":0, "Frac-Emitted":0, "dx":0}
 
-                flag_values_dict = {"ignore_alpha":0}
+                flag_values_dict = {"ignore_alpha":0, "symmetric_system":0}
                 node_init_list = []
                 edge_init_list = []
                 initFlag = 0
@@ -3409,8 +3421,7 @@ class Notebook:
 
         for key in flag_values_dict:
             self.sys_flag_dict[key].value = int(flag_values_dict[key])
-            if (self.sys_flag_dict[key].value): self.sys_flag_dict[key].tk_var.set(1)
-            else: self.sys_flag_dict[key].tk_var.set(0)
+            self.sys_flag_dict[key].tk_var.set(self.sys_flag_dict[key].value)
 
         try:
             self.set_init_x()
