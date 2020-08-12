@@ -41,21 +41,21 @@ def toCoord(i,dx, is_edge=False):
     absLowerBound = dx / 2 if not is_edge else 0
     return (absLowerBound + i * dx)
 
-def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0):
-    distance = np.linspace(0, m*dx, m)
+def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, symmetric=True):
+    distance = np.arange(0, m*dx, dx)
     distance_matrix = np.zeros((m, m))
     lf_distance_matrix = np.zeros((m, m)) # Account for "other half" of a symmetric system
 
     # Each row in distance_matrix represents the weight function centered around a different position
     for i in range(0,m):
         distance_matrix[i] = np.concatenate((np.flip(distance[0:i+1], 0), distance[1:m - i]))
-        lf_distance_matrix[i] = distance + (i * dx)
+        if symmetric: lf_distance_matrix[i] = distance + ((i+1) * dx)
     
     combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * (np.exp(-(alphaCof + thetaCof) * distance_matrix) + np.exp(-(alphaCof + thetaCof) * lf_distance_matrix))
     #combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * np.exp(-(alphaCof + thetaCof) * distance_matrix) 
     return combined_weight
 
-def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, recycle_photons=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, E_field_ext=0, init_N=0, init_P=0, init_E_field=0, init_Ec=0, init_Chi=0, write_output=True):
+def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, recycle_photons=True, symmetric=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, E_field_ext=0, init_N=0, init_P=0, init_E_field=0, init_Ec=0, init_Chi=0, write_output=True):
     ## Problem statement:
     # Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
     # Space step size is dx, time step is dt
@@ -83,7 +83,7 @@ def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_
 
     ## Generate a weight distribution needed for photon recycle term if photon recycle is being considered
     if recycle_photons:
-        combined_weight = gen_weight_distribution(m, dx, alphaCof, thetaCof, delta_frac, fracEmitted)
+        combined_weight = gen_weight_distribution(m, dx, alphaCof, thetaCof, delta_frac, fracEmitted, symmetric)
     else:
         combined_weight = 0
 
