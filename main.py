@@ -2633,7 +2633,11 @@ class Notebook:
                         temp_N = np.array(ifstream_N.root.N)
                         temp_P = np.array(ifstream_P.root.P)
                         data = ((temp_N + n0) * (temp_P + p0) - n0 * p0) / (tauN * (temp_P + p0) + tauP * (temp_N + n0))
-                        I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 else:
                     if include_negative:
