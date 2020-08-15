@@ -3,7 +3,7 @@ One-layer transient PL simulations, but in runnable application form
 
 ### Installation
 
-0. Ensure you have installed Python version 3.7+.
+0. Ensure you have installed Python version 3.7+ and downloaded [PyTables](https://www.pytables.org/downloads.html) version 3.6+.
 1. Download the files **main.py**, **finite.py**, and **odefuncs.py** to an empty directory.
 2. Run **main.py** as you would normally run a Python script - through your favorite IDE or using a command prompt with something akin to `python main.py`.
 
