@@ -63,7 +63,7 @@ class Initial_Condition:
 
 class Data_Set:
     # Object containing all the metadata required to plot and integrate saved data sets
-    def __init__(self, data, grid_x, node_x, edge_x, mu_n, mu_p, n0, p0, total_x, dx, B, tau_N, tau_P, Sf, Sb, temperature, rel_permitivity, ext_E_field, theta, alpha, delta, frac_emitted, total_t, dt, ignored_alpha, type, filename, show_index):
+    def __init__(self, data, grid_x, node_x, edge_x, params, type, filename, show_index):
         self.data = data            # The actual data e.g. N(x,t) associated with this set
         self.grid_x = grid_x        # Array of x-coordinates at which data was calculated - plotter uses these as x values
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
@@ -72,15 +72,13 @@ class Data_Set:
         # node_x and grid_x will usually be identical, unless the data is a type (like E-field) that exists on edges
         # There's a little optimization that can be made here because grid_x will either be identical to node_x or edge_x, but that makes the code harder to follow
 
-        self.num_tsteps = int(0.5 + total_t / dt)
         self.type = type            # String identifying variable the data is for e.g. N, P
         self.filename = filename    # String identifying file from which data set was read
         self.show_index = show_index# Time step number data belongs to
-		
-		# Python dictionaries are otherwise known as hash tables in other languages - each value in the table is assigned a key we can use to access it
-        self.params_dict = {"Mu_N": mu_n, "Mu_P": mu_p, "N0": n0, "P0": p0, "Thickness": total_x, "dx": dx, "B": B, "Tau_N": tau_N, "Tau_P": tau_P, "Sf": Sf, \
-            "Sb": Sb, "Temperature": temperature, "Rel-Permitivity": rel_permitivity, "Ext_E-Field": ext_E_field, "Theta": theta, "Alpha": alpha, "Delta": delta, "Frac-Emitted": frac_emitted, \
-            "Total-Time": total_t,"dt": dt,"ignore_alpha": ignored_alpha}
+
+		# dict() can be used to give a Data_Set a copy of the dictionary passed to it
+        self.params_dict = dict(params)
+        self.num_tsteps = int(0.5 + self.params_dict["Total-Time"] / self.params_dict["dt"])
         return
 
     def tag(self):
@@ -1909,7 +1907,8 @@ class Notebook:
             plot.xlim(*active_plot.xlim)
 
             for tag in active_datagroup.datasets:
-                plot.plot(active_datagroup.datasets[tag].grid_x, active_datagroup.datasets[tag].data, label=tag)
+                label = tag + "*" if active_datagroup.datasets[tag].params_dict["symmetric_system"] else tag
+                plot.plot(active_datagroup.datasets[tag].grid_x, active_datagroup.datasets[tag].data, label=label)
 
             plot.xlabel("x [nm]")
             plot.ylabel(active_datagroup.type)
@@ -1943,7 +1942,7 @@ class Notebook:
                 param_values_dict = {"Mu_N":0, "Mu_P":0, "N0":0, "P0":0, "Thickness":0, "dx":0,
                                      "B":0, "Tau_N":0, "Tau_P":0,"Sf":0, "Sb":0, 
                                      "Temperature":0, "Rel-Permitivity":0, "Ext_E-Field":0, "Theta":0, "Alpha":0, "Delta":0, 
-                                     "Frac-Emitted":0, "Total-Time":0, "dt":0, "ignore_alpha":0}
+                                     "Frac-Emitted":0, "Total-Time":0, "dt":0, "ignore_alpha":0, "symmetric_system":0}
                 for line in ifstream:
                     if "$" in line: continue
 
@@ -1969,11 +1968,6 @@ class Notebook:
             param_values_dict["Alpha"] = param_values_dict["Alpha"] * self.convert_in_dict["Alpha"]
             param_values_dict["Ext_E-Field"] = param_values_dict["Ext_E-Field"] * self.convert_in_dict["Ext_E-Field"]
 
-            param_tuple = (param_values_dict["Mu_N"], param_values_dict["Mu_P"], param_values_dict["N0"], param_values_dict["P0"], 
-                           param_values_dict["Thickness"], param_values_dict["dx"], param_values_dict["B"], param_values_dict["Tau_N"], 
-                           param_values_dict["Tau_P"], param_values_dict["Sf"], param_values_dict["Sb"], param_values_dict["Temperature"], 
-                           param_values_dict["Rel-Permitivity"], param_values_dict["Ext_E-Field"], param_values_dict["Theta"], param_values_dict["Alpha"], param_values_dict["Delta"], 
-                           param_values_dict["Frac-Emitted"], param_values_dict["Total-Time"], param_values_dict["dt"], param_values_dict["ignore_alpha"])
         except:
             self.write(self.analysis_status, "Error: This data set is missing or has unusual metadata.txt")
             return
@@ -1990,7 +1984,7 @@ class Notebook:
         if (datatype == "ΔN"):
             try:
                 # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
-                new_data = Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                new_data = Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
@@ -1998,7 +1992,7 @@ class Notebook:
 
         elif (datatype == "ΔP"):
             try:
-                new_data = Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                new_data = Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
@@ -2006,7 +2000,7 @@ class Notebook:
 
         elif (datatype == "E-field"):
             try:
-                new_data = Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                new_data = Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
@@ -2015,7 +2009,7 @@ class Notebook:
         elif (datatype == "RR"):
             try:
                 new_data = Data_Set(param_values_dict["B"] * ((self.read_N(data_filename, active_show_index) + param_values_dict["N0"]) * (self.read_P(data_filename, active_show_index) + param_values_dict["P0"]) - param_values_dict["N0"] * param_values_dict["P0"]), 
-                                    data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                                    data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: Unable to calculate Rad Rec")
@@ -2027,7 +2021,7 @@ class Notebook:
                 temp_P = self.read_P(data_filename, active_show_index)
                 new_data = Data_Set(((temp_N + param_values_dict["N0"]) * (temp_P + param_values_dict["P0"]) - param_values_dict["N0"] * param_values_dict["P0"]) / 
                                     ((param_values_dict["Tau_N"] * (temp_P + param_values_dict["P0"])) + (param_values_dict["Tau_P"] * (temp_N + param_values_dict["N0"]))), 
-                                    data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                                    data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: Unable to calculate Non Rad Rec")
@@ -2077,7 +2071,7 @@ class Notebook:
                     PL_base[p] += intg.trapz(combined_weight[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * rad_rec[p] + \
                         intg.trapz(combined_weight2[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * rad_rec[p]
 
-                new_data = Data_Set(PL_base, data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                new_data = Data_Set(PL_base, data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except OSError:
                 self.write(self.analysis_status, "Error: Unable to calculate PL")
@@ -2495,6 +2489,8 @@ class Notebook:
             if self.check_ignore_recycle.get(): ofstream.write("ignore_alpha: 1\n")
             else: ofstream.write("ignore_alpha: 0\n")
 
+            if self.check_symmetric.get(): ofstream.write("symmetric_system: 1\n")
+            else: ofstream.write("symmetric_system: 0\n")
 
         return
 
@@ -2553,21 +2549,32 @@ class Notebook:
             theta = active_datagroup.datasets[tag].params_dict["Theta"]
             delta = active_datagroup.datasets[tag].params_dict["Delta"]
             frac_emitted = active_datagroup.datasets[tag].params_dict["Frac-Emitted"]
+            symmetric_flag = active_datagroup.datasets[tag].params_dict["symmetric_system"]
 
             if self.PL_mode == "Current time step":
                 show_index = active_datagroup.datasets[tag].show_index
 
             # Clean up any bounds that extend past the confines of the system
+            # The system usually exists from x=0 to x=total_length, but can accept x=-total_length to x=total_length if symmetric
 
             for bounds in self.integration_bounds:
+                l_bound = bounds[0]
+                u_bound = bounds[1]
                
-                if (bounds[1] > total_length):
-                    bounds[1] = total_length
+                if (u_bound > total_length):
+                    u_bound = total_length
 
-                if (bounds[0] < 0):
-                    bounds[0] = 0
+                if symmetric_flag:
 
-            print("Bounds after cleanup: {}".format(self.integration_bounds))
+                    if (l_bound < -total_length):
+                        l_bound = -total_length
+                else:
+                    if (l_bound < 0):
+                        l_bound = 0
+
+                include_negative = symmetric_flag and (l_bound < 0)
+
+                print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
             #if (self.integration_lbound_entry.get() == "f"):
             #    self.PL = np.zeros((boundList.__len__(), int(n) + 1))
@@ -2580,21 +2587,24 @@ class Notebook:
             #        self.PL[i] = finite.propagatingPL(data_filename, boundList[i] - 500, boundList[i] + 500, dx, 0, total_length - dx, B_param, n0, p0, alpha, theta, delta, frac_emitted)
             #        if boundList[i] == 0:
             #            self.PL[i] *= 2
-            for bounds in self.integration_bounds:
                 if (active_datagroup.datasets[tag].type == "ΔN"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
                         data = ifstream_N.root.N
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
             
                 elif (active_datagroup.datasets[tag].type == "ΔP"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         data = ifstream_P.root.P
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (active_datagroup.datasets[tag].type == "E-field"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
                         data = ifstream_E_field.root.E_field
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (active_datagroup.datasets[tag].type == "RR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
@@ -2603,7 +2613,7 @@ class Notebook:
                         temp_P = np.array(ifstream_P.root.P)
 
                         data = B_param * (temp_N + n0) * (temp_P + p0) - n0 * p0
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (active_datagroup.datasets[tag].type == "NRR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
@@ -2611,10 +2621,10 @@ class Notebook:
                         temp_N = np.array(ifstream_N.root.N)
                         temp_P = np.array(ifstream_P.root.P)
                         data = ((temp_N + n0) * (temp_P + p0) - n0 * p0) / (tauN * (temp_P + p0) + tauP * (temp_N + n0))
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 else:
-                    I_data = finite.propagatingPL(data_filename, bounds[0], bounds[1], dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted)
+                    I_data = finite.propagatingPL(data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
             
 
                 if self.PL_mode == "Current time step":
@@ -2632,7 +2642,7 @@ class Notebook:
                     grid_xaxis = -1 # A dummy value for the I_Set constructor
                     xaxis_label = "Time [ns]"
 
-                self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(bounds[0]) + "_to_" + str(bounds[1])))
+                self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(l_bound) + "_to_" + str(u_bound)))
 
                 counter += 1
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
@@ -3190,7 +3200,7 @@ class Notebook:
         plot.ylim((largest_initValue + 1e-30) * 1e-12, (largest_initValue + 1e-30) * 1e4)
 
 
-        if self.sys_flag_dict["symmetric_system"].value:
+        if self.check_symmetric.get():
             plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_N), self.init_N), axis=0) * ((1e7) ** 3), label="delta_N") # [per nm^3] to [per cm^3]
             plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_P), self.init_P), axis=0) * ((1e7) ** 3), label="delta_P")
             

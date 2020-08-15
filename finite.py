@@ -189,7 +189,7 @@ def ode_twolayer(m, f, dm, df, thickness_Layer1, thickness_Layer2, z0, dt, total
         eta_UC= PL_Layer2_array / integrated_init_N*100    #[%]
     return
 
-def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alphaCof, thetaCof, delta_frac, fracEmitted, radrec_fromfile=True, rad_rec=0):
+def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alphaCof, thetaCof, delta_frac, fracEmitted, symmetric_flag, radrec_fromfile=True, rad_rec=0):
     #note: first dimension of radRec is time, second dimension is space
     if radrec_fromfile:
         with tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
@@ -218,21 +218,18 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
     # but we would need the node at x = 70 to calculate the portion from x = 60 to x = 65 (using PL[3]).
     need_extra_node = u_bound > toCoord(j, dx) + dx / 2 or l_bound == u_bound
 
-    distance = np.linspace(0, max - dx, m)
+    distance = np.arange(0, max, dx)
 
     # Make room for the extra node if needed
     if need_extra_node:
         distance_matrix = np.zeros((j - i + 1 + 1, m))
         lf_distance_matrix = np.zeros((j - i + 1 + 1, m))
-        rf_distance_matrix = np.zeros((j - i + 1 + 1, m))
 
         # Each row in weight will represent the weight function centered around a different position
-        # Total reflection is assumed to occur at either end of the system: 
-        # Left (x=0) reflection is equivalent to a symmetric wire situation while right reflection (x=thickness) is usually negligible
+        # Additional lf_weight counted in if wire is symmetric
         for n in range(i, j + 1 + 1):
             distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
-            lf_distance_matrix[n - i] = distance + (n * dx)
-            rf_distance_matrix[n - i] = (max - distance) + (max - n * dx)
+            lf_distance_matrix[n - i] = distance + ((n+1) * dx)
 
 
     else: # if we don't need the extra node
@@ -242,18 +239,16 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
 
         for n in range(i, j + 1):
             distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
-            lf_distance_matrix[n - i] = distance + (n * dx)
-            rf_distance_matrix[n - i] = (max - distance) + (max - n * dx)
+            lf_distance_matrix[n - i] = distance + ((n+1) * dx)
 
     
     weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
-    lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix)
-    rf_weight = np.exp(-(alphaCof + thetaCof) * rf_distance_matrix) * 0
+    lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix) if symmetric_flag else 0
 
-    combined_weight = (1 - fracEmitted) * 0.5 * thetaCof * delta_frac * (weight + lf_weight + rf_weight)
+    combined_weight = (1 - fracEmitted) * 0.5 * thetaCof * delta_frac * (weight + lf_weight)
 
     weight2 = np.exp(-(thetaCof) * distance_matrix)
-    lf_weight2 = np.exp(-(thetaCof) * lf_distance_matrix)
+    lf_weight2 = np.exp(-(thetaCof) * lf_distance_matrix) if symmetric_flag else 0
 
     combined_weight2 = (1 - fracEmitted) * 0.5 * thetaCof * (1 - delta_frac) * (weight2 + lf_weight2)
 
@@ -316,6 +311,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
     return PL
 
 def integrate(base_data, l_bound, u_bound, dx, max):
+    print("Integrating {} to {}".format(l_bound, u_bound))
     # See propagatingPL() for additional info
     i = toIndex(l_bound, dx, max)
     j = toIndex(u_bound, dx, max)
