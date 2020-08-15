@@ -51,8 +51,9 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmi
         distance_matrix[i] = np.concatenate((np.flip(distance[0:i+1], 0), distance[1:m - i]))
         if symmetric: lf_distance_matrix[i] = distance + ((i+1) * dx)
     
-    combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * (np.exp(-(alphaCof + thetaCof) * distance_matrix) + np.exp(-(alphaCof + thetaCof) * lf_distance_matrix))
-    #combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * np.exp(-(alphaCof + thetaCof) * distance_matrix) 
+    weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
+    lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix) if symmetric else 0
+    combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * (weight + lf_weight)
     return combined_weight
 
 def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, recycle_photons=True, symmetric=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, E_field_ext=0, init_N=0, init_P=0, init_E_field=0, init_Ec=0, init_Chi=0, write_output=True):
@@ -311,7 +312,6 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
     return PL
 
 def integrate(base_data, l_bound, u_bound, dx, max):
-    print("Integrating {} to {}".format(l_bound, u_bound))
     # See propagatingPL() for additional info
     i = toIndex(l_bound, dx, max)
     j = toIndex(u_bound, dx, max)

@@ -2599,12 +2599,20 @@ class Notebook:
                 elif (active_datagroup.datasets[tag].type == "ΔP"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         data = ifstream_P.root.P
-                        I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (active_datagroup.datasets[tag].type == "E-field"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
                         data = ifstream_E_field.root.E_field
-                        I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (active_datagroup.datasets[tag].type == "RR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
@@ -2613,7 +2621,11 @@ class Notebook:
                         temp_P = np.array(ifstream_P.root.P)
 
                         data = B_param * (temp_N + n0) * (temp_P + p0) - n0 * p0
-                        I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (active_datagroup.datasets[tag].type == "NRR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
@@ -2624,7 +2636,11 @@ class Notebook:
                         I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 else:
-                    I_data = finite.propagatingPL(data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
+                    if include_negative:
+                        I_data = finite.propagatingPL(data_filename, 0, -l_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag) + \
+                            finite.propagatingPL(data_filename, 0, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
+                    else:
+                        I_data = finite.propagatingPL(data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
             
 
                 if self.PL_mode == "Current time step":
