@@ -161,7 +161,7 @@ class Plot_State:
         self.time_index = 0
         self.datagroup = Data_Group(ID)
         self.data_filenames = []
-        self.display_legend = True
+        self.display_legend = 1
         return
 
     def remove_duplicate_filenames(self):
@@ -205,7 +205,7 @@ class I_Group:
         self.yaxis_type = 'log'
         self.xlim = (-1,-1)
         self.ylim = (-1,-1)
-        self.display_legend = True
+        self.display_legend = 1
         return
 
     def set_type(self, new_type):
@@ -290,11 +290,6 @@ class Notebook:
         self.get_default_dirs()
 
         # Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
-        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
-        self.convert_out_dict = {"Mu_N": ((1e-7) ** 2) / (1e-9), "Mu_P": ((1e-7) ** 2) / (1e-9), "N0": ((1e7) ** 3), "P0": ((1e7) ** 3), "Thickness": 1, "dx": 1, \
-                        "B": ((1e-7) ** 3) / (1e-9), "Tau_N": 1, "Tau_P": 1, "Sf": (1e-7) / (1e-9), "Sb": (1e-7) / (1e-9), "Temperature": 1, "Rel-Permitivity": 1, "Ext_E-Field": 1e3, \
-                        "Theta": 1e7, "Alpha": 1e7, "Delta": 1, "Frac-Emitted": 1}
-
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
         self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
                                 "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
@@ -305,17 +300,25 @@ class Notebook:
                                 "Temperature": 1, "Rel-Permitivity": 1, 
                                 "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
                                 "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
-                                "Delta": 1, "Frac-Emitted": 1}
+                                "Delta": 1, "Frac-Emitted": 1,
+                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3)}                     # [cm^-3] to [nm^-3]
 
-        # Tkinter elements require special variables to extract user input
+        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
+        self.convert_out_dict = {}
+        for param in self.convert_in_dict:
+            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
+
+        # Tkinter checkboxes and radiobuttons require special variables to extract user input
+        # IntVars or BooleanVars are sufficient for binary choices e.g. whether a checkbox is checked
+        # while StringVars are more suitable for open-ended choices e.g. selecting one mode from a list
         self.check_ignore_recycle = tk.IntVar()
         self.check_symmetric = tk.IntVar()
-        self.check_do_ss = tk.BooleanVar()
-        self.check_reset_params = tk.BooleanVar()
-        self.check_reset_inits = tk.BooleanVar()
-        self.check_display_legend = tk.BooleanVar()
+        self.check_do_ss = tk.IntVar()
+        self.check_reset_params = tk.IntVar()
+        self.check_reset_inits = tk.IntVar()
+        self.check_display_legend = tk.IntVar()
 
-        self.calculate_init_material_expfactor = tk.IntVar()
+        self.check_calculate_init_material_expfactor = tk.IntVar()
         self.AIC_stim_mode = tk.StringVar()
         self.AIC_gen_power_mode = tk.StringVar()
 
@@ -324,10 +327,10 @@ class Notebook:
         self.EIC_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
-        self.bay_params = {"Mu_N":tk.BooleanVar(), "Mu_P":tk.BooleanVar(), "N0":tk.BooleanVar(), "P0":tk.BooleanVar(),
-                        "B":tk.BooleanVar(), "Tau_N":tk.BooleanVar(), "Tau_P":tk.BooleanVar(), "Sf":tk.BooleanVar(), \
-                        "Sb":tk.BooleanVar(), "Temperature":tk.BooleanVar(), "Rel-Permitivity":tk.BooleanVar(), \
-                        "Theta":tk.BooleanVar(), "Alpha":tk.BooleanVar(), "Delta":tk.BooleanVar(), "Frac-Emitted":tk.BooleanVar()}
+        self.check_bay_params = {"Mu_N":tk.IntVar(), "Mu_P":tk.IntVar(), "N0":tk.IntVar(), "P0":tk.IntVar(),
+                        "B":tk.IntVar(), "Tau_N":tk.IntVar(), "Tau_P":tk.IntVar(), "Sf":tk.IntVar(), \
+                        "Sb":tk.IntVar(), "Temperature":tk.IntVar(), "Rel-Permitivity":tk.IntVar(), \
+                        "Theta":tk.IntVar(), "Alpha":tk.IntVar(), "Delta":tk.IntVar(), "Frac-Emitted":tk.IntVar()}
         
         self.bay_mode = tk.StringVar(value="model")
 
@@ -616,10 +619,10 @@ class Notebook:
         self.ICtab_status.grid(row=25, rowspan=2, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
 
-        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset System Parameters", variable=self.check_reset_params, onvalue=True, offvalue=False)
+        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset System Parameters", variable=self.check_reset_params, onvalue=1, offvalue=0)
         self.reset_params_checkbutton.grid(row=27, column=0)
 
-        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset Initial Distributions", variable=self.check_reset_inits, onvalue=True, offvalue=False)
+        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset Initial Distributions", variable=self.check_reset_inits, onvalue=1, offvalue=0)
         self.reset_params_checkbutton.grid(row=28,column=0)
 
         self.reset_IC_button = tk.Button(self.tab_inputs, text="Reset", command=self.reset_IC)
@@ -652,7 +655,7 @@ class Notebook:
         self.hline1_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline1_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.calc_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.calculate_init_material_expfactor, value=1)
+        self.calc_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=1)
         self.calc_AIC_expfactor.grid(row=2,column=0)
 
         self.calc_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 1")
@@ -685,7 +688,7 @@ class Notebook:
         self.hline2_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline2_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.enter_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.calculate_init_material_expfactor, value=0)
+        self.enter_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=0)
         self.enter_AIC_expfactor.grid(row=7,column=0)
 
         self.enter_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 2")
@@ -696,7 +699,6 @@ class Notebook:
 
         self.AIC_expfactor_entry = tk.Entry(self.material_param_frame, width=9)
         self.AIC_expfactor_entry.grid(row=8,column=3)
-
 
         self.pulse_laser_frame = tk.Frame(master=self.tab_analytical_init, highlightbackground="black", highlightthicknes=1)
         self.pulse_laser_frame.grid(row=1,column=4, padx=(20,0))
@@ -811,10 +813,10 @@ class Notebook:
         self.add_HIC_title = tk.Label(self.tab_rules_init, text="Add a custom initial condition (see manual for details)")
         self.add_HIC_title.grid(row=7, column=3,columnspan=2, padx=(6,0))
 
-        self.HIC_var_label = tk.Label(self.tab_rules_init, text="Is this init. cond. for ΔN, ΔP [nm^-3], dEc, or chi?")
+        self.HIC_var_label = tk.Label(self.tab_rules_init, text="Select variable to initialize:")
         self.HIC_var_label.grid(row=8,column=3)
 
-        self.HIC_var_dropdown = tk.OptionMenu(self.tab_rules_init, self.init_var_selection, "ΔN", "ΔP", "dEc", "chi")
+        self.HIC_var_dropdown = tk.OptionMenu(self.tab_rules_init, self.init_var_selection, "ΔN [cm^-3]", "ΔP [cm^-3]", "dEc", "chi")
         self.HIC_var_dropdown.grid(row=8,column=4)
 
         self.HIC_method_label = tk.Label(self.tab_rules_init, text="Select condition method:")
@@ -876,7 +878,7 @@ class Notebook:
         self.EIC_description = tk.Message(self.tab_explicit_init, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified spacing mesh.", width=360)
         self.EIC_description.grid(row=0,column=3)
 
-        self.EIC_dropdown = tk.OptionMenu(self.tab_explicit_init, self.EIC_var_selection, "ΔN", "ΔP", "dEc", "chi")
+        self.EIC_dropdown = tk.OptionMenu(self.tab_explicit_init, self.EIC_var_selection, "ΔN [cm^-3]", "ΔP [cm^-3]", "dEc", "chi")
         self.EIC_dropdown.grid(row=2,column=3)
 
         self.add_EIC_button = tk.Button(self.tab_explicit_init, text="Import", command=self.add_EIC)
@@ -938,7 +940,7 @@ class Notebook:
         self.dt_entry = tk.Entry(self.tab_simulate, width=9)
         self.dt_entry.grid(row=3,column=1)
 
-        self.do_ss_checkbutton = tk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=True, offvalue=False)
+        self.do_ss_checkbutton = tk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
         self.do_ss_checkbutton.grid(row=5,column=0)
 
         self.calculate_NP = tk.Button(self.tab_simulate, text="Calculate ΔN,ΔP", command=self.do_Batch)
@@ -1087,7 +1089,8 @@ class Notebook:
         return
 
     def DEBUG(self):
-        print("check_symmetric = {}".format(self.check_symmetric.get()))
+        print("self.init_N[0] = {} nm^-3".format(self.init_N[0]))
+        print("self.init_P[0] = {} nm^-3".format(self.init_P[0]))
         return
 
     ## Functions to create popups and manage
@@ -1120,8 +1123,8 @@ class Notebook:
             if self.IC_is_AIC:
                 self.batch_param_select = tk.OptionMenu(self.batch_popup, self.batch_param, *[key for key in self.sys_param_entryboxes_dict.keys() if not (key == "Thickness" or key == "dx")], 
                                                         *[key for key in self.analytical_entryboxes_dict.keys() if not (
-                                                            (self.calculate_init_material_expfactor.get() and (key == "AIC_expfactor")) or
-                                                            (not self.calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
+                                                            (self.check_calculate_init_material_expfactor.get() and (key == "AIC_expfactor")) or
+                                                            (not self.check_calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
                                                             (self.AIC_gen_power_mode.get() == "power-spot" and (key == "Power_Density" or key == "Max_Gen" or key == "Total_Gen")) or
                                                             (self.AIC_gen_power_mode.get() == "density" and (key == "Power" or key == "Spotsize" or key == "Max_Gen" or key == "Total_Gen")) or
                                                             (self.AIC_gen_power_mode.get() == "max-gen" and (key == "Power" or key == "Spotsize" or key == "Power_Density" or key == "Total_Gen")) or
@@ -1503,7 +1506,7 @@ class Notebook:
             self.yubound = tk.Entry(self.yframe, width=9)
             self.yubound.grid(row=4,column=1)
 
-            self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Display legend?", variable=self.check_display_legend, onvalue=True, offvalue=False)
+            self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Display legend?", variable=self.check_display_legend, onvalue=1, offvalue=0)
             self.toggle_legend_checkbutton.grid(row=2,column=0,columnspan=2)
 
             self.change_axis_continue_button = tk.Button(self.change_axis_popup, text="Continue", command=partial(self.on_change_axis_popup_close, plot_ID, continue_=True))
@@ -1515,22 +1518,18 @@ class Notebook:
 
             # Set the default values in the entry boxes to be the current options of the plot (in case the user only wants to make a few changes)
             if not (plot_ID == -1):
-                self.enter(self.xlbound, self.analysis_plots[plot_ID].xlim[0])
-                self.enter(self.xubound, self.analysis_plots[plot_ID].xlim[1])
-                self.enter(self.ylbound, self.analysis_plots[plot_ID].ylim[0])
-                self.enter(self.yubound, self.analysis_plots[plot_ID].ylim[1])
-                self.xaxis_type.set(self.analysis_plots[plot_ID].xaxis_type)
-                self.yaxis_type.set(self.analysis_plots[plot_ID].yaxis_type)
-                if self.analysis_plots[plot_ID].display_legend: self.toggle_legend_checkbutton.select()
+                active_plot = self.analysis_plots[plot_ID]
 
             else:
-                self.enter(self.xlbound, self.I_plot.xlim[0])
-                self.enter(self.xubound, self.I_plot.xlim[1])
-                self.enter(self.ylbound, self.I_plot.ylim[0])
-                self.enter(self.yubound, self.I_plot.ylim[1])
-                self.xaxis_type.set(self.I_plot.xaxis_type)
-                self.yaxis_type.set(self.I_plot.yaxis_type)
-                if self.I_plot.display_legend: self.toggle_legend_checkbutton.select()
+                active_plot = self.I_plot
+
+            self.enter(self.xlbound, active_plot.xlim[0])
+            self.enter(self.xubound, active_plot.xlim[1])
+            self.enter(self.ylbound, active_plot.ylim[0])
+            self.enter(self.yubound, active_plot.ylim[1])
+            self.xaxis_type.set(active_plot.xaxis_type)
+            self.yaxis_type.set(active_plot.yaxis_type)
+            self.check_display_legend.set(active_plot.display_legend)
 
             self.change_axis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_change_axis_popup_close, plot_ID, continue_=False))
             self.change_axis_popup.grab_set()
@@ -1723,49 +1722,49 @@ class Notebook:
             self.bay_title_label3 = tk.ttk.Label(self.bay_popup, text="Model Params", style="Header.TLabel")
             self.bay_title_label3.grid(row=4,column=2,columnspan=4)
 
-            self.bay_mun_check = tk.Checkbutton(self.bay_popup, text="Mu_N", variable=self.bay_params["Mu_N"], onvalue=True, offvalue=False)
+            self.bay_mun_check = tk.Checkbutton(self.bay_popup, text="Mu_N", variable=self.check_bay_params["Mu_N"], onvalue=1, offvalue=0)
             self.bay_mun_check.grid(row=5,column=2, padx=(19,0))
 
-            self.bay_mup_check = tk.Checkbutton(self.bay_popup, text="Mu_P", variable=self.bay_params["Mu_P"], onvalue=True, offvalue=False)
+            self.bay_mup_check = tk.Checkbutton(self.bay_popup, text="Mu_P", variable=self.check_bay_params["Mu_P"], onvalue=1, offvalue=0)
             self.bay_mup_check.grid(row=6,column=2, padx=(17,0))
 
-            self.bay_n0_check = tk.Checkbutton(self.bay_popup, text="N0", variable=self.bay_params["N0"], onvalue=True, offvalue=False)
+            self.bay_n0_check = tk.Checkbutton(self.bay_popup, text="N0", variable=self.check_bay_params["N0"], onvalue=1, offvalue=0)
             self.bay_n0_check.grid(row=7,column=2, padx=(3,0))
 
-            self.bay_p0_check = tk.Checkbutton(self.bay_popup, text="P0", variable=self.bay_params["P0"], onvalue=True, offvalue=False)
+            self.bay_p0_check = tk.Checkbutton(self.bay_popup, text="P0", variable=self.check_bay_params["P0"], onvalue=1, offvalue=0)
             self.bay_p0_check.grid(row=8,column=2)
 
-            self.bay_B_check = tk.Checkbutton(self.bay_popup, text="B", variable=self.bay_params["B"], onvalue=True, offvalue=False)
+            self.bay_B_check = tk.Checkbutton(self.bay_popup, text="B", variable=self.check_bay_params["B"], onvalue=1, offvalue=0)
             self.bay_B_check.grid(row=5,column=3, padx=(0,2))
 
-            self.bay_taun_check = tk.Checkbutton(self.bay_popup, text="Tau_N", variable=self.bay_params["Tau_N"], onvalue=True, offvalue=False)
+            self.bay_taun_check = tk.Checkbutton(self.bay_popup, text="Tau_N", variable=self.check_bay_params["Tau_N"], onvalue=1, offvalue=0)
             self.bay_taun_check.grid(row=6,column=3, padx=(24,0))
 
-            self.bay_taup_check = tk.Checkbutton(self.bay_popup, text="Tau_P", variable=self.bay_params["Tau_P"], onvalue=True, offvalue=False)
+            self.bay_taup_check = tk.Checkbutton(self.bay_popup, text="Tau_P", variable=self.check_bay_params["Tau_P"], onvalue=1, offvalue=0)
             self.bay_taup_check.grid(row=7,column=3, padx=(23,0))
 
-            self.bay_sf_check = tk.Checkbutton(self.bay_popup, text="Sf", variable=self.bay_params["Sf"], onvalue=True, offvalue=False)
+            self.bay_sf_check = tk.Checkbutton(self.bay_popup, text="Sf", variable=self.check_bay_params["Sf"], onvalue=1, offvalue=0)
             self.bay_sf_check.grid(row=8,column=3, padx=(1,0))
 
-            self.bay_sb_check = tk.Checkbutton(self.bay_popup, text="Sb", variable=self.bay_params["Sb"], onvalue=True, offvalue=False)
+            self.bay_sb_check = tk.Checkbutton(self.bay_popup, text="Sb", variable=self.check_bay_params["Sb"], onvalue=1, offvalue=0)
             self.bay_sb_check.grid(row=5,column=4, padx=(0,40))
 
-            self.bay_temperature_check = tk.Checkbutton(self.bay_popup, text="Temperature", variable=self.bay_params["Temperature"], onvalue=True, offvalue=False)
+            self.bay_temperature_check = tk.Checkbutton(self.bay_popup, text="Temperature", variable=self.check_bay_params["Temperature"], onvalue=1, offvalue=0)
             self.bay_temperature_check.grid(row=6,column=4, padx=(14,0))
 
-            self.bay_relperm_check = tk.Checkbutton(self.bay_popup, text="Rel-Permitivity", variable=self.bay_params["Rel-Permitivity"], onvalue=True, offvalue=False)
+            self.bay_relperm_check = tk.Checkbutton(self.bay_popup, text="Rel-Permitivity", variable=self.check_bay_params["Rel-Permitivity"], onvalue=1, offvalue=0)
             self.bay_relperm_check.grid(row=7,column=4, padx=(24,0))
 
-            self.bay_theta_check = tk.Checkbutton(self.bay_popup, text="Theta", variable=self.bay_params["Theta"], onvalue=True, offvalue=False)
+            self.bay_theta_check = tk.Checkbutton(self.bay_popup, text="Theta", variable=self.check_bay_params["Theta"], onvalue=1, offvalue=0)
             self.bay_theta_check.grid(row=8,column=4, padx=(0,25))
 
-            self.bay_alpha_check = tk.Checkbutton(self.bay_popup, text="Alpha", variable=self.bay_params["Alpha"], onvalue=True, offvalue=False)
+            self.bay_alpha_check = tk.Checkbutton(self.bay_popup, text="Alpha", variable=self.check_bay_params["Alpha"], onvalue=1, offvalue=0)
             self.bay_alpha_check.grid(row=5,column=5, padx=(0,26))
 
-            self.bay_delta_check = tk.Checkbutton(self.bay_popup, text="Delta", variable=self.bay_params["Delta"], onvalue=True, offvalue=False)
+            self.bay_delta_check = tk.Checkbutton(self.bay_popup, text="Delta", variable=self.check_bay_params["Delta"], onvalue=1, offvalue=0)
             self.bay_delta_check.grid(row=6,column=5, padx=(0,30))
 
-            self.bay_fm_check = tk.Checkbutton(self.bay_popup, text="Frac-Emitted", variable=self.bay_params["Frac-Emitted"], onvalue=True, offvalue=False)
+            self.bay_fm_check = tk.Checkbutton(self.bay_popup, text="Frac-Emitted", variable=self.check_bay_params["Frac-Emitted"], onvalue=1, offvalue=0)
             self.bay_fm_check.grid(row=7,column=5, padx=(10,0))
 
             self.bay_continue_button = tk.Button(self.bay_popup, text="Continue", command=partial(self.on_bayesim_popup_close, continue_=True))
@@ -1785,8 +1784,8 @@ class Notebook:
         try:
             if continue_:
                 print("Mode: {}".format(self.bay_mode.get()))
-                for key in self.bay_params:
-                    print("{}: {}".format(key, self.bay_params[key].get()))
+                for param in self.check_bay_params:
+                    print("{}: {}".format(param, self.check_bay_params[param].get()))
 
                 self.export_for_bayesim()
 
@@ -1832,13 +1831,13 @@ class Notebook:
         ## Update plots on Simulate tab
         ## Update N 
         plot.figure(3)
-        plot_labels = ("ns", "x [nm]", "ΔN [nm^-3]")
+        plot_labels = ("ns", "x [nm]", "ΔN [cm^-3]")
         if do_clear_plots: plot.clf()
         
-        plot.ylim(*(self.N_limits))
+        plot.ylim(self.N_limits[0] * self.convert_out_dict["N"], self.N_limits[1] * self.convert_out_dict["N"])
         plot.yscale('log')
 
-        plot.plot(self.node_x, self.sim_N)
+        plot.plot(self.node_x, self.sim_N * self.convert_out_dict["N"])
 
         plot.xlabel(plot_labels[1])
         plot.ylabel(plot_labels[2])
@@ -1849,14 +1848,14 @@ class Notebook:
 
         ## Update P
         plot.figure(4)
-        plot_labels = ("ns", "x [nm]", "ΔP [nm^-3]")
+        plot_labels = ("ns", "x [nm]", "ΔP [cm^-3]")
 
         if do_clear_plots: plot.clf()
 
-        plot.ylim(*(self.P_limits))
+        plot.ylim(self.P_limits[0] * self.convert_out_dict["P"], self.P_limits[1] * self.convert_out_dict["P"])
         plot.yscale('log')
 
-        plot.plot(self.node_x, self.sim_P)
+        plot.plot(self.node_x, self.sim_P * self.convert_out_dict["P"])
 
         plot.xlabel(plot_labels[1])
         plot.ylabel(plot_labels[2])
@@ -2400,8 +2399,8 @@ class Notebook:
 
             self.edge_x = np.linspace(0,self.thickness,self.m+1)
             self.node_x = np.linspace(self.dx/2, self.thickness - self.dx/2, self.m)
-            self.N_limits = (np.amax(self.init_N) * 1e-11, np.amax(self.init_N) * 10)
-            self.P_limits = (np.amax(self.init_P) * 1e-11, np.amax(self.init_P) * 10)
+            self.N_limits = [np.amax(self.init_N) * 1e-11, np.amax(self.init_N) * 10]
+            self.P_limits = [np.amax(self.init_P) * 1e-11, np.amax(self.init_P) * 10]
 
             self.sim_N = self.init_N
             self.sim_P = self.init_P
@@ -2798,7 +2797,7 @@ class Notebook:
             return
 
         # Check for valid option choices
-        AIC_options = {"long_expfactor":self.calculate_init_material_expfactor.get(), 
+        AIC_options = {"long_expfactor":self.check_calculate_init_material_expfactor.get(), 
                      "incidence":self.AIC_stim_mode.get(),
                      "power_mode":self.AIC_gen_power_mode.get()}
         try:
@@ -2812,15 +2811,11 @@ class Notebook:
         self.deleteall_HIC(False)
 
         # Establish constants; calculate alpha
-        # FIXME: Units
+        # FIXME: Move wavelength validation to within branches rather than before branches
         h = 6.626e-34   # [J*s]
         c = 2.997e8     # [m/s]
         hc_evnm = h * c * 6.241e18 * 1e9    # [J*m] to [eV*nm]
         hc_nm = h * c * 1e9     # [J*m] to [J*nm] 
-        try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
-        except ValueError:
-            self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
-            return
 
         if (AIC_options["long_expfactor"]):
             try: A0 = float(self.A0_entry.get())         # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
@@ -2831,6 +2826,11 @@ class Notebook:
             try: Eg = float(self.Eg_entry.get())                  # [eV]
             except ValueError:
                 self.write(self.ICtab_status, "Error: missing or invalid Eg")
+                return
+
+            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
             if AIC_options["incidence"] == "direct":
@@ -2860,6 +2860,11 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing power or spot size")
                 return
 
+            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
+                return
+
             if (self.pulse_freq_entry.get() == "cw"):
                 freq = 1
             else:
@@ -2878,6 +2883,10 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing power density")
                 return
 
+            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
+                return
             if (self.pulse_freq_entry.get() == "cw"):
                 freq = 1
             else:
@@ -2964,11 +2973,11 @@ class Notebook:
 
         self.check_IC_initialized()
         for condition in self.HIC_list:
-            if (condition.variable == "ΔN"):
-                self.init_N = self.calcHeuristic(condition, self.init_N)
+            if (condition.variable == "ΔN [cm^-3]"):
+                self.init_N = self.calcHeuristic(condition, self.init_N) * self.convert_in_dict["N"]
 
-            elif (condition.variable == "ΔP"):
-                self.init_P = self.calcHeuristic(condition, self.init_P)
+            elif (condition.variable == "ΔP [cm^-3]"):
+                self.init_P = self.calcHeuristic(condition, self.init_P) * self.convert_in_dict["P"]
 
             elif (condition.variable == "dEc"):
                 self.init_Ec = self.calcHeuristic(condition, self.init_Ec)
@@ -3195,9 +3204,9 @@ class Notebook:
                 
 
         if (IC_type == "ΔN"):
-            self.init_N = np.copy(temp_IC_values)
+            self.init_N = np.copy(temp_IC_values) * self.convert_in_dict["N"]
         elif (IC_type == "ΔP"):
-            self.init_P = np.copy(temp_IC_values)
+            self.init_P = np.copy(temp_IC_values) * self.convert_in_dict["P"]
         elif (IC_type == "dEc"):
             self.init_Ec = np.copy(temp_IC_values)
         elif (IC_type == "chi"):
@@ -3214,21 +3223,21 @@ class Notebook:
         plot.clf()
         plot.yscale('log')
 
-        max_N = np.amax(self.init_N) * ((1e7) ** 3)
-        max_P = np.amax(self.init_P) * ((1e7) ** 3)
+        max_N = np.amax(self.init_N) * self.convert_out_dict["N"]
+        max_P = np.amax(self.init_P) * self.convert_out_dict["P"]
         largest_initValue = max(max_N, max_P)
         plot.ylim((largest_initValue + 1e-30) * 1e-12, (largest_initValue + 1e-30) * 1e4)
 
 
         if self.check_symmetric.get():
-            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_N), self.init_N), axis=0) * ((1e7) ** 3), label="delta_N") # [per nm^3] to [per cm^3]
-            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_P), self.init_P), axis=0) * ((1e7) ** 3), label="delta_P")
+            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_N), self.init_N), axis=0) * self.convert_out_dict["N"], label="delta_N") # [per nm^3] to [per cm^3]
+            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_P), self.init_P), axis=0) * self.convert_out_dict["N"], label="delta_P")
             
             ymin, ymax = plot.gca().get_ylim()
             plot.fill([-self.init_x[-1], 0, 0, -self.init_x[-1]], [ymin, ymin, ymax, ymax], 'b', alpha=0.1, edgecolor='r')
         else:
-            plot.plot(self.init_x, self.init_N * ((1e7) ** 3), label="delta_N") # [per nm^3] to [per cm^3]
-            plot.plot(self.init_x, self.init_P * ((1e7) ** 3), label="delta_P")
+            plot.plot(self.init_x, self.init_N * self.convert_out_dict["N"], label="delta_N") # [per nm^3] to [per cm^3]
+            plot.plot(self.init_x, self.init_P * self.convert_out_dict["P"], label="delta_P")
 
         plot.xlabel("x [nm]")
         plot.ylabel("ΔN, ΔP [per cm^-3]")
@@ -3598,8 +3607,8 @@ class Notebook:
 
             elif self.bay_mode.get() == "model":
                 active_bay_params = []
-                for key in self.bay_params:
-                    if self.bay_params[key].get(): active_bay_params.append(key)
+                for param in self.check_bay_params:
+                    if self.check_bay_params[param].get(): active_bay_params.append(param)
 
                 is_first = True
                 for key in self.I_plot.I_sets:
