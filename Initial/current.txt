@@ -1,4 +1,4 @@
-$$ INITIAL CONDITION FILE CREATED ON 2020-07-11 AT 13:08:06.449543
+$$ INITIAL CONDITION FILE CREATED ON 2020-08-16 AT 14:49:12.214896
 $ System Parameters:
 Mu_N: 35
 Mu_P: 35
@@ -20,6 +20,7 @@ Frac-Emitted: 0.12
 dx: 20
 $ System Flags:
 ignore_alpha: 1
+symmetric_system: 1
 $ Initial Conditions: (Nodes) x, N, P
 1.00000000e+01	1.00000000e-05	1.00000000e-05
 3.00000000e+01	1.00000000e-05	1.00000000e-05
