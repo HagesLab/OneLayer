@@ -63,7 +63,7 @@ class Initial_Condition:
 
 class Data_Set:
     # Object containing all the metadata required to plot and integrate saved data sets
-    def __init__(self, data, grid_x, node_x, edge_x, mu_n, mu_p, n0, p0, total_x, dx, B, tau_N, tau_P, Sf, Sb, temperature, rel_permitivity, ext_E_field, theta, alpha, delta, frac_emitted, total_t, dt, ignored_alpha, type, filename, show_index):
+    def __init__(self, data, grid_x, node_x, edge_x, params, type, filename, show_index):
         self.data = data            # The actual data e.g. N(x,t) associated with this set
         self.grid_x = grid_x        # Array of x-coordinates at which data was calculated - plotter uses these as x values
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
@@ -72,15 +72,13 @@ class Data_Set:
         # node_x and grid_x will usually be identical, unless the data is a type (like E-field) that exists on edges
         # There's a little optimization that can be made here because grid_x will either be identical to node_x or edge_x, but that makes the code harder to follow
 
-        self.num_tsteps = int(0.5 + total_t / dt)
         self.type = type            # String identifying variable the data is for e.g. N, P
         self.filename = filename    # String identifying file from which data set was read
         self.show_index = show_index# Time step number data belongs to
-		
-		# Python dictionaries are otherwise known as hash tables in other languages - each value in the table is assigned a key we can use to access it
-        self.params_dict = {"Mu_N": mu_n, "Mu_P": mu_p, "N0": n0, "P0": p0, "Thickness": total_x, "dx": dx, "B": B, "Tau_N": tau_N, "Tau_P": tau_P, "Sf": Sf, \
-            "Sb": Sb, "Temperature": temperature, "Rel-Permitivity": rel_permitivity, "Ext_E-Field": ext_E_field, "Theta": theta, "Alpha": alpha, "Delta": delta, "Frac-Emitted": frac_emitted, \
-            "Total-Time": total_t,"dt": dt,"ignore_alpha": ignored_alpha}
+
+		# dict() can be used to give a Data_Set a copy of the dictionary passed to it
+        self.params_dict = dict(params)
+        self.num_tsteps = int(0.5 + self.params_dict["Total-Time"] / self.params_dict["dt"])
         return
 
     def tag(self):
@@ -163,7 +161,7 @@ class Plot_State:
         self.time_index = 0
         self.datagroup = Data_Group(ID)
         self.data_filenames = []
-        self.display_legend = True
+        self.display_legend = 1
         return
 
     def remove_duplicate_filenames(self):
@@ -207,7 +205,7 @@ class I_Group:
         self.yaxis_type = 'log'
         self.xlim = (-1,-1)
         self.ylim = (-1,-1)
-        self.display_legend = True
+        self.display_legend = 1
         return
 
     def set_type(self, new_type):
@@ -292,11 +290,6 @@ class Notebook:
         self.get_default_dirs()
 
         # Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
-        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
-        self.convert_out_dict = {"Mu_N": ((1e-7) ** 2) / (1e-9), "Mu_P": ((1e-7) ** 2) / (1e-9), "N0": ((1e7) ** 3), "P0": ((1e7) ** 3), "Thickness": 1, "dx": 1, \
-                        "B": ((1e-7) ** 3) / (1e-9), "Tau_N": 1, "Tau_P": 1, "Sf": (1e-7) / (1e-9), "Sb": (1e-7) / (1e-9), "Temperature": 1, "Rel-Permitivity": 1, "Ext_E-Field": 1e3, \
-                        "Theta": 1e7, "Alpha": 1e7, "Delta": 1, "Frac-Emitted": 1}
-
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
         self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
                                 "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
@@ -307,16 +300,25 @@ class Notebook:
                                 "Temperature": 1, "Rel-Permitivity": 1, 
                                 "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
                                 "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
-                                "Delta": 1, "Frac-Emitted": 1}
+                                "Delta": 1, "Frac-Emitted": 1,
+                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3)}                     # [cm^-3] to [nm^-3]
 
-        # Tkinter elements require special variables to extract user input
+        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
+        self.convert_out_dict = {}
+        for param in self.convert_in_dict:
+            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
+
+        # Tkinter checkboxes and radiobuttons require special variables to extract user input
+        # IntVars or BooleanVars are sufficient for binary choices e.g. whether a checkbox is checked
+        # while StringVars are more suitable for open-ended choices e.g. selecting one mode from a list
         self.check_ignore_recycle = tk.IntVar()
-        self.check_do_ss = tk.BooleanVar()
-        self.check_reset_params = tk.BooleanVar()
-        self.check_reset_inits = tk.BooleanVar()
-        self.check_display_legend = tk.BooleanVar()
+        self.check_symmetric = tk.IntVar()
+        self.check_do_ss = tk.IntVar()
+        self.check_reset_params = tk.IntVar()
+        self.check_reset_inits = tk.IntVar()
+        self.check_display_legend = tk.IntVar()
 
-        self.calculate_init_material_expfactor = tk.IntVar()
+        self.check_calculate_init_material_expfactor = tk.IntVar()
         self.AIC_stim_mode = tk.StringVar()
         self.AIC_gen_power_mode = tk.StringVar()
 
@@ -325,10 +327,10 @@ class Notebook:
         self.EIC_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
-        self.bay_params = {"Mu_N":tk.BooleanVar(), "Mu_P":tk.BooleanVar(), "N0":tk.BooleanVar(), "P0":tk.BooleanVar(),
-                        "B":tk.BooleanVar(), "Tau_N":tk.BooleanVar(), "Tau_P":tk.BooleanVar(), "Sf":tk.BooleanVar(), \
-                        "Sb":tk.BooleanVar(), "Temperature":tk.BooleanVar(), "Rel-Permitivity":tk.BooleanVar(), \
-                        "Theta":tk.BooleanVar(), "Alpha":tk.BooleanVar(), "Delta":tk.BooleanVar(), "Frac-Emitted":tk.BooleanVar()}
+        self.check_bay_params = {"Mu_N":tk.IntVar(), "Mu_P":tk.IntVar(), "N0":tk.IntVar(), "P0":tk.IntVar(),
+                        "B":tk.IntVar(), "Tau_N":tk.IntVar(), "Tau_P":tk.IntVar(), "Sf":tk.IntVar(), \
+                        "Sb":tk.IntVar(), "Temperature":tk.IntVar(), "Rel-Permitivity":tk.IntVar(), \
+                        "Theta":tk.IntVar(), "Alpha":tk.IntVar(), "Delta":tk.IntVar(), "Frac-Emitted":tk.IntVar()}
         
         self.bay_mode = tk.StringVar(value="model")
 
@@ -577,48 +579,54 @@ class Notebook:
         self.alpha_entry = tk.Entry(self.tab_inputs, width=9)
         self.alpha_entry.grid(row=16,column=1)
 
-        self.ignore_recycle_checkbutton = tk.Checkbutton(self.tab_inputs, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
-        self.ignore_recycle_checkbutton.grid(row=17,column=0)
-
         self.delta_label = tk.Label(self.tab_inputs, text="Delta Frac.")
-        self.delta_label.grid(row=18,column=0)
+        self.delta_label.grid(row=17,column=0)
 
         self.delta_entry = tk.Entry(self.tab_inputs, width=9)
-        self.delta_entry.grid(row=18,column=1)
+        self.delta_entry.grid(row=17,column=1)
 
         self.frac_emitted_label = tk.Label(self.tab_inputs, text="Frac. Emitted (0 to 1)")
-        self.frac_emitted_label.grid(row=19,column=0)
+        self.frac_emitted_label.grid(row=18,column=0)
 
         self.frac_emitted_entry = tk.Entry(self.tab_inputs, width=9)
-        self.frac_emitted_entry.grid(row=19,column=1)
+        self.frac_emitted_entry.grid(row=18,column=1)
+
+        self.flags_head = tk.ttk.Label(self.tab_inputs, text="Flags", style="Header.TLabel")
+        self.flags_head.grid(row=19,column=0,columnspan=2)
+
+        self.ignore_recycle_checkbutton = tk.Checkbutton(self.tab_inputs, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
+        self.ignore_recycle_checkbutton.grid(row=20,column=0)
+
+        self.symmetry_checkbutton = tk.Checkbutton(self.tab_inputs, text="Symmetric system?", variable=self.check_symmetric, onvalue=1, offvalue=0)
+        self.symmetry_checkbutton.grid(row=21,column=0)
 
         self.steps_head = tk.ttk.Label(self.tab_inputs, text="Resolution Setting", style="Header.TLabel")
-        self.steps_head.grid(row=20,column=0,columnspan=2)
+        self.steps_head.grid(row=22,column=0,columnspan=2)
 
         self.thickness_label = tk.Label(self.tab_inputs, text="Thickness (nm)")
-        self.thickness_label.grid(row=21,column=0)
+        self.thickness_label.grid(row=23,column=0)
 
         self.thickness_entry = tk.Entry(self.tab_inputs, width=9)
-        self.thickness_entry.grid(row=21,column=1)
+        self.thickness_entry.grid(row=23,column=1)
 
         self.dx_label = tk.Label(self.tab_inputs, text="Space step size [nm]")
-        self.dx_label.grid(row=22,column=0)
+        self.dx_label.grid(row=24,column=0)
 
         self.dx_entry = tk.Entry(self.tab_inputs, width=9)
-        self.dx_entry.grid(row=22,column=1)
+        self.dx_entry.grid(row=24,column=1)
 
-        self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=6)
-        self.ICtab_status.grid(row=23, rowspan=4, column=0, columnspan=2)
+        self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=4)
+        self.ICtab_status.grid(row=25, rowspan=2, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
 
-        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset System Parameters", variable=self.check_reset_params, onvalue=True, offvalue=False)
-        self.reset_params_checkbutton.grid(row=27,column=0)
+        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset System Parameters", variable=self.check_reset_params, onvalue=1, offvalue=0)
+        self.reset_params_checkbutton.grid(row=27, column=0)
 
-        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset Initial Distributions", variable=self.check_reset_inits, onvalue=True, offvalue=False)
+        self.reset_params_checkbutton = tk.Checkbutton(self.tab_inputs, text="Reset Initial Distributions", variable=self.check_reset_inits, onvalue=1, offvalue=0)
         self.reset_params_checkbutton.grid(row=28,column=0)
 
         self.reset_IC_button = tk.Button(self.tab_inputs, text="Reset", command=self.reset_IC)
-        self.reset_IC_button.grid(row=29,column=0, columnspan=2)
+        self.reset_IC_button.grid(row=29, column=0, columnspan=2)
 
         self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", style="Grey Bar.TSeparator")
         self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
@@ -647,7 +655,7 @@ class Notebook:
         self.hline1_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline1_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.calc_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.calculate_init_material_expfactor, value=1)
+        self.calc_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=1)
         self.calc_AIC_expfactor.grid(row=2,column=0)
 
         self.calc_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 1")
@@ -680,7 +688,7 @@ class Notebook:
         self.hline2_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline2_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.enter_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.calculate_init_material_expfactor, value=0)
+        self.enter_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=0)
         self.enter_AIC_expfactor.grid(row=7,column=0)
 
         self.enter_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 2")
@@ -691,7 +699,6 @@ class Notebook:
 
         self.AIC_expfactor_entry = tk.Entry(self.material_param_frame, width=9)
         self.AIC_expfactor_entry.grid(row=8,column=3)
-
 
         self.pulse_laser_frame = tk.Frame(master=self.tab_analytical_init, highlightbackground="black", highlightthicknes=1)
         self.pulse_laser_frame.grid(row=1,column=4, padx=(20,0))
@@ -806,10 +813,10 @@ class Notebook:
         self.add_HIC_title = tk.Label(self.tab_rules_init, text="Add a custom initial condition (see manual for details)")
         self.add_HIC_title.grid(row=7, column=3,columnspan=2, padx=(6,0))
 
-        self.HIC_var_label = tk.Label(self.tab_rules_init, text="Is this init. cond. for ΔN, ΔP [nm^-3], dEc, or chi?")
+        self.HIC_var_label = tk.Label(self.tab_rules_init, text="Select variable to initialize:")
         self.HIC_var_label.grid(row=8,column=3)
 
-        self.HIC_var_dropdown = tk.OptionMenu(self.tab_rules_init, self.init_var_selection, "ΔN", "ΔP", "dEc", "chi")
+        self.HIC_var_dropdown = tk.OptionMenu(self.tab_rules_init, self.init_var_selection, "ΔN [cm^-3]", "ΔP [cm^-3]", "dEc", "chi")
         self.HIC_var_dropdown.grid(row=8,column=4)
 
         self.HIC_method_label = tk.Label(self.tab_rules_init, text="Select condition method:")
@@ -871,7 +878,7 @@ class Notebook:
         self.EIC_description = tk.Message(self.tab_explicit_init, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified spacing mesh.", width=360)
         self.EIC_description.grid(row=0,column=3)
 
-        self.EIC_dropdown = tk.OptionMenu(self.tab_explicit_init, self.EIC_var_selection, "ΔN", "ΔP", "dEc", "chi")
+        self.EIC_dropdown = tk.OptionMenu(self.tab_explicit_init, self.EIC_var_selection, "ΔN [cm^-3]", "ΔP [cm^-3]", "dEc", "chi")
         self.EIC_dropdown.grid(row=2,column=3)
 
         self.add_EIC_button = tk.Button(self.tab_explicit_init, text="Import", command=self.add_EIC)
@@ -880,19 +887,19 @@ class Notebook:
         self.init_fig_NP = plot.figure(1, figsize=(4.85,3))
         self.init_canvas_NP = tkagg.FigureCanvasTkAgg(self.init_fig_NP, master=self.tab_inputs)
         self.init_NP_plotwidget = self.init_canvas_NP.get_tk_widget()
-        self.init_NP_plotwidget.grid(row=17,column=3,rowspan=10,columnspan=2)
+        self.init_NP_plotwidget.grid(row=17,column=3,rowspan=12,columnspan=2)
 
         self.np_toolbar_frame = tk.Frame(master=self.tab_inputs)
-        self.np_toolbar_frame.grid(row=28,column=3,columnspan=2)
+        self.np_toolbar_frame.grid(row=29,column=3,columnspan=2)
         self.np_toolbar = tkagg.NavigationToolbar2Tk(self.init_canvas_NP, self.np_toolbar_frame)
 
         self.init_fig_ec = plot.figure(2, figsize=(4.85,3))
         self.init_canvas_ec = tkagg.FigureCanvasTkAgg(self.init_fig_ec, master=self.tab_inputs)
         self.init_ec_plotwidget = self.init_canvas_ec.get_tk_widget()
-        self.init_ec_plotwidget.grid(row=17,column=5,rowspan=10,columnspan=2)
+        self.init_ec_plotwidget.grid(row=17,column=5,rowspan=12,columnspan=2)
 
         self.ec_toolbar_frame = tk.Frame(master=self.tab_inputs)
-        self.ec_toolbar_frame.grid(row=28,column=5,columnspan=2)
+        self.ec_toolbar_frame.grid(row=29,column=5,columnspan=2)
         self.ec_toolbar = tkagg.NavigationToolbar2Tk(self.init_canvas_ec, self.ec_toolbar_frame)
 
         # Dictionaries of parameter entry boxes
@@ -901,7 +908,8 @@ class Notebook:
                                           "Sf":self.Sf_entry, "Sb":self.Sb_entry, "Temperature":self.temperature_entry, "Rel-Permitivity":self.rel_permitivity_entry, "Ext_E-Field":self.ext_efield_entry,
                                           "Theta":self.theta_entry, "Alpha":self.alpha_entry, "Delta":self.delta_entry, "Frac-Emitted":self.frac_emitted_entry, "dx":self.dx_entry}
 
-        self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle)}
+        self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle),
+                              "symmetric_system":Flag(self.symmetry_checkbutton, self.check_symmetric)}
 
         self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "AIC_expfactor":self.AIC_expfactor_entry, "Pulse_Freq":self.pulse_freq_entry, 
                                            "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
@@ -932,7 +940,7 @@ class Notebook:
         self.dt_entry = tk.Entry(self.tab_simulate, width=9)
         self.dt_entry.grid(row=3,column=1)
 
-        self.do_ss_checkbutton = tk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=True, offvalue=False)
+        self.do_ss_checkbutton = tk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
         self.do_ss_checkbutton.grid(row=5,column=0)
 
         self.calculate_NP = tk.Button(self.tab_simulate, text="Calculate ΔN,ΔP", command=self.do_Batch)
@@ -1081,11 +1089,8 @@ class Notebook:
         return
 
     def DEBUG(self):
-        self.enter(self.AIC_expfactor_entry, "0.004")
-        self.enter(self.max_gen_entry, "20")
-        self.enter(self.pulse_freq_entry, "1")
-        self.enter(self.pulse_wavelength_entry, "520")
-        print("IC_IS_AIC = {}".format(self.IC_is_AIC))
+        print("self.init_N[0] = {} nm^-3".format(self.init_N[0]))
+        print("self.init_P[0] = {} nm^-3".format(self.init_P[0]))
         return
 
     ## Functions to create popups and manage
@@ -1118,8 +1123,8 @@ class Notebook:
             if self.IC_is_AIC:
                 self.batch_param_select = tk.OptionMenu(self.batch_popup, self.batch_param, *[key for key in self.sys_param_entryboxes_dict.keys() if not (key == "Thickness" or key == "dx")], 
                                                         *[key for key in self.analytical_entryboxes_dict.keys() if not (
-                                                            (self.calculate_init_material_expfactor.get() and (key == "AIC_expfactor")) or
-                                                            (not self.calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
+                                                            (self.check_calculate_init_material_expfactor.get() and (key == "AIC_expfactor")) or
+                                                            (not self.check_calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
                                                             (self.AIC_gen_power_mode.get() == "power-spot" and (key == "Power_Density" or key == "Max_Gen" or key == "Total_Gen")) or
                                                             (self.AIC_gen_power_mode.get() == "density" and (key == "Power" or key == "Spotsize" or key == "Max_Gen" or key == "Total_Gen")) or
                                                             (self.AIC_gen_power_mode.get() == "max-gen" and (key == "Power" or key == "Spotsize" or key == "Power_Density" or key == "Total_Gen")) or
@@ -1501,7 +1506,7 @@ class Notebook:
             self.yubound = tk.Entry(self.yframe, width=9)
             self.yubound.grid(row=4,column=1)
 
-            self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Display legend?", variable=self.check_display_legend, onvalue=True, offvalue=False)
+            self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Display legend?", variable=self.check_display_legend, onvalue=1, offvalue=0)
             self.toggle_legend_checkbutton.grid(row=2,column=0,columnspan=2)
 
             self.change_axis_continue_button = tk.Button(self.change_axis_popup, text="Continue", command=partial(self.on_change_axis_popup_close, plot_ID, continue_=True))
@@ -1513,22 +1518,18 @@ class Notebook:
 
             # Set the default values in the entry boxes to be the current options of the plot (in case the user only wants to make a few changes)
             if not (plot_ID == -1):
-                self.enter(self.xlbound, self.analysis_plots[plot_ID].xlim[0])
-                self.enter(self.xubound, self.analysis_plots[plot_ID].xlim[1])
-                self.enter(self.ylbound, self.analysis_plots[plot_ID].ylim[0])
-                self.enter(self.yubound, self.analysis_plots[plot_ID].ylim[1])
-                self.xaxis_type.set(self.analysis_plots[plot_ID].xaxis_type)
-                self.yaxis_type.set(self.analysis_plots[plot_ID].yaxis_type)
-                if self.analysis_plots[plot_ID].display_legend: self.toggle_legend_checkbutton.select()
+                active_plot = self.analysis_plots[plot_ID]
 
             else:
-                self.enter(self.xlbound, self.I_plot.xlim[0])
-                self.enter(self.xubound, self.I_plot.xlim[1])
-                self.enter(self.ylbound, self.I_plot.ylim[0])
-                self.enter(self.yubound, self.I_plot.ylim[1])
-                self.xaxis_type.set(self.I_plot.xaxis_type)
-                self.yaxis_type.set(self.I_plot.yaxis_type)
-                if self.I_plot.display_legend: self.toggle_legend_checkbutton.select()
+                active_plot = self.I_plot
+
+            self.enter(self.xlbound, active_plot.xlim[0])
+            self.enter(self.xubound, active_plot.xlim[1])
+            self.enter(self.ylbound, active_plot.ylim[0])
+            self.enter(self.yubound, active_plot.ylim[1])
+            self.xaxis_type.set(active_plot.xaxis_type)
+            self.yaxis_type.set(active_plot.yaxis_type)
+            self.check_display_legend.set(active_plot.display_legend)
 
             self.change_axis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_change_axis_popup_close, plot_ID, continue_=False))
             self.change_axis_popup.grab_set()
@@ -1721,49 +1722,49 @@ class Notebook:
             self.bay_title_label3 = tk.ttk.Label(self.bay_popup, text="Model Params", style="Header.TLabel")
             self.bay_title_label3.grid(row=4,column=2,columnspan=4)
 
-            self.bay_mun_check = tk.Checkbutton(self.bay_popup, text="Mu_N", variable=self.bay_params["Mu_N"], onvalue=True, offvalue=False)
+            self.bay_mun_check = tk.Checkbutton(self.bay_popup, text="Mu_N", variable=self.check_bay_params["Mu_N"], onvalue=1, offvalue=0)
             self.bay_mun_check.grid(row=5,column=2, padx=(19,0))
 
-            self.bay_mup_check = tk.Checkbutton(self.bay_popup, text="Mu_P", variable=self.bay_params["Mu_P"], onvalue=True, offvalue=False)
+            self.bay_mup_check = tk.Checkbutton(self.bay_popup, text="Mu_P", variable=self.check_bay_params["Mu_P"], onvalue=1, offvalue=0)
             self.bay_mup_check.grid(row=6,column=2, padx=(17,0))
 
-            self.bay_n0_check = tk.Checkbutton(self.bay_popup, text="N0", variable=self.bay_params["N0"], onvalue=True, offvalue=False)
+            self.bay_n0_check = tk.Checkbutton(self.bay_popup, text="N0", variable=self.check_bay_params["N0"], onvalue=1, offvalue=0)
             self.bay_n0_check.grid(row=7,column=2, padx=(3,0))
 
-            self.bay_p0_check = tk.Checkbutton(self.bay_popup, text="P0", variable=self.bay_params["P0"], onvalue=True, offvalue=False)
+            self.bay_p0_check = tk.Checkbutton(self.bay_popup, text="P0", variable=self.check_bay_params["P0"], onvalue=1, offvalue=0)
             self.bay_p0_check.grid(row=8,column=2)
 
-            self.bay_B_check = tk.Checkbutton(self.bay_popup, text="B", variable=self.bay_params["B"], onvalue=True, offvalue=False)
+            self.bay_B_check = tk.Checkbutton(self.bay_popup, text="B", variable=self.check_bay_params["B"], onvalue=1, offvalue=0)
             self.bay_B_check.grid(row=5,column=3, padx=(0,2))
 
-            self.bay_taun_check = tk.Checkbutton(self.bay_popup, text="Tau_N", variable=self.bay_params["Tau_N"], onvalue=True, offvalue=False)
+            self.bay_taun_check = tk.Checkbutton(self.bay_popup, text="Tau_N", variable=self.check_bay_params["Tau_N"], onvalue=1, offvalue=0)
             self.bay_taun_check.grid(row=6,column=3, padx=(24,0))
 
-            self.bay_taup_check = tk.Checkbutton(self.bay_popup, text="Tau_P", variable=self.bay_params["Tau_P"], onvalue=True, offvalue=False)
+            self.bay_taup_check = tk.Checkbutton(self.bay_popup, text="Tau_P", variable=self.check_bay_params["Tau_P"], onvalue=1, offvalue=0)
             self.bay_taup_check.grid(row=7,column=3, padx=(23,0))
 
-            self.bay_sf_check = tk.Checkbutton(self.bay_popup, text="Sf", variable=self.bay_params["Sf"], onvalue=True, offvalue=False)
+            self.bay_sf_check = tk.Checkbutton(self.bay_popup, text="Sf", variable=self.check_bay_params["Sf"], onvalue=1, offvalue=0)
             self.bay_sf_check.grid(row=8,column=3, padx=(1,0))
 
-            self.bay_sb_check = tk.Checkbutton(self.bay_popup, text="Sb", variable=self.bay_params["Sb"], onvalue=True, offvalue=False)
+            self.bay_sb_check = tk.Checkbutton(self.bay_popup, text="Sb", variable=self.check_bay_params["Sb"], onvalue=1, offvalue=0)
             self.bay_sb_check.grid(row=5,column=4, padx=(0,40))
 
-            self.bay_temperature_check = tk.Checkbutton(self.bay_popup, text="Temperature", variable=self.bay_params["Temperature"], onvalue=True, offvalue=False)
+            self.bay_temperature_check = tk.Checkbutton(self.bay_popup, text="Temperature", variable=self.check_bay_params["Temperature"], onvalue=1, offvalue=0)
             self.bay_temperature_check.grid(row=6,column=4, padx=(14,0))
 
-            self.bay_relperm_check = tk.Checkbutton(self.bay_popup, text="Rel-Permitivity", variable=self.bay_params["Rel-Permitivity"], onvalue=True, offvalue=False)
+            self.bay_relperm_check = tk.Checkbutton(self.bay_popup, text="Rel-Permitivity", variable=self.check_bay_params["Rel-Permitivity"], onvalue=1, offvalue=0)
             self.bay_relperm_check.grid(row=7,column=4, padx=(24,0))
 
-            self.bay_theta_check = tk.Checkbutton(self.bay_popup, text="Theta", variable=self.bay_params["Theta"], onvalue=True, offvalue=False)
+            self.bay_theta_check = tk.Checkbutton(self.bay_popup, text="Theta", variable=self.check_bay_params["Theta"], onvalue=1, offvalue=0)
             self.bay_theta_check.grid(row=8,column=4, padx=(0,25))
 
-            self.bay_alpha_check = tk.Checkbutton(self.bay_popup, text="Alpha", variable=self.bay_params["Alpha"], onvalue=True, offvalue=False)
+            self.bay_alpha_check = tk.Checkbutton(self.bay_popup, text="Alpha", variable=self.check_bay_params["Alpha"], onvalue=1, offvalue=0)
             self.bay_alpha_check.grid(row=5,column=5, padx=(0,26))
 
-            self.bay_delta_check = tk.Checkbutton(self.bay_popup, text="Delta", variable=self.bay_params["Delta"], onvalue=True, offvalue=False)
+            self.bay_delta_check = tk.Checkbutton(self.bay_popup, text="Delta", variable=self.check_bay_params["Delta"], onvalue=1, offvalue=0)
             self.bay_delta_check.grid(row=6,column=5, padx=(0,30))
 
-            self.bay_fm_check = tk.Checkbutton(self.bay_popup, text="Frac-Emitted", variable=self.bay_params["Frac-Emitted"], onvalue=True, offvalue=False)
+            self.bay_fm_check = tk.Checkbutton(self.bay_popup, text="Frac-Emitted", variable=self.check_bay_params["Frac-Emitted"], onvalue=1, offvalue=0)
             self.bay_fm_check.grid(row=7,column=5, padx=(10,0))
 
             self.bay_continue_button = tk.Button(self.bay_popup, text="Continue", command=partial(self.on_bayesim_popup_close, continue_=True))
@@ -1783,8 +1784,8 @@ class Notebook:
         try:
             if continue_:
                 print("Mode: {}".format(self.bay_mode.get()))
-                for key in self.bay_params:
-                    print("{}: {}".format(key, self.bay_params[key].get()))
+                for param in self.check_bay_params:
+                    print("{}: {}".format(param, self.check_bay_params[param].get()))
 
                 self.export_for_bayesim()
 
@@ -1830,13 +1831,13 @@ class Notebook:
         ## Update plots on Simulate tab
         ## Update N 
         plot.figure(3)
-        plot_labels = ("ns", "x [nm]", "ΔN [nm^-3]")
+        plot_labels = ("ns", "x [nm]", "ΔN [cm^-3]")
         if do_clear_plots: plot.clf()
         
-        plot.ylim(*(self.N_limits))
+        plot.ylim(self.N_limits[0] * self.convert_out_dict["N"], self.N_limits[1] * self.convert_out_dict["N"])
         plot.yscale('log')
 
-        plot.plot(self.node_x, self.sim_N)
+        plot.plot(self.node_x, self.sim_N * self.convert_out_dict["N"])
 
         plot.xlabel(plot_labels[1])
         plot.ylabel(plot_labels[2])
@@ -1847,14 +1848,14 @@ class Notebook:
 
         ## Update P
         plot.figure(4)
-        plot_labels = ("ns", "x [nm]", "ΔP [nm^-3]")
+        plot_labels = ("ns", "x [nm]", "ΔP [cm^-3]")
 
         if do_clear_plots: plot.clf()
 
-        plot.ylim(*(self.P_limits))
+        plot.ylim(self.P_limits[0] * self.convert_out_dict["P"], self.P_limits[1] * self.convert_out_dict["P"])
         plot.yscale('log')
 
-        plot.plot(self.node_x, self.sim_P)
+        plot.plot(self.node_x, self.sim_P * self.convert_out_dict["P"])
 
         plot.xlabel(plot_labels[1])
         plot.ylabel(plot_labels[2])
@@ -1905,7 +1906,8 @@ class Notebook:
             plot.xlim(*active_plot.xlim)
 
             for tag in active_datagroup.datasets:
-                plot.plot(active_datagroup.datasets[tag].grid_x, active_datagroup.datasets[tag].data, label=tag)
+                label = tag + "*" if active_datagroup.datasets[tag].params_dict["symmetric_system"] else tag
+                plot.plot(active_datagroup.datasets[tag].grid_x, active_datagroup.datasets[tag].data, label=label)
 
             plot.xlabel("x [nm]")
             plot.ylabel(active_datagroup.type)
@@ -1939,7 +1941,7 @@ class Notebook:
                 param_values_dict = {"Mu_N":0, "Mu_P":0, "N0":0, "P0":0, "Thickness":0, "dx":0,
                                      "B":0, "Tau_N":0, "Tau_P":0,"Sf":0, "Sb":0, 
                                      "Temperature":0, "Rel-Permitivity":0, "Ext_E-Field":0, "Theta":0, "Alpha":0, "Delta":0, 
-                                     "Frac-Emitted":0, "Total-Time":0, "dt":0, "ignore_alpha":0}
+                                     "Frac-Emitted":0, "Total-Time":0, "dt":0, "ignore_alpha":0, "symmetric_system":0}
                 for line in ifstream:
                     if "$" in line: continue
 
@@ -1965,11 +1967,6 @@ class Notebook:
             param_values_dict["Alpha"] = param_values_dict["Alpha"] * self.convert_in_dict["Alpha"]
             param_values_dict["Ext_E-Field"] = param_values_dict["Ext_E-Field"] * self.convert_in_dict["Ext_E-Field"]
 
-            param_tuple = (param_values_dict["Mu_N"], param_values_dict["Mu_P"], param_values_dict["N0"], param_values_dict["P0"], 
-                           param_values_dict["Thickness"], param_values_dict["dx"], param_values_dict["B"], param_values_dict["Tau_N"], 
-                           param_values_dict["Tau_P"], param_values_dict["Sf"], param_values_dict["Sb"], param_values_dict["Temperature"], 
-                           param_values_dict["Rel-Permitivity"], param_values_dict["Ext_E-Field"], param_values_dict["Theta"], param_values_dict["Alpha"], param_values_dict["Delta"], 
-                           param_values_dict["Frac-Emitted"], param_values_dict["Total-Time"], param_values_dict["dt"], param_values_dict["ignore_alpha"])
         except:
             self.write(self.analysis_status, "Error: This data set is missing or has unusual metadata.txt")
             return
@@ -1986,7 +1983,7 @@ class Notebook:
         if (datatype == "ΔN"):
             try:
                 # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
-                new_data = Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                new_data = Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
@@ -1994,7 +1991,7 @@ class Notebook:
 
         elif (datatype == "ΔP"):
             try:
-                new_data = Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                new_data = Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
@@ -2002,7 +1999,7 @@ class Notebook:
 
         elif (datatype == "E-field"):
             try:
-                new_data = Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                new_data = Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
@@ -2011,7 +2008,7 @@ class Notebook:
         elif (datatype == "RR"):
             try:
                 new_data = Data_Set(param_values_dict["B"] * ((self.read_N(data_filename, active_show_index) + param_values_dict["N0"]) * (self.read_P(data_filename, active_show_index) + param_values_dict["P0"]) - param_values_dict["N0"] * param_values_dict["P0"]), 
-                                    data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                                    data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: Unable to calculate Rad Rec")
@@ -2023,7 +2020,7 @@ class Notebook:
                 temp_P = self.read_P(data_filename, active_show_index)
                 new_data = Data_Set(((temp_N + param_values_dict["N0"]) * (temp_P + param_values_dict["P0"]) - param_values_dict["N0"] * param_values_dict["P0"]) / 
                                     ((param_values_dict["Tau_N"] * (temp_P + param_values_dict["P0"])) + (param_values_dict["Tau_P"] * (temp_N + param_values_dict["N0"]))), 
-                                    data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                                    data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: Unable to calculate Non Rad Rec")
@@ -2073,7 +2070,7 @@ class Notebook:
                     PL_base[p] += intg.trapz(combined_weight[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * rad_rec[p] + \
                         intg.trapz(combined_weight2[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * rad_rec[p]
 
-                new_data = Data_Set(PL_base, data_node_x, data_node_x, data_edge_x, *(param_tuple), datatype, data_filename, active_show_index)
+                new_data = Data_Set(PL_base, data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except OSError:
                 self.write(self.analysis_status, "Error: Unable to calculate PL")
@@ -2402,8 +2399,8 @@ class Notebook:
 
             self.edge_x = np.linspace(0,self.thickness,self.m+1)
             self.node_x = np.linspace(self.dx/2, self.thickness - self.dx/2, self.m)
-            self.N_limits = (np.amax(self.init_N) * 1e-11, np.amax(self.init_N) * 10)
-            self.P_limits = (np.amax(self.init_P) * 1e-11, np.amax(self.init_P) * 10)
+            self.N_limits = [np.amax(self.init_N) * 1e-11, np.amax(self.init_N) * 10]
+            self.P_limits = [np.amax(self.init_P) * 1e-11, np.amax(self.init_P) * 10]
 
             self.sim_N = self.init_N
             self.sim_P = self.init_P
@@ -2443,14 +2440,14 @@ class Notebook:
                 error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
                                                  temp_sim_dict["Mu_N"], temp_sim_dict["Mu_P"], temp_sim_dict["Temperature"], temp_sim_dict["N0"], temp_sim_dict["P0"], 
                                                  temp_sim_dict["Tau_N"], temp_sim_dict["Tau_P"], temp_sim_dict["B"], temp_sim_dict["Rel-Permitivity"], self.vac_permitivity,
-                                                 not self.check_ignore_recycle.get(), self.check_do_ss.get(), 0, temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
+                                                 not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), 0, temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
                                                  temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, self.init_Ec, self.init_Chi)
             
             else:
                 error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
                                                  temp_sim_dict["Mu_N"], temp_sim_dict["Mu_P"], temp_sim_dict["Temperature"], temp_sim_dict["N0"], temp_sim_dict["P0"], 
                                                  temp_sim_dict["Tau_N"], temp_sim_dict["Tau_P"], temp_sim_dict["B"], temp_sim_dict["Rel-Permitivity"], self.vac_permitivity,
-                                                 not self.check_ignore_recycle.get(), self.check_do_ss.get(), temp_sim_dict["Alpha"], temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
+                                                 not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), temp_sim_dict["Alpha"], temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
                                                  temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, self.init_Ec, self.init_Chi)
             
             grid_t = np.linspace(self.dt, self.simtime, self.n)
@@ -2491,6 +2488,8 @@ class Notebook:
             if self.check_ignore_recycle.get(): ofstream.write("ignore_alpha: 1\n")
             else: ofstream.write("ignore_alpha: 0\n")
 
+            if self.check_symmetric.get(): ofstream.write("symmetric_system: 1\n")
+            else: ofstream.write("symmetric_system: 0\n")
 
         return
 
@@ -2549,21 +2548,32 @@ class Notebook:
             theta = active_datagroup.datasets[tag].params_dict["Theta"]
             delta = active_datagroup.datasets[tag].params_dict["Delta"]
             frac_emitted = active_datagroup.datasets[tag].params_dict["Frac-Emitted"]
+            symmetric_flag = active_datagroup.datasets[tag].params_dict["symmetric_system"]
 
             if self.PL_mode == "Current time step":
                 show_index = active_datagroup.datasets[tag].show_index
 
             # Clean up any bounds that extend past the confines of the system
+            # The system usually exists from x=0 to x=total_length, but can accept x=-total_length to x=total_length if symmetric
 
             for bounds in self.integration_bounds:
+                l_bound = bounds[0]
+                u_bound = bounds[1]
                
-                if (bounds[1] > total_length):
-                    bounds[1] = total_length
+                if (u_bound > total_length):
+                    u_bound = total_length
 
-                if (bounds[0] < 0):
-                    bounds[0] = 0
+                if symmetric_flag:
 
-            print("Bounds after cleanup: {}".format(self.integration_bounds))
+                    if (l_bound < -total_length):
+                        l_bound = -total_length
+                else:
+                    if (l_bound < 0):
+                        l_bound = 0
+
+                include_negative = symmetric_flag and (l_bound < 0)
+
+                print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
             #if (self.integration_lbound_entry.get() == "f"):
             #    self.PL = np.zeros((boundList.__len__(), int(n) + 1))
@@ -2576,21 +2586,32 @@ class Notebook:
             #        self.PL[i] = finite.propagatingPL(data_filename, boundList[i] - 500, boundList[i] + 500, dx, 0, total_length - dx, B_param, n0, p0, alpha, theta, delta, frac_emitted)
             #        if boundList[i] == 0:
             #            self.PL[i] *= 2
-            for bounds in self.integration_bounds:
                 if (active_datagroup.datasets[tag].type == "ΔN"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
                         data = ifstream_N.root.N
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
             
                 elif (active_datagroup.datasets[tag].type == "ΔP"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         data = ifstream_P.root.P
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (active_datagroup.datasets[tag].type == "E-field"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
                         data = ifstream_E_field.root.E_field
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (active_datagroup.datasets[tag].type == "RR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
@@ -2599,7 +2620,11 @@ class Notebook:
                         temp_P = np.array(ifstream_P.root.P)
 
                         data = B_param * (temp_N + n0) * (temp_P + p0) - n0 * p0
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (active_datagroup.datasets[tag].type == "NRR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
@@ -2607,10 +2632,18 @@ class Notebook:
                         temp_N = np.array(ifstream_N.root.N)
                         temp_P = np.array(ifstream_P.root.P)
                         data = ((temp_N + n0) * (temp_P + p0) - n0 * p0) / (tauN * (temp_P + p0) + tauP * (temp_N + n0))
-                        I_data = finite.integrate(data, bounds[0], bounds[1], dx, total_length)
+                        if include_negative:
+                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
+                                finite.integrate(data, 0, u_bound, dx, total_length)
+                        else:
+                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 else:
-                    I_data = finite.propagatingPL(data_filename, bounds[0], bounds[1], dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted)
+                    if include_negative:
+                        I_data = finite.propagatingPL(data_filename, 0, -l_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag) + \
+                            finite.propagatingPL(data_filename, 0, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
+                    else:
+                        I_data = finite.propagatingPL(data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
             
 
                 if self.PL_mode == "Current time step":
@@ -2628,7 +2661,7 @@ class Notebook:
                     grid_xaxis = -1 # A dummy value for the I_Set constructor
                     xaxis_label = "Time [ns]"
 
-                self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(bounds[0]) + "_to_" + str(bounds[1])))
+                self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(l_bound) + "_to_" + str(u_bound)))
 
                 counter += 1
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
@@ -2764,7 +2797,7 @@ class Notebook:
             return
 
         # Check for valid option choices
-        AIC_options = {"long_expfactor":self.calculate_init_material_expfactor.get(), 
+        AIC_options = {"long_expfactor":self.check_calculate_init_material_expfactor.get(), 
                      "incidence":self.AIC_stim_mode.get(),
                      "power_mode":self.AIC_gen_power_mode.get()}
         try:
@@ -2778,15 +2811,11 @@ class Notebook:
         self.deleteall_HIC(False)
 
         # Establish constants; calculate alpha
-        # FIXME: Units
+        # FIXME: Move wavelength validation to within branches rather than before branches
         h = 6.626e-34   # [J*s]
         c = 2.997e8     # [m/s]
         hc_evnm = h * c * 6.241e18 * 1e9    # [J*m] to [eV*nm]
         hc_nm = h * c * 1e9     # [J*m] to [J*nm] 
-        try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
-        except ValueError:
-            self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
-            return
 
         if (AIC_options["long_expfactor"]):
             try: A0 = float(self.A0_entry.get())         # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
@@ -2797,6 +2826,11 @@ class Notebook:
             try: Eg = float(self.Eg_entry.get())                  # [eV]
             except ValueError:
                 self.write(self.ICtab_status, "Error: missing or invalid Eg")
+                return
+
+            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
             if AIC_options["incidence"] == "direct":
@@ -2826,6 +2860,11 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing power or spot size")
                 return
 
+            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
+                return
+
             if (self.pulse_freq_entry.get() == "cw"):
                 freq = 1
             else:
@@ -2844,6 +2883,10 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing power density")
                 return
 
+            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+            except ValueError:
+                self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
+                return
             if (self.pulse_freq_entry.get() == "cw"):
                 freq = 1
             else:
@@ -2930,11 +2973,11 @@ class Notebook:
 
         self.check_IC_initialized()
         for condition in self.HIC_list:
-            if (condition.variable == "ΔN"):
-                self.init_N = self.calcHeuristic(condition, self.init_N)
+            if (condition.variable == "ΔN [cm^-3]"):
+                self.init_N = self.calcHeuristic(condition, self.init_N) * self.convert_in_dict["N"]
 
-            elif (condition.variable == "ΔP"):
-                self.init_P = self.calcHeuristic(condition, self.init_P)
+            elif (condition.variable == "ΔP [cm^-3]"):
+                self.init_P = self.calcHeuristic(condition, self.init_P) * self.convert_in_dict["P"]
 
             elif (condition.variable == "dEc"):
                 self.init_Ec = self.calcHeuristic(condition, self.init_Ec)
@@ -3161,9 +3204,9 @@ class Notebook:
                 
 
         if (IC_type == "ΔN"):
-            self.init_N = np.copy(temp_IC_values)
+            self.init_N = np.copy(temp_IC_values) * self.convert_in_dict["N"]
         elif (IC_type == "ΔP"):
-            self.init_P = np.copy(temp_IC_values)
+            self.init_P = np.copy(temp_IC_values) * self.convert_in_dict["P"]
         elif (IC_type == "dEc"):
             self.init_Ec = np.copy(temp_IC_values)
         elif (IC_type == "chi"):
@@ -3180,13 +3223,21 @@ class Notebook:
         plot.clf()
         plot.yscale('log')
 
-        max_N = np.amax(self.init_N) * ((1e7) ** 3)
-        max_P = np.amax(self.init_P) * ((1e7) ** 3)
+        max_N = np.amax(self.init_N) * self.convert_out_dict["N"]
+        max_P = np.amax(self.init_P) * self.convert_out_dict["P"]
         largest_initValue = max(max_N, max_P)
         plot.ylim((largest_initValue + 1e-30) * 1e-12, (largest_initValue + 1e-30) * 1e4)
 
-        plot.plot(self.init_x, self.init_N * ((1e7) ** 3), label="delta_N") # [per nm^3] to [per cm^3]
-        plot.plot(self.init_x, self.init_P * ((1e7) ** 3), label="delta_P")
+
+        if self.check_symmetric.get():
+            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_N), self.init_N), axis=0) * self.convert_out_dict["N"], label="delta_N") # [per nm^3] to [per cm^3]
+            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_P), self.init_P), axis=0) * self.convert_out_dict["N"], label="delta_P")
+            
+            ymin, ymax = plot.gca().get_ylim()
+            plot.fill([-self.init_x[-1], 0, 0, -self.init_x[-1]], [ymin, ymin, ymax, ymax], 'b', alpha=0.1, edgecolor='r')
+        else:
+            plot.plot(self.init_x, self.init_N * self.convert_out_dict["N"], label="delta_N") # [per nm^3] to [per cm^3]
+            plot.plot(self.init_x, self.init_P * self.convert_out_dict["P"], label="delta_P")
 
         plot.xlabel("x [nm]")
         plot.ylabel("ΔN, ΔP [per cm^-3]")
@@ -3351,7 +3402,7 @@ class Notebook:
                                           "Sf":0, "Sb":0, "Temperature":0, "Rel-Permitivity":0, "Ext_E-Field":0,
                                           "Theta":0, "Alpha":0, "Delta":0, "Frac-Emitted":0, "dx":0}
 
-                flag_values_dict = {"ignore_alpha":0}
+                flag_values_dict = {"ignore_alpha":0, "symmetric_system":0}
                 node_init_list = []
                 edge_init_list = []
                 initFlag = 0
@@ -3409,8 +3460,7 @@ class Notebook:
 
         for key in flag_values_dict:
             self.sys_flag_dict[key].value = int(flag_values_dict[key])
-            if (self.sys_flag_dict[key].value): self.sys_flag_dict[key].tk_var.set(1)
-            else: self.sys_flag_dict[key].tk_var.set(0)
+            self.sys_flag_dict[key].tk_var.set(self.sys_flag_dict[key].value)
 
         try:
             self.set_init_x()
@@ -3557,8 +3607,8 @@ class Notebook:
 
             elif self.bay_mode.get() == "model":
                 active_bay_params = []
-                for key in self.bay_params:
-                    if self.bay_params[key].get(): active_bay_params.append(key)
+                for param in self.check_bay_params:
+                    if self.check_bay_params[param].get(): active_bay_params.append(param)
 
                 is_first = True
                 for key in self.I_plot.I_sets:
