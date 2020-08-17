@@ -29,8 +29,9 @@ import pandas as pd # For bayesim compatibility
 import bayesim.hdf5io as dd
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
-class Initial_Condition:
-    # Object containing group of parameters used to create heuristic initial conditions
+class Param_Rule:
+    # V2 Update
+    # This class stores info to help Nanowire calculate Parameter values
     def __init__(self, variable, type, l_bound, r_bound=-1, l_boundval=-1, r_boundval=-1):
         self.variable = variable # e.g. N, P, E-Field
         self.type = type
@@ -60,6 +61,109 @@ class Initial_Condition:
 
     def is_edge(self):
         return (self.variable == "dEc" or self.variable == "chi")
+
+class Parameter:
+    # Helper class to store info about each of a Nanowire's parameters and initial distributions
+    def __init__(self, is_edge, units):
+        self.is_edge = is_edge
+        # self.value can be a number (i.e. the parameter value is constant across the length of the nanowire)
+        # or an array (i.e. the parameter value is spatially dependent)
+        self.units = units
+        self.value = 0
+        self.param_rules = []
+        return
+
+class Flag:
+    # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
+    # but we interact with the checkbutton using the actual tk.CheckButton() element
+    # So wrap both of those together in a single object and call it a day
+    def __init__(self, tk_element, tk_var, value=0):
+        self.tk_element = tk_element
+        self.tk_var = tk_var
+        self.value = value
+
+class Nanowire:
+    # A Nanowire object contains all information regarding the initial state of a nanowire
+    def __init__(self):
+        self.total_length = -1
+        self.dx = -1
+        self.grid_x_nodes = -1
+        self.grid_x_edges = -1
+        self.spacegrid_is_set = False
+        self.param_dict = {"Mu_N":Parameter(is_edge=False, units="[cm^2 / V s]"), "Mu_P":Parameter(is_edge=False, units="[cm^2 / V s]"), 
+                            "N0":Parameter(is_edge=False, units="[cm^-3]"), "P0":Parameter(is_edge=False, units="[cm^-3]"), 
+                            "B":Parameter(is_edge=False, units="[cm^3 / s]"), "Tau_N":Parameter(is_edge=False, units="[ns]"), 
+                            "Tau_P":Parameter(is_edge=False, units="[ns]"), "Sf":Parameter(is_edge=False, units="[cm / s]"), 
+                            "Sb":Parameter(is_edge=False, units="[cm / s]"), "Temperature":Parameter(is_edge=False, units="[K]"), 
+                            "Rel-Permitivity":Parameter(is_edge=False, units=""), "Ext_E-Field":Parameter(is_edge=True, units="[V/um]"),
+                            "Theta":Parameter(is_edge=False, units="[cm^-1]"), "Alpha":Parameter(is_edge=False, units="[cm^-1]"), 
+                            "Delta":Parameter(is_edge=False, units=""), "Frac-Emitted":Parameter(is_edge=False, units=""),
+                            "init_deltaN":Parameter(is_edge=False, units="[cm^-3]"), "init_deltaP":Parameter(is_edge=False, units="[cm^-3]"), 
+                            "init_E_field":Parameter(is_edge=True, units="[WIP]"), "Ec":Parameter(is_edge=True, units="[WIP]"),
+                            "electron_affinity":Parameter(is_edge=True, units="[WIP]")}
+
+        self.flags_dict = {"ignore_alpha":0,
+                           "symmetric_system":0}
+        return
+
+    def add_param_rule(self, param_name, new_rule):
+        self.param_dict[param_name].param_rules.append(new_rule)
+        self.update_param_toarray(param_name)
+        return
+
+    def update_param_toarray(self, param_name):
+        param = self.param_dict[param_name]
+        if param.is_edge:
+            new_param_value = np.zeros(self.grid_x_edges.__len__())
+        else:
+            new_param_value = np.zeros(self.grid_x_nodes.__len__())
+
+        for condition in param.param_rules:
+            if (condition.type == "POINT"):
+                new_param_value[finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)] = condition.l_boundval
+
+            elif (condition.type == "FILL"):
+                i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
+                j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                new_param_value[i:j+1] = condition.l_boundval
+
+            elif (condition.type == "LINE"):
+                slope = (condition.r_boundval - condition.l_boundval) / (condition.r_bound - condition.l_bound)
+                i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
+                j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
+
+                ndx = np.linspace(0, self.dx * (j - i), j - i + 1)
+                new_param_value[i:j+1] = condition.l_boundval + ndx * slope
+
+            elif (condition.type == "EXP"):
+                i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
+                j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
+
+                ndx = np.linspace(0, j - i, j - i + 1)
+                try:
+                    new_param_value[i:j+1] = condition.l_boundval * np.power(condition.r_boundval / condition.l_boundval, ndx / (j - i))
+                except FloatingPointError:
+                    print("Warning: Step size too large to resolve initial condition accurately")
+
+        param.value = new_param_value
+        return
+
+    def DEBUG_print(self):
+        print("Behold the One Nanowire in its infinite glory:")
+        if self.spacegrid_is_set:
+            print("Grid is set")
+            print("Nodes: {}".format(self.grid_x_nodes))
+            print("Edges: {}".format(self.grid_x_edges))
+        else:
+            print("Grid is not set")
+
+        for param in self.param_dict:
+            print("{}: {}".format(param, self.param_dict[param].value))
+
+        for flag in self.flags_dict:
+            print("{}: {}".format(flag, self.flags_dict[flag]))
+
+        return
 
 class Data_Set:
     # Object containing all the metadata required to plot and integrate saved data sets
@@ -232,15 +336,6 @@ class I_Group:
         self.I_sets.clear()
         return
 
-class Flag:
-    # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
-    # but we interact with the checkbutton using the actual tk.CheckButton() element
-    # So wrap both of those together in a single object and call it a day
-    def __init__(self, tk_element, tk_var, value=0):
-        self.tk_element = tk_element
-        self.tk_var = tk_var
-        self.value = value
-
 def extract_values(string, delimiter):
     # Converts a string with deliimiters into a list of float values
 	# E.g. "100,200,300" with "," delimiter becomes [100,200,300]
@@ -335,6 +430,8 @@ class Notebook:
         self.bay_mode = tk.StringVar(value="model")
 
         # Flags and containers for IC arrays
+        self.nanowire = Nanowire()
+
         self.HIC_list = []
         self.IC_file_list = None
         self.init_N = None
@@ -395,6 +492,8 @@ class Notebook:
         self.bayesim_popup_isopen = False
 
         self.root.config(menu=self.menu_bar)
+
+
         self.add_tab_inputs()
         self.add_tab_simulate()
         self.add_tab_analyze()
@@ -489,131 +588,131 @@ class Notebook:
         self.DEBUG_BUTTON = tk.Button(self.tab_inputs, text="debug", command=self.DEBUG)
         self.DEBUG_BUTTON.grid(row=0,column=0,columnspan=2, pady=(24,0))
 
-        self.system_params_head = tk.ttk.Label(self.tab_inputs, text="System Parameters",style="Header.TLabel")
-        self.system_params_head.grid(row=1, column=0,columnspan=2)
-
-        self.N_mobility_label = tk.Label(self.tab_inputs, text="N Mobility [cm^2 / V s]")
-        self.N_mobility_label.grid(row=2, column=0)
-
-        self.N_mobility_entry = tk.Entry(self.tab_inputs, width=9)
-        self.N_mobility_entry.grid(row=2,column=1)
-
-        self.P_mobility_label = tk.Label(self.tab_inputs, text="P Mobility [cm^2 / V s]")
-        self.P_mobility_label.grid(row=3, column=0)
-
-        self.P_mobility_entry = tk.Entry(self.tab_inputs, width=9)
-        self.P_mobility_entry.grid(row=3,column=1)
-
-        self.n0_label = tk.Label(self.tab_inputs, text="n0 [cm^-3]")
-        self.n0_label.grid(row=4,column=0)
-
-        self.n0_entry = tk.Entry(self.tab_inputs, width=9)
-        self.n0_entry.grid(row=4,column=1)
-
-        self.p0_label = tk.Label(self.tab_inputs, text="p0 [cm^-3]")
-        self.p0_label.grid(row=5,column=0)
-
-        self.p0_entry = tk.Entry(self.tab_inputs, width=9)
-        self.p0_entry.grid(row=5,column=1)
-
-        self.B_label = tk.Label(self.tab_inputs, text="B (cm^3 / s)")
-        self.B_label.grid(row=6,column=0)
-
-        self.B_entry = tk.Entry(self.tab_inputs, width=9)
-        self.B_entry.grid(row=6,column=1)
-
-        self.tauN_label = tk.Label(self.tab_inputs, text="Tau_n (ns)")
-        self.tauN_label.grid(row=7, column=0)
-
-        self.tauN_entry = tk.Entry(self.tab_inputs, width=9)
-        self.tauN_entry.grid(row=7, column=1)
-
-        self.tauP_label = tk.Label(self.tab_inputs, text="Tau_p (ns)")
-        self.tauP_label.grid(row=8, column=0)
-
-        self.tauP_entry = tk.Entry(self.tab_inputs, width=9)
-        self.tauP_entry.grid(row=8, column=1)
-
-        self.Sf_label = tk.Label(self.tab_inputs, text="Sf (cm / s)")
-        self.Sf_label.grid(row=9, column=0)
-
-        self.Sf_entry = tk.Entry(self.tab_inputs, width=9)
-        self.Sf_entry.grid(row=9, column=1)
-
-        self.Sb_label = tk.Label(self.tab_inputs, text="Sb (cm / s)")
-        self.Sb_label.grid(row=10, column=0)
-
-        self.Sb_entry = tk.Entry(self.tab_inputs, width=9)
-        self.Sb_entry.grid(row=10, column=1)
-
-        self.temperature_label = tk.Label(self.tab_inputs, text="Temperature (K)")
-        self.temperature_label.grid(row=11, column=0)
-
-        self.temperature_entry = tk.Entry(self.tab_inputs, width=9)
-        self.temperature_entry.grid(row=11, column=1)
-
-        self.rel_permitivity_label = tk.Label(self.tab_inputs, text="Rel. Permitivity")
-        self.rel_permitivity_label.grid(row=12, column=0)
-
-        self.rel_permitivity_entry = tk.Entry(self.tab_inputs, width=9)
-        self.rel_permitivity_entry.grid(row=12, column=1)
-
-        self.ext_efield_label = tk.Label(self.tab_inputs, text="External E-field [V/um]")
-        self.ext_efield_label.grid(row=13,column=0)
-
-        self.ext_efield_entry = tk.Entry(self.tab_inputs, width=9)
-        self.ext_efield_entry.grid(row=13,column=1)
-
-        self.special_var_head = tk.ttk.Label(self.tab_inputs, text="Photon behavior parameters", style="Header.TLabel")
-        self.special_var_head.grid(row=14,column=0,columnspan=2)
-
-        self.theta_label = tk.Label(self.tab_inputs, text="Theta Cof. [cm^-1]")
-        self.theta_label.grid(row=15,column=0)
-
-        self.theta_entry = tk.Entry(self.tab_inputs, width=9)
-        self.theta_entry.grid(row=15,column=1)
-
-        self.alpha_label = tk.Label(self.tab_inputs, text="Alpha Cof. [cm^-1]")
-        self.alpha_label.grid(row=16,column=0)
-
-        self.alpha_entry = tk.Entry(self.tab_inputs, width=9)
-        self.alpha_entry.grid(row=16,column=1)
-
-        self.delta_label = tk.Label(self.tab_inputs, text="Delta Frac.")
-        self.delta_label.grid(row=17,column=0)
-
-        self.delta_entry = tk.Entry(self.tab_inputs, width=9)
-        self.delta_entry.grid(row=17,column=1)
-
-        self.frac_emitted_label = tk.Label(self.tab_inputs, text="Frac. Emitted (0 to 1)")
-        self.frac_emitted_label.grid(row=18,column=0)
-
-        self.frac_emitted_entry = tk.Entry(self.tab_inputs, width=9)
-        self.frac_emitted_entry.grid(row=18,column=1)
-
-        self.flags_head = tk.ttk.Label(self.tab_inputs, text="Flags", style="Header.TLabel")
-        self.flags_head.grid(row=19,column=0,columnspan=2)
-
-        self.ignore_recycle_checkbutton = tk.Checkbutton(self.tab_inputs, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
-        self.ignore_recycle_checkbutton.grid(row=20,column=0)
-
-        self.symmetry_checkbutton = tk.Checkbutton(self.tab_inputs, text="Symmetric system?", variable=self.check_symmetric, onvalue=1, offvalue=0)
-        self.symmetry_checkbutton.grid(row=21,column=0)
-
-        self.steps_head = tk.ttk.Label(self.tab_inputs, text="Resolution Setting", style="Header.TLabel")
-        self.steps_head.grid(row=22,column=0,columnspan=2)
+        self.steps_head = tk.ttk.Label(self.tab_inputs, text="Space Grid", style="Header.TLabel")
+        self.steps_head.grid(row=1,column=0,columnspan=2)
 
         self.thickness_label = tk.Label(self.tab_inputs, text="Thickness (nm)")
-        self.thickness_label.grid(row=23,column=0)
+        self.thickness_label.grid(row=2,column=0)
 
         self.thickness_entry = tk.Entry(self.tab_inputs, width=9)
-        self.thickness_entry.grid(row=23,column=1)
+        self.thickness_entry.grid(row=2,column=1)
 
         self.dx_label = tk.Label(self.tab_inputs, text="Space step size [nm]")
-        self.dx_label.grid(row=24,column=0)
+        self.dx_label.grid(row=3,column=0)
 
         self.dx_entry = tk.Entry(self.tab_inputs, width=9)
-        self.dx_entry.grid(row=24,column=1)
+        self.dx_entry.grid(row=3,column=1)
+
+        self.system_params_head = tk.ttk.Label(self.tab_inputs, text="System Parameters",style="Header.TLabel")
+        self.system_params_head.grid(row=4, column=0,columnspan=2)
+
+        self.N_mobility_label = tk.Label(self.tab_inputs, text="N Mobility [cm^2 / V s]")
+        self.N_mobility_label.grid(row=5, column=0)
+
+        self.N_mobility_entry = tk.Entry(self.tab_inputs, width=9)
+        self.N_mobility_entry.grid(row=5,column=1)
+
+        self.P_mobility_label = tk.Label(self.tab_inputs, text="P Mobility [cm^2 / V s]")
+        self.P_mobility_label.grid(row=6, column=0)
+
+        self.P_mobility_entry = tk.Entry(self.tab_inputs, width=9)
+        self.P_mobility_entry.grid(row=6,column=1)
+
+        self.n0_label = tk.Label(self.tab_inputs, text="n0 [cm^-3]")
+        self.n0_label.grid(row=7,column=0)
+
+        self.n0_entry = tk.Entry(self.tab_inputs, width=9)
+        self.n0_entry.grid(row=7,column=1)
+
+        self.p0_label = tk.Label(self.tab_inputs, text="p0 [cm^-3]")
+        self.p0_label.grid(row=8,column=0)
+
+        self.p0_entry = tk.Entry(self.tab_inputs, width=9)
+        self.p0_entry.grid(row=8,column=1)
+
+        self.B_label = tk.Label(self.tab_inputs, text="B (cm^3 / s)")
+        self.B_label.grid(row=9,column=0)
+
+        self.B_entry = tk.Entry(self.tab_inputs, width=9)
+        self.B_entry.grid(row=9,column=1)
+
+        self.tauN_label = tk.Label(self.tab_inputs, text="Tau_n (ns)")
+        self.tauN_label.grid(row=10, column=0)
+
+        self.tauN_entry = tk.Entry(self.tab_inputs, width=9)
+        self.tauN_entry.grid(row=10, column=1)
+
+        self.tauP_label = tk.Label(self.tab_inputs, text="Tau_p (ns)")
+        self.tauP_label.grid(row=11, column=0)
+
+        self.tauP_entry = tk.Entry(self.tab_inputs, width=9)
+        self.tauP_entry.grid(row=11, column=1)
+
+        self.Sf_label = tk.Label(self.tab_inputs, text="Sf (cm / s)")
+        self.Sf_label.grid(row=12, column=0)
+
+        self.Sf_entry = tk.Entry(self.tab_inputs, width=9)
+        self.Sf_entry.grid(row=12, column=1)
+
+        self.Sb_label = tk.Label(self.tab_inputs, text="Sb (cm / s)")
+        self.Sb_label.grid(row=13, column=0)
+
+        self.Sb_entry = tk.Entry(self.tab_inputs, width=9)
+        self.Sb_entry.grid(row=13, column=1)
+
+        self.temperature_label = tk.Label(self.tab_inputs, text="Temperature (K)")
+        self.temperature_label.grid(row=14, column=0)
+
+        self.temperature_entry = tk.Entry(self.tab_inputs, width=9)
+        self.temperature_entry.grid(row=14, column=1)
+
+        self.rel_permitivity_label = tk.Label(self.tab_inputs, text="Rel. Permitivity")
+        self.rel_permitivity_label.grid(row=15, column=0)
+
+        self.rel_permitivity_entry = tk.Entry(self.tab_inputs, width=9)
+        self.rel_permitivity_entry.grid(row=15, column=1)
+
+        self.ext_efield_label = tk.Label(self.tab_inputs, text="External E-field [V/um]")
+        self.ext_efield_label.grid(row=16,column=0)
+
+        self.ext_efield_entry = tk.Entry(self.tab_inputs, width=9)
+        self.ext_efield_entry.grid(row=16,column=1)
+
+        self.special_var_head = tk.ttk.Label(self.tab_inputs, text="Photon behavior parameters", style="Header.TLabel")
+        self.special_var_head.grid(row=17,column=0,columnspan=2)
+
+        self.theta_label = tk.Label(self.tab_inputs, text="Theta Cof. [cm^-1]")
+        self.theta_label.grid(row=18,column=0)
+
+        self.theta_entry = tk.Entry(self.tab_inputs, width=9)
+        self.theta_entry.grid(row=18,column=1)
+
+        self.alpha_label = tk.Label(self.tab_inputs, text="Alpha Cof. [cm^-1]")
+        self.alpha_label.grid(row=19,column=0)
+
+        self.alpha_entry = tk.Entry(self.tab_inputs, width=9)
+        self.alpha_entry.grid(row=19,column=1)
+
+        self.delta_label = tk.Label(self.tab_inputs, text="Delta Frac.")
+        self.delta_label.grid(row=20,column=0)
+
+        self.delta_entry = tk.Entry(self.tab_inputs, width=9)
+        self.delta_entry.grid(row=20,column=1)
+
+        self.frac_emitted_label = tk.Label(self.tab_inputs, text="Frac. Emitted (0 to 1)")
+        self.frac_emitted_label.grid(row=21,column=0)
+
+        self.frac_emitted_entry = tk.Entry(self.tab_inputs, width=9)
+        self.frac_emitted_entry.grid(row=21,column=1)
+
+        self.flags_head = tk.ttk.Label(self.tab_inputs, text="Flags", style="Header.TLabel")
+        self.flags_head.grid(row=22,column=0,columnspan=2)
+
+        self.ignore_recycle_checkbutton = tk.Checkbutton(self.tab_inputs, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
+        self.ignore_recycle_checkbutton.grid(row=23,column=0)
+
+        self.symmetry_checkbutton = tk.Checkbutton(self.tab_inputs, text="Symmetric system?", variable=self.check_symmetric, onvalue=1, offvalue=0)
+        self.symmetry_checkbutton.grid(row=24,column=0)
 
         self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=4)
         self.ICtab_status.grid(row=25, rowspan=2, column=0, columnspan=2)
@@ -816,7 +915,7 @@ class Notebook:
         self.HIC_var_label = tk.Label(self.tab_rules_init, text="Select variable to initialize:")
         self.HIC_var_label.grid(row=8,column=3)
 
-        self.HIC_var_dropdown = tk.OptionMenu(self.tab_rules_init, self.init_var_selection, "ΔN [cm^-3]", "ΔP [cm^-3]", "dEc", "chi")
+        self.HIC_var_dropdown = tk.OptionMenu(self.tab_rules_init, self.init_var_selection, *[str(param + self.nanowire.param_dict[param].units) for param in self.nanowire.param_dict])
         self.HIC_var_dropdown.grid(row=8,column=4)
 
         self.HIC_method_label = tk.Label(self.tab_rules_init, text="Select condition method:")
@@ -917,8 +1016,8 @@ class Notebook:
 
         # Attach sub-frames to input tab and input tab to overall notebook
         self.tab_inputs.add(self.tab_analytical_init, text="Analytical Init. Cond.")
-        self.tab_inputs.add(self.tab_rules_init, text="Heuristic Init. Cond.")
-        self.tab_inputs.add(self.tab_explicit_init, text="Explicit Init. Cond.")
+        self.tab_inputs.add(self.tab_rules_init, text="Parameter Tool")
+        self.tab_inputs.add(self.tab_explicit_init, text="Parameter List Upload")
         self.notebook.add(self.tab_inputs, text="Inputs")
         return
 
@@ -1089,8 +1188,7 @@ class Notebook:
         return
 
     def DEBUG(self):
-        print("self.init_N[0] = {} nm^-3".format(self.init_N[0]))
-        print("self.init_P[0] = {} nm^-3".format(self.init_P[0]))
+        self.nanowire.DEBUG_print()
         return
 
     ## Functions to create popups and manage
@@ -2762,24 +2860,28 @@ class Notebook:
 
     # Second, create a function that generates and locks in new spatial meshes. A new mesh can only be generated when the previous mesh is discarded using reset_IC().
     def set_init_x(self):
-        #if (float(self.thickness_entry.get()) != self.thickness or float(self.dx_entry.get()) != self.dx):
-        #    raise Exception("Error: Thickness or space step size has been altered - reset the initial condition to use new space mesh")
+        # Changed for V2
 
-        self.thickness = float(self.thickness_entry.get())
-        self.dx = float(self.dx_entry.get())
+        if self.nanowire.spacegrid_is_set:
+            return
 
-        if (self.thickness <= 0 or self.dx <= 0): raise ValueError
+        thickness = float(self.thickness_entry.get())
+        dx = float(self.dx_entry.get())
 
-        if not finite.check_valid_dx(self.thickness, self.dx):
+        if (thickness <= 0 or dx <= 0): raise ValueError
+
+        if not finite.check_valid_dx(thickness, dx):
             raise Exception("Error: space step size larger than thickness")
 
         # Upper limit on number of space steps
-        if (int(0.5 + self.thickness / self.dx) > 1e6): 
+        if (int(0.5 + thickness / dx) > 1e6): 
             raise Exception("Error: too many space steps")
 
-            
-        self.init_x = np.linspace(self.dx / 2,self.thickness - self.dx / 2, int(0.5 + self.thickness / self.dx))
-        self.init_x_edges = np.linspace(0, self.thickness, int(0.5 + self.thickness / self.dx) + 1)
+        self.nanowire.total_length = thickness
+        self.nanowire.dx = dx
+        self.nanowire.grid_x_nodes = np.linspace(dx / 2,thickness - dx / 2, int(0.5 + thickness / dx))
+        self.nanowire.grid_x_edges = np.linspace(0, thickness, int(0.5 + thickness / dx) + 1)
+        self.nanowire.spacegrid_is_set = True
         self.set_thickness_and_dx_entryboxes(state='lock')
         return
 
@@ -3014,9 +3116,12 @@ class Notebook:
         return
 
     def add_HIC(self):
-        # Create new Initial_Condition object and add to list
+        # V2 update
+        # Set the value of one of Nanowire's Parameters
         if (self.HIC_list.__len__() > 0 and isinstance(self.HIC_list[0], str)):
+            print("Something happened!")
             self.deleteall_HIC(False)
+
         try:
             self.set_init_x()
 
@@ -3029,6 +3134,9 @@ class Notebook:
             return
 
         try:
+            new_param_name = self.init_var_selection.get()
+            if "[" in new_param_name: new_param_name = new_param_name[:new_param_name.find("[")]
+
             if (self.init_shape_selection.get() == "POINT"):
 
                 if (float(self.HIC_lbound_entry.get()) < 0):
@@ -3037,19 +3145,22 @@ class Notebook:
                 if (float(self.HIC_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                newInitCond = Initial_Condition(self.init_var_selection.get(), "POINT", float(self.HIC_lbound_entry.get()), -1, float(self.HIC_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.HIC_lbound_entry.get()), -1, float(self.HIC_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
-                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.thickness):
+                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
                 	raise Exception("Error: Bound coordinates exceed system thickness specifications")
+
+                if (float(self.HIC_lbound_entry.get()) > float(self.HIC_rbound_entry.get())):
+                	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
 
                 if (float(self.HIC_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                newInitCond = Initial_Condition(self.init_var_selection.get(), "FILL", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
-                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.thickness):
+                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
                 	raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
                 if (float(self.HIC_lbound_entry.get()) > float(self.HIC_rbound_entry.get())):
@@ -3058,10 +3169,10 @@ class Notebook:
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                newInitCond = Initial_Condition(self.init_var_selection.get(), "LINE", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "LINE", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
 
             elif (self.init_shape_selection.get() == "EXP"):
-                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.thickness):
+                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
                     raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
                 if (float(self.HIC_lbound_entry.get()) > float(self.HIC_rbound_entry.get())):
@@ -3070,7 +3181,7 @@ class Notebook:
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                newInitCond = Initial_Condition(self.init_var_selection.get(), "EXP", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "EXP", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
 
             else:
                 raise Exception("Error: No init. type selected")
@@ -3083,11 +3194,16 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-        self.HIC_list.append(newInitCond)
-        self.HIC_listbox.insert(self.HIC_list.__len__() - 1, newInitCond.get())
-        self.recalc_HIC()
-        self.IC_is_AIC = False
-        self.update_IC_plot()
+        self.HIC_list.append(new_param_rule)
+        self.HIC_listbox.insert(self.HIC_list.__len__() - 1, new_param_rule.get())
+
+        self.nanowire.add_param_rule(new_param_name, new_param_rule)
+
+        self.write(self.ICtab_status, "")
+        
+        #self.recalc_HIC()
+        #self.IC_is_AIC = False
+        #self.update_IC_plot()
         return
 
 	# Repositions HICs in their list
