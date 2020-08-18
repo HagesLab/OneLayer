@@ -111,7 +111,19 @@ class Nanowire:
         self.update_param_toarray(param_name)
         return
 
+    def swap_param_rules(self, param_name, i):
+        self.param_dict[param_name].param_rules[i], self.param_dict[param_name].param_rules[i-1] = self.param_dict[param_name].param_rules[i-1], self.param_dict[param_name].param_rules[i]
+        self.update_param_toarray(param_name)
+        return
+
+    def remove_param_rule(self, param_name, i):
+        self.param_dict[param_name].param_rules.pop(i)
+        self.update_param_toarray(param_name)
+        return
+
     def update_param_toarray(self, param_name):
+        # Recalculate a Parameter from its Param_Rules
+        # This should be done every time the Param_Rules are changed
         param = self.param_dict[param_name]
         if param.is_edge:
             new_param_value = np.zeros(self.grid_x_edges.__len__())
@@ -119,24 +131,24 @@ class Nanowire:
             new_param_value = np.zeros(self.grid_x_nodes.__len__())
 
         for condition in param.param_rules:
+            i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
+            if (condition.l_bound - finite.toCoord(i, self.dx, param.is_edge) >= self.dx / 2): i += 1
+
             if (condition.type == "POINT"):
-                new_param_value[finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)] = condition.l_boundval
+                new_param_value[i] = condition.l_boundval
 
             elif (condition.type == "FILL"):
-                i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
                 j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
                 new_param_value[i:j+1] = condition.l_boundval
 
             elif (condition.type == "LINE"):
                 slope = (condition.r_boundval - condition.l_boundval) / (condition.r_bound - condition.l_bound)
-                i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
                 j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
 
                 ndx = np.linspace(0, self.dx * (j - i), j - i + 1)
                 new_param_value[i:j+1] = condition.l_boundval + ndx * slope
 
             elif (condition.type == "EXP"):
-                i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
                 j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
 
                 ndx = np.linspace(0, j - i, j - i + 1)
@@ -396,6 +408,8 @@ class Notebook:
                                 "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
                                 "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
                                 "Delta": 1, "Frac-Emitted": 1,
+                                "init_deltaN": ((1e-7) ** 3), "init_deltaP": ((1e-7) ** 3),
+                                "init_E_field": 1, "Ec": 1, "electron_affinity": 1,
                                 "N": ((1e-7) ** 3), "P": ((1e-7) ** 3)}                     # [cm^-3] to [nm^-3]
 
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
@@ -419,6 +433,7 @@ class Notebook:
 
         self.init_shape_selection = tk.StringVar()
         self.init_var_selection = tk.StringVar()
+        self.HIC_viewer_selection = tk.StringVar()
         self.EIC_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
@@ -433,6 +448,7 @@ class Notebook:
         self.nanowire = Nanowire()
 
         self.HIC_list = []
+        self.HIC_listbox_currentparam = ""
         self.IC_file_list = None
         self.init_N = None
         self.init_P = None
@@ -903,22 +919,22 @@ class Notebook:
         self.spacing_box2 = tk.Label(self.tab_rules_init, text="")
         self.spacing_box2.grid(row=0,rowspan=14,column=0,columnspan=3, padx=(370,0))
 
-        self.HIC_list_title = tk.ttk.Label(self.tab_rules_init, text="Heuristic Initial Condition Manager", style="Header.TLabel")
+        self.HIC_list_title = tk.ttk.Label(self.tab_rules_init, text="Parameter Rules", style="Header.TLabel")
         self.HIC_list_title.grid(row=0,column=3,columnspan=3)
 
         self.HIC_listbox = tk.Listbox(self.tab_rules_init, width=86,height=8)
         self.HIC_listbox.grid(row=1,rowspan=6,column=3,columnspan=3, padx=(12,0))
 
-        self.add_HIC_title = tk.Label(self.tab_rules_init, text="Add a custom initial condition (see manual for details)")
+        self.add_HIC_title = tk.Label(self.tab_rules_init, text="Add a custom parameter distribution (see manual for details)")
         self.add_HIC_title.grid(row=7, column=3,columnspan=2, padx=(6,0))
 
-        self.HIC_var_label = tk.Label(self.tab_rules_init, text="Select variable to initialize:")
+        self.HIC_var_label = tk.Label(self.tab_rules_init, text="Select parameter to edit:")
         self.HIC_var_label.grid(row=8,column=3)
 
         self.HIC_var_dropdown = tk.OptionMenu(self.tab_rules_init, self.init_var_selection, *[str(param + self.nanowire.param_dict[param].units) for param in self.nanowire.param_dict])
         self.HIC_var_dropdown.grid(row=8,column=4)
 
-        self.HIC_method_label = tk.Label(self.tab_rules_init, text="Select condition method:")
+        self.HIC_method_label = tk.Label(self.tab_rules_init, text="Select calculation method:")
         self.HIC_method_label.grid(row=9,column=3)
 
         self.HIC_method_dropdown = tk.OptionMenu(self.tab_rules_init, self.init_shape_selection, "POINT", "FILL", "LINE", "EXP")
@@ -948,26 +964,32 @@ class Notebook:
         self.HIC_rvalue_entry = tk.Entry(self.tab_rules_init, width=8)
         self.HIC_rvalue_entry.grid(row=13,column=4)
 
-        self.add_HIC_button = tk.Button(self.tab_rules_init, text="Add new initial condition", command=self.add_HIC)
+        self.add_HIC_button = tk.Button(self.tab_rules_init, text="Add new parameter rule", command=self.add_HIC)
         self.add_HIC_button.grid(row=14,column=3,columnspan=2)
 
-        self.delete_HIC_button = tk.Button(self.tab_rules_init, text="Delete highlighted init. cond.", command=self.delete_HIC)
+        self.delete_HIC_button = tk.Button(self.tab_rules_init, text="Delete highlighted rule", command=self.delete_HIC)
         self.delete_HIC_button.grid(row=8,column=5)
 
-        self.deleteall_HIC_button = tk.Button(self.tab_rules_init, text="Delete all init. conds.", command=self.deleteall_HIC)
+        self.deleteall_HIC_button = tk.Button(self.tab_rules_init, text="Delete all rules for this parameter", command=self.deleteall_HIC)
         self.deleteall_HIC_button.grid(row=9,column=5)
 
-        self.HIC_description = tk.Message(self.tab_rules_init, text="The Heuristic Initial Condition uses a series of rules and patterns to generate an initial carrier distribution.", width=250)
+        self.HIC_description = tk.Message(self.tab_rules_init, text="The Parameter Toolkit uses a series of rules and patterns to build a spatially dependent distribution for any parameter.", width=250)
         self.HIC_description.grid(row=10,rowspan=2,column=5,columnspan=2)
 
-        self.HIC_description2 = tk.Message(self.tab_rules_init, text="Warning: Deleting HIC's will RESET the displayed initial condition values.", width=250)
+        self.HIC_description2 = tk.Message(self.tab_rules_init, text="Warning: Rules are applied from top to bottom. Order matters!", width=250)
         self.HIC_description2.grid(row=12,rowspan=2,column=5,columnspan=2)
 
         self.moveup_HIC_button = tk.Button(self.tab_rules_init, text="⇧", command=self.moveup_HIC)
         self.moveup_HIC_button.grid(row=2,column=6, padx=(0,12))
 
+        self.HIC_viewer_dropdown = tk.OptionMenu(self.tab_rules_init, self.HIC_viewer_selection, *[param for param in self.nanowire.param_dict])
+        self.HIC_viewer_dropdown.grid(row=3,column=6, padx=(0,12))
+
+        self.HIC_view_button = tk.Button(self.tab_rules_init, text="Change view", command=self.refresh_paramrule_listbox)
+        self.HIC_view_button.grid(row=3,column=7, padx=(0,12))
+
         self.movedown_HIC_button = tk.Button(self.tab_rules_init, text="⇩", command=self.movedown_HIC)
-        self.movedown_HIC_button.grid(row=3,column=6, padx=(0,12))
+        self.movedown_HIC_button.grid(row=4,column=6, padx=(0,12))
 
         ## Explicit Inital Condition(EIC):
 
@@ -983,23 +1005,23 @@ class Notebook:
         self.add_EIC_button = tk.Button(self.tab_explicit_init, text="Import", command=self.add_EIC)
         self.add_EIC_button.grid(row=3,column=3)
 
-        self.init_fig_NP = plot.figure(1, figsize=(4.85,3))
-        self.init_canvas_NP = tkagg.FigureCanvasTkAgg(self.init_fig_NP, master=self.tab_inputs)
-        self.init_NP_plotwidget = self.init_canvas_NP.get_tk_widget()
-        self.init_NP_plotwidget.grid(row=17,column=3,rowspan=12,columnspan=2)
+        self.custom_param_fig = plot.figure(1, figsize=(4.85,3))
+        self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, master=self.tab_inputs)
+        self.custom_param_plotwidget = self.custom_param_canvas.get_tk_widget()
+        self.custom_param_plotwidget.grid(row=17,column=3,rowspan=12,columnspan=2)
 
-        self.np_toolbar_frame = tk.Frame(master=self.tab_inputs)
-        self.np_toolbar_frame.grid(row=29,column=3,columnspan=2)
-        self.np_toolbar = tkagg.NavigationToolbar2Tk(self.init_canvas_NP, self.np_toolbar_frame)
+        self.custom_param_toolbar_frame = tk.Frame(master=self.tab_inputs)
+        self.custom_param_toolbar_frame.grid(row=29,column=3,columnspan=2)
+        self.custom_param_toolbar = tkagg.NavigationToolbar2Tk(self.custom_param_canvas, self.custom_param_toolbar_frame)
 
-        self.init_fig_ec = plot.figure(2, figsize=(4.85,3))
-        self.init_canvas_ec = tkagg.FigureCanvasTkAgg(self.init_fig_ec, master=self.tab_inputs)
-        self.init_ec_plotwidget = self.init_canvas_ec.get_tk_widget()
-        self.init_ec_plotwidget.grid(row=17,column=5,rowspan=12,columnspan=2)
+        self.recent_param_fig = plot.figure(2, figsize=(4.85,3))
+        self.recent_param_canvas = tkagg.FigureCanvasTkAgg(self.recent_param_fig, master=self.tab_inputs)
+        self.recent_param_plotwidget = self.recent_param_canvas.get_tk_widget()
+        self.recent_param_plotwidget.grid(row=17,column=5,rowspan=12,columnspan=2)
 
-        self.ec_toolbar_frame = tk.Frame(master=self.tab_inputs)
-        self.ec_toolbar_frame.grid(row=29,column=5,columnspan=2)
-        self.ec_toolbar = tkagg.NavigationToolbar2Tk(self.init_canvas_ec, self.ec_toolbar_frame)
+        self.recent_param_toolbar_frame = tk.Frame(master=self.tab_inputs)
+        self.recent_param_toolbar_frame.grid(row=29,column=5,columnspan=2)
+        self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, self.recent_param_toolbar_frame)
 
         # Dictionaries of parameter entry boxes
         self.sys_param_entryboxes_dict = {"Mu_N":self.N_mobility_entry, "Mu_P":self.P_mobility_entry, "N0":self.n0_entry, "P0":self.p0_entry, 
@@ -1016,7 +1038,7 @@ class Notebook:
 
         # Attach sub-frames to input tab and input tab to overall notebook
         self.tab_inputs.add(self.tab_analytical_init, text="Analytical Init. Cond.")
-        self.tab_inputs.add(self.tab_rules_init, text="Parameter Tool")
+        self.tab_inputs.add(self.tab_rules_init, text="Parameter Toolkit")
         self.tab_inputs.add(self.tab_explicit_init, text="Parameter List Upload")
         self.notebook.add(self.tab_inputs, text="Inputs")
         return
@@ -1189,6 +1211,7 @@ class Notebook:
 
     def DEBUG(self):
         self.nanowire.DEBUG_print()
+        print(self.HIC_viewer_selection.get())
         return
 
     ## Functions to create popups and manage
@@ -2820,10 +2843,10 @@ class Notebook:
             self.set_thickness_and_dx_entryboxes(state='unlock')
             plot.figure(1)
             plot.clf()
-            self.init_canvas_NP.draw()
+            self.custom_param_canvas.draw()
             plot.figure(2)
             plot.clf()
-            self.init_fig_ec.canvas.draw()
+            self.recent_param_canvas.draw()
             cleared_items += " Inits"
 
         self.write(self.ICtab_status, "Cleared:{}".format(cleared_items))
@@ -3062,6 +3085,7 @@ class Notebook:
     def recalc_HIC(self):
         # Recalculate IC arrays from every condition, sequentially, in the HIC list
         # Used when HIC list is updated
+        # V2 Update: TODO consider deprecating
         try:
             self.set_init_x()
 
@@ -3118,6 +3142,8 @@ class Notebook:
     def add_HIC(self):
         # V2 update
         # Set the value of one of Nanowire's Parameters
+
+        # TODO: This check may be deprecated
         if (self.HIC_list.__len__() > 0 and isinstance(self.HIC_list[0], str)):
             print("Something happened!")
             self.deleteall_HIC(False)
@@ -3145,7 +3171,7 @@ class Notebook:
                 if (float(self.HIC_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.HIC_lbound_entry.get()), -1, float(self.HIC_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.HIC_lbound_entry.get()), -1, float(self.HIC_lvalue_entry.get()) * self.convert_in_dict[new_param_name], -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
@@ -3157,7 +3183,7 @@ class Notebook:
                 if (float(self.HIC_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()) * self.convert_in_dict[new_param_name], -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
@@ -3169,7 +3195,8 @@ class Notebook:
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "LINE", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "LINE", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), 
+                                            float(self.HIC_lvalue_entry.get()) * self.convert_in_dict[new_param_name], float(self.HIC_rvalue_entry.get()) * self.convert_in_dict[new_param_name])
 
             elif (self.init_shape_selection.get() == "EXP"):
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
@@ -3181,7 +3208,8 @@ class Notebook:
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "EXP", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "EXP", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), 
+                                            float(self.HIC_lvalue_entry.get()) * self.convert_in_dict[new_param_name], float(self.HIC_rvalue_entry.get()) * self.convert_in_dict[new_param_name])
 
             else:
                 raise Exception("Error: No init. type selected")
@@ -3194,67 +3222,113 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-        self.HIC_list.append(new_param_rule)
-        self.HIC_listbox.insert(self.HIC_list.__len__() - 1, new_param_rule.get())
+
+        #self.HIC_list.append(new_param_rule)
+        #self.HIC_listbox.insert(self.HIC_list.__len__() - 1, new_param_rule.get())
 
         self.nanowire.add_param_rule(new_param_name, new_param_rule)
 
-        self.write(self.ICtab_status, "")
-        
+        self.HIC_viewer_selection.set(new_param_name)
+        self.update_paramrule_listbox(new_param_name)
+
         #self.recalc_HIC()
         #self.IC_is_AIC = False
-        #self.update_IC_plot()
+        self.update_IC_plot(do_recent=True)
         return
 
-	# Repositions HICs in their list
-	# HICs are applied sequentially and do overwrite each other, so this CAN affect what the initial condition looks like
+    def refresh_paramrule_listbox(self):
+        # The View button has two jobs: change the listbox to the new param and display a snapshot of it
+        self.update_paramrule_listbox(self.HIC_viewer_selection.get())
+        self.update_IC_plot(do_recent=False)
+        return
+    
+    def update_paramrule_listbox(self, param_name):
+        # Grab current param's rules from Nanowire and show them in the param_rule listbox
+        if param_name == "":
+            self.write(self.ICtab_status, "Select a parameter")
+            return
+
+        # 1. Clear the viewer
+        self.hideall_HIC()
+
+        # 2. Write in the new rules
+        current_param_rules = self.nanowire.param_dict[param_name].param_rules
+        self.HIC_listbox_currentparam = param_name
+
+        for param_rule in current_param_rules:
+            self.HIC_list.append(param_rule)
+            self.HIC_listbox.insert(self.HIC_list.__len__() - 1, param_rule.get())
+
+        
+        self.write(self.ICtab_status, "")
+
+        return
+
+    # These two reposition the order of param_rules
     def moveup_HIC(self):
         currentSelectionIndex = self.HIC_listbox.curselection()[0]
         
         if (currentSelectionIndex > 0):
-            self.HIC_list[currentSelectionIndex], self.HIC_list[currentSelectionIndex - 1] = self.HIC_list[currentSelectionIndex - 1], self.IC_list[currentSelectionIndex]
+            # Two things must be done here for a complete swap:
+            # 1. Change the order param rules appear in the box
+            self.HIC_list[currentSelectionIndex], self.HIC_list[currentSelectionIndex - 1] = self.HIC_list[currentSelectionIndex - 1], self.HIC_list[currentSelectionIndex]
             self.HIC_listbox.delete(currentSelectionIndex)
             self.HIC_listbox.insert(currentSelectionIndex - 1, self.HIC_list[currentSelectionIndex - 1].get())
             self.HIC_listbox.selection_set(currentSelectionIndex - 1)
-            self.recalc_HIC()
-            self.update_IC_plot()
+
+            # 2. Change the order param rules are applied when calculating Parameter's values
+            self.nanowire.swap_param_rules(self.HIC_listbox_currentparam, currentSelectionIndex)
+            self.update_IC_plot(do_recent=True)
         return
 
     def movedown_HIC(self):
         currentSelectionIndex = self.HIC_listbox.curselection()[0] + 1
         
         if (currentSelectionIndex < self.HIC_list.__len__()):
-            self.HIC_list[currentSelectionIndex], self.HIC_list[currentSelectionIndex - 1] = self.HIC_list[currentSelectionIndex - 1], self.IC_list[currentSelectionIndex]
+            self.HIC_list[currentSelectionIndex], self.HIC_list[currentSelectionIndex - 1] = self.HIC_list[currentSelectionIndex - 1], self.HIC_list[currentSelectionIndex]
             self.HIC_listbox.delete(currentSelectionIndex)
             self.HIC_listbox.insert(currentSelectionIndex - 1, self.HIC_list[currentSelectionIndex - 1].get())
             self.HIC_listbox.selection_set(currentSelectionIndex)
-            self.recalc_HIC()
-            self.update_IC_plot()
+            
+            self.nanowire.swap_param_rules(self.HIC_listbox_currentparam, currentSelectionIndex)
+            self.update_IC_plot(do_recent=True)
         return
 
-    # Wrapper - Call delete_HIC until HIC list box is empty
-    def deleteall_HIC(self, doPlotUpdate=True):
+    def hideall_HIC(self, doPlotUpdate=True):
+        # Wrapper - Call hide_HIC() until listbox is empty
         while (self.HIC_list.__len__() > 0):
             # These first two lines mimic user repeatedly selecting topmost HIC in listbox
+            self.HIC_listbox.select_set(0)
+            self.HIC_listbox.event_generate("<<ListboxSelect>>")
+
+            self.hide_HIC()
+        return
+
+    def hide_HIC(self):
+        # Remove user-selected param rule from box (but don't touch Nanowire's saved info)
+        self.HIC_list.pop(self.HIC_listbox.curselection()[0])
+        self.HIC_listbox.delete(self.HIC_listbox.curselection()[0])
+        return
+
+    
+    def deleteall_HIC(self, doPlotUpdate=True):
+        # Wrapper - Call delete_HIC until Nanowire's list of param_rules is empty
+        while (self.HIC_list.__len__() > 0):
             self.HIC_listbox.select_set(0)
             self.HIC_listbox.event_generate("<<ListboxSelect>>")
 
             self.delete_HIC()
         return
 
-    # Remove user-selected HIC from box and scrub its calculated values from stored IC arrays
     def delete_HIC(self):
+        # Remove user-selected param rule from box AND from Nanowire's list of param_rules
         if (self.HIC_list.__len__() > 0):
             try:
-                print("Deleted init. cond. #" + str(self.HIC_listbox.curselection()[0]))
-                condition_to_delete = self.HIC_list[self.HIC_listbox.curselection()[0]]
-                self.uncalc_HIC(condition_to_delete.variable, condition_to_delete.l_bound, condition_to_delete.r_bound, condition_to_delete.type == "POINT", condition_to_delete.is_edge())
-                self.HIC_list.pop(self.HIC_listbox.curselection()[0])
-                self.HIC_listbox.delete(self.HIC_listbox.curselection()[0])
-                self.recalc_HIC()
-                self.update_IC_plot()
+                self.nanowire.remove_param_rule(self.HIC_listbox_currentparam, self.HIC_listbox.curselection()[0])
+                self.hide_HIC()
+                self.update_IC_plot(do_recent=True)
             except IndexError:
-                self.write(self.ICtab_status, "No HIC selected")
+                self.write(self.ICtab_status, "No rule selected")
                 return
         return
 
@@ -3332,54 +3406,41 @@ class Notebook:
         self.update_IC_plot(warn=warning_flag)
         return
 
-    ## Replot IC plots with updated IC arrays
-    def update_IC_plot(self, warn=False):
-        self.check_IC_initialized()
-        plot.figure(1)
+    def update_IC_plot(self, warn=False, do_recent=True):
+        # V2 update: can now plot any parameter
+        # Plot 2 is for recently changed parameter while plot 1 is for user-selected views
+        #self.check_IC_initialized()
+        if do_recent: plot.figure(2)
+        else: plot.figure(1)
+
         plot.clf()
         plot.yscale('log')
 
-        max_N = np.amax(self.init_N) * self.convert_out_dict["N"]
-        max_P = np.amax(self.init_P) * self.convert_out_dict["P"]
-        largest_initValue = max(max_N, max_P)
-        plot.ylim((largest_initValue + 1e-30) * 1e-12, (largest_initValue + 1e-30) * 1e4)
+        param_name = self.HIC_listbox_currentparam
+        param_obj = self.nanowire.param_dict[param_name]
+        max_val = np.amax(param_obj.value) * self.convert_out_dict[param_name]
+        grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
+
+        plot.ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
 
 
         if self.check_symmetric.get():
-            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_N), self.init_N), axis=0) * self.convert_out_dict["N"], label="delta_N") # [per nm^3] to [per cm^3]
-            plot.plot(np.concatenate((-np.flip(self.init_x), self.init_x), axis=0), np.concatenate((np.flip(self.init_P), self.init_P), axis=0) * self.convert_out_dict["N"], label="delta_P")
-            
+            plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(param_obj.value), param_obj.value), axis=0) * self.convert_out_dict[param_name], label=param_name)
+
             ymin, ymax = plot.gca().get_ylim()
-            plot.fill([-self.init_x[-1], 0, 0, -self.init_x[-1]], [ymin, ymin, ymax, ymax], 'b', alpha=0.1, edgecolor='r')
+            plot.fill([-grid_x[-1], 0, 0, -grid_x[-1]], [ymin, ymin, ymax, ymax], 'b', alpha=0.1, edgecolor='r')
         else:
-            plot.plot(self.init_x, self.init_N * self.convert_out_dict["N"], label="delta_N") # [per nm^3] to [per cm^3]
-            plot.plot(self.init_x, self.init_P * self.convert_out_dict["P"], label="delta_P")
+            plot.plot(grid_x, param_obj.value * self.convert_out_dict[param_name], label=param_name)
 
         plot.xlabel("x [nm]")
-        plot.ylabel("ΔN, ΔP [per cm^-3]")
-        plot.title("Initial ΔN, ΔP Distribution")
-        plot.legend()
+        plot.ylabel("{} {}".format(param_name, param_obj.units))
+        
+        if do_recent: plot.title("Recently Changed: {}".format(param_name))
+        else: plot.title("Snapshot: {}".format(param_name))
+
         plot.tight_layout()
-        self.init_fig_NP.canvas.draw()
-
-        plot.figure(2)
-        plot.clf()
-        plot.yscale('log')
-
-        max_Ec = np.amax(self.init_Ec)
-        max_Chi = np.amax(self.init_Chi)
-        largest_initValue = max(max_Ec, max_Chi)
-        plot.ylim((largest_initValue + 1e-30) * 1e-12, (largest_initValue + 1e-30) * 1e4)
-
-        plot.plot(self.init_x_edges, self.init_Ec, label="Eg")
-        plot.plot(self.init_x_edges, self.init_Chi, label="e- aff.")
-
-        plot.xlabel("x [nm]")
-        plot.ylabel("Eg, e- aff. [TODO]")
-        plot.title("Initial Eg, Electron Affinity Distribution")
-        plot.legend()
-        plot.tight_layout()
-        self.init_fig_ec.canvas.draw()
+        if do_recent: self.recent_param_fig.canvas.draw()
+        else: self.custom_param_fig.canvas.draw()
 
         if not warn: self.write(self.ICtab_status, "Initial Condition Updated")
         return

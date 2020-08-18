@@ -14,6 +14,7 @@ def check_valid_dx(length, dx):
     return (dx <= length)
 
 def toIndex(x,dx, absUpperBound, is_edge=False):
+    # Warning: this and toCoord() always round x down to the nearest node (or edge if is_edge=True)!
     absLowerBound = dx / 2 if not is_edge else 0
     if (x < absLowerBound):
         return 0
@@ -22,6 +23,12 @@ def toIndex(x,dx, absUpperBound, is_edge=False):
         return int(absUpperBound / dx)
 
     return int((x - absLowerBound) / dx)
+
+
+def toCoord(i,dx, is_edge=False):
+    absLowerBound = dx / 2 if not is_edge else 0
+    return (absLowerBound + i * dx)
+
 
 def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
     # h and c are Planck's const and speed of light, respectively. These default to common units [J*s] and [m/s] but
@@ -36,10 +43,6 @@ def pulse_laser_maxgen(max_gen, alpha, x_array, hc=6.626e-34*2.997e8):
 
 def pulse_laser_totalgen(total_gen, total_length, alpha, x_array, hc=6.626e-34*2.997e8):
     return ((total_gen * total_length * alpha * np.exp(alpha * total_length)) / (np.exp(alpha * total_length) - 1) * np.exp(-alpha * x_array))
-
-def toCoord(i,dx, is_edge=False):
-    absLowerBound = dx / 2 if not is_edge else 0
-    return (absLowerBound + i * dx)
 
 def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, symmetric=True):
     distance = np.arange(0, m*dx, dx)
