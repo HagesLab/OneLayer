@@ -117,6 +117,8 @@ class Nanowire:
         return
 
     def remove_param_rule(self, param_name, i):
+        # TODO: Only one updated needed for multiple removals
+        # Add shortcut for remove_all
         self.param_dict[param_name].param_rules.pop(i)
         self.update_param_toarray(param_name)
         return
@@ -499,6 +501,7 @@ class Notebook:
 
         # Check when popup menus open and close
         self.batch_popup_isopen = False
+        self.resetIC_popup_isopen = False
         self.overwrite_popup_isopen = False
         self.integration_popup_isopen = False
         self.integration_getbounds_popup_isopen = False
@@ -1290,6 +1293,74 @@ class Notebook:
         except:
             print("Error #103: Failed to close batch popup.")
 
+        return
+
+    def do_resetIC_popup(self):
+
+        if not self.resetIC_popup_isopen:
+
+            self.resetIC_popup = tk.Toplevel(self.root)
+
+            self.resetIC_title_label1 = tk.ttk.Label(self.resetIC_popup, text="Which Parameters should be cleared?", style="Header.TLabel")
+            self.resetIC_title_label1.grid(row=0,column=0,columnspan=2)
+
+            self.resetIC_checkbutton_frame = tk.Frame(self.resetIC_popup)
+            self.resetIC_checkbutton_frame.grid(row=1,column=0,columnspan=2)
+
+            # Let's try some procedurally generated checkbuttons: one created automatically per nanowire parameter
+            self.resetIC_checkparams = {}
+            self.resetIC_checkbuttons = {}
+            cb_row = 0
+            cb_col = 0
+            cb_per_col = 3
+            for param in self.nanowire.param_dict:
+                self.resetIC_checkparams[param] = tk.IntVar()
+
+                self.resetIC_checkbuttons[param] = tk.Checkbutton(self.resetIC_checkbutton_frame, text=param, variable=self.resetIC_checkparams[param], onvalue=1, offvalue=0)
+
+            for cb in self.resetIC_checkbuttons:
+                self.resetIC_checkbuttons[cb].grid(row=cb_row,column=cb_col, pady=(6,6))
+                cb_row += 1
+                if cb_row == cb_per_col:
+                    cb_row = 0
+                    cb_col += 1
+
+            
+            self.hline10_separator = tk.ttk.Separator(self.resetIC_popup, orient="horizontal", style="Grey Bar.TSeparator")
+            self.hline10_separator.grid(row=2,column=0,columnspan=2, pady=(10,10), sticky="ew")
+
+            self.resetIC_do_clearall = tk.IntVar()
+            self.resetIC_clearall_checkbutton = tk.Checkbutton(self.resetIC_popup, text="Clear All", variable=self.resetIC_do_clearall, onvalue=1, offvalue=0)
+            self.resetIC_clearall_checkbutton.grid(row=3,column=0)
+
+            self.resetIC_continue_button = tk.Button(self.resetIC_popup, text="Continue", command=self.DEBUG)
+            self.resetIC_continue_button.grid(row=3,column=1)
+
+            self.resetIC_popup.protocol("WM_DELETE_WINDOW", self.DEBUG)
+            self.resetIC_popup.grab_set()
+            self.resetIC_popup_isopen = True
+            return
+
+        else:
+            print("Error #700: Opened more than one resetIC popup at a time")
+
+        return
+
+    def on_resetIC_popup_close(self, continue_=False):
+        try:
+            if continue_:
+                print("Mode: {}".format(self.bay_mode.get()))
+                for param in self.check_bay_params:
+                    print("{}: {}".format(param, self.check_bay_params[param].get()))
+
+                self.export_for_bayesim()
+
+            self.bay_popup.destroy()
+            print("Bayesim popup closed")
+            self.bayesim_popup_isopen = False
+
+        except:
+            print("Error #601: Failed to close Bayesim popup")
         return
 
     def do_plotter_popup(self, plot_ID):
@@ -2824,33 +2895,39 @@ class Notebook:
     ## Initial Condition Managers
 
     def reset_IC(self, force=False):
-        # Clears and uninitializes all fields and saved data on IC tab
-        cleared_items = ""
-        if self.check_reset_params.get() or force:
-            for key in self.sys_param_entryboxes_dict:
-                self.enter(self.sys_param_entryboxes_dict[key], "")
+        # V2 Update: On IC tab:
+        # 1. Remove all param_rules from all Parameters
+        # 2. Remove all values stored in Nanowire()
+        # 3. Clear all entryboxes
+        # 4. Clear both plots
 
-            cleared_items += " Params,"
+        print("shonk bonk")
+        self.do_resetIC_popup()
+        #if self.check_reset_params.get() or force:
+        #    for key in self.sys_param_entryboxes_dict:
+        #        self.enter(self.sys_param_entryboxes_dict[key], "")
 
-        if self.check_reset_inits.get() or force:
-            self.deleteall_HIC()
-            self.IC_is_AIC = False
-            self.thickness = None
-            self.dx = None
-            self.init_N = None
-            self.init_P = None
-            self.init_Ec = None
-            self.init_Chi = None
-            self.set_thickness_and_dx_entryboxes(state='unlock')
-            plot.figure(1)
-            plot.clf()
-            self.custom_param_canvas.draw()
-            plot.figure(2)
-            plot.clf()
-            self.recent_param_canvas.draw()
-            cleared_items += " Inits"
+        #    cleared_items += " Params,"
 
-        self.write(self.ICtab_status, "Cleared:{}".format(cleared_items))
+        #if self.check_reset_inits.get() or force:
+        #    self.deleteall_HIC()
+        #    self.IC_is_AIC = False
+        #    self.thickness = None
+        #    self.dx = None
+        #    self.init_N = None
+        #    self.init_P = None
+        #    self.init_Ec = None
+        #    self.init_Chi = None
+        #    self.set_thickness_and_dx_entryboxes(state='unlock')
+        #    plot.figure(1)
+        #    plot.clf()
+        #    self.custom_param_canvas.draw()
+        #    plot.figure(2)
+        #    plot.clf()
+        #    self.recent_param_canvas.draw()
+        #    cleared_items += " Inits"
+
+        #self.write(self.ICtab_status, "Cleared:{}".format(cleared_items))
         return
 
     def check_IC_initialized(self):
@@ -3167,6 +3244,8 @@ class Notebook:
             return
 
         try:
+            # FIXME: Preconvert lvalue and rvalue before comparing init_shape_selection.get()
+            # FIXME: Add default conversion behavior
             new_param_name = self.init_var_selection.get()
             if "[" in new_param_name: new_param_name = new_param_name[:new_param_name.find("[")]
 
@@ -3316,7 +3395,6 @@ class Notebook:
         self.HIC_list.pop(self.HIC_listbox.curselection()[0])
         self.HIC_listbox.delete(self.HIC_listbox.curselection()[0])
         return
-
     
     def deleteall_HIC(self, doPlotUpdate=True):
         # Wrapper - Call delete_HIC until Nanowire's list of param_rules is empty
