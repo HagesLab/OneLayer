@@ -1329,14 +1329,14 @@ class Notebook:
             self.hline10_separator = tk.ttk.Separator(self.resetIC_popup, orient="horizontal", style="Grey Bar.TSeparator")
             self.hline10_separator.grid(row=2,column=0,columnspan=2, pady=(10,10), sticky="ew")
 
-            self.resetIC_do_clearall = tk.IntVar()
-            self.resetIC_clearall_checkbutton = tk.Checkbutton(self.resetIC_popup, text="Clear All", variable=self.resetIC_do_clearall, onvalue=1, offvalue=0)
+            self.resetIC_check_clearall = tk.IntVar()
+            self.resetIC_clearall_checkbutton = tk.Checkbutton(self.resetIC_popup, text="Clear All", variable=self.resetIC_check_clearall, onvalue=1, offvalue=0)
             self.resetIC_clearall_checkbutton.grid(row=3,column=0)
 
-            self.resetIC_continue_button = tk.Button(self.resetIC_popup, text="Continue", command=self.DEBUG)
+            self.resetIC_continue_button = tk.Button(self.resetIC_popup, text="Continue", command=partial(self.on_resetIC_popup_close, True))
             self.resetIC_continue_button.grid(row=3,column=1)
 
-            self.resetIC_popup.protocol("WM_DELETE_WINDOW", self.DEBUG)
+            self.resetIC_popup.protocol("WM_DELETE_WINDOW", self.on_resetIC_popup_close)
             self.resetIC_popup.grab_set()
             self.resetIC_popup_isopen = True
             return
@@ -1348,16 +1348,18 @@ class Notebook:
 
     def on_resetIC_popup_close(self, continue_=False):
         try:
+            self.resetIC_selected_params = []
+            self.resetIC_do_clearall = False
             if continue_:
-                print("Mode: {}".format(self.bay_mode.get()))
-                for param in self.check_bay_params:
-                    print("{}: {}".format(param, self.check_bay_params[param].get()))
+                self.resetIC_do_clearall = self.resetIC_check_clearall.get()
+                if self.resetIC_do_clearall:
+                    self.resetIC_selected_params = list(self.resetIC_checkparams.keys())
+                else:
+                    self.resetIC_selected_params = [param for param in self.resetIC_checkparams if self.resetIC_checkparams[param].get()]
 
-                self.export_for_bayesim()
-
-            self.bay_popup.destroy()
-            print("Bayesim popup closed")
-            self.bayesim_popup_isopen = False
+            self.resetIC_popup.destroy()
+            print("resetIC popup closed")
+            self.resetIC_popup_isopen = False
 
         except:
             print("Error #601: Failed to close Bayesim popup")
@@ -2896,38 +2898,44 @@ class Notebook:
 
     def reset_IC(self, force=False):
         # V2 Update: On IC tab:
-        # 1. Remove all param_rules from all Parameters
-        # 2. Remove all values stored in Nanowire()
-        # 3. Clear all entryboxes
-        # 4. Clear both plots
+        # 1. Remove all param_rules from all selected Parameters
+        # 2. Remove values stored in Nanowire()
+        # 3. Clear all entryboxes (TODO)
+        # + any visual changes to appeal to the user
 
         print("shonk bonk")
         self.do_resetIC_popup()
+        self.root.wait_window(self.resetIC_popup)
+
+        if (not self.resetIC_selected_params):
+            print("No params selected :(")
+            return
+
+        for param in self.resetIC_selected_params:
+            # Step 1 & 2
+            self.HIC_listbox_currentparam = param
+            self.update_paramrule_listbox(param)
+
+            # This line changes the text displayed in the param_rule display box's menu and is for cosmetic purposes only
+            self.HIC_viewer_selection.set(param)
+            self.deleteall_HIC()
+            self.nanowire.param_dict[param].value = 0
+            self.update_IC_plot(do_recent=True)
         #if self.check_reset_params.get() or force:
         #    for key in self.sys_param_entryboxes_dict:
         #        self.enter(self.sys_param_entryboxes_dict[key], "")
 
         #    cleared_items += " Params,"
 
-        #if self.check_reset_inits.get() or force:
-        #    self.deleteall_HIC()
-        #    self.IC_is_AIC = False
-        #    self.thickness = None
-        #    self.dx = None
-        #    self.init_N = None
-        #    self.init_P = None
-        #    self.init_Ec = None
-        #    self.init_Chi = None
-        #    self.set_thickness_and_dx_entryboxes(state='unlock')
-        #    plot.figure(1)
-        #    plot.clf()
-        #    self.custom_param_canvas.draw()
-        #    plot.figure(2)
-        #    plot.clf()
-        #    self.recent_param_canvas.draw()
-        #    cleared_items += " Inits"
+        if self.resetIC_do_clearall:
+            self.set_thickness_and_dx_entryboxes(state='unlock')
+            self.nanowire.total_length = None
+            self.nanowire.dx = None
+            self.nanowire.grid_x_edges = []
+            self.nanowire.grid_x_nodes = []
+            self.nanowire.spacegrid_is_set = False
 
-        #self.write(self.ICtab_status, "Cleared:{}".format(cleared_items))
+        self.write(self.ICtab_status, "Selected params cleared")
         return
 
     def check_IC_initialized(self):
@@ -3398,7 +3406,7 @@ class Notebook:
     
     def deleteall_HIC(self, doPlotUpdate=True):
         # Wrapper - Call delete_HIC until Nanowire's list of param_rules is empty
-        while (self.HIC_list.__len__() > 0):
+        while (self.nanowire.param_dict[self.HIC_listbox_currentparam].param_rules.__len__() > 0):
             self.HIC_listbox.select_set(0)
             self.HIC_listbox.event_generate("<<ListboxSelect>>")
 
@@ -3407,7 +3415,7 @@ class Notebook:
 
     def delete_HIC(self):
         # Remove user-selected param rule from box AND from Nanowire's list of param_rules
-        if (self.HIC_list.__len__() > 0):
+        if (self.nanowire.param_dict[self.HIC_listbox_currentparam].param_rules.__len__() > 0):
             try:
                 self.nanowire.remove_param_rule(self.HIC_listbox_currentparam, self.HIC_listbox.curselection()[0])
                 self.hide_HIC()
@@ -3503,19 +3511,25 @@ class Notebook:
 
         param_name = self.HIC_listbox_currentparam
         param_obj = self.nanowire.param_dict[param_name]
-        max_val = np.amax(param_obj.value) * self.convert_out_dict[param_name]
         grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
+        val_array = param_obj.value
+        # Support for constant value shortcut: temporarily create distribution
+        # simulating filling across nanowire with that value
+        if not isinstance(val_array, np.ndarray):
+            val_array = np.ones(grid_x.__len__()) * val_array
+        max_val = np.amax(param_obj.value) * self.convert_out_dict[param_name]
+        
 
         plot.ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
 
 
         if self.check_symmetric.get():
-            plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(param_obj.value), param_obj.value), axis=0) * self.convert_out_dict[param_name], label=param_name)
+            plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(val_array), val_array), axis=0) * self.convert_out_dict[param_name], label=param_name)
 
             ymin, ymax = plot.gca().get_ylim()
             plot.fill([-grid_x[-1], 0, 0, -grid_x[-1]], [ymin, ymin, ymax, ymax], 'b', alpha=0.1, edgecolor='r')
         else:
-            plot.plot(grid_x, param_obj.value * self.convert_out_dict[param_name], label=param_name)
+            plot.plot(grid_x, val_array * self.convert_out_dict[param_name], label=param_name)
 
         plot.xlabel("x [nm]")
         plot.ylabel("{} {}".format(param_name, param_obj.units))
