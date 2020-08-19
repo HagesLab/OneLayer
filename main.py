@@ -125,6 +125,7 @@ class Nanowire:
         # Recalculate a Parameter from its Param_Rules
         # This should be done every time the Param_Rules are changed
         param = self.param_dict[param_name]
+
         if param.is_edge:
             new_param_value = np.zeros(self.grid_x_edges.__len__())
         else:
@@ -1037,8 +1038,8 @@ class Notebook:
                                            "Max_Gen":self.max_gen_entry, "Total_Gen":self.total_gen_entry}
 
         # Attach sub-frames to input tab and input tab to overall notebook
-        self.tab_inputs.add(self.tab_analytical_init, text="Analytical Init. Cond.")
         self.tab_inputs.add(self.tab_rules_init, text="Parameter Toolkit")
+        self.tab_inputs.add(self.tab_analytical_init, text="Analytical Init. Cond.")
         self.tab_inputs.add(self.tab_explicit_init, text="Parameter List Upload")
         self.notebook.add(self.tab_inputs, text="Inputs")
         return
@@ -2932,11 +2933,13 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-        # Flush HICs, as AIC will overwrite the entire spatial mesh
-        self.deleteall_HIC(False)
+        # Remove all param_rules for init_deltaN and init_deltaP, as we will be reassigning them shortly.
+        self.HIC_listbox_currentparam = "init_deltaN"
+        self.deleteall_HIC()
+        self.HIC_listbox_currentparam = "init_deltaP"
+        self.deleteall_HIC()
 
         # Establish constants; calculate alpha
-        # FIXME: Move wavelength validation to within branches rather than before branches
         h = 6.626e-34   # [J*s]
         c = 2.997e8     # [m/s]
         hc_evnm = h * c * 6.241e18 * 1e9    # [J*m] to [eV*nm]
@@ -3000,7 +3003,7 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.init_N = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.init_x, hc=hc_nm)
+            self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
@@ -3022,7 +3025,7 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.init_N = finite.pulse_laser_powerdensity(power_density, freq, wavelength, alpha_nm, self.init_x, hc=hc_nm)
+            self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_powerdensity(power_density, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
@@ -3030,7 +3033,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
-            self.init_N = finite.pulse_laser_maxgen(max_gen, alpha_nm, self.init_x)
+            self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_maxgen(max_gen, alpha_nm, self.nanowire.grid_x_nodes)
         
 
         elif (AIC_options["power_mode"] == "total-gen"):
@@ -3039,16 +3042,20 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
-            self.init_N = finite.pulse_laser_totalgen(total_gen, self.thickness, alpha_nm, self.init_x)
+            self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_totalgen(total_gen, self.nanowire.total_length, alpha_nm, self.nanowire.grid_x_nodes)
         
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
 
         ## Assuming that the initial distributions of holes and electrons are identical
-        self.init_P = self.init_N
-        self.update_IC_plot()
-        self.IC_is_AIC = True
+        self.nanowire.param_dict["init_deltaP"].value = self.nanowire.param_dict["init_deltaN"].value
+        
+        self.HIC_listbox_currentparam = "init_deltaN"
+        self.update_IC_plot(do_recent=False)
+        self.HIC_listbox_currentparam = "init_deltaP"
+        self.update_IC_plot(do_recent=True)
+        #self.IC_is_AIC = True
         return
 
     ## Special functions for Heuristic Init:
