@@ -1135,13 +1135,7 @@ class Notebook:
         self.main1_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
         self.main1_toolbar_frame.grid(row=10,column=0,rowspan=2,columnspan=2)
         self.main1_toolbar = tkagg.NavigationToolbar2Tk(self.main1_canvas, self.main1_toolbar_frame)
-        self.main1_toolbar.grid(row=0,column=0,columnspan=4, padx=(0,70))
-        
-        self.main1_axis_button = tk.ttk.Button(self.main1_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=0))
-        self.main1_axis_button.grid(row=0,column=3,columnspan=2, padx=(40,0))
-        
-        self.main1_export_button = tk.ttk.Button(self.main1_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=0))
-        self.main1_export_button.grid(row=0,column=5)
+        self.main1_toolbar.grid(row=0,column=0,columnspan=99)
 
         self.main1_plot_button = tk.ttk.Button(self.main1_toolbar_frame, text="Plot", command=partial(self.a_plot, plot_ID=0))
         self.main1_plot_button.grid(row=1,column=0)
@@ -1149,14 +1143,20 @@ class Notebook:
         self.main1_tstep_entry = tk.ttk.Entry(self.main1_toolbar_frame, width=9)
         self.main1_tstep_entry.grid(row=1,column=1)
 
-        self.main1_tstep_button = tk.ttk.Button(self.main1_toolbar_frame, text="TimeStep >>", command=partial(self.plot_tstep, plot_ID=0))
+        self.main1_tstep_button = tk.ttk.Button(self.main1_toolbar_frame, text="Step >>", command=partial(self.plot_tstep, plot_ID=0))
         self.main1_tstep_button.grid(row=1,column=2)
 
         self.calculate_PL1 = tk.ttk.Button(self.main1_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate, plot_ID=0))
         self.calculate_PL1.grid(row=1,column=3)
 
+        self.main1_axis_button = tk.ttk.Button(self.main1_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=0))
+        self.main1_axis_button.grid(row=1,column=4)
+
+        self.main1_export_button = tk.ttk.Button(self.main1_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=0))
+        self.main1_export_button.grid(row=1,column=5)
+
         self.main1_IC_carry_button = tk.ttk.Button(self.main1_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup, plot_ID=0))
-        self.main1_IC_carry_button.grid(row=1,column=5)
+        self.main1_IC_carry_button.grid(row=1,column=6)
 
         self.main_fig2 = plot.figure(8, figsize=(4.85,3))
         self.main2_canvas = tkagg.FigureCanvasTkAgg(self.main_fig2, master=self.tab_analyze)
@@ -1168,13 +1168,7 @@ class Notebook:
         self.main2_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
         self.main2_toolbar_frame.grid(row=23,column=0,rowspan=2,columnspan=2)
         self.main2_toolbar = tkagg.NavigationToolbar2Tk(self.main2_canvas, self.main2_toolbar_frame)
-        self.main2_toolbar.grid(row=0,column=0,columnspan=4, padx=(0,70))
-
-        self.main2_axis_button = tk.ttk.Button(self.main2_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=1))
-        self.main2_axis_button.grid(row=0,column=3,columnspan=2, padx=(40,0))
-
-        self.main2_export_button = tk.ttk.Button(self.main2_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=1))
-        self.main2_export_button.grid(row=0,column=5)
+        self.main2_toolbar.grid(row=0,column=0,columnspan=5)
 
         self.main2_plot_button = tk.ttk.Button(self.main2_toolbar_frame, text="Plot", command=partial(self.a_plot, plot_ID=1))
         self.main2_plot_button.grid(row=1,column=0)
@@ -1182,14 +1176,20 @@ class Notebook:
         self.main2_tstep_entry = tk.ttk.Entry(self.main2_toolbar_frame, width=9)
         self.main2_tstep_entry.grid(row=1,column=1)
 
-        self.main2_tstep_button = tk.ttk.Button(self.main2_toolbar_frame, text="TimeStep >>", command=partial(self.plot_tstep, plot_ID=1))
+        self.main2_tstep_button = tk.ttk.Button(self.main2_toolbar_frame, text="Step >>", command=partial(self.plot_tstep, plot_ID=1))
         self.main2_tstep_button.grid(row=1,column=2)
 
         self.calculate_PL2 = tk.ttk.Button(self.main2_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate, plot_ID=1))
         self.calculate_PL2.grid(row=1,column=3)
 
+        self.main2_axis_button = tk.ttk.Button(self.main2_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=1))
+        self.main2_axis_button.grid(row=1,column=4)
+
+        self.main2_export_button = tk.ttk.Button(self.main2_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=1))
+        self.main2_export_button.grid(row=1,column=5)
+
         self.main2_IC_carry_button = tk.ttk.Button(self.main2_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup, plot_ID=1))
-        self.main2_IC_carry_button.grid(row=1,column=5)
+        self.main2_IC_carry_button.grid(row=1,column=6)
 
         self.analysis_title = tk.ttk.Label(self.tab_analyze, text="Plot and Integrate Saved Datasets", style="Header.TLabel")
         self.analysis_title.grid(row=0,column=3,columnspan=1, padx=(9,12))
@@ -1202,7 +1202,7 @@ class Notebook:
         self.main3_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
         self.main3_toolbar_frame.grid(row=18,column=3,columnspan=1, pady=(110,0))
         self.main3_toolbar = tkagg.NavigationToolbar2Tk(self.main3_canvas, self.main3_toolbar_frame)
-        self.main3_toolbar.grid(row=0,column=0,columnspan=99)
+        self.main3_toolbar.grid(row=0,column=0,columnspan=5)
 
         self.main3_axis_button = tk.ttk.Button(self.main3_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=-1))
         self.main3_axis_button.grid(row=1,column=0)
