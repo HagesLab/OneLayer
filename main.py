@@ -1135,7 +1135,7 @@ class Notebook:
         self.main1_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
         self.main1_toolbar_frame.grid(row=10,column=0,rowspan=2,columnspan=2)
         self.main1_toolbar = tkagg.NavigationToolbar2Tk(self.main1_canvas, self.main1_toolbar_frame)
-        self.main1_toolbar.grid(row=0,column=0,columnspan=99)
+        self.main1_toolbar.grid(row=0,column=0,columnspan=5)
 
         self.main1_plot_button = tk.ttk.Button(self.main1_toolbar_frame, text="Plot", command=partial(self.a_plot, plot_ID=0))
         self.main1_plot_button.grid(row=1,column=0)
@@ -1312,7 +1312,7 @@ class Notebook:
             self.resetIC_title_label1 = tk.ttk.Label(self.resetIC_popup, text="Which Parameters should be cleared?", style="Header.TLabel")
             self.resetIC_title_label1.grid(row=0,column=0,columnspan=2)
 
-            self.resetIC_checkbutton_frame = tk.Frame(self.resetIC_popup)
+            self.resetIC_checkbutton_frame = tk.ttk.Frame(self.resetIC_popup)
             self.resetIC_checkbutton_frame.grid(row=1,column=0,columnspan=2)
 
             # Let's try some procedurally generated checkbuttons: one created automatically per nanowire parameter
@@ -1324,7 +1324,7 @@ class Notebook:
             for param in self.nanowire.param_dict:
                 self.resetIC_checkparams[param] = tk.IntVar()
 
-                self.resetIC_checkbuttons[param] = tk.Checkbutton(self.resetIC_checkbutton_frame, text=param, variable=self.resetIC_checkparams[param], onvalue=1, offvalue=0)
+                self.resetIC_checkbuttons[param] = tk.ttk.Checkbutton(self.resetIC_checkbutton_frame, text=param, variable=self.resetIC_checkparams[param], onvalue=1, offvalue=0)
 
             for cb in self.resetIC_checkbuttons:
                 self.resetIC_checkbuttons[cb].grid(row=cb_row,column=cb_col, pady=(6,6))
@@ -1489,7 +1489,7 @@ class Notebook:
             self.single_intg_label = tk.ttk.Label(self.integration_getbounds_popup, text="Single integral", style="Header.TLabel")
             self.single_intg_label.grid(row=0,column=1, rowspan=3, padx=(0,20))
 
-            self.integration_getbounds_title_label = tk.ttk.Label(self.integration_getbounds_popup, text="Enter bounds of integration [nm]")
+            self.integration_getbounds_title_label = tk.Label(self.integration_getbounds_popup, text="Enter bounds of integration [nm]")
             self.integration_getbounds_title_label.grid(row=0,column=2,columnspan=4)
 
             self.lower = tk.Label(self.integration_getbounds_popup, text="Lower bound: x=")
