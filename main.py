@@ -136,6 +136,9 @@ class Nanowire:
 
         for condition in param.param_rules:
             i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
+            
+            # If the left bound coordinate exceeds the width of the node toIndex() (which always rounds down) 
+            # assigned, it should actually be mapped to the next node
             if (condition.l_bound - finite.toCoord(i, self.dx, param.is_edge) >= self.dx / 2): i += 1
 
             if (condition.type == "POINT"):
@@ -1052,11 +1055,21 @@ class Notebook:
         self.EIC_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified spacing mesh.", width=360)
         self.EIC_description.grid(row=0,column=0)
         
-        self.EIC_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.EIC_var_selection, var_dropdown_list[0], *var_dropdown_list)
+        self.EIC_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.EIC_var_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
         self.EIC_dropdown.grid(row=1,column=0)
 
         self.add_EIC_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_EIC)
         self.add_EIC_button.grid(row=2,column=0)
+        
+        self.EIC_fig = Figure(figsize=(6,3.8))
+        self.EIC_subplot = self.EIC_fig.add_subplot(111)
+        self.EIC_canvas = tkagg.FigureCanvasTkAgg(self.EIC_fig, master=self.listupload_frame)
+        self.EIC_plotwidget = self.EIC_canvas.get_tk_widget()
+        self.EIC_plotwidget.grid(row=0, rowspan=3,column=1)
+        
+        self.EIC_toolbar_frame = tk.ttk.Frame(master=self.listupload_frame)
+        self.EIC_toolbar_frame.grid(row=3,column=1)
+        self.EIC_toolbar = tkagg.NavigationToolbar2Tk(self.EIC_canvas, self.EIC_toolbar_frame)
 
         # Dictionaries of parameter entry boxes
         self.sys_param_entryboxes_dict = {"Mu_N":self.N_mobility_entry, "Mu_P":self.P_mobility_entry, "N0":self.n0_entry, "P0":self.p0_entry, 
@@ -3043,6 +3056,7 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
+            # Note: add_AIC() automatically converts into TEDs units. No need to multiply by self.convert_in_dict() here!
             self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "density"):
@@ -3361,7 +3375,7 @@ class Notebook:
         return
     
     def deleteall_HIC(self, doPlotUpdate=True):
-        # Wrapper - Call delete_HIC until Nanowire's list of param_rules is empty
+        # Wrapper - Call delete_HIC until Nanowire's list of param_rules is empty for current param
         while (self.nanowire.param_dict[self.HIC_listbox_currentparam].param_rules.__len__() > 0):
             self.HIC_listbox.select_set(0)
             self.HIC_listbox.event_generate("<<ListboxSelect>>")
@@ -3383,20 +3397,6 @@ class Notebook:
 
     # Fill IC arrays using list from .txt file
     def add_EIC(self):
-        warning_flag = False
-        IC_type = self.EIC_var_selection.get()
-        is_edge = (IC_type == "dEc" or IC_type == "chi")
-        valuelist_filename = tk.filedialog.askopenfilename(title="Select Values from text file", filetypes=[("Text files","*.txt")])
-        if valuelist_filename == "": # If no file selected
-            return
-
-        IC_values_list = []
-        with open(valuelist_filename, 'r') as ifstream:
-            for line in ifstream:
-                if (line == "" or "#" in line): continue
-
-                else: IC_values_list.append(line.strip('\n'))
-
         try:
             self.set_init_x()
 
@@ -3407,33 +3407,54 @@ class Notebook:
         except Exception as oops:
             self.write(self.ICtab_status, oops)
             return
+        
+        warning_flag = False
+        var = self.EIC_var_selection.get()
+        is_edge = self.nanowire.param_dict[var].is_edge
+        
+        valuelist_filename = tk.filedialog.askopenfilename(title="Select Values from text file", filetypes=[("Text files","*.txt")])
+        if valuelist_filename == "": # If no file selected
+            return
+
+        IC_values_list = []
+        with open(valuelist_filename, 'r') as ifstream:
+            for line in ifstream:
+                if (line.strip('\n') == "" or "#" in line): continue
+
+                else: IC_values_list.append(line.strip('\n'))
+
            
-        temp_IC_values = np.zeros(int(0.5 + self.thickness / self.dx)) if not is_edge else np.zeros(int(0.5 + self.thickness / self.dx) + 1)
+        temp_IC_values = np.zeros(self.nanowire.grid_x_nodes.__len__()) if not is_edge else np.zeros(self.nanowire.grid_x_edges.__len__())
 
         try:
             IC_values_list.sort(key = lambda x:float(x[0:x.find('\t')]))
+            
+            if IC_values_list.__len__() < 2: # if not enough points in list
+                raise ValueError
         except:
             self.write(self.ICtab_status, "Error: Unable to read point list")
             return
-
+        
+    
         for i in range(IC_values_list.__len__() - 1):
             try:
                 first_valueset = extract_values(IC_values_list[i], '\t') #[x1, y(x1)]
                 second_valueset = extract_values(IC_values_list[i+1], '\t') #[x2, y(x2)]
+                
             except ValueError:
                 self.write(self.ICtab_status, "Warning: Unusual point list content")
                 warning_flag = True
 
             # Linear interpolate from provided EIC list to specified grid points
-            if (first_valueset[0] <= self.dx / 2):
-                intermediate_x_indices = np.arange(finite.toIndex(first_valueset[0], self.dx, self.thickness, is_edge), finite.toIndex(second_valueset[0], self.dx, self.thickness, is_edge) + 1, 1)
+            lindex = finite.toIndex(first_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
+            rindex = finite.toIndex(second_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
 
-            else:
-                intermediate_x_indices = np.arange(finite.toIndex(first_valueset[0], self.dx, self.thickness, is_edge) + 1, finite.toIndex(second_valueset[0], self.dx, self.thickness, is_edge) + 1, 1)
+            intermediate_x_indices = np.arange(lindex, rindex, 1)
 
             for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
                 try:
-                    temp_IC_values[j] = first_valueset[1] + (finite.toCoord(j, self.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
+                    if (second_valueset[0] > self.nanowire.total_length): raise IndexError
+                    temp_IC_values[j] = first_valueset[1] + (finite.toCoord(j, self.nanowire.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
                 except IndexError:
                     self.write(self.ICtab_status, "Warning: some points out of bounds")
                     warning_flag = True
@@ -3441,30 +3462,22 @@ class Notebook:
                     temp_IC_values[j] = 0
                     warning_flag = True
                 
-
-        if (IC_type == "ΔN"):
-            self.init_N = np.copy(temp_IC_values) * self.convert_in_dict["N"]
-        elif (IC_type == "ΔP"):
-            self.init_P = np.copy(temp_IC_values) * self.convert_in_dict["P"]
-        elif (IC_type == "dEc"):
-            self.init_Ec = np.copy(temp_IC_values)
-        elif (IC_type == "chi"):
-            self.init_Chi = np.copy(temp_IC_values)
-
-        self.IC_is_AIC = False
-        self.update_IC_plot(warn=warning_flag)
+        
+        self.HIC_listbox_currentparam = var
+        self.deleteall_HIC()
+        self.nanowire.param_dict[var].value = temp_IC_values * self.convert_in_dict[var]
+        self.update_IC_plot(plot_ID="EIC", warn=warning_flag)
+        self.update_IC_plot(plot_ID="recent", warn=warning_flag)
         return
 
     def update_IC_plot(self, plot_ID, warn=False):
         # V2 update: can now plot any parameter
         # Plot 2 is for recently changed parameter while plot 1 is for user-selected views
-        #self.check_IC_initialized()
-        # if do_recent: plot.figure(2)
-        # else: plot.figure(1)
 
         if plot_ID=="recent": plot = self.recent_param_subplot
         elif plot_ID=="custom": plot = self.custom_param_subplot
         elif plot_ID=="AIC": plot = self.AIC_subplot
+        elif plot_ID=="EIC": plot = self.EIC_subplot
         plot.cla()
         plot.set_yscale('log')
 
@@ -3507,6 +3520,10 @@ class Notebook:
             plot.set_title("Recent AIC")
             self.AIC_fig.tight_layout()
             self.AIC_fig.canvas.draw()
+        elif plot_ID=="EIC": 
+            plot.set_title("Recent list upload")
+            self.EIC_fig.tight_layout()
+            self.EIC_fig.canvas.draw()
 
         if not warn: self.write(self.ICtab_status, "Initial Condition Updated")
         return
