@@ -1,7 +1,7 @@
 #################################################
 # Transient Electron Dynamics Simulator
 # Model photoluminescent behavior in one-dimensional nanowire
-# Last modified: July 8, 2020
+# Last modified: Aug 28, 2020
 # Author: Calvin Fai, Charles Hages
 # Contact:
 ################################################# 
@@ -11,6 +11,7 @@ import matplotlib
 matplotlib.use("TkAgg")
 import matplotlib.pylab as plot
 import matplotlib.backends.backend_tkagg as tkagg
+from matplotlib.figure import Figure
 from scipy import integrate as intg
 
 import tkinter.filedialog
@@ -276,7 +277,7 @@ class Plot_State:
         self.yaxis_type = 'log'
         self.xlim = (-1,-1)
         self.ylim = (-1,-1)
-        self.fig_ID = -1 # The plot.figure(#) the object is associated with
+        self.fig_ID = -1 # FIXME: To be deprecated
         self.time_index = 0
         self.datagroup = Data_Group(ID)
         self.data_filenames = []
@@ -470,7 +471,7 @@ class Notebook:
         self.carry_include_E_field = tk.IntVar()
         
         # Helpers, flags, and containers for analysis plots
-        self.analysis_plots = [Plot_State(ID=0), Plot_State(ID=1)]
+        self.analysis_plots = [Plot_State(ID=0), Plot_State(ID=1), Plot_State(ID=2), Plot_State(ID=3)]
         self.I_plot = I_Group()
         self.data_var = tk.StringVar()
         self.fetch_PLmode = tk.StringVar()
@@ -547,6 +548,9 @@ class Notebook:
 
     def run(self):
         self.notebook.pack(expand=1, fill="both")
+        width, height = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+
+        self.root.geometry('%dx%d+0+0' % (width,height))
         self.root.mainloop()
         return
 
@@ -927,6 +931,16 @@ class Notebook:
         self.AIC_description = tk.Message(self.AIC_frame, text="The Analytical Initial Condition uses the above numerical parameters to generate an initial carrier distribution based on an exponential decay equation.", width=320)
         self.AIC_description.grid(row=3,column=0,columnspan=3)
         
+        self.AIC_fig = Figure(figsize=(5,3.1))
+        self.AIC_subplot = self.AIC_fig.add_subplot(111)
+        self.AIC_canvas = tkagg.FigureCanvasTkAgg(self.AIC_fig, master=self.AIC_frame)
+        self.AIC_plotwidget = self.AIC_canvas.get_tk_widget()
+        self.AIC_plotwidget.grid(row=4, column=0, columnspan=3)
+        
+        self.AIC_toolbar_frame = tk.ttk.Frame(master=self.AIC_frame)
+        self.AIC_toolbar_frame.grid(row=5,column=0,columnspan=3)
+        self.AIC_toolbar = tkagg.NavigationToolbar2Tk(self.AIC_canvas, self.AIC_toolbar_frame)
+        
         ## Heuristic Initial Condition(HIC):
 
         self.param_rules_frame = tk.ttk.Frame(self.tab_rules_init)
@@ -988,6 +1002,31 @@ class Notebook:
 
         self.HIC_description2 = tk.Message(self.param_rules_frame, text="Warning: Rules are applied from top to bottom. Order matters!", width=250)
         self.HIC_description2.grid(row=9,rowspan=3,column=2,columnspan=2)
+        
+        # These plots were previously attached to self.tab_inputs so that it was visible on all three IC tabs,
+        # but it was hard to position them correctly.
+        # Attaching to the Parameter Toolkit makes them easier to position
+        self.custom_param_fig = Figure(figsize=(5,3.1))
+        self.custom_param_subplot = self.custom_param_fig.add_subplot(111)
+        self.custom_param_subplot.format_coord = lambda x, y: ""
+        self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, master=self.param_rules_frame)
+        self.custom_param_plotwidget = self.custom_param_canvas.get_tk_widget()
+        self.custom_param_plotwidget.grid(row=12, column=0, columnspan=2)
+
+        self.custom_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
+        self.custom_param_toolbar_frame.grid(row=13,column=0,columnspan=2)
+        self.custom_param_toolbar = tkagg.NavigationToolbar2Tk(self.custom_param_canvas, self.custom_param_toolbar_frame)
+        
+        self.recent_param_fig = Figure(figsize=(5,3.1))
+        self.recent_param_subplot = self.recent_param_fig.add_subplot(111)
+        self.recent_param_subplot.format_coord = lambda x, y: ""
+        self.recent_param_canvas = tkagg.FigureCanvasTkAgg(self.recent_param_fig, master=self.param_rules_frame)
+        self.recent_param_plotwidget = self.recent_param_canvas.get_tk_widget()
+        self.recent_param_plotwidget.grid(row=12,column=2,columnspan=2)
+
+        self.recent_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
+        self.recent_param_toolbar_frame.grid(row=13,column=2,columnspan=2)
+        self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, self.recent_param_toolbar_frame)
 
         self.moveup_HIC_button = tk.ttk.Button(self.param_rules_frame, text="⇧", command=self.moveup_HIC)
         self.moveup_HIC_button.grid(row=1,column=4)
@@ -1014,26 +1053,6 @@ class Notebook:
 
         self.add_EIC_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_EIC)
         self.add_EIC_button.grid(row=2,column=0)
-
-
-        # It's a little tricky to get the plots to appear where they should be, but the following works somehow
-        self.custom_param_fig = plot.figure(1, figsize=(4.85,3))
-        self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, master=self.tab_inputs)
-        self.custom_param_plotwidget = self.custom_param_canvas.get_tk_widget()
-        self.custom_param_plotwidget.grid(row=5,rowspan=4, column=3, pady=(260,0))
-
-        self.custom_param_toolbar_frame = tk.ttk.Frame(master=self.tab_inputs)
-        self.custom_param_toolbar_frame.grid(row=9,column=3)
-        self.custom_param_toolbar = tkagg.NavigationToolbar2Tk(self.custom_param_canvas, self.custom_param_toolbar_frame)
-
-        self.recent_param_fig = plot.figure(2, figsize=(4.85,3))
-        self.recent_param_canvas = tkagg.FigureCanvasTkAgg(self.recent_param_fig, master=self.tab_inputs)
-        self.recent_param_plotwidget = self.recent_param_canvas.get_tk_widget()
-        self.recent_param_plotwidget.grid(row=5,rowspan=4,column=4, pady=(260,0))
-
-        self.recent_param_toolbar_frame = tk.ttk.Frame(master=self.tab_inputs)
-        self.recent_param_toolbar_frame.grid(row=9,column=4)
-        self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, self.recent_param_toolbar_frame)
 
         # Dictionaries of parameter entry boxes
         self.sys_param_entryboxes_dict = {"Mu_N":self.N_mobility_entry, "Mu_P":self.P_mobility_entry, "N0":self.n0_entry, "P0":self.p0_entry, 
@@ -1083,7 +1102,7 @@ class Notebook:
         self.status_label.grid(row=7, column=0, columnspan=2)
 
         self.status = tk.Text(self.tab_simulate, width=28,height=4)
-        self.status.grid(row=8, rowspan=4, column=0, columnspan=2)
+        self.status.grid(row=8, rowspan=2, column=0, columnspan=2)
         self.status.configure(state='disabled')
 
         self.line3_separator = tk.ttk.Separator(self.tab_simulate, orient="vertical", style="Grey Bar.TSeparator")
@@ -1091,33 +1110,18 @@ class Notebook:
 
         self.subtitle = tk.ttk.Label(self.tab_simulate, text="1-D Carrier Sim (rk4 mtd), with photon propagation")
         self.subtitle.grid(row=0,column=3,columnspan=3)
-
-        self.n_fig = plot.figure(3, figsize=(4.85,3))
-        self.n_canvas = tkagg.FigureCanvasTkAgg(self.n_fig, master=self.tab_simulate)
-        self.n_plot_widget = self.n_canvas.get_tk_widget()
-        self.n_plot_widget.grid(row=1,column=3,rowspan=10,columnspan=2)
-
-        self.nfig_toolbar_frame = tk.ttk.Frame(master=self.tab_simulate)
-        self.nfig_toolbar_frame.grid(row=12,column=3,columnspan=2)
-        self.nfig_toolbar = tkagg.NavigationToolbar2Tk(self.n_canvas, self.nfig_toolbar_frame)
-
-        self.p_fig = plot.figure(4, figsize=(4.85,3))
-        self.p_canvas = tkagg.FigureCanvasTkAgg(self.p_fig, master=self.tab_simulate)
-        self.p_plot_widget = self.p_canvas.get_tk_widget()
-        self.p_plot_widget.grid(row=1,column=5,rowspan=10,columnspan=2)
-
-        self.pfig_toolbar_frame = tk.ttk.Frame(master=self.tab_simulate)
-        self.pfig_toolbar_frame.grid(row=12,column=5,columnspan=2)
-        self.pfig_toolbar = tkagg.NavigationToolbar2Tk(self.p_canvas, self.pfig_toolbar_frame)
-
-        self.E_fig = plot.figure(5, figsize=(4.85,3))
-        self.E_canvas = tkagg.FigureCanvasTkAgg(self.E_fig, master=self.tab_simulate)
-        self.E_plot_widget = self.E_canvas.get_tk_widget()
-        self.E_plot_widget.grid(row=13,column=3,rowspan=10,columnspan=2)
-
-        self.Efig_toolbar_frame = tk.ttk.Frame(master=self.tab_simulate)
-        self.Efig_toolbar_frame.grid(row=24,column=3,columnspan=2)
-        self.Efig_toolbar = tkagg.NavigationToolbar2Tk(self.E_canvas, self.Efig_toolbar_frame)
+        
+        self.sim_fig = Figure(figsize=(10,6.2))
+        self.n_subplot = self.sim_fig.add_subplot(221)
+        self.p_subplot = self.sim_fig.add_subplot(222)
+        self.E_subplot = self.sim_fig.add_subplot(223)
+        self.sim_canvas = tkagg.FigureCanvasTkAgg(self.sim_fig, master=self.tab_simulate)
+        self.sim_plot_widget = self.sim_canvas.get_tk_widget()
+        self.sim_plot_widget.grid(row=1,column=3,rowspan=12,columnspan=2)
+        
+        self.simfig_toolbar_frame = tk.ttk.Frame(master=self.tab_simulate)
+        self.simfig_toolbar_frame.grid(row=13,column=3,columnspan=2)
+        self.simfig_toolbar = tkagg.NavigationToolbar2Tk(self.sim_canvas, self.simfig_toolbar_frame)
 
         self.notebook.add(self.tab_simulate, text="Simulate")
         return
@@ -1125,99 +1129,74 @@ class Notebook:
     def add_tab_analyze(self):
         self.tab_analyze = tk.ttk.Frame(self.notebook)
 
-        self.main_fig1 = plot.figure(7, figsize=(4.85,3))
-        self.main1_canvas = tkagg.FigureCanvasTkAgg(self.main_fig1, master=self.tab_analyze)
-        self.main1_widget = self.main1_canvas.get_tk_widget()
-        self.main1_widget.grid(row=0,column=0,rowspan=10,columnspan=2, padx=(12,0))
-        self.analysis_plots[0].fig_ID = 7
-        self.analysis_plots[0].plot_obj = self.main_fig1
-
-        self.main1_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
-        self.main1_toolbar_frame.grid(row=10,column=0,rowspan=2,columnspan=2)
-        self.main1_toolbar = tkagg.NavigationToolbar2Tk(self.main1_canvas, self.main1_toolbar_frame)
-        self.main1_toolbar.grid(row=0,column=0,columnspan=5)
-
-        self.main1_plot_button = tk.ttk.Button(self.main1_toolbar_frame, text="Plot", command=partial(self.a_plot, plot_ID=0))
-        self.main1_plot_button.grid(row=1,column=0)
-        
-        self.main1_tstep_entry = tk.ttk.Entry(self.main1_toolbar_frame, width=9)
-        self.main1_tstep_entry.grid(row=1,column=1)
-
-        self.main1_tstep_button = tk.ttk.Button(self.main1_toolbar_frame, text="Step >>", command=partial(self.plot_tstep, plot_ID=0))
-        self.main1_tstep_button.grid(row=1,column=2)
-
-        self.calculate_PL1 = tk.ttk.Button(self.main1_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate, plot_ID=0))
-        self.calculate_PL1.grid(row=1,column=3)
-
-        self.main1_axis_button = tk.ttk.Button(self.main1_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=0))
-        self.main1_axis_button.grid(row=1,column=4)
-
-        self.main1_export_button = tk.ttk.Button(self.main1_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=0))
-        self.main1_export_button.grid(row=1,column=5)
-
-        self.main1_IC_carry_button = tk.ttk.Button(self.main1_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup, plot_ID=0))
-        self.main1_IC_carry_button.grid(row=1,column=6)
-
-        self.main_fig2 = plot.figure(8, figsize=(4.85,3))
-        self.main2_canvas = tkagg.FigureCanvasTkAgg(self.main_fig2, master=self.tab_analyze)
-        self.main2_widget = self.main2_canvas.get_tk_widget()
-        self.main2_widget.grid(row=13,column=0,rowspan=10,columnspan=2)
-        self.analysis_plots[1].fig_ID = 8
-        self.analysis_plots[1].plot_obj = self.main_fig2
-
-        self.main2_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
-        self.main2_toolbar_frame.grid(row=23,column=0,rowspan=2,columnspan=2)
-        self.main2_toolbar = tkagg.NavigationToolbar2Tk(self.main2_canvas, self.main2_toolbar_frame)
-        self.main2_toolbar.grid(row=0,column=0,columnspan=5)
-
-        self.main2_plot_button = tk.ttk.Button(self.main2_toolbar_frame, text="Plot", command=partial(self.a_plot, plot_ID=1))
-        self.main2_plot_button.grid(row=1,column=0)
-
-        self.main2_tstep_entry = tk.ttk.Entry(self.main2_toolbar_frame, width=9)
-        self.main2_tstep_entry.grid(row=1,column=1)
-
-        self.main2_tstep_button = tk.ttk.Button(self.main2_toolbar_frame, text="Step >>", command=partial(self.plot_tstep, plot_ID=1))
-        self.main2_tstep_button.grid(row=1,column=2)
-
-        self.calculate_PL2 = tk.ttk.Button(self.main2_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate, plot_ID=1))
-        self.calculate_PL2.grid(row=1,column=3)
-
-        self.main2_axis_button = tk.ttk.Button(self.main2_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=1))
-        self.main2_axis_button.grid(row=1,column=4)
-
-        self.main2_export_button = tk.ttk.Button(self.main2_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=1))
-        self.main2_export_button.grid(row=1,column=5)
-
-        self.main2_IC_carry_button = tk.ttk.Button(self.main2_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup, plot_ID=1))
-        self.main2_IC_carry_button.grid(row=1,column=6)
-
         self.analysis_title = tk.ttk.Label(self.tab_analyze, text="Plot and Integrate Saved Datasets", style="Header.TLabel")
-        self.analysis_title.grid(row=0,column=3,columnspan=1, padx=(9,12))
+        self.analysis_title.grid(row=0,column=0,columnspan=8)
+        
+        self.analyze_fig = Figure(figsize=(9.8,6))
+        # add_subplot() starts counting indices with 1 instead of 0
+        self.analyze_subplot0 = self.analyze_fig.add_subplot(221)
+        self.analyze_subplot1 = self.analyze_fig.add_subplot(222)
+        self.analyze_subplot2 = self.analyze_fig.add_subplot(223)
+        self.analyze_subplot3 = self.analyze_fig.add_subplot(224)
+        self.analysis_plots[0].plot_obj = self.analyze_subplot0
+        self.analysis_plots[1].plot_obj = self.analyze_subplot1
+        self.analysis_plots[2].plot_obj = self.analyze_subplot2
+        self.analysis_plots[3].plot_obj = self.analyze_subplot3
+        
+        self.analyze_canvas = tkagg.FigureCanvasTkAgg(self.analyze_fig, master=self.tab_analyze)
+        self.analyze_widget = self.analyze_canvas.get_tk_widget()
+        self.analyze_widget.grid(row=1,column=0,rowspan=1,columnspan=4, padx=(12,0))
 
-        self.main_fig3 = plot.figure(9, figsize=(5.8,3.6))
-        self.main3_canvas = tkagg.FigureCanvasTkAgg(self.main_fig3, master=self.tab_analyze)
-        self.main3_widget = self.main3_canvas.get_tk_widget()
-        self.main3_widget.grid(row=3,column=3,rowspan=16,columnspan=1, padx=(20,0))
+        self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
+        self.analyze_toolbar_frame.grid(row=2,column=0,rowspan=2,columnspan=4)
+        self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
+        self.analyze_toolbar.grid(row=0,column=0,columnspan=6)
 
-        self.main3_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
-        self.main3_toolbar_frame.grid(row=18,column=3,columnspan=1, pady=(110,0))
-        self.main3_toolbar = tkagg.NavigationToolbar2Tk(self.main3_canvas, self.main3_toolbar_frame)
-        self.main3_toolbar.grid(row=0,column=0,columnspan=5)
+        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.a_plot, plot_ID=0))
+        self.analyze_plot_button.grid(row=1,column=0)
+        
+        self.analyze_tstep_entry = tk.ttk.Entry(self.analyze_toolbar_frame, width=9)
+        self.analyze_tstep_entry.grid(row=1,column=1)
 
-        self.main3_axis_button = tk.ttk.Button(self.main3_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=-1))
-        self.main3_axis_button.grid(row=1,column=0)
+        self.analyze_tstep_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Step >>", command=partial(self.plot_tstep, plot_ID=0))
+        self.analyze_tstep_button.grid(row=1,column=2)
 
-        self.main3_export_button = tk.ttk.Button(self.main3_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=-1))
-        self.main3_export_button.grid(row=1,column=1)
+        self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate, plot_ID=0))
+        self.calculate_PL_button.grid(row=1,column=3)
 
-        self.main3_bayesim_button = tk.ttk.Button(self.main3_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
-        self.main3_bayesim_button.grid(row=1,column=2)
+        self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=0))
+        self.analyze_axis_button.grid(row=1,column=4)
+
+        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=0))
+        self.analyze_export_button.grid(row=1,column=5)
+
+        self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup, plot_ID=0))
+        self.analyze_IC_carry_button.grid(row=1,column=6)
+
+        self.integration_fig = Figure(figsize=(8,5))
+        self.integration_subplot = self.integration_fig.add_subplot(111)
+        self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_analyze)
+        self.integration_widget = self.integration_canvas.get_tk_widget()
+        self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
+
+        self.integration_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
+        self.integration_toolbar_frame.grid(row=2,column=5, rowspan=2,columnspan=1)
+        self.integration_toolbar = tkagg.NavigationToolbar2Tk(self.integration_canvas, self.integration_toolbar_frame)
+        self.integration_toolbar.grid(row=0,column=0,columnspan=5)
+
+        self.integration_axis_button = tk.ttk.Button(self.integration_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=-1))
+        self.integration_axis_button.grid(row=1,column=0)
+
+        self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=-1))
+        self.integration_export_button.grid(row=1,column=1)
+
+        self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
+        self.integration_bayesim_button.grid(row=1,column=2)
 
         self.analysis_status = tk.Text(self.tab_analyze, width=28,height=3)
-        self.analysis_status.grid(row=20,rowspan=3,column=3,columnspan=1)
+        self.analysis_status.grid(row=4,rowspan=3,column=5,columnspan=1)
         self.analysis_status.configure(state="disabled")
 
-        self.main_tstep_entryboxes = [self.main1_tstep_entry, self.main2_tstep_entry]
         self.notebook.add(self.tab_analyze, text="Analyze")
         return
 
@@ -2031,64 +2010,27 @@ class Notebook:
 
     ## Plotter for simulation tab    
     def update_data_plots(self, index, do_clear_plots=True):
-        ## Update plots on Simulate tab
-        ## Update N 
-        plot.figure(3)
-        plot_labels = ("ns", "x [nm]", "ΔN [cm^-3]")
-        if do_clear_plots: plot.clf()
+        ## V2: Update plots on Simulate tab
+        ## FIXME: Get this working with the Nanowire class
+        plot_list = [self.n_subplot, self.p_subplot, self.E_subplot]
+        plot_labels = ["N [cm^-3]", "P [cm^-3]", "[E field magnitude [WIP]"]
         
-        plot.ylim(self.N_limits[0] * self.convert_out_dict["N"], self.N_limits[1] * self.convert_out_dict["N"])
-        plot.yscale('log')
+        for i in plot_list.__len__():
+            plot = plot_list[i]
+            
+            if do_clear_plots: plot.cla()
+        
+            plot.set_ylim(self.N_limits[0] * self.convert_out_dict["N"], self.N_limits[1] * self.convert_out_dict["N"])
+            plot.set_yscale('log')
 
-        plot.plot(self.node_x, self.sim_N * self.convert_out_dict["N"])
+            plot.plot(self.node_x, self.sim_N * self.convert_out_dict["N"])
 
-        plot.xlabel(plot_labels[1])
-        plot.ylabel(plot_labels[2])
+            plot.set_xlabel(plot_labels[1])
+            plot.set_ylabel(plot_labels[2])
 
-        plot.title('Time: ' + str(self.simtime * index / self.n) + ' ' + plot_labels[2])
-        plot.tight_layout()
-        self.n_fig.canvas.draw()
-
-        ## Update P
-        plot.figure(4)
-        plot_labels = ("ns", "x [nm]", "ΔP [cm^-3]")
-
-        if do_clear_plots: plot.clf()
-
-        plot.ylim(self.P_limits[0] * self.convert_out_dict["P"], self.P_limits[1] * self.convert_out_dict["P"])
-        plot.yscale('log')
-
-        plot.plot(self.node_x, self.sim_P * self.convert_out_dict["P"])
-
-        plot.xlabel(plot_labels[1])
-        plot.ylabel(plot_labels[2])
-
-        plot.title('Time: ' + str(self.simtime * index / self.n) + ' ' + plot_labels[2])
-        plot.tight_layout()
-        self.p_fig.canvas.draw()
-
-        ## Update E-field
-        plot.figure(5)
-        plot_labels = ("ns", "x [nm]", "Magnitude of E field [?]")
-
-        if do_clear_plots: plot.clf()
- 
-        try:
-            plot.ylim(np.amax(np.abs(self.sim_E_field)) * 1e-11, np.amax(np.abs(self.sim_E_field)) * 1e1)
-            if (np.amax(np.abs(self.sim_E_field)) == 0): raise ValueError
-        except:
-            plot.ylim(*(self.N_limits))
-
-        plot.yscale('log')
-
-        plot.plot(self.edge_x, np.abs(self.sim_E_field))
-
-        plot.xlabel(plot_labels[1])
-        plot.ylabel(plot_labels[2])
-
-        plot.title('Time: ' + str(self.simtime * index / self.n) + ' ' + plot_labels[2])
-        plot.tight_layout()
-        self.E_fig.canvas.draw()
+            plot.title('Time: ' + str(self.simtime * index / self.n) + ' ' + plot_labels[2])
+        self.sim_fig.tight_layout()
+        self.sim_fig.canvas.draw()
         return
 
     ## Sub plotters for analyze tab
@@ -2316,7 +2258,7 @@ class Notebook:
         # Step already plotted data forward (or backward) in time
         active_plot = self.analysis_plots[plot_ID]
         try:
-            active_plot.add_time_index(int(self.main_tstep_entryboxes[plot_ID].get()))
+            active_plot.add_time_index(int(self.analyze_tstep_entry.get()))
         except ValueError:
             self.write(self.analysis_status, "Invalid number of time steps")
             return
@@ -2928,7 +2870,7 @@ class Notebook:
             self.HIC_viewer_selection.set(param)
             self.deleteall_HIC()
             self.nanowire.param_dict[param].value = 0
-            self.update_IC_plot(do_recent=True)
+            self.update_IC_plot(plot_ID="recent")
         #if self.check_reset_params.get() or force:
         #    for key in self.sys_param_entryboxes_dict:
         #        self.enter(self.sys_param_entryboxes_dict[key], "")
@@ -2942,6 +2884,7 @@ class Notebook:
             self.nanowire.grid_x_edges = []
             self.nanowire.grid_x_nodes = []
             self.nanowire.spacegrid_is_set = False
+            
 
         self.write(self.ICtab_status, "Selected params cleared")
         return
@@ -3143,11 +3086,12 @@ class Notebook:
 
         ## Assuming that the initial distributions of holes and electrons are identical
         self.nanowire.param_dict["init_deltaP"].value = self.nanowire.param_dict["init_deltaN"].value
-        
+
+        self.update_IC_plot(plot_ID="AIC")
         self.HIC_listbox_currentparam = "init_deltaN"
-        self.update_IC_plot(do_recent=False)
+        self.update_IC_plot(plot_ID="custom")
         self.HIC_listbox_currentparam = "init_deltaP"
-        self.update_IC_plot(do_recent=True)
+        self.update_IC_plot(plot_ID="recent")
         #self.IC_is_AIC = True
         return
 
@@ -3335,13 +3279,13 @@ class Notebook:
 
         #self.recalc_HIC()
         #self.IC_is_AIC = False
-        self.update_IC_plot(do_recent=True)
+        self.update_IC_plot(plot_ID="recent")
         return
 
     def refresh_paramrule_listbox(self):
         # The View button has two jobs: change the listbox to the new param and display a snapshot of it
         self.update_paramrule_listbox(self.HIC_viewer_selection.get())
-        self.update_IC_plot(do_recent=False)
+        self.update_IC_plot(plot_ID="custom")
         return
     
     def update_paramrule_listbox(self, param_name):
@@ -3380,7 +3324,7 @@ class Notebook:
 
             # 2. Change the order param rules are applied when calculating Parameter's values
             self.nanowire.swap_param_rules(self.HIC_listbox_currentparam, currentSelectionIndex)
-            self.update_IC_plot(do_recent=True)
+            self.update_IC_plot(plot_ID="recent")
         return
 
     def movedown_HIC(self):
@@ -3393,7 +3337,7 @@ class Notebook:
             self.HIC_listbox.selection_set(currentSelectionIndex)
             
             self.nanowire.swap_param_rules(self.HIC_listbox_currentparam, currentSelectionIndex)
-            self.update_IC_plot(do_recent=True)
+            self.update_IC_plot(plot_ID="recent")
         return
 
     def hideall_HIC(self, doPlotUpdate=True):
@@ -3427,7 +3371,7 @@ class Notebook:
             try:
                 self.nanowire.remove_param_rule(self.HIC_listbox_currentparam, self.HIC_listbox.curselection()[0])
                 self.hide_HIC()
-                self.update_IC_plot(do_recent=True)
+                self.update_IC_plot(plot_ID="recent")
             except IndexError:
                 self.write(self.ICtab_status, "No rule selected")
                 return
@@ -3507,17 +3451,22 @@ class Notebook:
         self.update_IC_plot(warn=warning_flag)
         return
 
-    def update_IC_plot(self, warn=False, do_recent=True):
+    def update_IC_plot(self, plot_ID, warn=False):
         # V2 update: can now plot any parameter
         # Plot 2 is for recently changed parameter while plot 1 is for user-selected views
         #self.check_IC_initialized()
-        if do_recent: plot.figure(2)
-        else: plot.figure(1)
+        # if do_recent: plot.figure(2)
+        # else: plot.figure(1)
 
-        plot.clf()
-        plot.yscale('log')
+        if plot_ID=="recent": plot = self.recent_param_subplot
+        elif plot_ID=="custom": plot = self.custom_param_subplot
+        elif plot_ID=="AIC": plot = self.AIC_subplot
+        plot.cla()
+        plot.set_yscale('log')
 
-        param_name = self.HIC_listbox_currentparam
+        if plot_ID=="AIC": param_name="init_deltaN"
+        else: param_name = self.HIC_listbox_currentparam
+        
         param_obj = self.nanowire.param_dict[param_name]
         grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
         val_array = param_obj.value
@@ -3528,26 +3477,32 @@ class Notebook:
         max_val = np.amax(param_obj.value) * self.convert_out_dict[param_name]
         
 
-        plot.ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
+        plot.set_ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
 
 
         if self.check_symmetric.get():
             plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(val_array), val_array), axis=0) * self.convert_out_dict[param_name], label=param_name)
 
-            ymin, ymax = plot.gca().get_ylim()
+            ymin, ymax = plot.get_ylim()
             plot.fill([-grid_x[-1], 0, 0, -grid_x[-1]], [ymin, ymin, ymax, ymax], 'b', alpha=0.1, edgecolor='r')
         else:
             plot.plot(grid_x, val_array * self.convert_out_dict[param_name], label=param_name)
 
-        plot.xlabel("x [nm]")
-        plot.ylabel("{} {}".format(param_name, param_obj.units))
+        plot.set_xlabel("x [nm]")
+        plot.set_ylabel("{} {}".format(param_name, param_obj.units))
         
-        if do_recent: plot.title("Recently Changed: {}".format(param_name))
-        else: plot.title("Snapshot: {}".format(param_name))
-
-        plot.tight_layout()
-        if do_recent: self.recent_param_fig.canvas.draw()
-        else: self.custom_param_fig.canvas.draw()
+        if plot_ID=="recent": 
+            plot.set_title("Recently Changed: {}".format(param_name))
+            self.recent_param_fig.tight_layout()
+            self.recent_param_fig.canvas.draw()
+        elif plot_ID=="custom": 
+            plot.set_title("Snapshot: {}".format(param_name))
+            self.custom_param_fig.tight_layout()
+            self.custom_param_fig.canvas.draw()
+        elif plot_ID=="AIC": 
+            plot.set_title("Recent AIC")
+            self.AIC_fig.tight_layout()
+            self.AIC_fig.canvas.draw()
 
         if not warn: self.write(self.ICtab_status, "Initial Condition Updated")
         return
