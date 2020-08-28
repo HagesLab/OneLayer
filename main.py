@@ -597,6 +597,10 @@ class Notebook:
         self.tab_rules_init = tk.ttk.Frame(self.tab_inputs)
         self.tab_explicit_init = tk.ttk.Frame(self.tab_inputs)
 
+        var_dropdown_list = [str(param + self.nanowire.param_dict[param].units) for param in self.nanowire.param_dict]
+        HIC_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
+        unitless_dropdown_list = [param for param in self.nanowire.param_dict]
+        
         self.line_sep_style = tk.ttk.Style()
         self.line_sep_style.configure("Grey Bar.TSeparator", background='#000000', padding=160)
 
@@ -954,14 +958,14 @@ class Notebook:
 
         self.HIC_var_label = tk.ttk.Label(self.param_rules_frame, text="Select parameter to edit:")
         self.HIC_var_label.grid(row=4,column=0)
-
-        self.HIC_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_var_selection, *[str(param + self.nanowire.param_dict[param].units) for param in self.nanowire.param_dict])
+        
+        self.HIC_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_var_selection, var_dropdown_list[0], *var_dropdown_list)
         self.HIC_var_dropdown.grid(row=4,column=1)
 
         self.HIC_method_label = tk.ttk.Label(self.param_rules_frame, text="Select calculation method:")
         self.HIC_method_label.grid(row=5,column=0)
 
-        self.HIC_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_shape_selection, "POINT", "FILL", "LINE", "EXP")
+        self.HIC_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_shape_selection, HIC_method_dropdown_list[0], *HIC_method_dropdown_list)
         self.HIC_method_dropdown.grid(row=5, column=1)
 
         self.HIC_lbound_label = tk.ttk.Label(self.param_rules_frame, text="Left bound coordinate:")
@@ -1031,7 +1035,7 @@ class Notebook:
         self.moveup_HIC_button = tk.ttk.Button(self.param_rules_frame, text="⇧", command=self.moveup_HIC)
         self.moveup_HIC_button.grid(row=1,column=4)
 
-        self.HIC_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.HIC_viewer_selection, *[param for param in self.nanowire.param_dict])
+        self.HIC_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.HIC_viewer_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
         self.HIC_viewer_dropdown.grid(row=2,column=4)
 
         self.HIC_view_button = tk.ttk.Button(self.param_rules_frame, text="Change view", command=self.refresh_paramrule_listbox)
@@ -1047,8 +1051,8 @@ class Notebook:
 
         self.EIC_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified spacing mesh.", width=360)
         self.EIC_description.grid(row=0,column=0)
-
-        self.EIC_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.EIC_var_selection, *[str(param + self.nanowire.param_dict[param].units) for param in self.nanowire.param_dict])
+        
+        self.EIC_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.EIC_var_selection, var_dropdown_list[0], *var_dropdown_list)
         self.EIC_dropdown.grid(row=1,column=0)
 
         self.add_EIC_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_EIC)
