@@ -3448,8 +3448,10 @@ class Notebook:
             # Linear interpolate from provided EIC list to specified grid points
             lindex = finite.toIndex(first_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
             rindex = finite.toIndex(second_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
+            
+            if (first_valueset[0] - finite.toCoord(lindex, self.nanowire.dx, is_edge) >= self.nanowire.dx / 2): lindex += 1
 
-            intermediate_x_indices = np.arange(lindex, rindex, 1)
+            intermediate_x_indices = np.arange(lindex, rindex + 1, 1)
 
             for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
                 try:
