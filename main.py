@@ -504,6 +504,7 @@ class Notebook:
         #self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
         # Check when popup menus open and close
+        self.sys_param_shortcut_popup_isopen = False
         self.batch_popup_isopen = False
         self.resetIC_popup_isopen = False
         self.overwrite_popup_isopen = False
@@ -651,105 +652,9 @@ class Notebook:
 
         self.system_params_head = tk.ttk.Label(self.params_frame, text="System Parameters",style="Header.TLabel")
         self.system_params_head.grid(row=0, column=0,columnspan=2)
-
-        self.N_mobility_label = tk.ttk.Label(self.params_frame, text="N Mobility [cm^2 / V s]")
-        self.N_mobility_label.grid(row=1, column=0)
-
-        self.N_mobility_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.N_mobility_entry.grid(row=1,column=1)
-
-        self.P_mobility_label = tk.ttk.Label(self.params_frame, text="P Mobility [cm^2 / V s]")
-        self.P_mobility_label.grid(row=2, column=0)
-
-        self.P_mobility_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.P_mobility_entry.grid(row=2,column=1)
-
-        self.n0_label = tk.ttk.Label(self.params_frame, text="n0 [cm^-3]")
-        self.n0_label.grid(row=3,column=0)
-
-        self.n0_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.n0_entry.grid(row=3,column=1)
-
-        self.p0_label = tk.ttk.Label(self.params_frame, text="p0 [cm^-3]")
-        self.p0_label.grid(row=4,column=0)
-
-        self.p0_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.p0_entry.grid(row=4,column=1)
-
-        self.B_label = tk.ttk.Label(self.params_frame, text="B (cm^3 / s)")
-        self.B_label.grid(row=5,column=0)
-
-        self.B_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.B_entry.grid(row=5,column=1)
-
-        self.tauN_label = tk.ttk.Label(self.params_frame, text="Tau_n (ns)")
-        self.tauN_label.grid(row=6, column=0)
-
-        self.tauN_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.tauN_entry.grid(row=6, column=1)
-
-        self.tauP_label = tk.ttk.Label(self.params_frame, text="Tau_p (ns)")
-        self.tauP_label.grid(row=7, column=0)
-
-        self.tauP_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.tauP_entry.grid(row=7, column=1)
-
-        self.Sf_label = tk.ttk.Label(self.params_frame, text="Sf (cm / s)")
-        self.Sf_label.grid(row=8, column=0)
-
-        self.Sf_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.Sf_entry.grid(row=8, column=1)
-
-        self.Sb_label = tk.ttk.Label(self.params_frame, text="Sb (cm / s)")
-        self.Sb_label.grid(row=9, column=0)
-
-        self.Sb_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.Sb_entry.grid(row=9, column=1)
-
-        self.temperature_label = tk.ttk.Label(self.params_frame, text="Temperature (K)")
-        self.temperature_label.grid(row=10, column=0)
-
-        self.temperature_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.temperature_entry.grid(row=10, column=1)
-
-        self.rel_permitivity_label = tk.ttk.Label(self.params_frame, text="Rel. Permitivity")
-        self.rel_permitivity_label.grid(row=11, column=0)
-
-        self.rel_permitivity_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.rel_permitivity_entry.grid(row=11, column=1)
-
-        self.ext_efield_label = tk.ttk.Label(self.params_frame, text="External E-field [V/um]")
-        self.ext_efield_label.grid(row=12,column=0)
-
-        self.ext_efield_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.ext_efield_entry.grid(row=12,column=1)
-
-        self.special_var_head = tk.ttk.Label(self.params_frame, text="Photon behavior parameters", style="Header.TLabel")
-        self.special_var_head.grid(row=13,column=0,columnspan=2)
-
-        self.theta_label = tk.ttk.Label(self.params_frame, text="Theta Cof. [cm^-1]")
-        self.theta_label.grid(row=14,column=0)
-
-        self.theta_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.theta_entry.grid(row=14,column=1)
-
-        self.alpha_label = tk.ttk.Label(self.params_frame, text="Alpha Cof. [cm^-1]")
-        self.alpha_label.grid(row=15,column=0)
-
-        self.alpha_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.alpha_entry.grid(row=15,column=1)
-
-        self.delta_label = tk.ttk.Label(self.params_frame, text="Delta Frac.")
-        self.delta_label.grid(row=16,column=0)
-
-        self.delta_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.delta_entry.grid(row=16,column=1)
-
-        self.frac_emitted_label = tk.ttk.Label(self.params_frame, text="Frac. Emitted (0 to 1)")
-        self.frac_emitted_label.grid(row=17,column=0)
-
-        self.frac_emitted_entry = tk.ttk.Entry(self.params_frame, width=9)
-        self.frac_emitted_entry.grid(row=17,column=1)
+        
+        self.system_params_shortcut_button = tk.ttk.Button(self.params_frame, text="Short-cut Param Entry Tool", command=self.do_sys_param_shortcut_popup)
+        self.system_params_shortcut_button.grid(row=1,column=0,columnspan=2)
 
         self.flags_frame = tk.ttk.Frame(self.tab_inputs)
         self.flags_frame.grid(row=6,column=0,columnspan=2)
@@ -1072,11 +977,7 @@ class Notebook:
         self.EIC_toolbar = tkagg.NavigationToolbar2Tk(self.EIC_canvas, self.EIC_toolbar_frame)
 
         # Dictionaries of parameter entry boxes
-        self.sys_param_entryboxes_dict = {"Mu_N":self.N_mobility_entry, "Mu_P":self.P_mobility_entry, "N0":self.n0_entry, "P0":self.p0_entry, 
-                                          "Thickness":self.thickness_entry, "B":self.B_entry, "Tau_N":self.tauN_entry, "Tau_P":self.tauP_entry,
-                                          "Sf":self.Sf_entry, "Sb":self.Sb_entry, "Temperature":self.temperature_entry, "Rel-Permitivity":self.rel_permitivity_entry, "Ext_E-Field":self.ext_efield_entry,
-                                          "Theta":self.theta_entry, "Alpha":self.alpha_entry, "Delta":self.delta_entry, "Frac-Emitted":self.frac_emitted_entry, "dx":self.dx_entry}
-
+        
         self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle),
                               "symmetric_system":Flag(self.symmetry_checkbutton, self.check_symmetric)}
 
@@ -1223,6 +1124,92 @@ class Notebook:
         return
 
     ## Functions to create popups and manage
+    
+    def do_sys_param_shortcut_popup(self):
+        # V2: An overhaul of the old method for inputting (spatially constant) parameters
+        if not self.sys_param_shortcut_popup_isopen: # Don't open more than one of this window at a time
+            try:
+                self.set_init_x()
+    
+            except ValueError:
+                self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
+                return
+    
+            except Exception as oops:
+                self.write(self.ICtab_status, oops)
+                return
+        
+            self.sys_param_shortcut_popup = tk.Toplevel(self.root)
+            
+            self.sys_param_shortcut_title_label = tk.ttk.Label(self.sys_param_shortcut_popup, text="Parameter Short-cut Tool", style="Header.TLabel")
+            self.sys_param_shortcut_title_label.grid(row=0,column=0)
+            
+            self.sys_param_instruction = tk.Message(self.sys_param_shortcut_popup, text="Are the values of certain parameters constant across the system? " +
+                                                 "Enter those values here and press \"Continue\" to apply them on all space grid points.", width=300)
+            self.sys_param_instruction.grid(row=0,column=1)
+            
+            self.sys_param_list_frame = tk.ttk.Frame(self.sys_param_shortcut_popup)
+            self.sys_param_list_frame.grid(row=1,column=0,columnspan=2)
+            
+            self.sys_param_entryboxes_dict = {}
+            self.sys_param_labels_dict = {}
+            row_count = 0
+            col_count = 0
+            max_per_col = 6
+            for param in self.nanowire.param_dict:
+                self.sys_param_labels_dict[param] = tk.ttk.Label(self.sys_param_list_frame, text="{} {}".format(param, self.nanowire.param_dict[param].units))
+                self.sys_param_labels_dict[param].grid(row=row_count, column=col_count)
+                self.sys_param_entryboxes_dict[param] = tk.ttk.Entry(self.sys_param_list_frame, width=9)
+                self.sys_param_entryboxes_dict[param].grid(row=row_count, column=col_count + 1)
+                row_count += 1
+                if row_count == max_per_col:
+                    row_count = 0
+                    col_count += 2
+                    
+            self.shortcut_continue_button = tk.Button(self.sys_param_shortcut_popup, text="Continue", command=partial(self.on_sys_param_shortcut_popup_close, True))
+            self.shortcut_continue_button.grid(row=2,column=1)
+                    
+            ## Temporarily disable the main window while this popup is active
+            self.sys_param_shortcut_popup.protocol("WM_DELETE_WINDOW", self.on_sys_param_shortcut_popup_close)
+            self.sys_param_shortcut_popup.grab_set()
+            self.sys_param_shortcut_popup_isopen = True
+                    
+        else:
+            print("Error #2020: Opened more than one sys param shortcut popup at a time")
+            
+    def on_sys_param_shortcut_popup_close(self, continue_=False):
+        try:
+
+            if continue_:
+                changed_params = []
+                for param in self.nanowire.param_dict:
+                    val = self.sys_param_entryboxes_dict[param].get()
+                    if val == "": continue
+                    else:
+                        try:
+                            val = float(val)
+                            
+                        except:
+                            continue
+                    
+                    self.HIC_listbox_currentparam = param
+                    self.deleteall_HIC()
+                    self.nanowire.param_dict[param].value = val
+                    changed_params.append(param)
+                    
+                if changed_params.__len__() > 0:
+                    self.update_IC_plot(plot_ID="recent")
+                    self.write(self.ICtab_status, "Updated: {}".format(changed_params))
+                    
+                else:
+                    self.write(self.ICtab_status, "")
+                    
+            self.sys_param_shortcut_popup.destroy()
+            self.sys_param_shortcut_popup_isopen = False
+        except FloatingPointError:
+            print("Error #2021: Failed to close shortcut popup.")
+        
+        return
 
     def do_batch_popup(self):
         # Check that user has filled in all parameters
@@ -1230,7 +1217,7 @@ class Notebook:
             self.write(self.ICtab_status, "Error: Missing or invalid parameters")
             return
 
-        if not self.batch_popup_isopen: # Don't open more than one of this window at a time
+        if not self.batch_popup_isopen: 
             self.batch_param = tk.StringVar()
 
             self.batch_popup = tk.Toplevel(self.root)
@@ -1261,6 +1248,7 @@ class Notebook:
                                                             )])
             else:
                 self.batch_param_select = tk.OptionMenu(self.batch_popup, self.batch_param, *[key for key in self.sys_param_entryboxes_dict.keys() if not (key == "Thickness" or key == "dx")])
+            
             self.batch_param_select.grid(row=0,column=2)
 
             self.batch_param_entry = tk.Entry(self.batch_popup, width=80)
@@ -1280,7 +1268,6 @@ class Notebook:
             self.create_batch_button = tk.Button(self.batch_popup, text="Create Batch", command=self.create_batch_init)
             self.create_batch_button.grid(row=3,column=3, padx=(130,0))
 
-            ## Temporarily disable the main window while this popup is active
             self.batch_popup.protocol("WM_DELETE_WINDOW", self.on_batch_popup_close)
             self.batch_popup.grab_set()
             self.batch_popup_isopen = True
@@ -2865,12 +2852,11 @@ class Notebook:
 
     def reset_IC(self, force=False):
         # V2 Update: On IC tab:
-        # 1. Remove all param_rules from all selected Parameters
-        # 2. Remove values stored in Nanowire()
-        # 3. Clear all entryboxes (TODO)
+        # 1. Remove all param_rules from all selected Parameters in the listbox
+        # 2. Remove all param_rules from all selected Parameters stored in Nanowire()
+        # 3. Remove values stored in Nanowire()
         # + any visual changes to appeal to the user
 
-        print("shonk bonk")
         self.do_resetIC_popup()
         self.root.wait_window(self.resetIC_popup)
 
@@ -2879,13 +2865,16 @@ class Notebook:
             return
 
         for param in self.resetIC_selected_params:
-            # Step 1 & 2
+            # Step 1 and 2
             self.HIC_listbox_currentparam = param
+            
+            # These two lines changes the text displayed in the param_rule display box's menu and is for cosmetic purposes only
             self.update_paramrule_listbox(param)
-
-            # This line changes the text displayed in the param_rule display box's menu and is for cosmetic purposes only
             self.HIC_viewer_selection.set(param)
+            
             self.deleteall_HIC()
+            
+            # Step 3
             self.nanowire.param_dict[param].value = 0
             self.update_IC_plot(plot_ID="recent")
         #if self.check_reset_params.get() or force:
