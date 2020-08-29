@@ -641,7 +641,7 @@ class Notebook:
         self.thickness_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
         self.thickness_entry.grid(row=1,column=1)
 
-        self.dx_label = tk.ttk.Label(self.spacegrid_frame, text="Space step size [nm]")
+        self.dx_label = tk.ttk.Label(self.spacegrid_frame, text="Node width [nm]")
         self.dx_label.grid(row=2,column=0)
 
         self.dx_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
@@ -661,7 +661,8 @@ class Notebook:
 
         self.flags_head = tk.ttk.Label(self.flags_frame, text="Flags", style="Header.TLabel")
         self.flags_head.grid(row=0,column=0,columnspan=2)
-
+        
+        # TODO: Procedurally generated elements for flags
         self.ignore_recycle_checkbutton = tk.ttk.Checkbutton(self.flags_frame, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
         self.ignore_recycle_checkbutton.grid(row=1,column=0)
 
@@ -1194,7 +1195,7 @@ class Notebook:
                     
                     self.HIC_listbox_currentparam = param
                     self.deleteall_HIC()
-                    self.nanowire.param_dict[param].value = val
+                    self.nanowire.param_dict[param].value = val * self.convert_in_dict[param]
                     changed_params.append(param)
                     
                 if changed_params.__len__() > 0:
@@ -3586,9 +3587,9 @@ class Notebook:
     def save_ICfile(self):
         try:
             # Check that user has filled in all parameters
-            if not (self.test_entryboxes_valid(self.sys_param_entryboxes_dict)):
-                self.write(self.ICtab_status, "Error: Missing or invalid parameter: {}".format(self.missing_params[0]))
-                return
+            # if not (self.test_entryboxes_valid(self.sys_param_entryboxes_dict)):
+            #     self.write(self.ICtab_status, "Error: Missing or invalid parameter: {}".format(self.missing_params[0]))
+            #     return
 
             new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file", filetypes=[("Text files","*.txt")])
             
@@ -3603,7 +3604,7 @@ class Notebook:
         return
 
     def write_init_file(self, newFileName, dir_name=""):
-        self.update_IC_plot()
+        # self.update_IC_plot()
 
         try:
             with open(newFileName, "w+") as ofstream:
@@ -3611,24 +3612,34 @@ class Notebook:
 
                 # We don't really need to note down the time of creation, but it could be useful for interaction with other programs.
                 ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
+                ofstream.write("$ Space Grid:\n")
+                ofstream.write("Total length: {}\n".format(self.nanowire.total_length))
+                ofstream.write("Node width: {}\n".format(self.nanowire.dx))
+                
                 ofstream.write("$ System Parameters:\n")
-                for key in self.sys_param_entryboxes_dict:
-                    ofstream.write(key + ": " + str(self.sys_param_entryboxes_dict[key].get()) + "\n")
+                
+                for param in self.nanowire.param_dict:
+                    ofstream.write("{}: {}\n".format(param, self.nanowire.param_dict[param].value * self.convert_out_dict[param]))
+                # for key in self.sys_param_entryboxes_dict:
+                #     ofstream.write(key + ": " + str(self.sys_param_entryboxes_dict[key].get()) + "\n")
 
                 ofstream.write("$ System Flags:\n")
-                for key in self.sys_flag_dict:
-                    ofstream.write(key + ": " + str(self.sys_flag_dict[key].tk_var.get()) + "\n")
+                
+                for flag in self.nanowire.flags_dict:
+                    ofstream.write("{}: {}\n".format(flag, self.nanowire.flags_dict[flag]))
+                # for key in self.sys_flag_dict:
+                #     ofstream.write(key + ": " + str(self.sys_flag_dict[key].tk_var.get()) + "\n")
 
-                ofstream.write("$ Initial Conditions: (Nodes) x, N, P\n")
-                for i in range(self.init_x.__len__()):
-                    ofstream.write("{:.8e}\t{:.8e}\t{:.8e}\n".format(self.init_x[i], self.init_N[i], self.init_P[i]))
+                # ofstream.write("$ Initial Conditions: (Nodes) x, N, P\n")
+                # for i in range(self.init_x.__len__()):
+                #     ofstream.write("{:.8e}\t{:.8e}\t{:.8e}\n".format(self.init_x[i], self.init_N[i], self.init_P[i]))
 
-                ofstream.write("\n$ Initial Conditions: (Edges) x, E-field, Eg, Chi\n")
-                for i in range(self.init_x_edges.__len__()):
-                    ofstream.write("{:.8e}\t{:.8e}\t{:.8e}\t{:.8e}\n".format(self.init_x_edges[i], 0, self.init_Ec[i], self.init_Chi[i]))
+                # ofstream.write("\n$ Initial Conditions: (Edges) x, E-field, Eg, Chi\n")
+                # for i in range(self.init_x_edges.__len__()):
+                #     ofstream.write("{:.8e}\t{:.8e}\t{:.8e}\t{:.8e}\n".format(self.init_x_edges[i], 0, self.init_Ec[i], self.init_Chi[i]))
 
-        except OSError as oops:
-            self.write(self.ICtab_status, "IC file not created")
+        except OSError:
+            self.write(self.ICtab_status, "Error: failed to create IC file")
             return
 
         self.write(self.ICtab_status, "IC file generated")
