@@ -3402,7 +3402,7 @@ class Notebook:
         var = self.EIC_var_selection.get()
         is_edge = self.nanowire.param_dict[var].is_edge
         
-        valuelist_filename = tk.filedialog.askopenfilename(title="Select Values from text file", filetypes=[("Text files","*.txt")])
+        valuelist_filename = tk.filedialog.askopenfilename(initialdir="", title="Select Values from text file", filetypes=[("Text files","*.txt")])
         if valuelist_filename == "": # If no file selected
             return
 
@@ -3619,7 +3619,17 @@ class Notebook:
                 ofstream.write("$ System Parameters:\n")
                 
                 for param in self.nanowire.param_dict:
-                    ofstream.write("{}: {}\n".format(param, self.nanowire.param_dict[param].value * self.convert_out_dict[param]))
+                    param_values = self.nanowire.param_dict[param].value * self.convert_out_dict[param]
+                    if isinstance(param_values, np.ndarray):
+                        # Write the array in a more convenient format
+                        ofstream.write("{} (LONG): {:.8e}".format(param, param_values[0]))
+                        for value in param_values[1:]:
+                            ofstream.write("\t{:.8e}".format(value))
+                            
+                        ofstream.write('\n')
+                    else:
+                        # The param value is just a single constant
+                        ofstream.write("{}: {}\n".format(param, param_values))
                 # for key in self.sys_param_entryboxes_dict:
                 #     ofstream.write(key + ": " + str(self.sys_param_entryboxes_dict[key].get()) + "\n")
 
