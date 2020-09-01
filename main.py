@@ -103,6 +103,8 @@ class Nanowire:
                             "init_E_field":Parameter(is_edge=True, units="[WIP]"), "Ec":Parameter(is_edge=True, units="[WIP]"),
                             "electron_affinity":Parameter(is_edge=True, units="[WIP]")}
 
+        # This tells TEDs what flags there will be, but isn't used for storage until a simulation begins.
+        # The reason why is that outside of simulations, we care more about whether a flag appears visually selected than its value
         self.flags_dict = {"ignore_alpha":0,
                            "symmetric_system":0}
         return
@@ -178,9 +180,6 @@ class Nanowire:
 
         for param in self.param_dict:
             print("{}: {}".format(param, self.param_dict[param].value))
-
-        for flag in self.flags_dict:
-            print("{}: {}".format(flag, self.flags_dict[flag]))
 
         return
 
@@ -3586,10 +3585,6 @@ class Notebook:
 	# Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked
     def save_ICfile(self):
         try:
-            # Check that user has filled in all parameters
-            # if not (self.test_entryboxes_valid(self.sys_param_entryboxes_dict)):
-            #     self.write(self.ICtab_status, "Error: Missing or invalid parameter: {}".format(self.missing_params[0]))
-            #     return
 
             new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file", filetypes=[("Text files","*.txt")])
             
@@ -3604,7 +3599,6 @@ class Notebook:
         return
 
     def write_init_file(self, newFileName, dir_name=""):
-        # self.update_IC_plot()
 
         try:
             with open(newFileName, "w+") as ofstream:
@@ -3613,16 +3607,17 @@ class Notebook:
                 # We don't really need to note down the time of creation, but it could be useful for interaction with other programs.
                 ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
                 ofstream.write("$ Space Grid:\n")
-                ofstream.write("Total length: {}\n".format(self.nanowire.total_length))
-                ofstream.write("Node width: {}\n".format(self.nanowire.dx))
+                ofstream.write("Total_length: {}\n".format(self.nanowire.total_length))
+                ofstream.write("Node_width: {}\n".format(self.nanowire.dx))
                 
                 ofstream.write("$ System Parameters:\n")
                 
+                # Saves occur as-is: any missing parameters are saved with whatever default value Nanowire gives them
                 for param in self.nanowire.param_dict:
                     param_values = self.nanowire.param_dict[param].value * self.convert_out_dict[param]
                     if isinstance(param_values, np.ndarray):
                         # Write the array in a more convenient format
-                        ofstream.write("{} (LONG): {:.8e}".format(param, param_values[0]))
+                        ofstream.write("{}: {:.8e}".format(param, param_values[0]))
                         for value in param_values[1:]:
                             ofstream.write("\t{:.8e}".format(value))
                             
@@ -3630,24 +3625,12 @@ class Notebook:
                     else:
                         # The param value is just a single constant
                         ofstream.write("{}: {}\n".format(param, param_values))
-                # for key in self.sys_param_entryboxes_dict:
-                #     ofstream.write(key + ": " + str(self.sys_param_entryboxes_dict[key].get()) + "\n")
 
                 ofstream.write("$ System Flags:\n")
                 
                 for flag in self.nanowire.flags_dict:
-                    ofstream.write("{}: {}\n".format(flag, self.nanowire.flags_dict[flag]))
-                # for key in self.sys_flag_dict:
-                #     ofstream.write(key + ": " + str(self.sys_flag_dict[key].tk_var.get()) + "\n")
-
-                # ofstream.write("$ Initial Conditions: (Nodes) x, N, P\n")
-                # for i in range(self.init_x.__len__()):
-                #     ofstream.write("{:.8e}\t{:.8e}\t{:.8e}\n".format(self.init_x[i], self.init_N[i], self.init_P[i]))
-
-                # ofstream.write("\n$ Initial Conditions: (Edges) x, E-field, Eg, Chi\n")
-                # for i in range(self.init_x_edges.__len__()):
-                #     ofstream.write("{:.8e}\t{:.8e}\t{:.8e}\t{:.8e}\n".format(self.init_x_edges[i], 0, self.init_Ec[i], self.init_Chi[i]))
-
+                    ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].tk_var.get()))
+                
         except OSError:
             self.write(self.ICtab_status, "Error: failed to create IC file")
             return
@@ -3669,72 +3652,97 @@ class Notebook:
         try:
             print("Poked file: {}".format(self.IC_file_name))
             with open(self.IC_file_name, 'r') as ifstream:
-                init_param_values_dict = {"Mu_N":0, "Mu_P":0, "N0":0, "P0":0, 
-                                          "Thickness":0, "B":0, "Tau_N":0, "Tau_P":0,
-                                          "Sf":0, "Sb":0, "Temperature":0, "Rel-Permitivity":0, "Ext_E-Field":0,
-                                          "Theta":0, "Alpha":0, "Delta":0, "Frac-Emitted":0, "dx":0}
+                init_param_values_dict = {}
 
-                flag_values_dict = {"ignore_alpha":0, "symmetric_system":0}
-                node_init_list = []
-                edge_init_list = []
+                flag_values_dict = {}
+                total_length = 0
+                dx = 0
+
                 initFlag = 0
                 file_is_valid = False
                 # Extract parameters, ICs
                 for line in ifstream:
                     # Attempt to determine if loaded file is valid initial condition.
-                    if not(file_is_valid) and ("$$ INITIAL CONDITION FILE CREATED ON" in line):
-                        file_is_valid = True
-                        continue
+                    # i.e. if the user mis-clicks on a non-TEDs file
+                    if not(file_is_valid):
+                        if ("$$ INITIAL CONDITION FILE CREATED ON" in line):
+                            file_is_valid = True
+                            continue
+                        else:
+                            raise OSError("Error: unable to read selected file")
 
                     if ("#" in line) or (line.strip('\n').__len__() == 0):
                         continue
 
+                    # There are three "$" markers in an IC file: "Space Grid", "System Parameters" and "System Flags"
+                    # each corresponding to a different section of the file
+                    
+                    elif "$ Space Grid" in line:
+                        print("Now searching for space grid parameters: total length and dx")
+                        initFlag = 1
+                        
                     elif "$ System Parameters" in line:
-                        continue
-
-                    # There are four "$" flags in an IC file: "System Parameters", "System Flags", "Node Initial Conditions", and "Edge Initial Conditions"
-                    # each corresponding to a different part of the initial state of the system
-                    elif "$ Initial Conditions:" in line or "$ System Flags:" in line:
-                        initFlag += 1
-
-                    elif (initFlag == 0):
-                        line = line.strip('\n')
-                        init_param_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+                        print("Now searching for system parameters...")
+                        initFlag = 2
+                        
+                    elif "$ System Flags" in line:
+                        print("Now searching for flag values...")
+                        initFlag = 3
 
                     elif (initFlag == 1):
                         line = line.strip('\n')
-                        flag_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
-
+                        if line[0:line.find(':')] == "Total_length":
+                            total_length = (line[line.find(' ') + 1:])
+                            
+                        elif line[0:line.find(':')] == "Node_width":
+                            dx = (line[line.find(' ') + 1:])
+                            
                     elif (initFlag == 2):
-                        if ('j' in line): raise OSError("Error: unable to read complex value in {}".format(self.IC_file_name)) # If complex arg detected
-                        node_init_list.append(line.strip('\n'))
+                        line = line.strip('\n')
+                        init_param_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+
 
                     elif (initFlag == 3):
-                        if ('j' in line): raise OSError("Error: unable to read complex value in {}".format(self.IC_file_name)) # If complex arg detected
-                        edge_init_list.append(line.strip('\n'))
-
-                if not(file_is_valid):
-                    raise OSError("Error: unable to read {}".format(self.IC_file_name))
+                        line = line.strip('\n')
+                        flag_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
 
         except Exception as oops:
             self.write(self.ICtab_status, oops)
             return
 
-        # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and ICs that were generated using the Initial tab
+        ## At this point everything from the file has been read. 
+        # Whether those values are valid is another story, but having a valid space grid is essential.
+        try:
+            total_length = float(total_length)
+            dx = float(dx)
+            if (total_length <= 0) or (dx <= 0) or (total_length < dx):
+                raise ValueError
+        except:
+            self.write(self.ICtab_status, "Error: invalid space grid")
+            return
+        
+        # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and any other values that may exist on the GUI
         for key in self.analytical_entryboxes_dict:
             self.enter(self.analytical_entryboxes_dict[key], "")
+            
+        for param in self.nanowire.param_dict:
+            self.HIC_listbox_currentparam = param
+            
+            self.update_paramrule_listbox(param)            
+            self.deleteall_HIC()
+            
+            self.nanowire.param_dict[param].value = 0
 
-        self.reset_IC(force=True)
-
-        # Enter saved params into boxes
-        for key in init_param_values_dict:
-            self.enter(self.sys_param_entryboxes_dict[key], init_param_values_dict[key])
-
-        for key in flag_values_dict:
-            self.sys_flag_dict[key].value = int(flag_values_dict[key])
-            self.sys_flag_dict[key].tk_var.set(self.sys_flag_dict[key].value)
+        self.set_thickness_and_dx_entryboxes(state='unlock')
+        self.nanowire.total_length = None
+        self.nanowire.dx = None
+        self.nanowire.grid_x_edges = []
+        self.nanowire.grid_x_nodes = []
+        self.nanowire.spacegrid_is_set = False
 
         try:
+            self.enter(self.thickness_entry, total_length)
+            self.enter(self.dx_entry, dx)
             self.set_init_x()
             
         except ValueError:
@@ -3745,78 +3753,26 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-        self.init_N = np.zeros(int(0.5 + self.thickness / self.dx))
-        self.init_P = np.zeros(int(0.5 + self.thickness / self.dx))
-        self.init_E_field = np.zeros(int(0.5 + self.thickness / self.dx) + 1)
-        self.init_Ec = np.zeros(int(0.5 + self.thickness / self.dx) + 1)
-        self.init_Chi = np.zeros(int(0.5 + self.thickness / self.dx) + 1)
-
-        # Though a rare case, the file reader is able to interpret out-of-order IC values and sort by ascending x coord
-        node_init_list.sort(key = lambda x:float(x[0:x.find('\t')]))
-        edge_init_list.sort(key = lambda x:float(x[0:x.find('\t')]))
-
-        # Process the sorted node_init_list entries TWO at a time, filling all relevant IC arrays with linear-interpolated values.
-        # We could use a much less complex one-value-at-a-time reader, but those methods usually lose out on linear interpolation ability
-        try:
-            for i in range(0, node_init_list.__len__() - 1):
-                try:
-                    first_valueset = extract_values(node_init_list[i], '\t') #[x1, N(x1), P(x1)]
-                    second_valueset = extract_values(node_init_list[i+1], '\t') #[x2, N(x2), P(x2)]
-                except ValueError:
-                    self.write(self.ICtab_status, "Warning: Unusual IC File content")
-                    warning_flag = True
-
-                intermediate_x_indices = np.arange(finite.toIndex(first_valueset[0], self.dx, self.thickness, is_edge=False), finite.toIndex(second_valueset[0], self.dx, self.thickness, is_edge=False) + 1, 1)
-
-                for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
-                    try:
-                        self.init_N[j] = first_valueset[1] + (finite.toCoord(j, self.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
-                    except:
-                        self.init_N[j] = 0
-                        
-                    try:
-                        self.init_P[j] = first_valueset[2] + (finite.toCoord(j, self.dx) - first_valueset[0]) * (second_valueset[2] - first_valueset[2]) / (second_valueset[0] - first_valueset[0])
-                    except:
-                        self.init_P[j] = 0
-
-        
-             #END LOOP
-        #END LOOP
+        for flag in self.nanowire.flags_dict:
+            # Again, we don't bother with Nanowire's flags_dict until it's time to simulate
+            # All we need to do here is mark the appropriate GUI elements as selected
+            self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
             
-        # Now do the same for edge_init_list
-            for i in range(0, edge_init_list.__len__() - 1):
-                try:
-                    first_valueset = extract_values(edge_init_list[i], '\t') #[x1, E(x1), Eg(x1), Chi(x1)]
-                    second_valueset = extract_values(edge_init_list[i+1], '\t') #[x2, E(x2), Eg(x2), Chi(x2)]
-                except ValueError:
-                    self.write(self.ICtab_status, "Warning: Unusual IC File content")
-                    warning_flag = True
-
-                intermediate_x_indices = np.arange(finite.toIndex(first_valueset[0], self.dx, self.thickness, is_edge=True), finite.toIndex(second_valueset[0], self.dx, self.thickness, is_edge=True) + 1, 1)
-
-                for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
-                    try:
-                        self.init_E_field[j] = first_valueset[1] + (finite.toCoord(j, self.dx, True) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
-                    except:
-                        self.init_E_field[j] = 0
-
-                    try:
-                        self.init_Ec[j] = first_valueset[2] + (finite.toCoord(j, self.dx, True) - first_valueset[0]) * (second_valueset[2] - first_valueset[2]) / (second_valueset[0] - first_valueset[0])
-                    except:
-                        self.init_Ec[j] = 0
-                        
-                    try:
-                        self.init_Chi[j] = first_valueset[3] + (finite.toCoord(j, self.dx, True) - first_valueset[0]) * (second_valueset[3] - first_valueset[3]) / (second_valueset[0] - first_valueset[0])
-                    except:
-                        self.init_Chi[j] = 0
-
-        except IndexError:
-            self.write(self.ICtab_status, "Warning: could not fit IC distribution into system with thickness {}".format(self.thickness))
-            warning_flag = True
-
-        self.update_IC_plot(warn=warning_flag)
-
+        for param in self.nanowire.param_dict:
+            new_value = init_param_values_dict[param]
+            try:
+                if '\t' in new_value:
+                    self.nanowire.param_dict[param].value = np.array(extract_values(new_value, '\t')) * self.convert_in_dict[param]
+                else: self.nanowire.param_dict[param].value = float(new_value) * self.convert_in_dict[param]
+                
+                self.HIC_listbox_currentparam = param
+                self.update_IC_plot(plot_ID="recent")
+            except:
+                print("Warning: could not apply value for param: {}".format(param))
+                warning_flag += 1
+                
         if not warning_flag: self.write(self.ICtab_status, "IC file loaded successfully")
+        else: self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
         return
 
     # Data I/O
