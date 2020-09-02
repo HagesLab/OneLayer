@@ -74,14 +74,6 @@ class Parameter:
         self.param_rules = []
         return
 
-class Flag:
-    # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
-    # but we interact with the checkbutton using the actual tk.CheckButton() element
-    # So wrap both of those together in a single object and call it a day
-    def __init__(self, tk_element, tk_var, value=0):
-        self.tk_element = tk_element
-        self.tk_var = tk_var
-        self.value = value
 
 class Nanowire:
     # A Nanowire object contains all information regarding the initial state of a nanowire
@@ -182,6 +174,25 @@ class Nanowire:
             print("{}: {}".format(param, self.param_dict[param].value))
 
         return
+    
+class Flag:
+    # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
+    # but we interact with the checkbutton using the actual tk.CheckButton() element
+    # So wrap both of those together in a single object and call it a day
+    def __init__(self, tk_element, tk_var, value=0):
+        self.tk_element = tk_element
+        self.tk_var = tk_var
+        self.value = value
+        return
+
+class Batchable:
+    # Much like the flag class, the Batchable() serves to collect together various tk elements and values for the batch IC tool.
+    def __init__(self, tk_optionmenu, tk_entrybox, param_name):
+        self.tk_optionmenu = tk_optionmenu
+        self.tk_entrybox = tk_entrybox
+        self.param_name = param_name
+        return
+
 
 class Data_Set:
     # Object containing all the metadata required to plot and integrate saved data sets
@@ -1213,60 +1224,74 @@ class Notebook:
 
     def do_batch_popup(self):
         # Check that user has filled in all parameters
-        if not (self.test_entryboxes_valid(self.sys_param_entryboxes_dict)):
-            self.write(self.ICtab_status, "Error: Missing or invalid parameters")
+        try:
+            self.set_init_x()
+        except:
+            self.write(self.ICtab_status, "Error: missing space grid")
             return
 
         if not self.batch_popup_isopen: 
+            max_batchable_params = 4
             self.batch_param = tk.StringVar()
 
             self.batch_popup = tk.Toplevel(self.root)
             self.batch_title_label = tk.ttk.Label(self.batch_popup, text="Batch IC Tool", style="Header.TLabel")
             self.batch_title_label.grid(row=0,column=0)
-            self.batch_instruction1 = tk.Message(self.batch_popup, text="This Batch Tool allows you to generate many copies of the currently-loaded IC, varying exactly one parameter between all of them.", width=300)
+            self.batch_instruction1 = tk.Message(self.batch_popup, text="This Batch Tool allows you to generate many copies of the currently-loaded IC, varying up to {} parameters between all of them.".format(max_batchable_params), width=300)
             self.batch_instruction1.grid(row=1,column=0)
 
-            self.batch_instruction2 = tk.Message(self.batch_popup, text="An IC is considered currently-loaded when plots appear on the main Inputs tab and the system parameters are filled in.", width=300)
+            self.batch_instruction2 = tk.Message(self.batch_popup, text="All copies will be stored in a single folder.", width=300)
             self.batch_instruction2.grid(row=2,column=0)
 
-            self.batch_instruction3 = tk.Message(self.batch_popup, text="Please ensure that this is the case before using this tool.", width=300)
+            self.batch_instruction3 = tk.Message(self.batch_popup, text="For best results, load a complete IC file or fill in values for all params before using this tool.", width=300)
             self.batch_instruction3.grid(row=3,column=0)
 
-            self.batch_param_label = tk.Label(self.batch_popup, text="Select Batch Parameter:")
+            self.batch_param_label = tk.ttk.Label(self.batch_popup, text="Select Batch Parameter:")
             self.batch_param_label.grid(row=0,column=1)
+            
+            self.batch_entry_frame = tk.ttk.Frame(self.batch_popup)
+            self.batch_entry_frame.grid(row=1,column=1,columnspan=3, rowspan=3)
+           
 
             # Contextually-dependent options for batchable params
-            if self.IC_is_AIC:
-                self.batch_param_select = tk.OptionMenu(self.batch_popup, self.batch_param, *[key for key in self.sys_param_entryboxes_dict.keys() if not (key == "Thickness" or key == "dx")], 
-                                                        *[key for key in self.analytical_entryboxes_dict.keys() if not (
-                                                            (self.check_calculate_init_material_expfactor.get() and (key == "AIC_expfactor")) or
-                                                            (not self.check_calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
-                                                            (self.AIC_gen_power_mode.get() == "power-spot" and (key == "Power_Density" or key == "Max_Gen" or key == "Total_Gen")) or
-                                                            (self.AIC_gen_power_mode.get() == "density" and (key == "Power" or key == "Spotsize" or key == "Max_Gen" or key == "Total_Gen")) or
-                                                            (self.AIC_gen_power_mode.get() == "max-gen" and (key == "Power" or key == "Spotsize" or key == "Power_Density" or key == "Total_Gen")) or
-                                                            (self.AIC_gen_power_mode.get() == "total-gen" and (key == "Power_Density" or key == "Power" or key == "Spotsize" or key == "Max_Gen"))
-                                                            )])
-            else:
-                self.batch_param_select = tk.OptionMenu(self.batch_popup, self.batch_param, *[key for key in self.sys_param_entryboxes_dict.keys() if not (key == "Thickness" or key == "dx")])
+            self.IC_is_AIC = False
+            self.batchables_array = []
+            batchable_params = [param for param in self.nanowire.param_dict]
             
-            self.batch_param_select.grid(row=0,column=2)
+            if self.IC_is_AIC:
+                # Boolean logic is fun
+                # The main idea is to hide certain parameters based on which options were used to construct the AIC
+                AIC_params = [key for key in self.analytical_entryboxes_dict.keys() if not (
+                            (self.check_calculate_init_material_expfactor.get() and (key == "AIC_expfactor")) or
+                            (not self.check_calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
+                            (self.AIC_gen_power_mode.get() == "power-spot" and (key == "Power_Density" or key == "Max_Gen" or key == "Total_Gen")) or
+                            (self.AIC_gen_power_mode.get() == "density" and (key == "Power" or key == "Spotsize" or key == "Max_Gen" or key == "Total_Gen")) or
+                            (self.AIC_gen_power_mode.get() == "max-gen" and (key == "Power" or key == "Spotsize" or key == "Power_Density" or key == "Total_Gen")) or
+                            (self.AIC_gen_power_mode.get() == "total-gen" and (key == "Power_Density" or key == "Power" or key == "Spotsize" or key == "Max_Gen"))
+                            )]
 
-            self.batch_param_entry = tk.Entry(self.batch_popup, width=80)
-            self.enter(self.batch_param_entry, "Enter a list of space-separated values for the selected Batch Parameter")
-            self.batch_param_entry.grid(row=0,column=3)
-
-            self.batch_status = tk.Text(self.batch_popup, width=40,height=2)
-            self.batch_status.grid(row=1,column=3)
+            for i in range(max_batchable_params):
+                batch_param_name = tk.StringVar()
+                if self.IC_is_AIC:
+                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params, *AIC_params)
+                else:
+                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params)
+                optionmenu.grid(row=i,column=0,padx=(20,20))
+                batch_param_entry = tk.ttk.Entry(self.batch_entry_frame, width=80)
+                batch_param_entry.grid(row=i,column=1,columnspan=2)
+                if i == 0: self.enter(batch_param_entry, "Enter a list of space-separated values for the selected Batch Parameter")
+                self.batchables_array.append(Batchable(optionmenu, batch_param_entry, batch_param_name))
+                    
+            self.batch_status = tk.Text(self.batch_popup, width=20,height=2)
+            self.batch_status.grid(row=4,column=0)
             self.batch_status.configure(state='disabled')
 
-            self.batch_name_label = tk.Label(self.batch_popup, text="Enter a name for the new batch folder:")
-            self.batch_name_label.grid(row=2,column=3,columnspan=1)
+            self.batch_name_entry = tk.ttk.Entry(self.batch_popup, width=24)
+            self.enter(self.batch_name_entry, "Enter name for batch folder")
+            self.batch_name_entry.grid(row=4,column=1)
 
-            self.batch_name_entry = tk.Entry(self.batch_popup, width=24)
-            self.batch_name_entry.grid(row=3,column=3,padx=(0,120))
-
-            self.create_batch_button = tk.Button(self.batch_popup, text="Create Batch", command=self.create_batch_init)
-            self.create_batch_button.grid(row=3,column=3, padx=(130,0))
+            self.create_batch_button = tk.ttk.Button(self.batch_popup, text="Create Batch", command=self.create_batch_init)
+            self.create_batch_button.grid(row=4,column=2)
 
             self.batch_popup.protocol("WM_DELETE_WINDOW", self.on_batch_popup_close)
             self.batch_popup.grab_set()
@@ -3535,11 +3560,25 @@ class Notebook:
 
     def create_batch_init(self):
         try:
-            batch_values = extract_values(self.batch_param_entry.get(), ' ')
+            batch_values = {}
+            for batchable in self.batchables_array:
+                if batchable.param_name.get():
+                    batch_values[batchable.param_name.get()] = []
+                    
+            for batchable in self.batchables_array:
+                if batchable.param_name.get():
+                    batch_values[batchable.param_name.get()] += extract_values(batchable.tk_entrybox.get(), ' ')
+            
+            if not batch_values: # If no batch params were selected
+                raise ValueError
         except ValueError:
             self.write(self.batch_status, "Error: Invalid batch values")
             return
 
+
+        print(batch_values)
+        return
+    
         try:
             batch_dir_name = self.batch_name_entry.get()
             if batch_dir_name == "": raise OSError("Error: Batch folder must have a name")
