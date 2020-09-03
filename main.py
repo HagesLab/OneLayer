@@ -1240,7 +1240,7 @@ class Notebook:
             self.batch_instruction1 = tk.Message(self.batch_popup, text="This Batch Tool allows you to generate many copies of the currently-loaded IC, varying up to {} parameters between all of them.".format(max_batchable_params), width=300)
             self.batch_instruction1.grid(row=1,column=0)
 
-            self.batch_instruction2 = tk.Message(self.batch_popup, text="All copies will be stored in a single folder.", width=300)
+            self.batch_instruction2 = tk.Message(self.batch_popup, text="All copies will be stored in a new folder with the name you enter into the appropriate box.", width=300)
             self.batch_instruction2.grid(row=2,column=0)
 
             self.batch_instruction3 = tk.Message(self.batch_popup, text="For best results, load a complete IC file or fill in values for all params before using this tool.", width=300)
@@ -1259,6 +1259,14 @@ class Notebook:
             batchable_params = [param for param in self.nanowire.param_dict]
             
             if self.IC_is_AIC:
+                
+                self.AIC_instruction1 = tk.Message(self.batch_popup, text="Additional options for generating init_deltaN and init_deltaP batches " +
+                                                  "are available when using the Analytical Initial Condition tool", width=300)
+                self.AIC_instruction1.grid(row=4,column=0)
+                self.AIC_instruction2 = tk.Message(self.batch_popup, text="Please note that TEDs will use the values and settings on the A.I.C. tool's tab " +
+                                                   "to complete the batches when one or more of these options are selected.", width=300)
+                self.AIC_instruction2.grid(row=5,column=0)
+                
                 # Boolean logic is fun
                 # The main idea is to hide certain parameters based on which options were used to construct the AIC
                 AIC_params = [key for key in self.analytical_entryboxes_dict.keys() if not (
@@ -1283,15 +1291,15 @@ class Notebook:
                 self.batchables_array.append(Batchable(optionmenu, batch_param_entry, batch_param_name))
                     
             self.batch_status = tk.Text(self.batch_popup, width=20,height=2)
-            self.batch_status.grid(row=4,column=0)
+            self.batch_status.grid(row=6,column=0)
             self.batch_status.configure(state='disabled')
 
             self.batch_name_entry = tk.ttk.Entry(self.batch_popup, width=24)
             self.enter(self.batch_name_entry, "Enter name for batch folder")
-            self.batch_name_entry.grid(row=4,column=1)
+            self.batch_name_entry.grid(row=6,column=1)
 
             self.create_batch_button = tk.ttk.Button(self.batch_popup, text="Create Batch", command=self.create_batch_init)
-            self.create_batch_button.grid(row=4,column=2)
+            self.create_batch_button.grid(row=6,column=2)
 
             self.batch_popup.protocol("WM_DELETE_WINDOW", self.on_batch_popup_close)
             self.batch_popup.grab_set()
