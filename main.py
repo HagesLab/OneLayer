@@ -473,7 +473,7 @@ class Notebook:
         self.init_Ec = None
         self.init_Chi = None
         self.IC_file_name = ""
-        self.IC_is_AIC = False
+        self.using_AIC = False
 
         self.sim_N = None
         self.sim_P = None
@@ -1223,7 +1223,6 @@ class Notebook:
         return
 
     def do_batch_popup(self):
-        # Check that user has filled in all parameters
         try:
             self.set_init_x()
         except:
@@ -1235,8 +1234,10 @@ class Notebook:
             self.batch_param = tk.StringVar()
 
             self.batch_popup = tk.Toplevel(self.root)
+            
             self.batch_title_label = tk.ttk.Label(self.batch_popup, text="Batch IC Tool", style="Header.TLabel")
             self.batch_title_label.grid(row=0,column=0)
+            
             self.batch_instruction1 = tk.Message(self.batch_popup, text="This Batch Tool allows you to generate many copies of the currently-loaded IC, varying up to {} parameters between all of them.".format(max_batchable_params), width=300)
             self.batch_instruction1.grid(row=1,column=0)
 
@@ -1254,15 +1255,15 @@ class Notebook:
            
 
             # Contextually-dependent options for batchable params
-            self.IC_is_AIC = False
             self.batchables_array = []
-            batchable_params = [param for param in self.nanowire.param_dict]
+            batchable_params = [param for param in self.nanowire.param_dict if not (self.using_AIC and (param == "init_deltaN" or param == "init_deltaP"))]
             
-            if self.IC_is_AIC:
+            if self.using_AIC:
                 
                 self.AIC_instruction1 = tk.Message(self.batch_popup, text="Additional options for generating init_deltaN and init_deltaP batches " +
                                                   "are available when using the Analytical Initial Condition tool", width=300)
                 self.AIC_instruction1.grid(row=4,column=0)
+                
                 self.AIC_instruction2 = tk.Message(self.batch_popup, text="Please note that TEDs will use the values and settings on the A.I.C. tool's tab " +
                                                    "to complete the batches when one or more of these options are selected.", width=300)
                 self.AIC_instruction2.grid(row=5,column=0)
@@ -1280,14 +1281,17 @@ class Notebook:
 
             for i in range(max_batchable_params):
                 batch_param_name = tk.StringVar()
-                if self.IC_is_AIC:
+                if self.using_AIC:
                     optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params, *AIC_params)
                 else:
                     optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params)
+                
                 optionmenu.grid(row=i,column=0,padx=(20,20))
                 batch_param_entry = tk.ttk.Entry(self.batch_entry_frame, width=80)
                 batch_param_entry.grid(row=i,column=1,columnspan=2)
+                
                 if i == 0: self.enter(batch_param_entry, "Enter a list of space-separated values for the selected Batch Parameter")
+                
                 self.batchables_array.append(Batchable(optionmenu, batch_param_entry, batch_param_name))
                     
             self.batch_status = tk.Text(self.batch_popup, width=20,height=2)
@@ -3132,7 +3136,7 @@ class Notebook:
         self.update_IC_plot(plot_ID="custom")
         self.HIC_listbox_currentparam = "init_deltaP"
         self.update_IC_plot(plot_ID="recent")
-        #self.IC_is_AIC = True
+        self.using_AIC = True
         return
 
     ## Special functions for Heuristic Init:
@@ -3318,7 +3322,7 @@ class Notebook:
         self.update_paramrule_listbox(new_param_name)
 
         #self.recalc_HIC()
-        #self.IC_is_AIC = False
+        if new_param_name == "init_deltaN" or new_param_name == "init_deltaP": self.using_AIC = False
         self.update_IC_plot(plot_ID="recent")
         return
 
@@ -3486,6 +3490,7 @@ class Notebook:
                     temp_IC_values[j] = 0
                     warning_flag = True
                 
+        if var == "init_deltaN" or var == "init_deltaP": self.using_AIC = False
         
         self.HIC_listbox_currentparam = var
         self.deleteall_HIC()
@@ -3585,25 +3590,33 @@ class Notebook:
 
 
         print(batch_values)
-        return
-    
-        try:
-            batch_dir_name = self.batch_name_entry.get()
-            if batch_dir_name == "": raise OSError("Error: Batch folder must have a name")
-            if not check_valid_filename(batch_dir_name): raise OSError("File names may not contain certain symbols such as ., <, >, /, \\, *, ?, :, \", |")
-        except Exception as e:
-            self.write(self.batch_status, e)
-            return
 
-        try:
-            os.mkdir("{}\\{}".format(self.default_dirs["Initial"], batch_dir_name))
-        except FileExistsError:
-            self.write(self.batch_status, "Error: {} folder already exists".format(batch_dir_name))
-            return
+    
+        # try:
+        #     batch_dir_name = self.batch_name_entry.get()
+        #     if batch_dir_name == "": raise OSError("Error: Batch folder must have a name")
+        #     if not check_valid_filename(batch_dir_name): raise OSError("File names may not contain certain symbols such as ., <, >, /, \\, *, ?, :, \", |")
+        # except Exception as e:
+        #     self.write(self.batch_status, e)
+        #     return
+
+        # try:
+        #     os.mkdir("{}\\{}".format(self.default_dirs["Initial"], batch_dir_name))
+        # except FileExistsError:
+        #     self.write(self.batch_status, "Error: {} folder already exists".format(batch_dir_name))
+        #     return
+        
+        batch_combinations = []
+        batch_param_names = batch_values.keys()
+        print(batch_param_names)
+        return
+        # Generate all combinations of batch values
+        # Apply each combination to Nanowire, going through AIC if necessary
+        # Save Nanowire's state
 
         appended_sys_param_entryboxes_dict = dict(self.sys_param_entryboxes_dict)
 
-        if self.IC_is_AIC:
+        if self.using_AIC:
             # dict.update(dict2) adds the contents of dict2 to dict, overwriting values in dict if needed
             appended_sys_param_entryboxes_dict.update(dict(self.analytical_entryboxes_dict))
 
@@ -3616,7 +3629,7 @@ class Notebook:
                 # simply call a function to calculate the new IC every time a new parameter that changes the IC is entered
 
                 # So far this only applies to the AIC
-                if self.IC_is_AIC:
+                if self.using_AIC:
                     self.add_AIC()
                 # For whatever reason, tk.filedialog.asksaveasfilename will automatically append .txt to the file name before passing to self.write_init_file(). 
                 # This behavior is NOT done by default, so here the .txt is manually appended to the file name.
@@ -3693,7 +3706,7 @@ class Notebook:
         self.load_ICfile()
         return
 
-    def load_ICfile(self):
+    def load_ICfile(self, cycle_through_IC_plots=False):
         warning_flag = False
 
         try:
@@ -3813,11 +3826,13 @@ class Notebook:
                 else: self.nanowire.param_dict[param].value = float(new_value) * self.convert_in_dict[param]
                 
                 self.HIC_listbox_currentparam = param
-                self.update_IC_plot(plot_ID="recent")
+                if cycle_through_IC_plots: self.update_IC_plot(plot_ID="recent")
             except:
                 print("Warning: could not apply value for param: {}".format(param))
                 warning_flag += 1
                 
+        self.using_AIC = False
+        
         if not warning_flag: self.write(self.ICtab_status, "IC file loaded successfully")
         else: self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
         return
