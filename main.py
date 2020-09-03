@@ -3606,11 +3606,58 @@ class Notebook:
         #     self.write(self.batch_status, "Error: {} folder already exists".format(batch_dir_name))
         #     return
         
+        
+        # This algorithm was shamelessly stolen from our bay.py script...
+        # TODO: ...and should really, really be a standalone function!!
+        # def get_all_combinations(param_values)
+                
         batch_combinations = []
-        batch_param_names = batch_values.keys()
+        batch_param_names = list(batch_values.keys())
         print(batch_param_names)
+        
+        iterable_param_indexes = {}
+        iterable_param_lengths = {}
+        for param in batch_param_names:
+            iterable_param_indexes[param] = 0
+            iterable_param_lengths[param] = batch_values[param].__len__()
+        
+        pivot_index = batch_param_names.__len__() - 1
+
+        current_params = dict(batch_values)
+        # Create a list of all combinations of parameter values
+        while(pivot_index >= 0):
+
+            # Generate the next parameter set using lists of indices stored in the helper structures
+            for iterable_param in batch_param_names:
+                current_params[iterable_param] = batch_values[iterable_param][iterable_param_indexes[iterable_param]]
+
+            batch_combinations.append(dict(current_params))
+
+            # Determine the next iterable parameter using a "reverse search" amd update indices from right to left
+            # For example, given Param_A = [1,2,3], Param_B = [4,5,6], Param_C = [7,8]:
+            # The order {A, B, C} this algorithm will run is: 
+            # {1,4,7}, 
+            # {1,4,8}, 
+            # {1,5,7}, 
+            # {1,5,8}, 
+            # {1,6,7}, 
+            # {1,6,8},
+            # ...
+            # {3,6,7},
+            # {3,6,8}
+            pivot_index = batch_param_names.__len__() - 1
+            while (pivot_index >= 0 and iterable_param_indexes[batch_param_names[pivot_index]] == iterable_param_lengths[batch_param_names[pivot_index]] - 1):
+                pivot_index -= 1
+
+            iterable_param_indexes[batch_param_names[pivot_index]] += 1
+
+            for i in range(pivot_index + 1, batch_param_names.__len__()):
+                iterable_param_indexes[batch_param_names[i]] = 0
+                
+        print(batch_combinations)
+
         return
-        # Generate all combinations of batch values
+
         # Apply each combination to Nanowire, going through AIC if necessary
         # Save Nanowire's state
 
@@ -3706,7 +3753,7 @@ class Notebook:
         self.load_ICfile()
         return
 
-    def load_ICfile(self, cycle_through_IC_plots=False):
+    def load_ICfile(self, cycle_through_IC_plots=True):
         warning_flag = False
 
         try:
