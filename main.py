@@ -1294,7 +1294,7 @@ class Notebook:
                 
                 self.batchables_array.append(Batchable(optionmenu, batch_param_entry, batch_param_name))
                     
-            self.batch_status = tk.Text(self.batch_popup, width=20,height=2)
+            self.batch_status = tk.Text(self.batch_popup, width=30,height=3)
             self.batch_status.grid(row=6,column=0)
             self.batch_status.configure(state='disabled')
 
@@ -3588,23 +3588,26 @@ class Notebook:
             self.write(self.batch_status, "Error: Invalid batch values")
             return
 
-
         print(batch_values)
 
-    
-        # try:
-        #     batch_dir_name = self.batch_name_entry.get()
-        #     if batch_dir_name == "": raise OSError("Error: Batch folder must have a name")
-        #     if not check_valid_filename(batch_dir_name): raise OSError("File names may not contain certain symbols such as ., <, >, /, \\, *, ?, :, \", |")
-        # except Exception as e:
-        #     self.write(self.batch_status, e)
-        #     return
+        try:
+            batch_dir_name = self.batch_name_entry.get()
+            if batch_dir_name == "": raise OSError("Error: Batch folder must have a name")
+            if not check_valid_filename(batch_dir_name): raise OSError("File names may not contain certain symbols such as ., <, >, /, \\, *, ?, :, \", |")
+        except Exception as e:
+            self.write(self.batch_status, e)
+            return
 
-        # try:
-        #     os.mkdir("{}\\{}".format(self.default_dirs["Initial"], batch_dir_name))
-        # except FileExistsError:
-        #     self.write(self.batch_status, "Error: {} folder already exists".format(batch_dir_name))
-        #     return
+        try:
+            os.mkdir("{}\\{}".format(self.default_dirs["Initial"], batch_dir_name))
+        except FileExistsError:
+            self.write(self.batch_status, "Error: {} folder already exists".format(batch_dir_name))
+            return
+        
+        # Record the original values of the Nanowire, so we can restore them after the batch algo finishes
+        original_param_values = {}
+        for param in self.nanowire.param_dict:
+            original_param_values[param] = self.nanowire.param_dict[param].value
         
         
         # This algorithm was shamelessly stolen from our bay.py script...
@@ -3613,7 +3616,6 @@ class Notebook:
                 
         batch_combinations = []
         batch_param_names = list(batch_values.keys())
-        print(batch_param_names)
         
         iterable_param_indexes = {}
         iterable_param_lengths = {}
@@ -3654,38 +3656,32 @@ class Notebook:
             for i in range(pivot_index + 1, batch_param_names.__len__()):
                 iterable_param_indexes[batch_param_names[i]] = 0
                 
-        print(batch_combinations)
-
-        return
-
         # Apply each combination to Nanowire, going through AIC if necessary
-        # Save Nanowire's state
 
-        appended_sys_param_entryboxes_dict = dict(self.sys_param_entryboxes_dict)
-
-        if self.using_AIC:
-            # dict.update(dict2) adds the contents of dict2 to dict, overwriting values in dict if needed
-            appended_sys_param_entryboxes_dict.update(dict(self.analytical_entryboxes_dict))
-
-        try:
-            for batch_value in batch_values:
-                self.enter(appended_sys_param_entryboxes_dict[self.batch_param.get()], str(batch_value))
+        for batch_set in batch_combinations:
+            filename = ""
+            for param in batch_set:
+                filename += str("__{}_{:.0e}".format(param, batch_set[param]))
                 
-                # It turns out that the previous batch tool did not actually support differing IC distributions, only
-                # different parameter sets with the same IC distribution. To make IC distributions batchable, we
-                # simply call a function to calculate the new IC every time a new parameter that changes the IC is entered
+                if param in self.analytical_entryboxes_dict:
+                    self.enter(self.analytical_entryboxes_dict[param], str(batch_set[param]))
+                    
+                else:
+                    self.nanowire.param_dict[param].value = batch_set[param] * self.convert_in_dict[param]
 
-                # So far this only applies to the AIC
-                if self.using_AIC:
-                    self.add_AIC()
-                # For whatever reason, tk.filedialog.asksaveasfilename will automatically append .txt to the file name before passing to self.write_init_file(). 
-                # This behavior is NOT done by default, so here the .txt is manually appended to the file name.
-                self.write_init_file("{}\\{}\\{}{:.0e}.txt".format(self.default_dirs["Initial"], batch_dir_name, self.batch_param.get(),batch_value))
-        except KeyError:
-            self.write(self.batch_status, "Select a parameter from the drop-down menu")
-            return
-
-        self.write(self.batch_status, "Batch {} created successfully".format(batch_dir_name))
+                
+            if self.using_AIC: self.add_AIC()
+                
+            try:
+                self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], batch_dir_name, filename))
+            except:
+                self.write(self.batch_status, "Error: failed to create batch file {}".format(filename))
+                
+        # Restore the original values of Nanowire
+        for param in self.nanowire.param_dict:
+            self.nanowire.param_dict[param].value = original_param_values[param]
+        
+        self.write(self.batch_status, "Batch \"{}\" created successfully".format(batch_dir_name))
 
         return
 
