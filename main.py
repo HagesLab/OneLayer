@@ -2966,20 +2966,6 @@ class Notebook:
         self.write(self.ICtab_status, "Selected params cleared")
         return
 
-    def check_IC_initialized(self):
-        # Helper to make sure IC arrays are initialized to some dummy values at least—allows plotter to plot some IC even if not all IC variables (N, P, Ec, Chi) are assigned yet
-        # This is mainly used when the program is first started up and the IC arrays don't have values yet
-        if self.init_N is None:
-            self.init_N = np.zeros(int(0.5 + self.thickness / self.dx))
-        if self.init_P is None:
-            self.init_P = np.zeros(int(0.5 + self.thickness / self.dx))
-        if self.init_Ec is None:
-            self.init_Ec = np.zeros(int(0.5 + self.thickness / self.dx) + 1)
-        if self.init_Chi is None:
-            self.init_Chi = np.zeros(int(0.5 + self.thickness / self.dx) + 1)
-
-        return
-
 	## This is a patch of a consistency issue involving initial conditions - we require different variables of a single initial condition
 	## to fit to the same spatial mesh, which can get messed up if the user changes the mesh while editing initial conditions.
 
@@ -3173,94 +3159,7 @@ class Notebook:
         self.using_AIC = True
         return
 
-    ## Special functions for Heuristic Init:
-    def calcHeuristic(self, condition, initArray):
-        # Translates the parameters of a HIC into IC arrays
-        if (condition.type == "POINT"):
-            initArray[finite.toIndex(condition.l_bound, self.dx, self.thickness, condition.is_edge())] = condition.l_boundval
-
-        elif (condition.type == "FILL"):
-            i = finite.toIndex(condition.l_bound, self.dx, self.thickness, condition.is_edge())
-            j = finite.toIndex(condition.r_bound, self.dx, self.thickness, condition.is_edge())
-            initArray[i:j+1] = condition.l_boundval
-
-        elif (condition.type == "LINE"):
-            slope = (condition.r_boundval - condition.l_boundval) / (condition.r_bound - condition.l_bound)
-            i = finite.toIndex(condition.l_bound, self.dx, self.thickness, condition.is_edge())
-            j = finite.toIndex(condition.r_bound, self.dx, self.thickness, condition.is_edge())
-
-            ndx = np.linspace(0, self.dx * (j - i), j - i + 1)
-            initArray[i:j+1] = condition.l_boundval + ndx * slope
-
-        elif (condition.type == "EXP"):
-            i = finite.toIndex(condition.l_bound, self.dx, self.thickness, condition.is_edge())
-            j = finite.toIndex(condition.r_bound, self.dx, self.thickness, condition.is_edge())
-
-            ndx = np.linspace(0, j - i, j - i + 1)
-            try:
-                initArray[i:j+1] = condition.l_boundval * np.power(condition.r_boundval / condition.l_boundval, ndx / (j - i))
-            except FloatingPointError:
-                print("Warning: Step size too large to resolve initial condition accurately")
-
-        return initArray
-
-    def recalc_HIC(self):
-        # Recalculate IC arrays from every condition, sequentially, in the HIC list
-        # Used when HIC list is updated
-        # V2 Update: TODO consider deprecating
-        try:
-            self.set_init_x()
-
-        except ValueError:
-            self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
-            return
-
-        except Exception as oops:
-            self.write(self.ICtab_status, oops)
-            return
-
-        self.check_IC_initialized()
-        for condition in self.HIC_list:
-            if (condition.variable == "ΔN [cm^-3]"):
-                self.init_N = self.calcHeuristic(condition, self.init_N) * self.convert_in_dict["N"]
-
-            elif (condition.variable == "ΔP [cm^-3]"):
-                self.init_P = self.calcHeuristic(condition, self.init_P) * self.convert_in_dict["P"]
-
-            elif (condition.variable == "dEc"):
-                self.init_Ec = self.calcHeuristic(condition, self.init_Ec)
-
-            elif (condition.variable == "chi"):
-                self.init_Chi = self.calcHeuristic(condition, self.init_Chi)
-        return
-
-    def uncalc_HIC(self, IC_var, lbound, rbound, on_point, is_edge=False):
-        # (Attempts to) undo effect of adding a particular HIC
-        # Only used when user deletes HIC
-        if (IC_var == "ΔN"):
-            if on_point:
-                self.init_N[finite.toIndex(lbound, self.dx, self.thickness, is_edge)] = 0
-            else:
-                self.init_N[finite.toIndex(lbound, self.dx, self.thickness, is_edge):finite.toIndex(rbound, self.dx, self.thickness, is_edge) + 1] = 0
-        elif (IC_var == "ΔP"):
-            if on_point:
-                self.init_P[finite.toIndex(lbound, self.dx, self.thickness, is_edge)] = 0
-            else:
-                self.init_P[finite.toIndex(lbound, self.dx, self.thickness, is_edge):finite.toIndex(rbound, self.dx, self.thickness, is_edge) + 1] = 0
-
-        elif (IC_var == "dEc"):
-            if on_point:
-                self.init_Ec[finite.toIndex(lbound, self.dx, self.thickness, is_edge)] = 0
-            else:
-                self.init_Ec[finite.toIndex(lbound, self.dx, self.thickness, is_edge):finite.toIndex(rbound, self.dx, self.thickness, is_edge) + 1] = 0
-        elif (IC_var == "chi"):
-            if on_point:
-                self.init_Chi[finite.toIndex(lbound, self.dx, self.thickness, is_edge)] = 0
-            else:
-                self.init_Chi[finite.toIndex(lbound, self.dx, self.thickness, is_edge):finite.toIndex(rbound, self.dx, self.thickness, is_edge) + 1] = 0
-
-        return
-
+    ## Special functions for Parameter Toolkit:
     def add_HIC(self):
         # V2 update
         # Set the value of one of Nanowire's Parameters
@@ -3592,18 +3491,6 @@ class Notebook:
         return
 
     ## Initial Condition I/O
-
-    def test_entryboxes_valid(self, entrybox_list):
-        # Check if all system parameters are filled in
-        self.missing_params = []
-        for key in entrybox_list:
-            try:
-                test_var = float(entrybox_list[key].get())
-                if (test_var == ""): raise TypeError
-            except:
-                self.missing_params.append(key)
-
-        return (self.missing_params.__len__() == 0)
 
     def create_batch_init(self):
         try:
