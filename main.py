@@ -1239,7 +1239,7 @@ class Notebook:
                     
                     self.HIC_listbox_currentparam = param
                     self.deleteall_HIC()
-                    self.nanowire.param_dict[param].value = val * self.convert_in_dict[param]
+                    self.nanowire.param_dict[param].value = val
                     changed_params.append(param)
                     
                 if changed_params.__len__() > 0:
@@ -3282,8 +3282,6 @@ class Notebook:
             return
 
         try:
-            # FIXME: Preconvert lvalue and rvalue before comparing init_shape_selection.get()
-            # FIXME: Add default conversion behavior
             new_param_name = self.init_var_selection.get()
             if "[" in new_param_name: new_param_name = new_param_name[:new_param_name.find("[")]
 
@@ -3295,7 +3293,7 @@ class Notebook:
                 if (float(self.HIC_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.HIC_lbound_entry.get()), -1, float(self.HIC_lvalue_entry.get()) * self.convert_in_dict[new_param_name], -1)
+                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.HIC_lbound_entry.get()), -1, float(self.HIC_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
@@ -3307,7 +3305,7 @@ class Notebook:
                 if (float(self.HIC_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()) * self.convert_in_dict[new_param_name], -1)
+                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
@@ -3320,7 +3318,7 @@ class Notebook:
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
                 new_param_rule = Param_Rule(new_param_name, "LINE", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), 
-                                            float(self.HIC_lvalue_entry.get()) * self.convert_in_dict[new_param_name], float(self.HIC_rvalue_entry.get()) * self.convert_in_dict[new_param_name])
+                                            float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
 
             elif (self.init_shape_selection.get() == "EXP"):
                 if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
@@ -3333,7 +3331,7 @@ class Notebook:
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
                 new_param_rule = Param_Rule(new_param_name, "EXP", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), 
-                                            float(self.HIC_lvalue_entry.get()) * self.convert_in_dict[new_param_name], float(self.HIC_rvalue_entry.get()) * self.convert_in_dict[new_param_name])
+                                            float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
 
             else:
                 raise Exception("Error: No init. type selected")
@@ -3528,7 +3526,7 @@ class Notebook:
         
         self.HIC_listbox_currentparam = var
         self.deleteall_HIC()
-        self.nanowire.param_dict[var].value = temp_IC_values * self.convert_in_dict[var]
+        self.nanowire.param_dict[var].value = temp_IC_values
         self.update_IC_plot(plot_ID="EIC", warn=warning_flag)
         self.update_IC_plot(plot_ID="recent", warn=warning_flag)
         return
@@ -3554,19 +3552,19 @@ class Notebook:
         # simulating filling across nanowire with that value
         if not isinstance(val_array, np.ndarray):
             val_array = np.ones(grid_x.__len__()) * val_array
-        max_val = np.amax(param_obj.value) * self.convert_out_dict[param_name]
+        max_val = np.amax(param_obj.value)
         
 
         plot.set_ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
 
 
         if self.check_symmetric.get():
-            plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(val_array), val_array), axis=0) * self.convert_out_dict[param_name], label=param_name)
+            plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(val_array), val_array), axis=0), label=param_name)
 
             ymin, ymax = plot.get_ylim()
             plot.fill([-grid_x[-1], 0, 0, -grid_x[-1]], [ymin, ymin, ymax, ymax], 'b', alpha=0.1, edgecolor='r')
         else:
-            plot.plot(grid_x, val_array * self.convert_out_dict[param_name], label=param_name)
+            plot.plot(grid_x, val_array, label=param_name)
 
         plot.set_xlabel("x [nm]")
         plot.set_ylabel("{} {}".format(param_name, param_obj.units))
@@ -3703,7 +3701,7 @@ class Notebook:
                     self.enter(self.analytical_entryboxes_dict[param], str(batch_set[param]))
                     
                 else:
-                    self.nanowire.param_dict[param].value = batch_set[param] * self.convert_in_dict[param]
+                    self.nanowire.param_dict[param].value = batch_set[param]
 
                 
             if self.using_AIC: self.add_AIC()
@@ -3753,7 +3751,7 @@ class Notebook:
                 
                 # Saves occur as-is: any missing parameters are saved with whatever default value Nanowire gives them
                 for param in self.nanowire.param_dict:
-                    param_values = self.nanowire.param_dict[param].value * self.convert_out_dict[param]
+                    param_values = self.nanowire.param_dict[param].value
                     if isinstance(param_values, np.ndarray):
                         # Write the array in a more convenient format
                         ofstream.write("{}: {:.8e}".format(param, param_values[0]))
@@ -3901,8 +3899,8 @@ class Notebook:
             new_value = init_param_values_dict[param]
             try:
                 if '\t' in new_value:
-                    self.nanowire.param_dict[param].value = np.array(extract_values(new_value, '\t')) * self.convert_in_dict[param]
-                else: self.nanowire.param_dict[param].value = float(new_value) * self.convert_in_dict[param]
+                    self.nanowire.param_dict[param].value = np.array(extract_values(new_value, '\t'))
+                else: self.nanowire.param_dict[param].value = float(new_value)
                 
                 self.HIC_listbox_currentparam = param
                 if cycle_through_IC_plots: self.update_IC_plot(plot_ID="recent")
