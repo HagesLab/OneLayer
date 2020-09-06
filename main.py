@@ -15,6 +15,7 @@ from matplotlib.figure import Figure
 from scipy import integrate as intg
 
 import tkinter.filedialog
+import tkinter.scrolledtext as tkscrolledtext
 import tkinter as tk
 from tkinter import ttk # ttk is a sort of expansion pack to Tkinter, featuring additional elements and features.
 import time
@@ -1149,8 +1150,8 @@ class Notebook:
         if not self.sys_summary_popup_isopen: # Don't open more than one of this window at a time
             self.sys_summary_popup = tk.Toplevel(self.root)
             
-            self.summary_textbox = tk.Text(self.sys_summary_popup, width=100,height=30)
-            self.summary_textbox.grid(row=0,column=0,padx=(20,20), pady=(20,20))
+            self.summary_textbox = tkscrolledtext.ScrolledText(self.sys_summary_popup, width=100,height=30)
+            self.summary_textbox.grid(row=0,column=0,padx=(20,0), pady=(20,20))
             
             self.sys_summary_popup_isopen = True
             
