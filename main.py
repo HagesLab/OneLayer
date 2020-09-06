@@ -162,18 +162,19 @@ class Nanowire:
         return
 
     def DEBUG_print(self):
-        print("Behold the One Nanowire in its infinite glory:")
+        #print("Behold the One Nanowire in its infinite glory:")
+        mssg = ""
         if self.spacegrid_is_set:
-            print("Grid is set")
-            print("Nodes: {}".format(self.grid_x_nodes))
-            print("Edges: {}".format(self.grid_x_edges))
+            mssg += ("Space Grid is set\n")
+            mssg += ("Nodes: {}\n".format(self.grid_x_nodes))
+            mssg += ("Edges: {}\n".format(self.grid_x_edges))
         else:
-            print("Grid is not set")
+            mssg += ("Grid is not set\n")
 
         for param in self.param_dict:
-            print("{}: {}".format(param, self.param_dict[param].value))
+            mssg += ("{} {}: {}\n".format(param, self.param_dict[param].units, self.param_dict[param].value))
 
-        return
+        return mssg
     
 class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
@@ -514,6 +515,7 @@ class Notebook:
         #self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
         # Check when popup menus open and close
+        self.sys_summary_popup_isopen = False
         self.sys_param_shortcut_popup_isopen = False
         self.batch_popup_isopen = False
         self.resetIC_popup_isopen = False
@@ -682,6 +684,9 @@ class Notebook:
         self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=4)
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
+        
+        self.system_log_button = tk.ttk.Button(self.tab_inputs, text="Print System Summary", command=self.do_sys_summary_popup)
+        self.system_log_button.grid(row=8,column=0,columnspan=2)
 
         self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", style="Grey Bar.TSeparator")
         self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
@@ -1130,15 +1135,41 @@ class Notebook:
         return
 
     def DEBUG(self):
-        self.nanowire.DEBUG_print()
-        print(self.HIC_viewer_selection.get())
+        print(self.nanowire.DEBUG_print())
         return
 
+    def update_system_summary(self):
+        if self.sys_summary_popup_isopen:
+            self.write(self.summary_textbox, self.nanowire.DEBUG_print())
+            
+        return
     ## Functions to create popups and manage
     
+    def do_sys_summary_popup(self):
+        if not self.sys_summary_popup_isopen: # Don't open more than one of this window at a time
+            self.sys_summary_popup = tk.Toplevel(self.root)
+            
+            self.summary_textbox = tk.Text(self.sys_summary_popup, width=100,height=30)
+            self.summary_textbox.grid(row=0,column=0,padx=(20,20), pady=(20,20))
+            
+            self.sys_summary_popup_isopen = True
+            
+            self.update_system_summary()
+            
+            self.sys_summary_popup.protocol("WM_DELETE_WINDOW", self.on_sys_summary_popup_close)
+            return
+        
+    def on_sys_summary_popup_close(self):
+        try:
+            self.sys_summary_popup.destroy()
+            self.sys_summary_popup_isopen = False
+        except FloatingPointError:
+            print("Error #2022: Failed to close shortcut popup.")
+        return
+        
     def do_sys_param_shortcut_popup(self):
         # V2: An overhaul of the old method for inputting (spatially constant) parameters
-        if not self.sys_param_shortcut_popup_isopen: # Don't open more than one of this window at a time
+        if not self.sys_param_shortcut_popup_isopen:
             try:
                 self.set_init_x()
     
@@ -1180,9 +1211,11 @@ class Notebook:
             self.shortcut_continue_button = tk.Button(self.sys_param_shortcut_popup, text="Continue", command=partial(self.on_sys_param_shortcut_popup_close, True))
             self.shortcut_continue_button.grid(row=2,column=1)
                     
-            ## Temporarily disable the main window while this popup is active
             self.sys_param_shortcut_popup.protocol("WM_DELETE_WINDOW", self.on_sys_param_shortcut_popup_close)
+            
+            ## Temporarily disable the main window while this popup is active
             self.sys_param_shortcut_popup.grab_set()
+            
             self.sys_param_shortcut_popup_isopen = True
                     
         else:
@@ -2927,7 +2960,7 @@ class Notebook:
             self.nanowire.grid_x_edges = []
             self.nanowire.grid_x_nodes = []
             self.nanowire.spacegrid_is_set = False
-            
+            self.update_system_summary()
 
         self.write(self.ICtab_status, "Selected params cleared")
         return
@@ -3538,6 +3571,8 @@ class Notebook:
         plot.set_ylabel("{} {}".format(param_name, param_obj.units))
         
         if plot_ID=="recent": 
+            self.update_system_summary()
+            
             plot.set_title("Recently Changed: {}".format(param_name))
             self.recent_param_fig.tight_layout()
             self.recent_param_fig.canvas.draw()
