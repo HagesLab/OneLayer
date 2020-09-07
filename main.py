@@ -2086,16 +2086,23 @@ class Notebook:
     ## Plotter for simulation tab    
     def update_data_plots(self, index, do_clear_plots=True):
         ## V2: Update plots on Simulate tab
-        ## FIXME: Get this working with the Nanowire class
+        ## FIXME: This abomination of 1x3 arrays
+        
+        # Why + 1e-30?
+        # We want a log-scaled plot, and adding a tiny number to the y limits avoids the edge case of every value being zero.
+        self.N_limits = [np.abs(np.amin(self.sim_N + 1e-30) * 1e-1), np.amax(self.sim_N + 1e-30) * 10]
+        self.P_limits = [np.abs(np.amin(self.sim_P + 1e-30) * 1e-1), np.amax(self.sim_P + 1e-30) * 10]
+        self.E_field_limits = [np.abs(np.amax(self.sim_E_field + 1e-30) * 1e-11), np.amax(self.sim_E_field + 1e-30) * 10]
+
+        
         plot_list = [self.n_subplot, self.p_subplot, self.E_subplot]
         plot_ylabels = ["N", "P", "E_field"]
         plot_yunits = ["[cm^-3]", "[cm^-3]", "WIP"]
         plot_ylimits = np.array([self.N_limits, self.P_limits, self.E_field_limits])
         plot_ydata = [self.sim_N, self.sim_P, self.sim_E_field]
         plot_xdata = [self.nanowire.grid_x_nodes, self.nanowire.grid_x_nodes, self.nanowire.grid_x_edges]
+        
         for i in range(plot_list.__len__()):
-            if not isinstance(plot_ydata[i], np.ndarray):
-                plot_ydata[i] = np.ones(plot_xdata[i].__len__()) * plot_ydata[i]
             
             plot = plot_list[i]
             
@@ -2541,6 +2548,29 @@ class Notebook:
             for param in self.nanowire.param_dict:
                 temp_sim_dict[param] = self.nanowire.param_dict[param].value * self.convert_in_dict[param]
 
+            # The three true initial conditions for our three coupled ODEs
+            # N = N0 + delta_N
+            self.init_N = (self.nanowire.param_dict["N0"].value + self.nanowire.param_dict["init_deltaN"].value) * self.convert_in_dict["N"]
+            self.init_P = (self.nanowire.param_dict["P0"].value + self.nanowire.param_dict["init_deltaP"].value) * self.convert_in_dict["P"]
+            self.init_E_field = self.nanowire.param_dict["init_E_field"].value * self.convert_in_dict["E_field"]
+            self.Ec = self.nanowire.param_dict["Ec"].value * self.convert_in_dict["Ec"]
+            self.electron_affinity = self.nanowire.param_dict["electron_affinity"].value * self.convert_in_dict["electron_affinity"]
+            # "Typecast" single values to uniform arrays
+            if not isinstance(self.init_N, np.ndarray):
+                self.init_N = np.ones(self.nanowire.grid_x_nodes.__len__()) * self.init_N
+                
+            if not isinstance(self.init_P, np.ndarray):
+                self.init_P = np.ones(self.nanowire.grid_x_nodes.__len__()) * self.init_P
+                
+            if not isinstance(self.init_E_field, np.ndarray):
+                self.init_E_field = np.ones(self.nanowire.grid_x_edges.__len__()) * self.init_E_field
+            
+            if not isinstance(self.Ec, np.ndarray):
+                self.Ec = np.ones(self.nanowire.grid_x_edges.__len__()) * self.Ec
+                
+            if not isinstance(self.electron_affinity, np.ndarray):
+                self.electron_affinity = np.ones(self.nanowire.grid_x_edges.__len__()) * self.electron_affinity
+            
         except ValueError:
             self.write(self.status, "Error: Invalid parameters")
             return
@@ -2549,68 +2579,55 @@ class Notebook:
             self.write(self.status, oops)
             return
     
-        # try:
-        #     # Construct the data folder's name from the corresponding IC file's name
-        #     shortened_IC_name = self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")]
-        #     data_file_name = shortened_IC_name
+        try:
+            # Construct the data folder's name from the corresponding IC file's name
+            shortened_IC_name = self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")]
+            data_file_name = shortened_IC_name
 
-        #     print("Attempting to create {} data folder".format(data_file_name))
+            print("Attempting to create {} data folder".format(data_file_name))
 
-        #     full_path_name = "{}\\{}".format(self.default_dirs["Data"], data_file_name)
-        #     # Append a number to the end of the new directory's name if an overwrite would occur
-        #     # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
-        #     ## TODO: Overwrite warning - alert user when this happens
-        #     if os.path.isdir(full_path_name):
-        #         print("{} folder already exists; trying alternate name".format(data_file_name))
-        #         append = 1
-        #         while (os.path.isdir("{}({})".format(full_path_name, append))):
-        #             append += 1
+            full_path_name = "{}\\{}".format(self.default_dirs["Data"], data_file_name)
+            # Append a number to the end of the new directory's name if an overwrite would occur
+            # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
+            ## TODO: Overwrite warning - alert user when this happens
+            if os.path.isdir(full_path_name):
+                print("{} folder already exists; trying alternate name".format(data_file_name))
+                append = 1
+                while (os.path.isdir("{}({})".format(full_path_name, append))):
+                    append += 1
 
-        #         full_path_name = "{}({})".format(full_path_name, append)
-        #         data_file_name = "{}({})".format(data_file_name, append)
+                full_path_name = "{}({})".format(full_path_name, append)
+                data_file_name = "{}({})".format(data_file_name, append)
 
-        #     os.mkdir("{}".format(full_path_name))
+            os.mkdir("{}".format(full_path_name))
 
-        # except FileExistsError:
-        #     print("Error: unable to create directory for results of simulation {}".format(shortened_IC_name))
-        #     return
+        except FileExistsError:
+            print("Error: unable to create directory for results of simulation {}".format(shortened_IC_name))
+            return
 
         try:
             ## Calculate!
             atom = tables.Float64Atom()
 
-            # Create data files
-            # with tables.open_file(full_path_name + "\\" + data_file_name + "-n.h5", mode='w') as ofstream_N, \
-            #     tables.open_file(full_path_name + "\\" + data_file_name + "-p.h5", mode='w') as ofstream_P, \
-            #     tables.open_file(full_path_name + "\\" + data_file_name + "-E_field.h5", mode='w') as ofstream_E_field:
-            #     array_N = ofstream_N.create_earray(ofstream_N.root, "N", atom, (0, self.m))
-            #     array_P = ofstream_P.create_earray(ofstream_P.root, "P", atom, (0, self.m))
-            #     array_E_field = ofstream_E_field.create_earray(ofstream_E_field.root, "E_field", atom, (0, self.m+1))
-            #     array_N.append(np.reshape(self.init_N, (1, self.m)))
-            #     array_P.append(np.reshape(self.init_P, (1, self.m)))
-            #     array_E_field.append(np.reshape(self.init_E_field, (1, self.m + 1)))
+            ## Create data files
+            with tables.open_file(full_path_name + "\\" + data_file_name + "-n.h5", mode='w') as ofstream_N, \
+                tables.open_file(full_path_name + "\\" + data_file_name + "-p.h5", mode='w') as ofstream_P, \
+                tables.open_file(full_path_name + "\\" + data_file_name + "-E_field.h5", mode='w') as ofstream_E_field:
+                array_N = ofstream_N.create_earray(ofstream_N.root, "N", atom, (0, self.m))
+                array_P = ofstream_P.create_earray(ofstream_P.root, "P", atom, (0, self.m))
+                array_E_field = ofstream_E_field.create_earray(ofstream_E_field.root, "E_field", atom, (0, self.m+1))
+                array_N.append(np.reshape(self.init_N, (1, self.m)))
+                array_P.append(np.reshape(self.init_P, (1, self.m)))
+                array_E_field.append(np.reshape(self.init_E_field, (1, self.m + 1)))
             
             ## Setup simulation plots and plot initial
-            self.init_N = (self.nanowire.param_dict["N0"].value + self.nanowire.param_dict["init_deltaN"].value) * self.convert_in_dict["N"]
-            self.init_P = (self.nanowire.param_dict["P0"].value + self.nanowire.param_dict["init_deltaP"].value) * self.convert_in_dict["P"]
-            self.init_E_field = self.nanowire.param_dict["init_E_field"].value * self.convert_in_dict["E_field"]
             
-            # Why + 1e-30?
-            # We want a log-scaled plot, and adding a tiny number to the y limits avoids the edge case of every value being zero.
-            self.N_limits = [np.amax(self.init_N + 1e-30) * 1e-11, np.amax(self.init_N + 1e-30) * 10]
-            self.P_limits = [np.amax(self.init_P + 1e-30) * 1e-11, np.amax(self.init_P + 1e-30) * 10]
-            self.E_field_limits = [np.amax(self.init_E_field + 1e-30) * 1e-11, np.amax(self.init_E_field + 1e-30) * 10]
-
             self.sim_N = self.init_N
             self.sim_P = self.init_P
             self.sim_E_field = self.init_E_field
             self.update_data_plots(0)
 
-            self.write(self.status, "Now calculating ΔN, ΔP")
             numTimeStepsDone = 0
-            
-            self.write(self.status, "Test complete")
-            return
 
             # WIP: Option for staggered calculate/plot: In this mode the program calculates a block of time steps, plots intermediate (N, P, E), and calculates the next block 
             # using the final time step from the previous block as the initial condition.
@@ -2637,18 +2654,18 @@ class Notebook:
 
             # TODO: Why don't we just pass in the whole dictionary and let ode_nanowire extract the values?
             if self.check_ignore_recycle.get():
-                error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
+                error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
                                                  temp_sim_dict["Mu_N"], temp_sim_dict["Mu_P"], temp_sim_dict["Temperature"], temp_sim_dict["N0"], temp_sim_dict["P0"], 
                                                  temp_sim_dict["Tau_N"], temp_sim_dict["Tau_P"], temp_sim_dict["B"], temp_sim_dict["Rel-Permitivity"], self.vac_permitivity,
                                                  not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), 0, temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
-                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, self.init_Ec, self.init_Chi)
+                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, self.Ec, self.electron_affinity)
             
             else:
-                error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
+                error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
                                                  temp_sim_dict["Mu_N"], temp_sim_dict["Mu_P"], temp_sim_dict["Temperature"], temp_sim_dict["N0"], temp_sim_dict["P0"], 
                                                  temp_sim_dict["Tau_N"], temp_sim_dict["Tau_P"], temp_sim_dict["B"], temp_sim_dict["Rel-Permitivity"], self.vac_permitivity,
                                                  not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), temp_sim_dict["Alpha"], temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
-                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, self.init_Ec, self.init_Chi)
+                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, self.Ec, self.electron_affinity)
             
             grid_t = np.linspace(self.dt, self.simtime, self.n)
 
