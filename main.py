@@ -429,8 +429,8 @@ class Notebook:
                                 "Delta": 1, "Frac-Emitted": 1,
                                 "init_deltaN": ((1e-7) ** 3), "init_deltaP": ((1e-7) ** 3),
                                 "init_E_field": 1, "Ec": 1, "electron_affinity": 1,
-                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3)}                     # [cm^-3] to [nm^-3]
-
+                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
+                                "E_field": 1}
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
         self.convert_out_dict = {}
         for param in self.convert_in_dict:
@@ -2088,22 +2088,28 @@ class Notebook:
         ## V2: Update plots on Simulate tab
         ## FIXME: Get this working with the Nanowire class
         plot_list = [self.n_subplot, self.p_subplot, self.E_subplot]
-        plot_labels = ["N [cm^-3]", "P [cm^-3]", "[E field magnitude [WIP]"]
-        
-        for i in plot_list.__len__():
+        plot_ylabels = ["N", "P", "E_field"]
+        plot_yunits = ["[cm^-3]", "[cm^-3]", "WIP"]
+        plot_ylimits = np.array([self.N_limits, self.P_limits, self.E_field_limits])
+        plot_ydata = [self.sim_N, self.sim_P, self.sim_E_field]
+        plot_xdata = [self.nanowire.grid_x_nodes, self.nanowire.grid_x_nodes, self.nanowire.grid_x_edges]
+        for i in range(plot_list.__len__()):
+            if not isinstance(plot_ydata[i], np.ndarray):
+                plot_ydata[i] = np.ones(plot_xdata[i].__len__()) * plot_ydata[i]
+            
             plot = plot_list[i]
             
             if do_clear_plots: plot.cla()
         
-            plot.set_ylim(self.N_limits[0] * self.convert_out_dict["N"], self.N_limits[1] * self.convert_out_dict["N"])
+            plot.set_ylim(plot_ylimits[i,0] * self.convert_out_dict[plot_ylabels[i]], plot_ylimits[i,1] * self.convert_out_dict[plot_ylabels[i]])
             plot.set_yscale('log')
 
-            plot.plot(self.node_x, self.sim_N * self.convert_out_dict["N"])
+            plot.plot(plot_xdata[i], plot_ydata[i] * self.convert_out_dict[plot_ylabels[i]])
 
-            plot.set_xlabel(plot_labels[1])
-            plot.set_ylabel(plot_labels[2])
+            plot.set_xlabel("x [nm]")
+            plot.set_ylabel("{} {}".format(plot_ylabels[i], plot_yunits[i]))
 
-            plot.title('Time: ' + str(self.simtime * index / self.n) + ' ' + plot_labels[2])
+            plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
         self.sim_fig.tight_layout()
         self.sim_fig.canvas.draw()
         return
@@ -2132,7 +2138,7 @@ class Notebook:
             plot.xlabel("x [nm]")
             plot.ylabel(active_datagroup.type)
             plot.legend()
-            plot.title("Time: " + str(active_datagroup.get_maxtime() * active_plot.time_index / active_datagroup.get_maxnumtsteps()) + " / " + str(active_datagroup.get_maxtime()) + "ns")
+            plot.set_title("Time: " + str(active_datagroup.get_maxtime() * active_plot.time_index / active_datagroup.get_maxnumtsteps()) + " / " + str(active_datagroup.get_maxtime()) + "ns")
             plot.tight_layout()
             active_plot.plot_obj.canvas.draw()
 
@@ -2489,11 +2495,11 @@ class Notebook:
         # We test that the two following entryboxes are valid before opening any popups
         # Imagine if you selected 37 files from the popup and TED refused to calculate because these entryboxes were empty!
         try:
-            test_simtime = float(self.simtime_entry.get())      # [ns]
-            test_dt = float(self.dt_entry.get())           # [ns]
+            self.simtime = float(self.simtime_entry.get())      # [ns]
+            self.dt = float(self.dt_entry.get())           # [ns]
 
-            if (test_simtime <= 0): raise Exception("Error: Invalid simulation time")
-            if (test_dt <= 0 or test_dt > test_simtime): raise Exception("Error: Invalid dt")
+            if (self.simtime <= 0): raise Exception("Error: Invalid simulation time")
+            if (self.dt <= 0 or self.dt > self.simtime): raise Exception("Error: Invalid dt")
         
         except ValueError:
             self.write(self.status, "Error: Invalid parameters")
@@ -2513,7 +2519,7 @@ class Notebook:
             self.load_ICfile()
             self.write(self.status, "Now calculating {} : ({} of {})".format(self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")], str(batch_num), str(IC_files.__len__())))
             self.do_Calculate()
-            time.sleep(2)
+            time.sleep(1)
 
         return
 
@@ -2521,50 +2527,19 @@ class Notebook:
     def do_Calculate(self):
         ## Setup parameters
         try:
-
-            self.thickness = float(self.thickness_entry.get())  # [nm]
-            self.simtime = float(self.simtime_entry.get())      # [ns]
-            self.dx = float(self.dx_entry.get())                # [nm]
-            self.dt = float(self.dt_entry.get())                # [ns]
-
-            if (self.simtime <= 0): raise Exception("Error: Invalid simulation time")
-            if (self.dt <= 0 or self.dt > self.simtime): raise Exception("Error: Invalid dt")
-
-            self.m = int(0.5 + self.thickness / self.dx)         # Number of space steps
+            self.m = int(0.5 + self.nanowire.total_length / self.nanowire.dx)         # Number of space steps
             self.n = int(0.5 + self.simtime / self.dt)           # Number of time steps
 
             # Upper limit on number of time steps
             if (self.n > 2.5e5): raise Exception("Error: too many time steps")
 
-            self.sf = float(self.Sf_entry.get())
-            self.sb = float(self.Sb_entry.get())
-
-            self.mu_N = float(self.N_mobility_entry.get())
-            self.mu_P = float(self.P_mobility_entry.get())
-            self.n0 = float(self.n0_entry.get())
-            self.p0 = float(self.p0_entry.get())
-            self.B_param = float(self.B_entry.get())
-            self.tauNeg = float(self.tauN_entry.get())
-            self.tauPos = float(self.tauP_entry.get())
-            self.temperature = float(self.temperature_entry.get())                    # [K]
-            self.rel_permitivity = float(self.rel_permitivity_entry.get())
-            self.ext_E_field = float(self.ext_efield_entry.get())
             self.vac_permitivity = 8.854 * 1e-12 * (1e-9)                      # [F/m] to [F/nm]
 
-            self.alphaCof = float(self.alpha_entry.get())
-            self.thetaCof = float(self.theta_entry.get())
-            self.fracEmitted = float(self.frac_emitted_entry.get())
-            self.delta_frac = float(self.delta_entry.get())
-
-
-            temp_sim_dict = {"Mu_N": self.mu_N, "Mu_P": self.mu_P, "N0": self.n0, "P0": self.p0, "Thickness": self.thickness, "dx": self.dx, \
-                        "B": self.B_param, "Tau_N": self.tauNeg, "Tau_P": self.tauPos, "Sf": self.sf, "Sb": self.sb, "Temperature": self.temperature, \
-                        "Rel-Permitivity": self.rel_permitivity, "Ext_E-Field": self.ext_E_field, \
-                        "Theta": self.thetaCof, "Alpha": self.alphaCof, "Delta": self.delta_frac, "Frac-Emitted": self.fracEmitted}
+            temp_sim_dict = {}
 
             # Convert into TEDs units
-            for param in temp_sim_dict:
-                temp_sim_dict[param] = temp_sim_dict[param] * self.convert_in_dict[param]
+            for param in self.nanowire.param_dict:
+                temp_sim_dict[param] = self.nanowire.param_dict[param].value * self.convert_in_dict[param]
 
         except ValueError:
             self.write(self.status, "Error: Invalid parameters")
@@ -2573,64 +2548,69 @@ class Notebook:
         except Exception as oops:
             self.write(self.status, oops)
             return
+    
+        # try:
+        #     # Construct the data folder's name from the corresponding IC file's name
+        #     shortened_IC_name = self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")]
+        #     data_file_name = shortened_IC_name
 
-        try:
-            # Construct the data folder's name from the corresponding IC file's name
-            shortened_IC_name = self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")]
-            data_file_name = shortened_IC_name
+        #     print("Attempting to create {} data folder".format(data_file_name))
 
-            print("Attempting to create {} data folder".format(data_file_name))
+        #     full_path_name = "{}\\{}".format(self.default_dirs["Data"], data_file_name)
+        #     # Append a number to the end of the new directory's name if an overwrite would occur
+        #     # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
+        #     ## TODO: Overwrite warning - alert user when this happens
+        #     if os.path.isdir(full_path_name):
+        #         print("{} folder already exists; trying alternate name".format(data_file_name))
+        #         append = 1
+        #         while (os.path.isdir("{}({})".format(full_path_name, append))):
+        #             append += 1
 
-            full_path_name = "{}\\{}".format(self.default_dirs["Data"], data_file_name)
-            # Append a number to the end of the new directory's name if an overwrite would occur
-            # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
-            ## TODO: Overwrite warning - alert user when this happens
-            if os.path.isdir(full_path_name):
-                print("{} folder already exists; trying alternate name".format(data_file_name))
-                append = 1
-                while (os.path.isdir("{}({})".format(full_path_name, append))):
-                    append += 1
+        #         full_path_name = "{}({})".format(full_path_name, append)
+        #         data_file_name = "{}({})".format(data_file_name, append)
 
-                full_path_name = "{}({})".format(full_path_name, append)
-                data_file_name = "{}({})".format(data_file_name, append)
+        #     os.mkdir("{}".format(full_path_name))
 
-            os.mkdir("{}".format(full_path_name))
-
-        except FileExistsError:
-            print("Error: unable to create directory for results of simulation {}".format(shortened_IC_name))
-            return
+        # except FileExistsError:
+        #     print("Error: unable to create directory for results of simulation {}".format(shortened_IC_name))
+        #     return
 
         try:
             ## Calculate!
             atom = tables.Float64Atom()
 
             # Create data files
-            with tables.open_file(full_path_name + "\\" + data_file_name + "-n.h5", mode='w') as ofstream_N, \
-                tables.open_file(full_path_name + "\\" + data_file_name + "-p.h5", mode='w') as ofstream_P, \
-                tables.open_file(full_path_name + "\\" + data_file_name + "-E_field.h5", mode='w') as ofstream_E_field:
-                array_N = ofstream_N.create_earray(ofstream_N.root, "N", atom, (0, self.m))
-                array_P = ofstream_P.create_earray(ofstream_P.root, "P", atom, (0, self.m))
-                array_E_field = ofstream_E_field.create_earray(ofstream_E_field.root, "E_field", atom, (0, self.m+1))
-                array_N.append(np.reshape(self.init_N, (1, self.m)))
-                array_P.append(np.reshape(self.init_P, (1, self.m)))
-                array_E_field.append(np.reshape(self.init_E_field, (1, self.m + 1)))
+            # with tables.open_file(full_path_name + "\\" + data_file_name + "-n.h5", mode='w') as ofstream_N, \
+            #     tables.open_file(full_path_name + "\\" + data_file_name + "-p.h5", mode='w') as ofstream_P, \
+            #     tables.open_file(full_path_name + "\\" + data_file_name + "-E_field.h5", mode='w') as ofstream_E_field:
+            #     array_N = ofstream_N.create_earray(ofstream_N.root, "N", atom, (0, self.m))
+            #     array_P = ofstream_P.create_earray(ofstream_P.root, "P", atom, (0, self.m))
+            #     array_E_field = ofstream_E_field.create_earray(ofstream_E_field.root, "E_field", atom, (0, self.m+1))
+            #     array_N.append(np.reshape(self.init_N, (1, self.m)))
+            #     array_P.append(np.reshape(self.init_P, (1, self.m)))
+            #     array_E_field.append(np.reshape(self.init_E_field, (1, self.m + 1)))
             
             ## Setup simulation plots and plot initial
-
-            self.edge_x = np.linspace(0,self.thickness,self.m+1)
-            self.node_x = np.linspace(self.dx/2, self.thickness - self.dx/2, self.m)
-            self.N_limits = [np.amax(self.init_N) * 1e-11, np.amax(self.init_N) * 10]
-            self.P_limits = [np.amax(self.init_P) * 1e-11, np.amax(self.init_P) * 10]
+            self.init_N = (self.nanowire.param_dict["N0"].value + self.nanowire.param_dict["init_deltaN"].value) * self.convert_in_dict["N"]
+            self.init_P = (self.nanowire.param_dict["P0"].value + self.nanowire.param_dict["init_deltaP"].value) * self.convert_in_dict["P"]
+            self.init_E_field = self.nanowire.param_dict["init_E_field"].value * self.convert_in_dict["E_field"]
+            
+            # Why + 1e-30?
+            # We want a log-scaled plot, and adding a tiny number to the y limits avoids the edge case of every value being zero.
+            self.N_limits = [np.amax(self.init_N + 1e-30) * 1e-11, np.amax(self.init_N + 1e-30) * 10]
+            self.P_limits = [np.amax(self.init_P + 1e-30) * 1e-11, np.amax(self.init_P + 1e-30) * 10]
+            self.E_field_limits = [np.amax(self.init_E_field + 1e-30) * 1e-11, np.amax(self.init_E_field + 1e-30) * 10]
 
             self.sim_N = self.init_N
             self.sim_P = self.init_P
             self.sim_E_field = self.init_E_field
-            self.sim_Ec = self.init_Ec
-            self.sim_Chi = self.init_Chi
             self.update_data_plots(0)
 
             self.write(self.status, "Now calculating ΔN, ΔP")
             numTimeStepsDone = 0
+            
+            self.write(self.status, "Test complete")
+            return
 
             # WIP: Option for staggered calculate/plot: In this mode the program calculates a block of time steps, plots intermediate (N, P, E), and calculates the next block 
             # using the final time step from the previous block as the initial condition.
@@ -2693,6 +2673,7 @@ class Notebook:
         except FloatingPointError:
             self.write(self.status, "Overflow detected - calculation aborted")
             return
+
 
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
