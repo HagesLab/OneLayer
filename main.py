@@ -284,7 +284,7 @@ class Data_Group:
 class Plot_State:
     # Object containing variables needed for each small plot on analysis tab
 	# This is really a wrapper that enhances interactions between the Data_Group object and the embedded plot
-    # There are currently two but hopefully this class helps simplify adding more
+    # There are currently four of these
     def __init__(self, ID, plot_obj=None):
         self.ID = ID
         self.plot_obj = plot_obj
@@ -2171,10 +2171,7 @@ class Notebook:
 
         try:
             with open(self.default_dirs["Data"] + "\\" + data_filename + "\\" + "metadata.txt", "r") as ifstream:
-                param_values_dict = {"Mu_N":0, "Mu_P":0, "N0":0, "P0":0, "Thickness":0, "dx":0,
-                                     "B":0, "Tau_N":0, "Tau_P":0,"Sf":0, "Sb":0, 
-                                     "Temperature":0, "Rel-Permitivity":0, "Ext_E-Field":0, "Theta":0, "Alpha":0, "Delta":0, 
-                                     "Frac-Emitted":0, "Total-Time":0, "dt":0, "ignore_alpha":0, "symmetric_system":0}
+                param_values_dict = {}
                 for line in ifstream:
                     if "$" in line: continue
 
@@ -2321,6 +2318,7 @@ class Notebook:
         # THe Plot button on the Analyze tab calls this function
         self.do_plotter_popup(plot_ID)
         self.root.wait_window(self.plotter_popup)
+        
         active_plot = self.analysis_plots[plot_ID]
         if (active_plot.data_filenames.__len__() == 0): return
 
@@ -2697,6 +2695,9 @@ class Notebook:
 
         with open(full_path_name + "\\metadata.txt", "w+") as ofstream:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
+            ofstream.write("Total_length: " + str(self.nanowire.total_length) + "\n")
+            ofstream.write("Node_width: " + str(self.nanowire.dx) + "\n")
+            
             for param in temp_sim_dict:
                 ofstream.write("{}: {}\n".format(param, (temp_sim_dict[param] * self.convert_out_dict[param])))
 
