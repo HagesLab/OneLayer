@@ -1087,7 +1087,7 @@ class Notebook:
         self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
         self.analyze_toolbar.grid(row=0,column=0,columnspan=6)
 
-        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.a_plot, plot_ID=0))
+        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.fetch_dataset, plot_ID=0))
         self.analyze_plot_button.grid(row=1,column=0)
         
         self.analyze_tstep_entry = tk.ttk.Entry(self.analyze_toolbar_frame, width=9)
@@ -2084,7 +2084,7 @@ class Notebook:
         return
 
     ## Plotter for simulation tab    
-    def update_data_plots(self, index, do_clear_plots=True):
+    def update_sim_plots(self, index, do_clear_plots=True):
         ## V2: Update plots on Simulate tab
         ## FIXME: This abomination of 1x3 arrays
         
@@ -2123,7 +2123,7 @@ class Notebook:
 
     ## Sub plotters for analyze tab
 
-    def data_plot(self, plot_ID, clear_plot=True):
+    def plot_analyze(self, plot_ID, clear_plot=True):
         # Draw on analysis tab
         try:
             active_plot = self.analysis_plots[plot_ID]
@@ -2316,7 +2316,7 @@ class Notebook:
             self.write(self.analysis_status, "Error: dt or total t mismatch")
         return
 
-    def a_plot(self, plot_ID):
+    def fetch_dataset(self, plot_ID):
         # Wrapper to apply read_data() on multiple selected datasets
         # THe Plot button on the Analyze tab calls this function
         self.do_plotter_popup(plot_ID)
@@ -2339,7 +2339,7 @@ class Notebook:
         active_plot.ylim = (active_plot.datagroup.get_maxval() * 1e-11, active_plot.datagroup.get_maxval() * 10)
         active_plot.xaxis_type = 'linear'
         active_plot.yaxis_type = 'log'
-        self.data_plot(plot_ID, clear_plot=True)
+        self.plot_analyze(plot_ID, clear_plot=True)
         return
 
     def plot_tstep(self, plot_ID):
@@ -2445,7 +2445,7 @@ class Notebook:
         else:
             self.write(self.analysis_status, "Error #107: Data group has an invalid datatype")
 
-        self.data_plot(plot_ID, clear_plot=True)
+        self.plot_analyze(plot_ID, clear_plot=True)
         self.write(self.analysis_status, "")
         return
 
@@ -2625,7 +2625,7 @@ class Notebook:
             self.sim_N = self.init_N
             self.sim_P = self.init_P
             self.sim_E_field = self.init_E_field
-            self.update_data_plots(0)
+            self.update_sim_plots(0)
 
             numTimeStepsDone = 0
 
@@ -2649,7 +2649,7 @@ class Notebook:
             #        self.init_E_field = ifstream_E_field.root.E_field[-1]
 
 
-            #    self.update_data_plots(int(self.n * i / self.numPartitions), self.numPartitions > 20)
+            #    self.update_sim_plots(int(self.n * i / self.numPartitions), self.numPartitions > 20)
                 #self.update_err_plots()
 
             # TODO: Why don't we just pass in the whole dictionary and let ode_nanowire extract the values?
@@ -2678,11 +2678,11 @@ class Notebook:
             self.write(self.status, "Finalizing...")
 
             #self.read_TS(self.n)
-            #self.update_data_plots(self.n, self.numPartitions > 20)
+            #self.update_sim_plots(self.n, self.numPartitions > 20)
 
             for i in range(1,6):
                 self.read_TS(data_file_name, int(self.n * i / 5))
-                self.update_data_plots(self.n, do_clear_plots=False)
+                self.update_sim_plots(self.n, do_clear_plots=False)
 
             time.sleep(3)
             self.write(self.status, "Simulations complete")
