@@ -263,7 +263,7 @@ class Data_Group:
         return result
 
     def get_max_x(self):
-        return np.amax([self.datasets[tag].params_dict["Thickness"] for tag in self.datasets])
+        return np.amax([self.datasets[tag].params_dict["Total_length"] for tag in self.datasets])
 
     def get_maxtime(self):
         return np.amax([self.datasets[tag].params_dict["Total-Time"] for tag in self.datasets])
@@ -449,6 +449,7 @@ class Notebook:
         self.check_calculate_init_material_expfactor = tk.IntVar()
         self.AIC_stim_mode = tk.StringVar()
         self.AIC_gen_power_mode = tk.StringVar()
+        self.active_analysisplot_ID = tk.IntVar()
 
         self.init_shape_selection = tk.StringVar()
         self.init_var_selection = tk.StringVar()
@@ -1082,18 +1083,45 @@ class Notebook:
         self.analyze_widget = self.analyze_canvas.get_tk_widget()
         self.analyze_widget.grid(row=1,column=0,rowspan=1,columnspan=4, padx=(12,0))
 
+        self.analyze_plotselector_frame = tk.ttk.Frame(master=self.tab_analyze)
+        self.analyze_plotselector_frame.grid(row=2,rowspan=2,column=0,columnspan=4)
+        
+        self.analysisplot_topleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=0)
+        self.analysisplot_topleft.grid(row=0,column=0)
+
+        self.analysisplot_topleft_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Top Left")
+        self.analysisplot_topleft_label.grid(row=0,column=1)
+        
+        self.analysisplot_topright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=1)
+        self.analysisplot_topright.grid(row=0,column=2)
+
+        self.analysisplot_topright_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Top Right")
+        self.analysisplot_topright_label.grid(row=0,column=3)
+        
+        self.analysisplot_bottomleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=2)
+        self.analysisplot_bottomleft.grid(row=1,column=0)
+
+        self.analysisplot_bottomleft_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Bottom Left")
+        self.analysisplot_bottomleft_label.grid(row=1,column=1)
+        
+        self.analysisplot_bottomright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=3)
+        self.analysisplot_bottomright.grid(row=1,column=2)
+
+        self.analysisplot_bottomright_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Bottom Right")
+        self.analysisplot_bottomright_label.grid(row=1,column=3)
+        
         self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
-        self.analyze_toolbar_frame.grid(row=2,column=0,rowspan=2,columnspan=4)
+        self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=2,columnspan=4)
         self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
         self.analyze_toolbar.grid(row=0,column=0,columnspan=6)
 
-        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.fetch_dataset, plot_ID=0))
+        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.fetch_dataset))
         self.analyze_plot_button.grid(row=1,column=0)
         
         self.analyze_tstep_entry = tk.ttk.Entry(self.analyze_toolbar_frame, width=9)
         self.analyze_tstep_entry.grid(row=1,column=1)
 
-        self.analyze_tstep_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Step >>", command=partial(self.plot_tstep, plot_ID=0))
+        self.analyze_tstep_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Step >>", command=partial(self.plot_tstep))
         self.analyze_tstep_button.grid(row=1,column=2)
 
         self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate, plot_ID=0))
@@ -1433,22 +1461,22 @@ class Notebook:
             self.plotter_popup = tk.Toplevel(self.root)
 
             self.plotter_title_label = tk.ttk.Label(self.plotter_popup, text="Select a data type", style="Header.TLabel")
-            self.plotter_title_label.grid(row=0,column=0,columnspan=3)
+            self.plotter_title_label.grid(row=0,column=0,columnspan=2)
 
             self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, "ΔN", "ΔP", "E-field", "RR", "NRR", "PL")
-            self.var_select_menu.grid(row=1,column=1)
+            self.var_select_menu.grid(row=1,column=0)
 
-            self.plotter_continue_button = tk.Button(self.plotter_popup, text="Continue and select datasets", command=partial(self.on_plotter_popup_close, plot_ID, continue_=True))
-            self.plotter_continue_button.grid(row=2,column=1)
+            self.plotter_continue_button = tk.Button(self.plotter_popup, text="Continue", command=partial(self.on_plotter_popup_close, plot_ID, continue_=True))
+            self.plotter_continue_button.grid(row=1,column=1)
 
             self.data_listbox = tk.Listbox(self.plotter_popup, width=20, height=20, selectmode="extended")
-            self.data_listbox.grid(row=3,rowspan=13,column=0,columnspan=2)
+            self.data_listbox.grid(row=2,rowspan=13,column=0)
             self.data_listbox.delete(0,tk.END)
             self.data_list = [file for file in os.listdir(self.default_dirs["Data"]) if not file.endswith(".txt")]
             self.data_listbox.insert(0,*(self.data_list))
 
             self.plotter_status = tk.Text(self.plotter_popup, width=24,height=2)
-            self.plotter_status.grid(row=3,rowspan=2,column=2,columnspan=1)
+            self.plotter_status.grid(row=3,rowspan=2,column=1)
             self.plotter_status.configure(state="disabled")
 
             self.plotter_popup.protocol("WM_DELETE_WINDOW", partial(self.on_plotter_popup_close, plot_ID, continue_=False))
@@ -2126,30 +2154,30 @@ class Notebook:
     def plot_analyze(self, plot_ID, clear_plot=True):
         # Draw on analysis tab
         try:
-            active_plot = self.analysis_plots[plot_ID]
-            plot.figure(active_plot.fig_ID)
-
-            if clear_plot: plot.clf()
+            active_plot_data = self.analysis_plots[plot_ID]
+            subplot = active_plot_data.plot_obj
             
-            plot.yscale(active_plot.yaxis_type)
-            plot.xscale(active_plot.xaxis_type)
-            active_datagroup = active_plot.datagroup
+            if clear_plot: subplot.cla()
+            
+            subplot.set_yscale(active_plot_data.yaxis_type)
+            subplot.set_xscale(active_plot_data.xaxis_type)
+            active_datagroup = active_plot_data.datagroup
 
-            plot.ylim(*active_plot.ylim)
-            plot.xlim(*active_plot.xlim)
+            subplot.set_ylim(*active_plot_data.ylim)
+            subplot.set_xlim(*active_plot_data.xlim)
 
             for tag in active_datagroup.datasets:
                 label = tag + "*" if active_datagroup.datasets[tag].params_dict["symmetric_system"] else tag
-                plot.plot(active_datagroup.datasets[tag].grid_x, active_datagroup.datasets[tag].data, label=label)
+                subplot.plot(active_datagroup.datasets[tag].grid_x, active_datagroup.datasets[tag].data, label=label)
 
-            plot.xlabel("x [nm]")
-            plot.ylabel(active_datagroup.type)
-            plot.legend()
-            plot.set_title("Time: " + str(active_datagroup.get_maxtime() * active_plot.time_index / active_datagroup.get_maxnumtsteps()) + " / " + str(active_datagroup.get_maxtime()) + "ns")
-            plot.tight_layout()
-            active_plot.plot_obj.canvas.draw()
+            subplot.set_xlabel("x [nm]")
+            subplot.set_ylabel(active_datagroup.type)
+            subplot.legend()
+            subplot.set_title("Time: " + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) + " / " + str(active_datagroup.get_maxtime()) + "ns")
+            self.analyze_fig.tight_layout()
+            self.analyze_fig.canvas.draw()
 
-        except OSError:
+        except:
             self.write(self.analysis_status, "Error #106: Plot failed")
             return
 
@@ -2178,27 +2206,25 @@ class Notebook:
                     elif "#" in line: continue
 
                     else:
-                        param_values_dict[line[0:line.find(':')]] = float(line[line.find(' ') + 1:].strip('\n'))
+                        param = line[0:line.find(':')]
+                        new_value = line[line.find(' ') + 1:].strip('\n')
+
+                        if '\t' in new_value:
+                            param_values_dict[param] = np.array(extract_values(new_value, '\t'))
+                        else: param_values_dict[param] = float(new_value)
 
             data_n = int(0.5 + param_values_dict["Total-Time"] / param_values_dict["dt"])
-            data_m = int(0.5 + param_values_dict["Thickness"] / param_values_dict["dx"])
-            data_edge_x = np.linspace(0, param_values_dict["Thickness"],data_m+1)
-            data_node_x = np.linspace(param_values_dict["dx"] / 2, param_values_dict["Thickness"] - param_values_dict["dx"] / 2, data_m)
+            data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
+            data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
+            data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
 
             # Convert from cm, V, s to nm, V, ns
-            param_values_dict["Sf"] = param_values_dict["Sf"] * self.convert_in_dict["Sf"]
-            param_values_dict["Sb"] = param_values_dict["Sb"] * self.convert_in_dict["Sb"]
-            param_values_dict["Mu_N"] = param_values_dict["Mu_N"] * self.convert_in_dict["Mu_N"]
-            param_values_dict["Mu_P"] = param_values_dict["Mu_P"] * self.convert_in_dict["Mu_P"]
-            param_values_dict["N0"] = param_values_dict["N0"] * self.convert_in_dict["N0"]
-            param_values_dict["P0"] = param_values_dict["P0"] * self.convert_in_dict["P0"]
-            param_values_dict["B"] = param_values_dict["B"] * self.convert_in_dict["B"]
-            param_values_dict["Theta"] = param_values_dict["Theta"] * self.convert_in_dict["Theta"]
-            param_values_dict["Alpha"] = param_values_dict["Alpha"] * self.convert_in_dict["Alpha"]
-            param_values_dict["Ext_E-Field"] = param_values_dict["Ext_E-Field"] * self.convert_in_dict["Ext_E-Field"]
+            for param in param_values_dict:
+                if param in self.convert_in_dict:
+                    param_values_dict[param] *= self.convert_in_dict[param]
 
         except:
-            self.write(self.analysis_status, "Error: This data set is missing or has unusual metadata.txt")
+            self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
             return
 
         active_datagroup = active_plot.datagroup
@@ -2235,6 +2261,7 @@ class Notebook:
                 self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
                 return
 
+        # TODO: New equations for RR, NRR, and PL after resolving N vs. delta_N
         elif (datatype == "RR"):
             try:
                 new_data = Data_Set(param_values_dict["B"] * ((self.read_N(data_filename, active_show_index) + param_values_dict["N0"]) * (self.read_P(data_filename, active_show_index) + param_values_dict["P0"]) - param_values_dict["N0"] * param_values_dict["P0"]), 
@@ -2261,8 +2288,8 @@ class Notebook:
                 rad_rec = param_values_dict["B"] * ((self.read_N(data_filename, active_show_index) + param_values_dict["N0"]) * (self.read_P(data_filename, active_show_index) + param_values_dict["P0"]) - \
                     param_values_dict["N0"] * param_values_dict["P0"])
 
-                max = param_values_dict["Thickness"]
-                dx = param_values_dict["dx"]
+                max = param_values_dict["Total_length"]
+                dx = param_values_dict["Node_width"]
                 distance = np.linspace(0, max - dx, data_m)
                 alphaCof = param_values_dict["Alpha"] if not param_values_dict["ignore_alpha"] else 0
                 thetaCof = param_values_dict["Theta"]
@@ -2313,9 +2340,10 @@ class Notebook:
             self.write(self.analysis_status, "Error: dt or total t mismatch")
         return
 
-    def fetch_dataset(self, plot_ID):
+    def fetch_dataset(self):
         # Wrapper to apply read_data() on multiple selected datasets
         # THe Plot button on the Analyze tab calls this function
+        plot_ID = self.active_analysisplot_ID.get()
         self.do_plotter_popup(plot_ID)
         self.root.wait_window(self.plotter_popup)
         
@@ -2340,8 +2368,9 @@ class Notebook:
         self.plot_analyze(plot_ID, clear_plot=True)
         return
 
-    def plot_tstep(self, plot_ID):
+    def plot_tstep(self):
         # Step already plotted data forward (or backward) in time
+        plot_ID = self.active_analysisplot_ID.get()
         active_plot = self.analysis_plots[plot_ID]
         try:
             active_plot.add_time_index(int(self.analyze_tstep_entry.get()))
@@ -2397,8 +2426,8 @@ class Notebook:
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 rad_rec = B * ((self.read_N(filename, active_show_index) + n0) * (self.read_P(filename, active_show_index) + p0) - n0 * p0)
 
-                max = active_datagroup.datasets[tag].params_dict["Thickness"]
-                dx = active_datagroup.datasets[tag].params_dict["dx"]
+                max = active_datagroup.datasets[tag].params_dict["Total_length"]
+                dx = active_datagroup.datasets[tag].params_dict["Node_width"]
                 data_m = int(0.5 + max / dx)
                 distance = np.linspace(0, max - dx, data_m)
                 alphaCof = active_datagroup.datasets[tag].params_dict["Alpha"] if not active_datagroup.datasets[tag].params_dict["ignore_alpha"] else 0
@@ -2699,7 +2728,15 @@ class Notebook:
             ofstream.write("Node_width: " + str(self.nanowire.dx) + "\n")
             
             for param in temp_sim_dict:
-                ofstream.write("{}: {}\n".format(param, (temp_sim_dict[param] * self.convert_out_dict[param])))
+                param_values = temp_sim_dict[param] * self.convert_out_dict[param]
+                if isinstance(param_values, np.ndarray):
+                    ofstream.write("{}: {:.8e}".format(param, param_values[0]))
+                    for value in param_values[1:]:
+                        ofstream.write("\t{:.8e}".format(value))
+                        
+                    ofstream.write('\n')
+                else:
+                    ofstream.write("{}: {}\n".format(param, param_values))
 
             # The following params are exclusive to metadata files
             ofstream.write("Total-Time: " + str(self.simtime) + "\n")
