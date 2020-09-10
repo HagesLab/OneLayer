@@ -2580,8 +2580,6 @@ class Notebook:
             self.init_N = (self.nanowire.param_dict["N0"].value + self.nanowire.param_dict["init_deltaN"].value) * self.convert_in_dict["N"]
             self.init_P = (self.nanowire.param_dict["P0"].value + self.nanowire.param_dict["init_deltaP"].value) * self.convert_in_dict["P"]
             self.init_E_field = self.nanowire.param_dict["init_E_field"].value * self.convert_in_dict["E_field"]
-            self.Ec = self.nanowire.param_dict["Ec"].value * self.convert_in_dict["Ec"]
-            self.electron_affinity = self.nanowire.param_dict["electron_affinity"].value * self.convert_in_dict["electron_affinity"]
             # "Typecast" single values to uniform arrays
             if not isinstance(self.init_N, np.ndarray):
                 self.init_N = np.ones(self.nanowire.grid_x_nodes.__len__()) * self.init_N
@@ -2591,13 +2589,7 @@ class Notebook:
                 
             if not isinstance(self.init_E_field, np.ndarray):
                 self.init_E_field = np.ones(self.nanowire.grid_x_edges.__len__()) * self.init_E_field
-            
-            if not isinstance(self.Ec, np.ndarray):
-                self.Ec = np.ones(self.nanowire.grid_x_edges.__len__()) * self.Ec
-                
-            if not isinstance(self.electron_affinity, np.ndarray):
-                self.electron_affinity = np.ones(self.nanowire.grid_x_edges.__len__()) * self.electron_affinity
-            
+        
         except ValueError:
             self.write(self.status, "Error: Invalid parameters")
             return
@@ -2685,14 +2677,14 @@ class Notebook:
                                                  temp_sim_dict["Mu_N"], temp_sim_dict["Mu_P"], temp_sim_dict["Temperature"], temp_sim_dict["N0"], temp_sim_dict["P0"], 
                                                  temp_sim_dict["Tau_N"], temp_sim_dict["Tau_P"], temp_sim_dict["B"], temp_sim_dict["Rel-Permitivity"], self.vac_permitivity,
                                                  not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), 0, temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
-                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, self.Ec, self.electron_affinity)
+                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, temp_sim_dict["Ec"], temp_sim_dict["electron_affinity"])
             
             else:
                 error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
                                                  temp_sim_dict["Mu_N"], temp_sim_dict["Mu_P"], temp_sim_dict["Temperature"], temp_sim_dict["N0"], temp_sim_dict["P0"], 
                                                  temp_sim_dict["Tau_N"], temp_sim_dict["Tau_P"], temp_sim_dict["B"], temp_sim_dict["Rel-Permitivity"], self.vac_permitivity,
                                                  not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), temp_sim_dict["Alpha"], temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
-                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, self.Ec, self.electron_affinity)
+                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, temp_sim_dict["Ec"], temp_sim_dict["electron_affinity"])
             
             grid_t = np.linspace(self.dt, self.simtime, self.n)
 
@@ -3138,7 +3130,7 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            # Note: add_AIC() automatically converts into TEDs units. No need to multiply by self.convert_in_dict() here!
+            # Note: add_AIC() automatically converts into TEDs units. For consistency add_AIC should really deposit values in common units.
             self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "density"):
@@ -3183,7 +3175,10 @@ class Notebook:
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
-
+        
+        
+        ## TODO: Make AIC deposit in common units, so this patch isn't required
+        self.nanowire.param_dict["init_deltaN"].value *= self.convert_out_dict["init_deltaN"]
         ## Assuming that the initial distributions of holes and electrons are identical
         self.nanowire.param_dict["init_deltaP"].value = self.nanowire.param_dict["init_deltaN"].value
 
