@@ -82,15 +82,15 @@ def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, params, recycle_p
     ## Unpack params; typecast non-array params to arrays if needed
     Sf = params["Sf"]
     Sb = params["Sb"]
-    mu_n = toArray(params["Mu_N"], m, False)
-    mu_p = toArray(params["Mu_P"], m, False)
-    T = toArray(params["Temperature"], m, False)
+    mu_n = toArray(params["Mu_N"], m, True)
+    mu_p = toArray(params["Mu_P"], m, True)
+    T = toArray(params["Temperature"], m, True)
     n0 = toArray(params["N0"], m, False)
     p0 = toArray(params["P0"], m, False)
     tauN = toArray(params["Tau_N"], m, False)
     tauP = toArray(params["Tau_P"], m, False)
     B = toArray(params["B"], m, False)
-    eps = toArray(params["Rel-Permitivity"], m, False)
+    eps = toArray(params["Rel-Permitivity"], m, True)
     E_field_ext = toArray(params["Ext_E-Field"], m, True)
     alphaCof = toArray(params["Alpha"], m, False) if recycle_photons else np.zeros(m)
     thetaCof = toArray(params["Theta"], m, False)

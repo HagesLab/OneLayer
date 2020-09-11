@@ -25,10 +25,13 @@ def dydt(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q
     E_field = y[2*(m):]
     delta_N_edges = (delta_N[:-1] + np.roll(delta_N, -1)[:-1]) / 2 # Excluding the boundaries; see the following FIXME
     delta_P_edges = (delta_P[:-1] + np.roll(delta_P, -1)[:-1]) / 2
+    n0_edges = (n0[:-1] + np.roll(n0, -1)[:-1]) / 2
+    p0_edges = (p0[:-1] + np.roll(p0, -1)[:-1]) / 2
+    
     ## Do boundary conditions of Jn, Jp
     # FIXME: Calculate N, P at boundaries?
-    Sft = ((delta_N[0] + n0) * (delta_P[0] + p0) - n0 * p0) / (((delta_N[0] + n0) / Sf) + ((delta_P[0] + p0) / Sf))
-    Sbt = ((delta_N[m-1] + n0) * (delta_P[m-1] + p0) - n0 * p0) / (((delta_N[m-1] + n0) / Sb) + ((delta_P[m-1] + p0) / Sb))
+    Sft = ((delta_N[0] + n0[0]) * (delta_P[0] + p0[0]) - n0[0] * p0[0]) / (((delta_N[0] + n0[0]) / Sf) + ((delta_P[0] + p0[0]) / Sf))
+    Sbt = ((delta_N[m-1] + n0[m-1]) * (delta_P[m-1] + p0[m-1]) - n0[m-1] * p0[m-1]) / (((delta_N[m-1] + n0[m-1]) / Sb) + ((delta_P[m-1] + p0[m-1]) / Sb))
     Jn[0] = Sft
     Jn[m] = -Sbt
     Jp[0] = -Sft
@@ -37,17 +40,17 @@ def dydt(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q
     ## Calculate Jn, Jp [nm^-2 ns^-1] over the space dimension, 
     # Jn(t) ~ N(t) * E_field(t) + (dN/dt)
     # np.roll(y,m) shifts the values of array y by m places, allowing for quick approximation of dy/dx ~ (y[m+1] - y[m-1] / 2*dx) over entire array y
-    Jn[1:-1] = (-mu_n * (delta_N_edges + n0) * (q * (E_field[1:-1] + E_field_ext) + dChidz[1:-1]) + 
-                (mu_n*kB*T) * ((np.roll(delta_N,-1)[:-1] - delta_N[:-1]) / (dx)))
+    Jn[1:-1] = (-mu_n[1:-1] * (delta_N_edges + n0_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1]) + 
+                (mu_n[1:-1]*kB*T[1:-1]) * ((np.roll(delta_N,-1)[:-1] - delta_N[:-1]) / (dx)))
 
     ## Changed sign
-    Jp[1:-1] = (-mu_p * (delta_P_edges + p0) * (q * (E_field[1:-1] + E_field_ext) + dChidz[1:-1] + dEcdz[1:-1]) -
-                (mu_p*kB*T) * ((np.roll(delta_P, -1)[:-1] - delta_P[:-1]) / (dx)))
+    Jp[1:-1] = (-mu_p[1:-1] * (delta_P_edges + p0_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEcdz[1:-1]) -
+                (mu_p[1:-1]*kB*T[1:-1]) * ((np.roll(delta_P, -1)[:-1] - delta_P[:-1]) / (dx)))
 
         
     # [V nm^-1 ns^-1]
     dEdt = (Jn + Jp) * ((q_C) / (eps * eps0))
-
+    
     ## Calculate recombination (consumption) terms
     rad_rec = B * ((delta_N + n0) * (delta_P + p0) - n0 * p0)
     non_rad_rec = ((delta_N + n0) * (delta_P + p0) - n0 * p0) / ((tauN * (delta_P + p0)) + (tauP * (delta_N + n0)))
@@ -59,7 +62,6 @@ def dydt(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q
         G_array = 0
     ## Calculate dJn/dx
     dJz = (np.roll(Jn, -1)[:-1] - Jn[:-1]) / (dx)
-
 
     ## delta_N(t) = delta_N(t-1) + dt * (dN/dt)
     #N_new = np.maximum(N_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)

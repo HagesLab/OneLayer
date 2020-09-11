@@ -84,12 +84,12 @@ class Nanowire:
         self.grid_x_nodes = -1
         self.grid_x_edges = -1
         self.spacegrid_is_set = False
-        self.param_dict = {"Mu_N":Parameter(is_edge=False, units="[cm^2 / V s]"), "Mu_P":Parameter(is_edge=False, units="[cm^2 / V s]"), 
+        self.param_dict = {"Mu_N":Parameter(is_edge=True, units="[cm^2 / V s]"), "Mu_P":Parameter(is_edge=True, units="[cm^2 / V s]"), 
                             "N0":Parameter(is_edge=False, units="[cm^-3]"), "P0":Parameter(is_edge=False, units="[cm^-3]"), 
                             "B":Parameter(is_edge=False, units="[cm^3 / s]"), "Tau_N":Parameter(is_edge=False, units="[ns]"), 
                             "Tau_P":Parameter(is_edge=False, units="[ns]"), "Sf":Parameter(is_edge=False, units="[cm / s]"), 
-                            "Sb":Parameter(is_edge=False, units="[cm / s]"), "Temperature":Parameter(is_edge=False, units="[K]"), 
-                            "Rel-Permitivity":Parameter(is_edge=False, units=""), "Ext_E-Field":Parameter(is_edge=True, units="[V/um]"),
+                            "Sb":Parameter(is_edge=False, units="[cm / s]"), "Temperature":Parameter(is_edge=True, units="[K]"), 
+                            "Rel-Permitivity":Parameter(is_edge=True, units=""), "Ext_E-Field":Parameter(is_edge=True, units="[V/um]"),
                             "Theta":Parameter(is_edge=False, units="[cm^-1]"), "Alpha":Parameter(is_edge=False, units="[cm^-1]"), 
                             "Delta":Parameter(is_edge=False, units=""), "Frac-Emitted":Parameter(is_edge=False, units=""),
                             "init_deltaN":Parameter(is_edge=False, units="[cm^-3]"), "init_deltaP":Parameter(is_edge=False, units="[cm^-3]"), 
