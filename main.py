@@ -2554,10 +2554,13 @@ class Notebook:
             self.write(self.status, "Now calculating {} : ({} of {})".format(self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")], str(batch_num), str(IC_files.__len__())))
             self.do_Calculate()
             time.sleep(1)
+            
+        self.write(self.status, "Simulations complete")
 
         return
 
 	# The big function that does all the simulating
+    # TODO: This should belong to Nanowire(), not Notebook()
     def do_Calculate(self):
         ## Setup parameters
         try:
@@ -2566,8 +2569,6 @@ class Notebook:
 
             # Upper limit on number of time steps
             if (self.n > 2.5e5): raise Exception("Error: too many time steps")
-
-            self.vac_permitivity = 8.854 * 1e-12 * (1e-9)                      # [F/m] to [F/nm]
 
             temp_sim_dict = {}
 
@@ -2671,20 +2672,12 @@ class Notebook:
             #    self.update_sim_plots(int(self.n * i / self.numPartitions), self.numPartitions > 20)
                 #self.update_err_plots()
 
-            # TODO: Why don't we just pass in the whole dictionary and let ode_nanowire extract the values?
-            if self.check_ignore_recycle.get():
-                error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
-                                                 temp_sim_dict["Mu_N"], temp_sim_dict["Mu_P"], temp_sim_dict["Temperature"], temp_sim_dict["N0"], temp_sim_dict["P0"], 
-                                                 temp_sim_dict["Tau_N"], temp_sim_dict["Tau_P"], temp_sim_dict["B"], temp_sim_dict["Rel-Permitivity"], self.vac_permitivity,
-                                                 not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), 0, temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
-                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, temp_sim_dict["Ec"], temp_sim_dict["electron_affinity"])
+            write_output = True
+
+            error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict,
+                                             not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), write_output,
+                                             self.init_N, self.init_P, self.init_E_field)
             
-            else:
-                error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict["Sf"], temp_sim_dict["Sb"], 
-                                                 temp_sim_dict["Mu_N"], temp_sim_dict["Mu_P"], temp_sim_dict["Temperature"], temp_sim_dict["N0"], temp_sim_dict["P0"], 
-                                                 temp_sim_dict["Tau_N"], temp_sim_dict["Tau_P"], temp_sim_dict["B"], temp_sim_dict["Rel-Permitivity"], self.vac_permitivity,
-                                                 not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), temp_sim_dict["Alpha"], temp_sim_dict["Theta"], temp_sim_dict["Delta"], temp_sim_dict["Frac-Emitted"],
-                                                 temp_sim_dict["Ext_E-Field"], self.init_N, self.init_P, self.init_E_field, temp_sim_dict["Ec"], temp_sim_dict["electron_affinity"])
             
             grid_t = np.linspace(self.dt, self.simtime, self.n)
 
@@ -2703,8 +2696,8 @@ class Notebook:
                 self.read_TS(data_file_name, int(self.n * i / 5))
                 self.update_sim_plots(self.n, do_clear_plots=False)
 
-            time.sleep(3)
-            self.write(self.status, "Simulations complete")
+            #time.sleep(3)
+            
             
         except FloatingPointError:
             self.write(self.status, "Overflow detected - calculation aborted")
