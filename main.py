@@ -431,6 +431,11 @@ class Notebook:
                                 "init_E_field": 1, "Ec": 1, "electron_affinity": 1,
                                 "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
                                 "E_field": 1}
+        
+        # FIXME: Check these
+        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
+        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] * self.convert_in_dict["Tau_N"]
+        self.convert_in_dict["PL"] = self.convert_in_dict["RR"] * self.convert_in_dict["Theta"]
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
         self.convert_out_dict = {}
         for param in self.convert_in_dict:
@@ -1463,7 +1468,7 @@ class Notebook:
             self.plotter_title_label = tk.ttk.Label(self.plotter_popup, text="Select a data type", style="Header.TLabel")
             self.plotter_title_label.grid(row=0,column=0,columnspan=2)
 
-            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, "ΔN", "ΔP", "E-field", "RR", "NRR", "PL")
+            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, "N", "P", "E-field", "RR", "NRR", "PL")
             self.var_select_menu.grid(row=1,column=0)
 
             self.plotter_continue_button = tk.Button(self.plotter_popup, text="Continue", command=partial(self.on_plotter_popup_close, plot_ID, continue_=True))
@@ -2166,9 +2171,10 @@ class Notebook:
             subplot.set_ylim(*active_plot_data.ylim)
             subplot.set_xlim(*active_plot_data.xlim)
 
+            # This data is in TEDs units since we just used it in a calculation - convert back to common units first
             for tag in active_datagroup.datasets:
                 label = tag + "*" if active_datagroup.datasets[tag].params_dict["symmetric_system"] else tag
-                subplot.plot(active_datagroup.datasets[tag].grid_x, active_datagroup.datasets[tag].data, label=label)
+                subplot.plot(active_datagroup.datasets[tag].grid_x, active_datagroup.datasets[tag].data * self.convert_out_dict[active_datagroup.type], label=label)
 
             subplot.set_xlabel("x [nm]")
             subplot.set_ylabel(active_datagroup.type)
@@ -2236,7 +2242,7 @@ class Notebook:
 
 		# Now that we have the parameters from metadata, fetch the data itself
 		# For N, P, E-field this is just reading the data but for others we'll calculate it in situ
-        if (datatype == "ΔN"):
+        if (datatype == "N"):
             try:
                 # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
                 new_data = Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
@@ -2245,7 +2251,7 @@ class Notebook:
                 self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
                 return
 
-        elif (datatype == "ΔP"):
+        elif (datatype == "P"):
             try:
                 new_data = Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
@@ -2264,7 +2270,7 @@ class Notebook:
         # TODO: New equations for RR, NRR, and PL after resolving N vs. delta_N
         elif (datatype == "RR"):
             try:
-                new_data = Data_Set(param_values_dict["B"] * ((self.read_N(data_filename, active_show_index) + param_values_dict["N0"]) * (self.read_P(data_filename, active_show_index) + param_values_dict["P0"]) - param_values_dict["N0"] * param_values_dict["P0"]), 
+                new_data = Data_Set(param_values_dict["B"] * ((self.read_N(data_filename, active_show_index)) * (self.read_P(data_filename, active_show_index)) - param_values_dict["N0"] * param_values_dict["P0"]), 
                                     data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
@@ -2275,8 +2281,8 @@ class Notebook:
             try:
                 temp_N = self.read_N(data_filename, active_show_index)
                 temp_P = self.read_P(data_filename, active_show_index)
-                new_data = Data_Set(((temp_N + param_values_dict["N0"]) * (temp_P + param_values_dict["P0"]) - param_values_dict["N0"] * param_values_dict["P0"]) / 
-                                    ((param_values_dict["Tau_N"] * (temp_P + param_values_dict["P0"])) + (param_values_dict["Tau_P"] * (temp_N + param_values_dict["N0"]))), 
+                new_data = Data_Set((temp_N * temp_P - param_values_dict["N0"] * param_values_dict["P0"]) / 
+                                    ((param_values_dict["Tau_N"] * temp_P) + (param_values_dict["Tau_P"] * temp_N)), 
                                     data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
@@ -2285,7 +2291,7 @@ class Notebook:
 
         elif (datatype == "PL"):
             try:
-                rad_rec = param_values_dict["B"] * ((self.read_N(data_filename, active_show_index) + param_values_dict["N0"]) * (self.read_P(data_filename, active_show_index) + param_values_dict["P0"]) - \
+                rad_rec = param_values_dict["B"] * (self.read_N(data_filename, active_show_index) * self.read_P(data_filename, active_show_index) - \
                     param_values_dict["N0"] * param_values_dict["P0"])
 
                 max = param_values_dict["Total_length"]
@@ -2295,6 +2301,7 @@ class Notebook:
                 thetaCof = param_values_dict["Theta"]
                 delta_frac = param_values_dict["Delta"]
                 fracEmitted = param_values_dict["Frac-Emitted"]
+                symmetric_system = param_values_dict["symmetric_system"]
                 
                 # Make room for one more value than necessary - this value at index j+1 will be used to pad the upper correction
                 distance_matrix = np.zeros((data_m, data_m))
@@ -2310,13 +2317,12 @@ class Notebook:
                     rf_distance_matrix[n] = (max - distance) + (max - n * dx)
 
                 weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
-                lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix)
-                rf_weight = np.exp(-(alphaCof + thetaCof) * rf_distance_matrix) * 0
+                lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix) if symmetric_system else 0
 
-                combined_weight = (1 - fracEmitted) * 0.5 * thetaCof * delta_frac * (weight + lf_weight + rf_weight)
+                combined_weight = (1 - fracEmitted) * 0.5 * thetaCof * delta_frac * (weight + lf_weight)
 
                 weight2 = np.exp(-(thetaCof) * distance_matrix)
-                lf_weight2 = np.exp(-(thetaCof) * lf_distance_matrix)
+                lf_weight2 = np.exp(-(thetaCof) * lf_distance_matrix) if symmetric_system else 0
 
                 combined_weight2 = (1 - fracEmitted) * 0.5 * thetaCof * (1 - delta_frac) * (weight2 + lf_weight2)
 
@@ -2362,7 +2368,7 @@ class Notebook:
 
         
         active_plot.xlim = (0, active_plot.datagroup.get_max_x())
-        active_plot.ylim = (active_plot.datagroup.get_maxval() * 1e-11, active_plot.datagroup.get_maxval() * 10)
+        active_plot.ylim = (active_plot.datagroup.get_maxval() * self.convert_out_dict[active_plot.datagroup.type] * 1e-11, self.convert_out_dict[active_plot.datagroup.type] * 10)
         active_plot.xaxis_type = 'linear'
         active_plot.yaxis_type = 'log'
         self.plot_analyze(plot_ID, clear_plot=True)
@@ -2382,12 +2388,12 @@ class Notebook:
         active_datagroup = active_plot.datagroup
 
         # Search data files for data at new time step
-        if active_datagroup.type == "ΔN":
+        if active_datagroup.type == "N":
             for tag in active_datagroup.datasets:
                 active_datagroup.datasets[tag].data = self.read_N(active_datagroup.datasets[tag].filename, active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
-        elif active_datagroup.type == "ΔP":
+        elif active_datagroup.type == "P":
             for tag in active_datagroup.datasets:
                 active_datagroup.datasets[tag].data = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
@@ -2402,9 +2408,7 @@ class Notebook:
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 B = active_datagroup.datasets[tag].params_dict["B"]
-                active_datagroup.datasets[tag].data = B \
-                    * ((self.read_N(active_datagroup.datasets[tag].filename, active_show_index) + n0) \
-                    * (self.read_P(active_datagroup.datasets[tag].filename, active_show_index) + p0) - n0 * p0)
+                active_datagroup.datasets[tag].data = B * (self.read_N(active_datagroup.datasets[tag].filename, active_show_index) * self.read_P(active_datagroup.datasets[tag].filename, active_show_index) - n0 * p0)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "NRR":
@@ -2415,7 +2419,7 @@ class Notebook:
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 tauN = active_datagroup.datasets[tag].params_dict["Tau_N"]
                 tauP = active_datagroup.datasets[tag].params_dict["Tau_P"]
-                active_datagroup.datasets[tag].data = ((temp_N + n0) * (temp_P + p0) - n0 * p0) / ((tauN * (temp_P + p0)) + (tauP * (temp_N + n0)))
+                active_datagroup.datasets[tag].data = (temp_N * temp_P - n0 * p0) / ((tauN * temp_P) + (tauP * temp_N))
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "PL":
@@ -2424,7 +2428,7 @@ class Notebook:
                 B = active_datagroup.datasets[tag].params_dict["B"]
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
-                rad_rec = B * ((self.read_N(filename, active_show_index) + n0) * (self.read_P(filename, active_show_index) + p0) - n0 * p0)
+                rad_rec = B * ((self.read_N(filename, active_show_index) * self.read_P(filename, active_show_index)) - n0 * p0)
 
                 max = active_datagroup.datasets[tag].params_dict["Total_length"]
                 dx = active_datagroup.datasets[tag].params_dict["Node_width"]
@@ -2731,6 +2735,9 @@ class Notebook:
 
             if self.check_symmetric.get(): ofstream.write("symmetric_system: 1\n")
             else: ofstream.write("symmetric_system: 0\n")
+            
+            if self.check_do_ss.get(): ofstream.write("steady_state_exc: 1\n")
+            else: ofstream.write("steady_state_exc: 0\n")
 
         return
 
@@ -2827,7 +2834,7 @@ class Notebook:
             #        self.PL[i] = finite.propagatingPL(data_filename, boundList[i] - 500, boundList[i] + 500, dx, 0, total_length - dx, B_param, n0, p0, alpha, theta, delta, frac_emitted)
             #        if boundList[i] == 0:
             #            self.PL[i] *= 2
-                if (active_datagroup.datasets[tag].type == "ΔN"):
+                if (active_datagroup.datasets[tag].type == "N"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
                         data = ifstream_N.root.N
                         if include_negative:
@@ -2836,7 +2843,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
             
-                elif (active_datagroup.datasets[tag].type == "ΔP"):
+                elif (active_datagroup.datasets[tag].type == "P"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         data = ifstream_P.root.P
                         if include_negative:
