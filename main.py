@@ -2368,7 +2368,8 @@ class Notebook:
 
         
         active_plot.xlim = (0, active_plot.datagroup.get_max_x())
-        active_plot.ylim = (active_plot.datagroup.get_maxval() * self.convert_out_dict[active_plot.datagroup.type] * 1e-11, self.convert_out_dict[active_plot.datagroup.type] * 10)
+        max_val = active_plot.datagroup.get_maxval() * self.convert_out_dict[active_plot.datagroup.type]
+        active_plot.ylim = (max_val * 1e-11, max_val * 10)
         active_plot.xaxis_type = 'linear'
         active_plot.yaxis_type = 'log'
         self.plot_analyze(plot_ID, clear_plot=True)
