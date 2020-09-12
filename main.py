@@ -9,7 +9,6 @@
 import numpy as np
 import matplotlib
 matplotlib.use("TkAgg")
-import matplotlib.pylab as plot
 import matplotlib.backends.backend_tkagg as tkagg
 from matplotlib.figure import Figure
 from scipy import integrate as intg
