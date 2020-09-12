@@ -1132,10 +1132,10 @@ class Notebook:
         self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate))
         self.calculate_PL_button.grid(row=1,column=3)
 
-        self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=0))
+        self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=0))
         self.analyze_axis_button.grid(row=1,column=4)
 
-        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=0))
+        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=0, from_integration=0))
         self.analyze_export_button.grid(row=1,column=5)
 
         self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup, plot_ID=0))
@@ -1152,7 +1152,7 @@ class Notebook:
         self.integration_toolbar = tkagg.NavigationToolbar2Tk(self.integration_canvas, self.integration_toolbar_frame)
         self.integration_toolbar.grid(row=0,column=0,columnspan=5)
 
-        self.integration_axis_button = tk.ttk.Button(self.integration_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=-1))
+        self.integration_axis_button = tk.ttk.Button(self.integration_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=1))
         self.integration_axis_button.grid(row=1,column=0)
 
         self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=-1))
@@ -1722,12 +1722,13 @@ class Notebook:
 
         return
     
-    def do_change_axis_popup(self, plot_ID):
+    def do_change_axis_popup(self, from_integration):
         # Don't open if no data plotted
-        if plot_ID == -1:
+        if from_integration:
             if self.I_plot.size() == 0: return
 
         else:
+            plot_ID = self.active_analysisplot_ID.get()
             if self.analysis_plots[plot_ID].datagroup.size() == 0: return
 
         if not self.change_axis_popup_isopen:
@@ -1799,7 +1800,7 @@ class Notebook:
             self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Display legend?", variable=self.check_display_legend, onvalue=1, offvalue=0)
             self.toggle_legend_checkbutton.grid(row=2,column=0,columnspan=2)
 
-            self.change_axis_continue_button = tk.Button(self.change_axis_popup, text="Continue", command=partial(self.on_change_axis_popup_close, plot_ID, continue_=True))
+            self.change_axis_continue_button = tk.Button(self.change_axis_popup, text="Continue", command=partial(self.on_change_axis_popup_close, from_integration, continue_=True))
             self.change_axis_continue_button.grid(row=3,column=0,columnspan=2)
 
             self.change_axis_status = tk.Text(self.change_axis_popup, width=24,height=2)
@@ -1807,7 +1808,7 @@ class Notebook:
             self.change_axis_status.configure(state="disabled")
 
             # Set the default values in the entry boxes to be the current options of the plot (in case the user only wants to make a few changes)
-            if not (plot_ID == -1):
+            if not (from_integration):
                 active_plot = self.analysis_plots[plot_ID]
 
             else:
@@ -1821,48 +1822,50 @@ class Notebook:
             self.yaxis_type.set(active_plot.yaxis_type)
             self.check_display_legend.set(active_plot.display_legend)
 
-            self.change_axis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_change_axis_popup_close, plot_ID, continue_=False))
+            self.change_axis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_change_axis_popup_close, from_integration, continue_=False))
             self.change_axis_popup.grab_set()
             self.change_axis_popup_isopen = True
         else:
             print("Error #440: Opened more than one PL change axis popup at a time")
         return
 
-    def on_change_axis_popup_close(self, plot_ID, continue_=False):
+    def on_change_axis_popup_close(self, from_integration, continue_=False):
         try:
             if continue_:
                 if not self.xaxis_type or not self.yaxis_type: raise ValueError("Error: invalid axis type")
                 if self.xlbound.get() == "" or self.xubound.get() == "" or self.ylbound.get() == "" or self.yubound.get() == "": raise ValueError("Error: missing bounds")
                 bounds = [float(self.xlbound.get()), float(self.xubound.get()), float(self.ylbound.get()), float(self.yubound.get())]
             
-                if not (plot_ID == -1):
-                    plot.figure(self.analysis_plots[plot_ID].fig_ID)
+                if not (from_integration):
+                    plot_ID = self.active_analysisplot_ID.get()
+                    plot = self.analysis_plots[plot_ID].plot_obj
                     
                 else:
-                    plot.figure(9)
+                    plot = self.integration_subplot
 
                 # Set plot axis params and save in corresponding plot state object, if the selected plot has such an object
-                plot.yscale(self.yaxis_type.get())
-                plot.xscale(self.xaxis_type.get())
+                plot.set_yscale(self.yaxis_type.get())
+                plot.set_xscale(self.xaxis_type.get())
 
-                plot.ylim(bounds[2], bounds[3])
-                plot.xlim(bounds[0], bounds[1])
+                plot.set_ylim(bounds[2], bounds[3])
+                plot.set_xlim(bounds[0], bounds[1])
 
                 if self.check_display_legend.get():
                     plot.legend()
                 else:
                     plot.legend('', frameon=False)
 
-                plot.tight_layout()
 
-                if not (plot_ID == -1):
-                    self.analysis_plots[plot_ID].plot_obj.canvas.draw()
+                if not (from_integration):
+                    self.analyze_fig.tight_layout()
+                    self.analyze_fig.canvas.draw()
                     
                 else:
-                    self.main_fig3.canvas.draw()
+                    self.integration_fig.tight_layout()
+                    self.integration_fig.canvas.draw()
 
                 # Save these params to pre-populate the popup the next time it's opened
-                if not (plot_ID == -1):
+                if not (from_integration):
                     self.analysis_plots[plot_ID].yaxis_type = self.yaxis_type.get()
                     self.analysis_plots[plot_ID].xaxis_type = self.xaxis_type.get()
                     self.analysis_plots[plot_ID].ylim = (bounds[2], bounds[3])
