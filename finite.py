@@ -229,7 +229,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
     if radrec_fromfile:
         with tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
-            radRec = B * ((n0 + np.array(ifstream_N.root.N)) * (p0 + np.array(ifstream_P.root.P)) - n0 * p0)
+            radRec = B * ((np.array(ifstream_N.root.N)) * (np.array(ifstream_P.root.P)) - n0 * p0)
 
     else:
         radRec = rad_rec

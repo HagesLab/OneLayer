@@ -1129,7 +1129,7 @@ class Notebook:
         self.analyze_tstep_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Step >>", command=partial(self.plot_tstep))
         self.analyze_tstep_button.grid(row=1,column=2)
 
-        self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate, plot_ID=0))
+        self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate))
         self.calculate_PL_button.grid(row=1,column=3)
 
         self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, plot_ID=0))
@@ -2742,7 +2742,8 @@ class Notebook:
 
         return
 
-    def do_Integrate(self, plot_ID):
+    def do_Integrate(self):
+        plot_ID = self.active_analysisplot_ID.get()
         self.write(self.analysis_status, "")
 
         active_plot = self.analysis_plots[plot_ID]
@@ -2785,8 +2786,8 @@ class Notebook:
             print("Now integrating {}".format(data_filename))
 
             # Unpack needed params from the dictionaries of params
-            dx = active_datagroup.datasets[tag].params_dict["dx"]
-            total_length = active_datagroup.datasets[tag].params_dict["Thickness"]
+            dx = active_datagroup.datasets[tag].params_dict["Node_width"]
+            total_length = active_datagroup.datasets[tag].params_dict["Total_length"]
             total_time = active_datagroup.datasets[tag].params_dict["Total-Time"]
             B_param = active_datagroup.datasets[tag].params_dict["B"]
             n0 = active_datagroup.datasets[tag].params_dict["N0"]
@@ -2868,7 +2869,7 @@ class Notebook:
                         temp_N = np.array(ifstream_N.root.N)
                         temp_P = np.array(ifstream_P.root.P)
 
-                        data = B_param * (temp_N + n0) * (temp_P + p0) - n0 * p0
+                        data = B_param * (temp_N) * (temp_P) - n0 * p0
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
@@ -2880,7 +2881,7 @@ class Notebook:
                         tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.N)
                         temp_P = np.array(ifstream_P.root.P)
-                        data = ((temp_N + n0) * (temp_P + p0) - n0 * p0) / (tauN * (temp_P + p0) + tauP * (temp_N + n0))
+                        data = ((temp_N) * (temp_P) - n0 * p0) / (tauN * (temp_P) + tauP * (temp_N))
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
@@ -2916,33 +2917,33 @@ class Notebook:
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
 
             
-        plot.figure(9)
-        plot.clf()
+        plot = self.integration_subplot
+        plot.cla()
         
-        max = self.I_plot.get_maxval()
+        max = self.I_plot.get_maxval() * self.convert_out_dict[active_datagroup.type]
         
         self.I_plot.xaxis_type = 'linear'
         self.I_plot.yaxis_type = 'log'
         self.I_plot.ylim = max * 1e-12, max * 10
 
-        plot.yscale(self.I_plot.yaxis_type)
-        plot.ylim(self.I_plot.ylim)
-        plot.xlabel(xaxis_label)
-        plot.ylabel(self.I_plot.type)
-        plot.title("Total {} from {} nm to {} nm".format(self.I_plot.type, self.integration_lbound, self.integration_ubound))
+        plot.set_yscale(self.I_plot.yaxis_type)
+        plot.set_ylim(self.I_plot.ylim)
+        plot.set_xlabel(xaxis_label)
+        plot.set_ylabel(self.I_plot.type)
+        plot.set_title("Total {} from {} nm to {} nm".format(self.I_plot.type, self.integration_lbound, self.integration_ubound))
 
         for key in self.I_plot.I_sets:
 
             if self.PL_mode == "Current time step":
-                plot.scatter(self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
+                plot.scatter(self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data * self.convert_out_dict[active_datagroup.type], label=self.I_plot.I_sets[key].tag())
 
             elif self.PL_mode == "All time steps":
-                plot.plot(self.I_plot.global_gridx, self.I_plot.I_sets[key].I_data, label=self.I_plot.I_sets[key].tag())
+                plot.plot(self.I_plot.global_gridx, self.I_plot.I_sets[key].I_data * self.convert_out_dict[active_datagroup.type], label=self.I_plot.I_sets[key].tag())
                 self.I_plot.xlim = (0, np.amax(self.I_plot.global_gridx))
                 
         plot.legend()
-        plot.tight_layout()
-        self.main_fig3.canvas.draw()
+        self.integration_fig.tight_layout()
+        self.integration_fig.canvas.draw()
         
         self.write(self.analysis_status, "Integration complete")
 
