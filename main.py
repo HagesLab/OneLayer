@@ -1,7 +1,7 @@
 #################################################
 # Transient Electron Dynamics Simulator
 # Model photoluminescent behavior in one-dimensional nanowire
-# Last modified: Aug 28, 2020
+# Last modified: Sep 12, 2020
 # Author: Calvin Fai, Charles Hages
 # Contact:
 ################################################# 
@@ -24,7 +24,6 @@ import tables
 import itertools
 from functools import partial # This lets us pass params to functions called by tkinter buttons
 import finite
-import csv
 
 import pandas as pd # For bayesim compatibility
 import bayesim.hdf5io as dd
@@ -254,6 +253,7 @@ class Data_Group:
         return np.array(self.datasets.values())
 
     def build(self):
+        # FIXME: Needs to convert_out data
         #result = [item for item in self.datasets[key].build() for key in self.datasets]
         result = []
         for key in self.datasets:
@@ -1134,10 +1134,10 @@ class Notebook:
         self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=0))
         self.analyze_axis_button.grid(row=1,column=4)
 
-        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=0, from_integration=0))
+        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Export", command=partial(self.export_plot, from_integration=0))
         self.analyze_export_button.grid(row=1,column=5)
 
-        self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup, plot_ID=0))
+        self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup))
         self.analyze_IC_carry_button.grid(row=1,column=6)
 
         self.integration_fig = Figure(figsize=(8,5))
@@ -1154,7 +1154,7 @@ class Notebook:
         self.integration_axis_button = tk.ttk.Button(self.integration_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=1))
         self.integration_axis_button.grid(row=1,column=0)
 
-        self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, text="Export", command=partial(self.export_plot, plot_ID=-1))
+        self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, text="Export", command=partial(self.export_plot, from_integration=1))
         self.integration_export_button.grid(row=1,column=1)
 
         self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
@@ -1467,7 +1467,7 @@ class Notebook:
             self.plotter_title_label = tk.ttk.Label(self.plotter_popup, text="Select a data type", style="Header.TLabel")
             self.plotter_title_label.grid(row=0,column=0,columnspan=2)
 
-            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, "N", "P", "E-field", "RR", "NRR", "PL")
+            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, "N", "P", "E_field", "RR", "NRR", "PL")
             self.var_select_menu.grid(row=1,column=0)
 
             self.plotter_continue_button = tk.Button(self.plotter_popup, text="Continue", command=partial(self.on_plotter_popup_close, plot_ID, continue_=True))
@@ -1889,7 +1889,8 @@ class Notebook:
 
         return
 
-    def do_IC_carry_popup(self, plot_ID):
+    def do_IC_carry_popup(self):
+        plot_ID = self.active_analysisplot_ID.get()
         # Don't open if no data plotted
         if self.analysis_plots[plot_ID].datagroup.size() == 0: return
 
@@ -1899,13 +1900,13 @@ class Notebook:
             self.IC_carry_title_label = tk.ttk.Label(self.IC_carry_popup, text="Select data to include in new IC", style="Header.TLabel")
             self.IC_carry_title_label.grid(row=0,column=0,columnspan=2)
 
-            self.include_N_checkbutton = tk.Checkbutton(self.IC_carry_popup, text="ΔN", variable=self.carry_include_N)
+            self.include_N_checkbutton = tk.Checkbutton(self.IC_carry_popup, text="N", variable=self.carry_include_N)
             self.include_N_checkbutton.grid(row=1,column=0)
 
-            self.include_P_checkbutton = tk.Checkbutton(self.IC_carry_popup, text="ΔP", variable=self.carry_include_P)
+            self.include_P_checkbutton = tk.Checkbutton(self.IC_carry_popup, text="P", variable=self.carry_include_P)
             self.include_P_checkbutton.grid(row=2,column=0)
             
-            self.include_E_checkbutton = tk.Checkbutton(self.IC_carry_popup, text="E-field", variable=self.carry_include_E_field)
+            self.include_E_checkbutton = tk.Checkbutton(self.IC_carry_popup, text="E_field", variable=self.carry_include_E_field)
             self.include_E_checkbutton.grid(row=3,column=0)
 
             self.carry_IC_listbox = tk.Listbox(self.IC_carry_popup, width=30,height=10, selectmode='extended')
@@ -1913,19 +1914,20 @@ class Notebook:
             for key in self.analysis_plots[plot_ID].datagroup.datasets:
                 self.carry_IC_listbox.insert(tk.END, key)
 
-            self.IC_carry_continue_button = tk.Button(self.IC_carry_popup, text="Continue", command=partial(self.on_IC_carry_popup_close, plot_ID, continue_=True))
+            self.IC_carry_continue_button = tk.Button(self.IC_carry_popup, text="Continue", command=partial(self.on_IC_carry_popup_close, continue_=True))
             self.IC_carry_continue_button.grid(row=5,column=0,columnspan=2)
 
-            self.IC_carry_popup.protocol("WM_DELETE_WINDOW", partial(self.on_IC_carry_popup_close, plot_ID, continue_=False))
+            self.IC_carry_popup.protocol("WM_DELETE_WINDOW", partial(self.on_IC_carry_popup_close, continue_=False))
             self.IC_carry_popup.grab_set()
             self.IC_carry_popup_isopen = True
         else:
             print("Error #510: Opened more than one PL change axis popup at a time")
         return
 
-    def on_IC_carry_popup_close(self, plot_ID, continue_=False):
+    def on_IC_carry_popup_close(self, continue_=False):
         try:
             if continue_:
+                plot_ID = self.active_analysisplot_ID.get()
                 active_sets = self.analysis_plots[plot_ID].datagroup.datasets
                 pile = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
                 for key in pile:
@@ -1933,28 +1935,38 @@ class Notebook:
                     if new_filename == "": continue
 
                     if new_filename.endswith(".txt"): new_filename = new_filename[:-4]
+                    
+                    param_dict_copy = dict(active_sets[key].params_dict)
 
                     node_x = active_sets[key].node_x
                     edge_x = active_sets[key].edge_x
-                    init_N = self.read_N(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_N.get() else np.zeros(node_x.__len__())
-                    init_P = self.read_P(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_P.get() else np.zeros(node_x.__len__())
-                    init_E_field = self.read_E_field(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(edge_x.__len__())
+                    param_dict_copy["init_deltaN"] = self.read_N(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
+                    param_dict_copy["init_deltaP"] = self.read_P(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
+                    param_dict_copy["init_E_field"] = self.read_E_field(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(edge_x.__len__())
 
                     with open(new_filename + ".txt", "w+") as ofstream:
                         ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
+                        ofstream.write("$ Space Grid:\n")
+                        ofstream.write("Total_length: {}\n".format(active_sets[key].params_dict["Total_length"]))
+                        ofstream.write("Node_width: {}\n".format(active_sets[key].params_dict["Node_width"]))
                         ofstream.write("$ System Parameters:\n")
-                        for param in active_sets[key].params_dict:
-                            if param == "Total-Time" or param == "dt" or param == "ignore_alpha": 
-                                continue
-                            ofstream.write(param + ": " + str(active_sets[key].params_dict[param] * self.convert_out_dict[param]) + "\n")
+                        for param in param_dict_copy:
+                            if not (param == "Total_length" or param == "Node_width" or param == "Total-Time" or param == "dt" or param == "steady_state_exc" or param in self.nanowire.flags_dict): 
+                                param_values = param_dict_copy[param] * self.convert_out_dict[param]
+                                if isinstance(param_values, np.ndarray):
+                                    ofstream.write("{}: {:.8e}".format(param, param_values[0]))
+                                    for value in param_values[1:]:
+                                        ofstream.write("\t{:.8e}".format(value))
+                                        
+                                    ofstream.write('\n')
+                                else:
+                                    ofstream.write("{}: {}\n".format(param, param_values))
 
-                        ofstream.write("$ Initial Conditions: (Nodes) x, N, P\n")
-                        for i in range(node_x.__len__()):
-                            ofstream.write("{:.8e}\t{:.8e}\t{:.8e}\n".format(node_x[i], init_N[i], init_P[i]))
-
-                        ofstream.write("\n$ Initial Conditions: (Edges) x, E-field, Eg, Chi\n")
-                        for i in range(edge_x.__len__()):
-                            ofstream.write("{:.8e}\t{:.8e}\t{:.8e}\t{:.8e}\n".format(edge_x[i], init_E_field[i], 0, 0))
+                        ofstream.write("$ System Flags:\n")
+                        
+                        for param in param_dict_copy:
+                            if param in self.nanowire.flags_dict: 
+                                ofstream.write("{}: {}\n".format(param, param_dict_copy[param]))
 
                 self.write(self.analysis_status, "IC file generated")
 
@@ -1965,8 +1977,8 @@ class Notebook:
         except OSError as oops:
             self.write(self.analysis_status, "IC file not created")
             
-        except:
-            print("Error #511: Failed to close IC carry popup.")
+        # except:
+        #     print("Error #511: Failed to close IC carry popup.")
 
         return
 
@@ -2261,7 +2273,7 @@ class Notebook:
                 self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
                 return
 
-        elif (datatype == "E-field"):
+        elif (datatype == "E_field"):
             try:
                 new_data = Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
@@ -2401,7 +2413,7 @@ class Notebook:
                 active_datagroup.datasets[tag].data = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
-        elif active_datagroup.type == "E-field":
+        elif active_datagroup.type == "E_field":
             for tag in active_datagroup.datasets:
                 active_datagroup.datasets[tag].data = self.read_E_field(active_datagroup.datasets[tag].filename, active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
@@ -2856,7 +2868,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
-                elif (active_datagroup.datasets[tag].type == "E-field"):
+                elif (active_datagroup.datasets[tag].type == "E_field"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
                         data = ifstream_E_field.root.E_field
                         if include_negative:
@@ -2922,7 +2934,7 @@ class Notebook:
         plot = self.integration_subplot
         plot.cla()
         
-        max = self.I_plot.get_maxval() * self.convert_out_dict[active_datagroup.type]
+        max = self.I_plot.get_maxval() * self.convert_out_dict[self.I_plot.type]
         
         self.I_plot.xaxis_type = 'linear'
         self.I_plot.yaxis_type = 'log'
@@ -2937,10 +2949,10 @@ class Notebook:
         for key in self.I_plot.I_sets:
 
             if self.PL_mode == "Current time step":
-                plot.scatter(self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data * self.convert_out_dict[active_datagroup.type], label=self.I_plot.I_sets[key].tag())
+                plot.scatter(self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data * self.convert_out_dict[self.I_plot.type], label=self.I_plot.I_sets[key].tag())
 
             elif self.PL_mode == "All time steps":
-                plot.plot(self.I_plot.global_gridx, self.I_plot.I_sets[key].I_data * self.convert_out_dict[active_datagroup.type], label=self.I_plot.I_sets[key].tag())
+                plot.plot(self.I_plot.global_gridx, self.I_plot.I_sets[key].I_data * self.convert_out_dict[self.I_plot.type], label=self.I_plot.I_sets[key].tag())
                 self.I_plot.xlim = (0, np.amax(self.I_plot.global_gridx))
                 
         plot.legend()
@@ -3838,18 +3850,18 @@ class Notebook:
 
     # Data I/O
 
-    def export_plot(self, plot_ID):
+    def export_plot(self, from_integration):
 
-        if plot_ID == -1:
+        if from_integration:
             if self.I_plot.size() == 0: return
             if self.I_plot.mode == "Current time step": 
-                paired_data = [[self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data] for key in self.I_plot.I_sets]
+                paired_data = [[self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data * self.convert_out_dict[self.I_plot.type]] for key in self.I_plot.I_sets]
 
                 # TODO: Write both of these values with their units
                 header = "{}, {}".format(self.I_plot.x_param, self.I_plot.type)
 
             else: # if self.I_plot.mode == "All time steps"
-                raw_data = np.array([self.I_plot.I_sets[key].I_data for key in self.I_plot.I_sets])
+                raw_data = np.array([self.I_plot.I_sets[key].I_data * self.convert_out_dict[self.I_plot.type] for key in self.I_plot.I_sets])
                 grid_x = np.reshape(self.I_plot.global_gridx, (1,self.I_plot.global_gridx.__len__()))
                 paired_data = np.concatenate((grid_x, raw_data), axis=0).T
                 header = "Time [ns],"
@@ -3857,6 +3869,7 @@ class Notebook:
                     header += self.I_plot.I_sets[key].tag().replace("Δ", "") + ","
 
         else:
+            plot_ID = self.active_analysisplot_ID.get()
             if self.analysis_plots[plot_ID].datagroup.size() == 0: return
             paired_data = self.analysis_plots[plot_ID].datagroup.build()
             # We need some fancy footwork using itertools to transpose a non-rectangular array
@@ -3879,6 +3892,7 @@ class Notebook:
         return
 
     def export_for_bayesim(self):
+        # Note: DO NOT convert_out any of these values - bayesim models are created in TEDs units.
         if self.I_plot.size() == 0: return
             
         if (self.I_plot.mode == "All time steps"):
