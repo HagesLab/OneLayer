@@ -1,4 +1,4 @@
-$$ INITIAL CONDITION FILE CREATED ON 2020-09-01 AT 14:23:46.446101
+$$ INITIAL CONDITION FILE CREATED ON 2020-09-01 AT 14:36:05.713000
 $ Space Grid:
 Total_length: 10000.0
 Node_width: 20.0
@@ -26,4 +26,4 @@ Ec: 0.0
 electron_affinity: 0.0
 $ System Flags:
 ignore_alpha: 0
-symmetric_system: 0
+symmetric_system: 1
