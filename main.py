@@ -449,6 +449,7 @@ class Notebook:
         self.check_reset_params = tk.IntVar()
         self.check_reset_inits = tk.IntVar()
         self.check_display_legend = tk.IntVar()
+        self.check_autointegrate = tk.IntVar(value=1)
 
         self.check_calculate_init_material_expfactor = tk.IntVar()
         self.AIC_stim_mode = tk.StringVar()
@@ -1470,8 +1471,11 @@ class Notebook:
             self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, "N", "P", "E_field", "RR", "NRR", "PL")
             self.var_select_menu.grid(row=1,column=0)
 
+            self.autointegrate_checkbutton = tk.Checkbutton(self.plotter_popup, text="Auto integrate all space and time steps?", variable=self.check_autointegrate, onvalue=1, offvalue=0)
+            self.autointegrate_checkbutton.grid(row=1,column=1)
+            
             self.plotter_continue_button = tk.Button(self.plotter_popup, text="Continue", command=partial(self.on_plotter_popup_close, plot_ID, continue_=True))
-            self.plotter_continue_button.grid(row=1,column=1)
+            self.plotter_continue_button.grid(row=2,column=1)
 
             self.data_listbox = tk.Listbox(self.plotter_popup, width=20, height=20, selectmode="extended")
             self.data_listbox.grid(row=2,rowspan=13,column=0)
@@ -1564,8 +1568,8 @@ class Notebook:
     def do_integration_getbounds_popup(self):
         if not self.integration_getbounds_popup_isopen:
             # Reset integration bounds
-            self.integration_lbound = ""
-            self.integration_ubound = ""
+            # self.integration_lbound = ""
+            # self.integration_ubound = ""
 
             self.integration_getbounds_popup = tk.Toplevel(self.root)
 
@@ -2387,6 +2391,14 @@ class Notebook:
         active_plot.xaxis_type = 'linear'
         active_plot.yaxis_type = 'log'
         self.plot_analyze(plot_ID, clear_plot=True)
+        
+        if self.check_autointegrate.get():
+            self.write(self.analysis_status, "Data read success; integrating...")
+            self.do_Integrate(bypass_inputs=True)
+            
+        else:
+            self.write(self.analysis_status, "Data read success")
+        
         return
 
     def plot_tstep(self):
@@ -2457,7 +2469,6 @@ class Notebook:
                 # Make room for one more value than necessary - this value at index j+1 will be used to pad the upper correction
                 distance_matrix = np.zeros((data_m, data_m))
                 lf_distance_matrix = np.zeros((data_m, data_m))
-                rf_distance_matrix = np.zeros((data_m, data_m))
 
                 # Each row in weight will represent the weight function centered around a different position
                 # Total reflection is assumed to occur at either end of the system: 
@@ -2465,16 +2476,14 @@ class Notebook:
                 for n in range(0, data_m):
                     distance_matrix[n] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:data_m - n]))
                     lf_distance_matrix[n] = distance + (n * dx)
-                    rf_distance_matrix[n] = (max - distance) + (max - n * dx)
 
                 weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
-                lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix)
-                rf_weight = np.exp(-(alphaCof + thetaCof) * rf_distance_matrix) * 0
+                lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix) if active_datagroup.datasets[tag].params_dict["symmetric_system"] else 0
 
-                combined_weight = (1 - fracEmitted) * 0.5 * thetaCof * delta_frac * (weight + lf_weight + rf_weight)
+                combined_weight = (1 - fracEmitted) * 0.5 * thetaCof * delta_frac * (weight + lf_weight)
 
                 weight2 = np.exp(-(thetaCof) * distance_matrix)
-                lf_weight2 = np.exp(-(thetaCof) * lf_distance_matrix)
+                lf_weight2 = np.exp(-(thetaCof) * lf_distance_matrix) if active_datagroup.datasets[tag].params_dict["symmetric_system"] else 0
 
                 combined_weight2 = (1 - fracEmitted) * 0.5 * thetaCof * (1 - delta_frac) * (weight2 + lf_weight2)
 
@@ -2756,34 +2765,42 @@ class Notebook:
 
         return
 
-    def do_Integrate(self):
+    def do_Integrate(self, bypass_inputs=True):
         plot_ID = self.active_analysisplot_ID.get()
         self.write(self.analysis_status, "")
 
         active_plot = self.analysis_plots[plot_ID]
-        if active_plot.datagroup.datasets.__len__() == 0: return
+        active_datagroup = active_plot.datagroup
+        if active_datagroup.datasets.__len__() == 0: return
 
         # Collect instructions from user using a series of popup windows
-        self.do_integration_popup()
-        self.root.wait_window(self.integration_popup) # Pause here until popup is closed
-        if self.PL_mode == "":
-            self.write(self.analysis_status, "Integration cancelled")
-            return
-
-        self.do_integration_getbounds_popup()
-        self.root.wait_window(self.integration_getbounds_popup)
-
-        if self.PL_mode == "Current time step":
-            self.do_PL_xaxis_popup()
-            self.root.wait_window(self.PL_xaxis_popup)
-            if self.xaxis_param == "":
+        if not bypass_inputs:
+            self.do_integration_popup()
+            self.root.wait_window(self.integration_popup) # Pause here until popup is closed
+            if self.PL_mode == "":
                 self.write(self.analysis_status, "Integration cancelled")
                 return
-            print("Selected param {}".format(self.xaxis_param))
-            self.I_plot.x_param = self.xaxis_param
-
+    
+            self.do_integration_getbounds_popup()
+            self.root.wait_window(self.integration_getbounds_popup)
+    
+            if self.PL_mode == "Current time step":
+                self.do_PL_xaxis_popup()
+                self.root.wait_window(self.PL_xaxis_popup)
+                if self.xaxis_param == "":
+                    self.write(self.analysis_status, "Integration cancelled")
+                    return
+                print("Selected param {}".format(self.xaxis_param))
+                self.I_plot.x_param = self.xaxis_param
+    
+            else:
+                self.I_plot.x_param = "Time"
+                
         else:
+            # A "default integration behavior": integrate the present data over all time and space steps
+            self.PL_mode = "All time steps"
             self.I_plot.x_param = "Time"
+            self.integration_bounds = [[0,active_datagroup.get_max_x()]]
             
         # Clean up the I_plot and prepare to integrate given selections
         # A lot of the following is a data transfer between the sending active_datagroup and the receiving I_plot
@@ -2791,7 +2808,7 @@ class Notebook:
         self.I_plot.mode = self.PL_mode
         self.I_plot.global_gridx = None
 
-        active_datagroup = active_plot.datagroup
+        
         n = active_datagroup.get_maxnumtsteps()
         counter = 0
         # Integrate for EACH dataset in chosen datagroup
@@ -2839,17 +2856,6 @@ class Notebook:
 
                 print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
-            #if (self.integration_lbound_entry.get() == "f"):
-            #    self.PL = np.zeros((boundList.__len__(), int(n) + 1))
-            #    for i in range(boundList.__len__()):
-            #        self.PL[i] = finite.propagatingPL(data_filename, boundList[i], boundList[i], dx, 0, total_length - dx, B_param, n0, p0, alpha, theta, delta, frac_emitted)
-
-            #elif (self.integration_lbound_entry.get() == "g"):
-            #    self.PL = np.zeros((boundList.__len__(), int(n) + 1))
-            #    for i in range(boundList.__len__()):
-            #        self.PL[i] = finite.propagatingPL(data_filename, boundList[i] - 500, boundList[i] + 500, dx, 0, total_length - dx, B_param, n0, p0, alpha, theta, delta, frac_emitted)
-            #        if boundList[i] == 0:
-            #            self.PL[i] *= 2
                 if (active_datagroup.datasets[tag].type == "N"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
                         data = ifstream_N.root.N
@@ -2944,7 +2950,7 @@ class Notebook:
         plot.set_ylim(self.I_plot.ylim)
         plot.set_xlabel(xaxis_label)
         plot.set_ylabel(self.I_plot.type)
-        plot.set_title("Total {} from {} nm to {} nm".format(self.I_plot.type, self.integration_lbound, self.integration_ubound))
+        plot.set_title("Integrated {}".format(self.I_plot.type))
 
         for key in self.I_plot.I_sets:
 
