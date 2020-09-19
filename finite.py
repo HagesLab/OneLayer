@@ -14,6 +14,7 @@ def check_valid_dx(length, dx):
     return (dx <= length)
 
 def toIndex(x,dx, absUpperBound, is_edge=False):
+    # Warning: this and toCoord() always round x down to the nearest node (or edge if is_edge=True)!
     absLowerBound = dx / 2 if not is_edge else 0
     if (x < absLowerBound):
         return 0
@@ -22,6 +23,22 @@ def toIndex(x,dx, absUpperBound, is_edge=False):
         return int(absUpperBound / dx)
 
     return int((x - absLowerBound) / dx)
+
+
+def toCoord(i,dx, is_edge=False):
+    absLowerBound = dx / 2 if not is_edge else 0
+    return (absLowerBound + i * dx)
+
+def toArray(value, m, is_edge):
+    if not isinstance(value, np.ndarray):
+        if is_edge:
+            return np.ones(m+1) * value
+        else:
+            return np.ones(m) * value
+        
+    else:
+        return value
+
 
 def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
     # h and c are Planck's const and speed of light, respectively. These default to common units [J*s] and [m/s] but
@@ -36,10 +53,6 @@ def pulse_laser_maxgen(max_gen, alpha, x_array, hc=6.626e-34*2.997e8):
 
 def pulse_laser_totalgen(total_gen, total_length, alpha, x_array, hc=6.626e-34*2.997e8):
     return ((total_gen * total_length * alpha * np.exp(alpha * total_length)) / (np.exp(alpha * total_length) - 1) * np.exp(-alpha * x_array))
-
-def toCoord(i,dx, is_edge=False):
-    absLowerBound = dx / 2 if not is_edge else 0
-    return (absLowerBound + i * dx)
 
 def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, symmetric=True):
     distance = np.arange(0, m*dx, dx)
@@ -56,7 +69,7 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmi
     combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * (weight + lf_weight)
     return combined_weight
 
-def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, recycle_photons=True, symmetric=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, E_field_ext=0, init_N=0, init_P=0, init_E_field=0, init_Ec=0, init_Chi=0, write_output=True):
+def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, params, recycle_photons=True, symmetric=True, do_ss=False, write_output=True, init_N=0, init_P=0, init_E_field=0):
     ## Problem statement:
     # Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
     # Space step size is dx, time step is dt
@@ -66,7 +79,28 @@ def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_
     ## Set data type of array files
     atom = tables.Float64Atom()
 
+    ## Unpack params; typecast non-array params to arrays if needed
+    Sf = params["Sf"]
+    Sb = params["Sb"]
+    mu_n = toArray(params["Mu_N"], m, True)
+    mu_p = toArray(params["Mu_P"], m, True)
+    T = toArray(params["Temperature"], m, True)
+    n0 = toArray(params["N0"], m, False)
+    p0 = toArray(params["P0"], m, False)
+    tauN = toArray(params["Tau_N"], m, False)
+    tauP = toArray(params["Tau_P"], m, False)
+    B = toArray(params["B"], m, False)
+    eps = toArray(params["Rel-Permitivity"], m, True)
+    E_field_ext = toArray(params["Ext_E-Field"], m, True)
+    alphaCof = toArray(params["Alpha"], m, False) if recycle_photons else np.zeros(m)
+    thetaCof = toArray(params["Theta"], m, False)
+    delta_frac = toArray(params["Delta"], m, False)
+    fracEmitted = toArray(params["Frac-Emitted"], m, False)
+    init_Ec = toArray(params["Ec"], m, True)
+    init_Chi = toArray(params["electron_affinity"], m, True)
+           
     ## Define constants
+    eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
     q = 1.0 # [e]
     q_C = 1.602e-19 # [C]
     kB = 8.61773e-5  # [eV / K]
@@ -195,7 +229,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
     if radrec_fromfile:
         with tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
-            radRec = B * ((n0 + np.array(ifstream_N.root.N)) * (p0 + np.array(ifstream_P.root.P)) - n0 * p0)
+            radRec = B * ((np.array(ifstream_N.root.N)) * (np.array(ifstream_P.root.P)) - n0 * p0)
 
     else:
         radRec = rad_rec

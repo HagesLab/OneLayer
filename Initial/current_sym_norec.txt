@@ -25,5 +25,5 @@ init_E_field: 0.0
 Ec: 0.0
 electron_affinity: 0.0
 $ System Flags:
-ignore_alpha: 0
-symmetric_system: 0
+ignore_alpha: 1
+symmetric_system: 1
