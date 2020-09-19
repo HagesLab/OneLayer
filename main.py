@@ -193,6 +193,9 @@ class Batchable:
         self.param_name = param_name
         return
 
+class Scalable_Plot_State:
+    def __init__(self):
+        return
 
 class Data_Set:
     # Object containing all the metadata required to plot and integrate saved data sets
@@ -222,8 +225,8 @@ class Data_Set:
 
 class Data_Group:
     # Object containing list of Data_Sets; there is one Data_Group for each of the two small plots on analysis tab
-    def __init__(self, ID):
-        self.ID = ID
+    def __init__(self):
+        #self.ID = ID
         self.type = "None"
         self.dt = -1
         self.total_t = -1
@@ -284,16 +287,16 @@ class Plot_State:
     # Object containing variables needed for each small plot on analysis tab
 	# This is really a wrapper that enhances interactions between the Data_Group object and the embedded plot
     # There are currently four of these
-    def __init__(self, ID, plot_obj=None):
-        self.ID = ID
+    def __init__(self, plot_obj=None):
+        #self.ID = ID
         self.plot_obj = plot_obj
         self.xaxis_type = 'linear'
         self.yaxis_type = 'log'
         self.xlim = (-1,-1)
         self.ylim = (-1,-1)
-        self.fig_ID = -1 # FIXME: To be deprecated
+        #self.fig_ID = -1 # FIXME: To be deprecated
         self.time_index = 0
-        self.datagroup = Data_Group(ID)
+        self.datagroup = Data_Group()
         self.data_filenames = []
         self.display_legend = 1
         return
@@ -327,6 +330,7 @@ class I_Set:
     def tag(self):
         return self.filename + "_" + self.type
 
+## FIXME: With tau_diff coming in, the I_group should no longer be a singleton. FInd a way to combine I_Group and I_set with DataSet, DataGroup, and Plot_State
 class I_Group:
     # A batch of I_sets generated from the same Integrate operation
     def __init__(self):
@@ -492,7 +496,7 @@ class Notebook:
         self.carry_include_E_field = tk.IntVar()
         
         # Helpers, flags, and containers for analysis plots
-        self.analysis_plots = [Plot_State(ID=0), Plot_State(ID=1), Plot_State(ID=2), Plot_State(ID=3)]
+        self.analysis_plots = [Plot_State(), Plot_State(), Plot_State(), Plot_State()]
         self.I_plot = I_Group()
         self.data_var = tk.StringVar()
         self.fetch_PLmode = tk.StringVar()
@@ -1142,7 +1146,8 @@ class Notebook:
         self.analyze_IC_carry_button.grid(row=1,column=6)
 
         self.integration_fig = Figure(figsize=(8,5))
-        self.integration_subplot = self.integration_fig.add_subplot(111)
+        self.integration_subplot = self.integration_fig.add_subplot(121)
+        self.taudiff_subplot = self.integration_fig.add_subplot(122)
         self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_analyze)
         self.integration_widget = self.integration_canvas.get_tk_widget()
         self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
@@ -2820,6 +2825,7 @@ class Notebook:
             dx = active_datagroup.datasets[tag].params_dict["Node_width"]
             total_length = active_datagroup.datasets[tag].params_dict["Total_length"]
             total_time = active_datagroup.datasets[tag].params_dict["Total-Time"]
+            dt = active_datagroup.datasets[tag].params_dict["dt"]
             B_param = active_datagroup.datasets[tag].params_dict["B"]
             n0 = active_datagroup.datasets[tag].params_dict["N0"]
             p0 = active_datagroup.datasets[tag].params_dict["P0"]
@@ -2914,7 +2920,8 @@ class Notebook:
                             finite.propagatingPL(data_filename, 0, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
                     else:
                         I_data = finite.propagatingPL(data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
-            
+                        tau_diff = finite.tau_diff(I_data, dt)
+                        self.taudiff_subplot.plot(np.linspace(0, total_time, n + 1), tau_diff)
 
                 if self.PL_mode == "Current time step":
                     # FIXME: We don't need to integrate everything just to extract a single time step
