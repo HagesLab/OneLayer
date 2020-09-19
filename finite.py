@@ -270,7 +270,6 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
     else: # if we don't need the extra node
         distance_matrix = np.zeros((j - i + 1, m))
         lf_distance_matrix = np.zeros((j - i + 1, m))
-        rf_distance_matrix = np.zeros((j - i + 1, m))
 
         for n in range(i, j + 1):
             distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
@@ -400,6 +399,15 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
         u_bound_correction += integrand[j-i+1] * ufrac2
 
     return u_bound_correction - l_bound_correction
+
+def tau_diff(PL, dt):
+    ln_PL = np.log(PL)
+    dln_PLdt = np.zeros(ln_PL.__len__())
+    dln_PLdt[0] = (ln_PL[1] - ln_PL[0]) / dt
+    dln_PLdt[-1] = (ln_PL[-1] - ln_PL[-2]) / dt
+    dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)
+    return -(dln_PLdt ** -1)
+    
 
 def CalcInt(input_array,spacing):
     # FIXME: NEEDS TESTING WITH bay.py
