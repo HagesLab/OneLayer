@@ -194,8 +194,8 @@ class Batchable:
 
 class Data_Set:
     def __init__(self, data, grid_x, params_dict, type, filename):
-        self.data = data    # This is usually PL values
-        self.grid_x = grid_x    # This is usually time values
+        self.data = data
+        self.grid_x = grid_x
         self.params_dict = dict(params_dict)
         self.type = type
         self.filename = filename
@@ -244,7 +244,6 @@ class Data_Group:
         return
 
 class Raw_Data_Group(Data_Group):
-    # Object containing list of Data_Sets; there is one Data_Group for each of the two small plots on analysis tab
     def __init__(self):
         super().__init__()
         self.dt = -1
@@ -1675,8 +1674,7 @@ class Notebook:
             self.PL_xaxis_title_label = tk.ttk.Label(self.PL_xaxis_popup, text="Select parameter for x axis", style="Header.TLabel")
             self.PL_xaxis_title_label.grid(row=0,column=0,columnspan=3)
 
-            self.xaxis_param_menu = tk.OptionMenu(self.PL_xaxis_popup, self.xaxis_selection, "Mu_N", "Mu_P", "N0", "P0", "Thickness", "dx", "B", "Tau_N", "Tau_P", "Sf", \
-            "Sb", "Temperature", "Rel-Permitivity", "Theta", "Alpha", "Delta", "Frac-Emitted","Total-Time","dt","ignore_alpha")
+            self.xaxis_param_menu = tk.OptionMenu(self.PL_xaxis_popup, self.xaxis_selection, *[param for param in self.nanowire.param_dict])
             self.xaxis_param_menu.grid(row=1,column=1)
 
             self.PL_xaxis_continue_button = tk.Button(self.PL_xaxis_popup, text="Continue", command=partial(self.on_PL_xaxis_popup_close, continue_=True))
@@ -2747,7 +2745,7 @@ class Notebook:
 
         return
 
-    def do_Integrate(self, bypass_inputs=True):
+    def do_Integrate(self, bypass_inputs=False):
         plot_ID = self.active_analysisplot_ID.get()
         self.write(self.analysis_status, "")
 
@@ -2787,15 +2785,18 @@ class Notebook:
         # Clean up the I_plot and prepare to integrate given selections
         # A lot of the following is a data transfer between the sending active_datagroup and the receiving I_plot
         self.integration_plots[0].datagroup.clear()
+        self.integration_plots[1].datagroup.clear()
         self.integration_plots[0].mode = self.PL_mode
         self.integration_plots[0].global_gridx = None
 
         
         n = active_datagroup.get_maxnumtsteps()
+        
         counter = 0
         # Integrate for EACH dataset in chosen datagroup
         for tag in active_datagroup.datasets:
             data_filename = active_datagroup.datasets[tag].filename
+            datatype = active_datagroup.datasets[tag].type
             print("Now integrating {}".format(data_filename))
 
             # Unpack needed params from the dictionaries of params
@@ -2839,7 +2840,7 @@ class Notebook:
 
                 print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
-                if (active_datagroup.datasets[tag].type == "N"):
+                if (datatype == "N"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
                         data = ifstream_N.root.N
                         if include_negative:
@@ -2848,7 +2849,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
             
-                elif (active_datagroup.datasets[tag].type == "P"):
+                elif (datatype == "P"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         data = ifstream_P.root.P
                         if include_negative:
@@ -2857,7 +2858,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
-                elif (active_datagroup.datasets[tag].type == "E_field"):
+                elif (datatype == "E_field"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
                         data = ifstream_E_field.root.E_field
                         if include_negative:
@@ -2866,7 +2867,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
-                elif (active_datagroup.datasets[tag].type == "RR"):
+                elif (datatype == "RR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
                         tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.N)
@@ -2879,7 +2880,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
-                elif (active_datagroup.datasets[tag].type == "NRR"):
+                elif (datatype == "NRR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
                         tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.N)
@@ -2891,14 +2892,13 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
-                else:
+                else: # datatype = "PL"
                     if include_negative:
                         I_data = finite.propagatingPL(data_filename, 0, -l_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag) + \
                             finite.propagatingPL(data_filename, 0, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
                     else:
                         I_data = finite.propagatingPL(data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
-                        tau_diff = finite.tau_diff(I_data, dt)
-                        self.taudiff_subplot.plot(np.linspace(0, total_time, n + 1), tau_diff)
+                            
 
                 if self.PL_mode == "Current time step":
                     # FIXME: We don't need to integrate everything just to extract a single time step
@@ -2917,6 +2917,12 @@ class Notebook:
 
                 self.integration_plots[0].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(l_bound) + "_to_" + str(u_bound)))
 
+                # Do some bonus calculations involving PL's time derivative
+                if (self.PL_mode == "All time steps" and datatype == "PL"):
+                    self.integration_plots[1].global_gridx = np.linspace(0, total_time, n + 1)
+                    tau_diff = finite.tau_diff(I_data, dt)
+                    self.integration_plots[1].datagroup.add(Integrated_Data_Set(tau_diff, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(l_bound) + "_to_" + str(u_bound)))
+                        
                 counter += 1
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
 
@@ -2947,6 +2953,17 @@ class Notebook:
                 self.integration_plots[0].xlim = (0, np.amax(self.integration_plots[0].global_gridx))
                 
         subplot.legend()
+        
+        self.taudiff_subplot.cla()
+        if self.integration_plots[1].datagroup.size():
+            self.taudiff_subplot.set_ylabel("tau_diff")
+            self.taudiff_subplot.set_xlabel("Time [ns]")
+            self.taudiff_subplot.set_title("-(dln(PL)/dt)^(-1)")
+            for key in self.integration_plots[1].datagroup.datasets:
+                self.taudiff_subplot.plot(self.integration_plots[1].global_gridx, self.integration_plots[1].datagroup.datasets[key].data, label=self.integration_plots[1].datagroup.datasets[key].tag())
+        
+            self.taudiff_subplot.legend()
+
         self.integration_fig.tight_layout()
         self.integration_fig.canvas.draw()
         
