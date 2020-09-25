@@ -73,7 +73,6 @@ class Parameter:
         self.param_rules = []
         return
 
-
 class Nanowire:
     # A Nanowire object contains all information regarding the initial state of a nanowire
     def __init__(self):
@@ -193,45 +192,62 @@ class Batchable:
         self.param_name = param_name
         return
 
-
 class Data_Set:
+    def __init__(self, data, grid_x, params_dict, type, filename):
+        self.data = data
+        self.grid_x = grid_x
+        self.params_dict = dict(params_dict)
+        self.type = type
+        self.filename = filename
+        return
+    
+    def tag(self):
+        return self.filename + "_" + self.type
+    
+class Raw_Data_Set(Data_Set):
     # Object containing all the metadata required to plot and integrate saved data sets
-    def __init__(self, data, grid_x, node_x, edge_x, params, type, filename, show_index):
-        self.data = data            # The actual data e.g. N(x,t) associated with this set
-        self.grid_x = grid_x        # Array of x-coordinates at which data was calculated - plotter uses these as x values
+    def __init__(self, data, grid_x, node_x, edge_x, params_dict, type, filename, show_index):
+        super().__init__(data, grid_x, params_dict, type, filename)
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
         self.edge_x = edge_x        # node_x but for system node edges - also needed to regenerate ICs
 
         # node_x and grid_x will usually be identical, unless the data is a type (like E-field) that exists on edges
         # There's a little optimization that can be made here because grid_x will either be identical to node_x or edge_x, but that makes the code harder to follow
 
-        self.type = type            # String identifying variable the data is for e.g. N, P
-        self.filename = filename    # String identifying file from which data set was read
-        self.show_index = show_index# Time step number data belongs to
+        self.show_index = show_index # Time step number data belongs to
 
-		# dict() can be used to give a Data_Set a copy of the dictionary passed to it
-        self.params_dict = dict(params)
         self.num_tsteps = int(0.5 + self.params_dict["Total-Time"] / self.params_dict["dt"])
         return
 
-    def tag(self):
-        return self.filename + "_" + self.type
-
     def build(self):
         return np.vstack((self.grid_x, self.data))
-
-class Data_Group:
-    # Object containing list of Data_Sets; there is one Data_Group for each of the two small plots on analysis tab
-    def __init__(self, ID):
-        self.ID = ID
-        self.type = "None"
-        self.dt = -1
-        self.total_t = -1
-        self.datasets = {}
+    
+class Integrated_Data_Set(Data_Set):
+    def __init__(self, data, grid_x, params_dict, type, filename):
+        super().__init__(data, grid_x, params_dict, type, filename)
         return
 
-    def set_type(self, new_type):
-        self.type = new_type
+class Data_Group:
+    def __init__(self):
+        self.type = "None"
+        self.datasets = {}
+        return
+    
+    def get_maxval(self):
+        return np.amax([np.amax(self.datasets[tag].data) for tag in self.datasets])
+    
+    def size(self):
+        return len(self.datasets)
+    
+    def clear(self):
+        self.datasets.clear()
+        return
+
+class Raw_Data_Group(Data_Group):
+    def __init__(self):
+        super().__init__()
+        self.dt = -1
+        self.total_t = -1
         return
 
     def add(self, data, tag):
@@ -245,12 +261,9 @@ class Data_Group:
             self.datasets[tag] = data
 
         else:
-            raise ValueError("Cannot plot selected data sets: dt or total t mismatch")
+            print("Cannot plot selected data sets: dt or total t mismatch")
 
         return
-
-    def get_data(self):
-        return np.array(self.datasets.values())
 
     def build(self):
         # FIXME: Needs to convert_out data
@@ -270,100 +283,65 @@ class Data_Group:
     def get_maxnumtsteps(self):
         return np.amax([self.datasets[tag].num_tsteps for tag in self.datasets])
 
-    def get_maxval(self):
-        return np.amax([np.amax(self.datasets[tag].data) for tag in self.datasets])
+class Integrated_Data_Group(Data_Group):
+    def __init__(self):
+        super().__init__()
+        return
+    
+    def add(self, new_set):
+        if (len(self.datasets) == 0): # Allow the first set in to set the type restriction
+           self.type = new_set.type
 
-    def size(self):
-        return len(self.datasets)
+        # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong
+        if (self.type == new_set.type):
+            self.datasets[new_set.tag] = new_set
 
-    def clear(self):
-        self.datasets.clear()
         return
 
-class Plot_State:
-    # Object containing variables needed for each small plot on analysis tab
-	# This is really a wrapper that enhances interactions between the Data_Group object and the embedded plot
-    # There are currently four of these
-    def __init__(self, ID, plot_obj=None):
-        self.ID = ID
+class Scalable_Plot_State:
+    def __init__(self, plot_obj=None):
         self.plot_obj = plot_obj
         self.xaxis_type = 'linear'
         self.yaxis_type = 'log'
         self.xlim = (-1,-1)
         self.ylim = (-1,-1)
-        self.fig_ID = -1 # FIXME: To be deprecated
-        self.time_index = 0
-        self.datagroup = Data_Group(ID)
-        self.data_filenames = []
         self.display_legend = 1
         return
 
-    def remove_duplicate_filenames(self):
-        # Sets, unlike arrays, contain at most one copy of each item. Forcing an array into a set like this
-        # is a fast way to scrub duplicate entries, which is needed because we don't want to waste time
-        # plotting the same data set multiple times.
-        # Unfortunately, sets are not indexable, so we convert back into arrays to regain index access ability.
-            
-        self.data_filenames = list(set(self.data_filenames))
+class Integration_Plot_State(Scalable_Plot_State):
+    def __init__(self):
+        super().__init__()
+        self.mode = ""
+        self.x_param = "None"   # This is usually "Time"
+        self.global_gridx = None    # In some modes of operation every I_Set will have the same grid_x
+        self.datagroup = Integrated_Data_Group()
         return
+
+class Analysis_Plot_State(Scalable_Plot_State):
+    # Object containing variables needed for each small plot on analysis tab
+	# This is really a wrapper that enhances interactions between the Data_Group object and the embedded plot
+    # There are currently four of these
+    def __init__(self):
+        super().__init__()
+        self.time_index = 0
+        self.data_filenames = []
+        self.datagroup = Raw_Data_Group()
+        return
+
+    # def remove_duplicate_filenames(self):
+    #     # Sets, unlike arrays, contain at most one copy of each item. Forcing an array into a set like this
+    #     # is a fast way to scrub duplicate entries, which is needed because we don't want to waste time
+    #     # plotting the same data set multiple times.
+    #     # Unfortunately, sets are not indexable, so we convert back into arrays to regain index access ability.
+            
+    #     self.data_filenames = list(set(self.data_filenames))
+    #     return
 
     def add_time_index(self, offset):
         self.time_index += offset
         if self.time_index < 0: self.time_index = 0
         if self.time_index > self.datagroup.get_maxnumtsteps(): 
             self.time_index = self.datagroup.get_maxnumtsteps()
-        return
-
-class I_Set:
-    # I_Sets are similar to Data_Sets but store exclusively the integrated data generated from Data_Sets
-    def __init__(self, I_data, grid_x, params_dict, type, filename):
-        self.I_data = I_data    # This is usually PL values
-        self.grid_x = grid_x    # This is usually time values
-        self.params_dict = params_dict
-        self.type = type
-        self.filename = filename
-        return
-
-    def tag(self):
-        return self.filename + "_" + self.type
-
-class I_Group:
-    # A batch of I_sets generated from the same Integrate operation
-    def __init__(self):
-        self.I_sets = {}
-        self.type = "None"      # This is usually "PL"
-        self.mode = ""
-        self.x_param = "None"   # This is usually "Time"
-        self.global_gridx = None    # In some modes of operation every I_Set will have the same grid_x
-        self.xaxis_type = 'linear'
-        self.yaxis_type = 'log'
-        self.xlim = (-1,-1)
-        self.ylim = (-1,-1)
-        self.display_legend = 1
-        return
-
-    def set_type(self, new_type):
-        self.type = new_type
-        return
-
-    def add(self, new_set):
-        if (len(self.I_sets) == 0): # Allow the first set in to set the type restriction
-           self.type = new_set.type
-
-        # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong
-        if (self.type == new_set.type):
-            self.I_sets[new_set.tag] = new_set
-
-        return
-
-    def get_maxval(self):
-        return np.amax([np.amax(self.I_sets[tag].I_data) for tag in self.I_sets])
-
-    def size(self):
-        return len(self.I_sets)
-
-    def clear(self):
-        self.I_sets.clear()
         return
 
 def extract_values(string, delimiter):
@@ -492,8 +470,8 @@ class Notebook:
         self.carry_include_E_field = tk.IntVar()
         
         # Helpers, flags, and containers for analysis plots
-        self.analysis_plots = [Plot_State(ID=0), Plot_State(ID=1), Plot_State(ID=2), Plot_State(ID=3)]
-        self.I_plot = I_Group()
+        self.analysis_plots = [Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State()]
+        self.integration_plots = [Integration_Plot_State(), Integration_Plot_State()]
         self.data_var = tk.StringVar()
         self.fetch_PLmode = tk.StringVar()
         self.fetch_intg_mode = tk.StringVar()
@@ -1141,8 +1119,12 @@ class Notebook:
         self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup))
         self.analyze_IC_carry_button.grid(row=1,column=6)
 
-        self.integration_fig = Figure(figsize=(8,5))
-        self.integration_subplot = self.integration_fig.add_subplot(111)
+        self.integration_fig = Figure(figsize=(9,5))
+        self.integration_subplot = self.integration_fig.add_subplot(121)
+        self.taudiff_subplot = self.integration_fig.add_subplot(122)
+        self.integration_plots[0].plot_obj = self.integration_subplot
+        self.integration_plots[1].plot_obj = self.taudiff_subplot
+        
         self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_analyze)
         self.integration_widget = self.integration_canvas.get_tk_widget()
         self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
@@ -1507,7 +1489,7 @@ class Notebook:
                 for next_dir in dir_names:
                     self.analysis_plots[plot_ID].data_filenames.append(next_dir)
 
-                self.analysis_plots[plot_ID].remove_duplicate_filenames()
+                #self.analysis_plots[plot_ID].remove_duplicate_filenames()
 
             self.plotter_popup.destroy()
             print("Plotter popup closed")
@@ -1692,8 +1674,7 @@ class Notebook:
             self.PL_xaxis_title_label = tk.ttk.Label(self.PL_xaxis_popup, text="Select parameter for x axis", style="Header.TLabel")
             self.PL_xaxis_title_label.grid(row=0,column=0,columnspan=3)
 
-            self.xaxis_param_menu = tk.OptionMenu(self.PL_xaxis_popup, self.xaxis_selection, "Mu_N", "Mu_P", "N0", "P0", "Thickness", "dx", "B", "Tau_N", "Tau_P", "Sf", \
-            "Sb", "Temperature", "Rel-Permitivity", "Theta", "Alpha", "Delta", "Frac-Emitted","Total-Time","dt","ignore_alpha")
+            self.xaxis_param_menu = tk.OptionMenu(self.PL_xaxis_popup, self.xaxis_selection, *[param for param in self.nanowire.param_dict])
             self.xaxis_param_menu.grid(row=1,column=1)
 
             self.PL_xaxis_continue_button = tk.Button(self.PL_xaxis_popup, text="Continue", command=partial(self.on_PL_xaxis_popup_close, continue_=True))
@@ -1728,7 +1709,7 @@ class Notebook:
     def do_change_axis_popup(self, from_integration):
         # Don't open if no data plotted
         if from_integration:
-            if self.I_plot.size() == 0: return
+            if self.integration_plots[0].datagroup.size() == 0: return
 
         else:
             plot_ID = self.active_analysisplot_ID.get()
@@ -1815,7 +1796,7 @@ class Notebook:
                 active_plot = self.analysis_plots[plot_ID]
 
             else:
-                active_plot = self.I_plot
+                active_plot = self.integration_plots[0]
 
             self.enter(self.xlbound, active_plot.xlim[0])
             self.enter(self.xubound, active_plot.xlim[1])
@@ -1844,7 +1825,7 @@ class Notebook:
                     plot = self.analysis_plots[plot_ID].plot_obj
                     
                 else:
-                    plot = self.integration_subplot
+                    plot = self.integration_plots[0].plot_obj
 
                 # Set plot axis params and save in corresponding plot state object, if the selected plot has such an object
                 plot.set_yscale(self.yaxis_type.get())
@@ -1875,11 +1856,11 @@ class Notebook:
                     self.analysis_plots[plot_ID].xlim = (bounds[0], bounds[1])
                     self.analysis_plots[plot_ID].display_legend = self.check_display_legend.get()
                 else:
-                    self.I_plot.yaxis_type = self.yaxis_type.get()
-                    self.I_plot.xaxis_type = self.xaxis_type.get()
-                    self.I_plot.ylim = (bounds[2], bounds[3])
-                    self.I_plot.xlim = (bounds[0], bounds[1])
-                    self.I_plot.display_legend = self.check_display_legend.get()
+                    self.integration_plots[0].yaxis_type = self.yaxis_type.get()
+                    self.integration_plots[0].xaxis_type = self.xaxis_type.get()
+                    self.integration_plots[0].ylim = (bounds[2], bounds[3])
+                    self.integration_plots[0].xlim = (bounds[0], bounds[1])
+                    self.integration_plots[0].display_legend = self.check_display_legend.get()
 
             self.change_axis_popup.destroy()
             print("PL change axis popup closed")
@@ -1987,7 +1968,7 @@ class Notebook:
         return
 
     def do_bayesim_popup(self):
-        if self.I_plot.size() == 0: return
+        if self.integration_plots[0].datagroup.size() == 0: return
 
         if not self.bayesim_popup_isopen:
 
@@ -1998,7 +1979,7 @@ class Notebook:
 
             self.bay_text1 = tk.Message(self.bay_popup, text=
                                         "Select \"Observation\" to save each curve as an experimentally observed data set or " +
-                                        "Model to combine all curves into a single model set.", width=320)
+                                        "(WIP) Model to combine all curves into a single model set.", width=320)
             self.bay_text1.grid(row=1,column=0)
 
             self.bay_text2 = tk.Message(self.bay_popup, text=
@@ -2024,7 +2005,7 @@ class Notebook:
             self.bay_mod_mode = tk.ttk.Radiobutton(self.bay_popup, variable=self.bay_mode, value="model")
             self.bay_mod_mode.grid(row=2,column=2)
 
-            self.bay_mod_header = tk.Label(self.bay_popup, text="Model")
+            self.bay_mod_header = tk.Label(self.bay_popup, text="(WIP) Model")
             self.bay_mod_header.grid(row=2,column=3)
 
             self.bay_title_label3 = tk.ttk.Label(self.bay_popup, text="Model Params", style="Header.TLabel")
@@ -2263,7 +2244,7 @@ class Notebook:
         if (datatype == "N"):
             try:
                 # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
-                new_data = Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
@@ -2271,7 +2252,7 @@ class Notebook:
 
         elif (datatype == "P"):
             try:
-                new_data = Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
@@ -2279,16 +2260,15 @@ class Notebook:
 
         elif (datatype == "E_field"):
             try:
-                new_data = Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
                 return
-
-        # TODO: New equations for RR, NRR, and PL after resolving N vs. delta_N
+        
         elif (datatype == "RR"):
             try:
-                new_data = Data_Set(param_values_dict["B"] * ((self.read_N(data_filename, active_show_index)) * (self.read_P(data_filename, active_show_index)) - param_values_dict["N0"] * param_values_dict["P0"]), 
+                new_data = Raw_Data_Set(param_values_dict["B"] * ((self.read_N(data_filename, active_show_index)) * (self.read_P(data_filename, active_show_index)) - param_values_dict["N0"] * param_values_dict["P0"]), 
                                     data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
@@ -2299,7 +2279,7 @@ class Notebook:
             try:
                 temp_N = self.read_N(data_filename, active_show_index)
                 temp_P = self.read_P(data_filename, active_show_index)
-                new_data = Data_Set((temp_N * temp_P - param_values_dict["N0"] * param_values_dict["P0"]) / 
+                new_data = Raw_Data_Set((temp_N * temp_P - param_values_dict["N0"] * param_values_dict["P0"]) / 
                                     ((param_values_dict["Tau_N"] * temp_P) + (param_values_dict["Tau_P"] * temp_N)), 
                                     data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
@@ -2351,7 +2331,7 @@ class Notebook:
                     PL_base[p] += intg.trapz(combined_weight[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * rad_rec[p] + \
                         intg.trapz(combined_weight2[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * rad_rec[p]
 
-                new_data = Data_Set(PL_base, data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(PL_base, data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except OSError:
                 self.write(self.analysis_status, "Error: Unable to calculate PL")
@@ -2765,7 +2745,7 @@ class Notebook:
 
         return
 
-    def do_Integrate(self, bypass_inputs=True):
+    def do_Integrate(self, bypass_inputs=False):
         plot_ID = self.active_analysisplot_ID.get()
         self.write(self.analysis_status, "")
 
@@ -2791,35 +2771,39 @@ class Notebook:
                     self.write(self.analysis_status, "Integration cancelled")
                     return
                 print("Selected param {}".format(self.xaxis_param))
-                self.I_plot.x_param = self.xaxis_param
+                self.integration_plots[0].x_param = self.xaxis_param
     
             else:
-                self.I_plot.x_param = "Time"
+                self.integration_plots[0].x_param = "Time"
                 
         else:
             # A "default integration behavior": integrate the present data over all time and space steps
             self.PL_mode = "All time steps"
-            self.I_plot.x_param = "Time"
+            self.integration_plots[0].x_param = "Time"
             self.integration_bounds = [[0,active_datagroup.get_max_x()]]
             
         # Clean up the I_plot and prepare to integrate given selections
         # A lot of the following is a data transfer between the sending active_datagroup and the receiving I_plot
-        self.I_plot.clear()
-        self.I_plot.mode = self.PL_mode
-        self.I_plot.global_gridx = None
+        self.integration_plots[0].datagroup.clear()
+        self.integration_plots[1].datagroup.clear()
+        self.integration_plots[0].mode = self.PL_mode
+        self.integration_plots[0].global_gridx = None
 
         
         n = active_datagroup.get_maxnumtsteps()
+        
         counter = 0
         # Integrate for EACH dataset in chosen datagroup
         for tag in active_datagroup.datasets:
             data_filename = active_datagroup.datasets[tag].filename
+            datatype = active_datagroup.datasets[tag].type
             print("Now integrating {}".format(data_filename))
 
             # Unpack needed params from the dictionaries of params
             dx = active_datagroup.datasets[tag].params_dict["Node_width"]
             total_length = active_datagroup.datasets[tag].params_dict["Total_length"]
             total_time = active_datagroup.datasets[tag].params_dict["Total-Time"]
+            dt = active_datagroup.datasets[tag].params_dict["dt"]
             B_param = active_datagroup.datasets[tag].params_dict["B"]
             n0 = active_datagroup.datasets[tag].params_dict["N0"]
             p0 = active_datagroup.datasets[tag].params_dict["P0"]
@@ -2856,7 +2840,7 @@ class Notebook:
 
                 print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
-                if (active_datagroup.datasets[tag].type == "N"):
+                if (datatype == "N"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
                         data = ifstream_N.root.N
                         if include_negative:
@@ -2865,7 +2849,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
             
-                elif (active_datagroup.datasets[tag].type == "P"):
+                elif (datatype == "P"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         data = ifstream_P.root.P
                         if include_negative:
@@ -2874,7 +2858,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
-                elif (active_datagroup.datasets[tag].type == "E_field"):
+                elif (datatype == "E_field"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
                         data = ifstream_E_field.root.E_field
                         if include_negative:
@@ -2883,7 +2867,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
-                elif (active_datagroup.datasets[tag].type == "RR"):
+                elif (datatype == "RR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
                         tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.N)
@@ -2896,7 +2880,7 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
-                elif (active_datagroup.datasets[tag].type == "NRR"):
+                elif (datatype == "NRR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
                         tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.N)
@@ -2908,13 +2892,13 @@ class Notebook:
                         else:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
-                else:
+                else: # datatype = "PL"
                     if include_negative:
                         I_data = finite.propagatingPL(data_filename, 0, -l_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag) + \
                             finite.propagatingPL(data_filename, 0, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
                     else:
                         I_data = finite.propagatingPL(data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
-            
+                            
 
                 if self.PL_mode == "Current time step":
                     # FIXME: We don't need to integrate everything just to extract a single time step
@@ -2927,41 +2911,59 @@ class Notebook:
                     xaxis_label = self.xaxis_param + " [WIP]"
 
                 elif self.PL_mode == "All time steps":
-                    self.I_plot.global_gridx = np.linspace(0, total_time, n + 1)
+                    self.integration_plots[0].global_gridx = np.linspace(0, total_time, n + 1)
                     grid_xaxis = -1 # A dummy value for the I_Set constructor
                     xaxis_label = "Time [ns]"
 
-                self.I_plot.add(I_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(l_bound) + "_to_" + str(u_bound)))
+                self.integration_plots[0].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(l_bound) + "_to_" + str(u_bound)))
 
+                # Do some bonus calculations involving PL's time derivative
+                if (self.PL_mode == "All time steps" and datatype == "PL"):
+                    self.integration_plots[1].global_gridx = np.linspace(0, total_time, n + 1)
+                    tau_diff = finite.tau_diff(I_data, dt)
+                    self.integration_plots[1].datagroup.add(Integrated_Data_Set(tau_diff, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(l_bound) + "_to_" + str(u_bound)))
+                        
                 counter += 1
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
 
             
-        plot = self.integration_subplot
-        plot.cla()
+        subplot = self.integration_plots[0].plot_obj
+        datagroup = self.integration_plots[0].datagroup
+        subplot.cla()
         
-        max = self.I_plot.get_maxval() * self.convert_out_dict[self.I_plot.type]
+        max = datagroup.get_maxval() * self.convert_out_dict[datagroup.type]
         
-        self.I_plot.xaxis_type = 'linear'
-        self.I_plot.yaxis_type = 'log'
-        self.I_plot.ylim = max * 1e-12, max * 10
+        self.integration_plots[0].xaxis_type = 'linear'
+        self.integration_plots[0].yaxis_type = 'log'
+        self.integration_plots[0].ylim = max * 1e-12, max * 10
 
-        plot.set_yscale(self.I_plot.yaxis_type)
-        plot.set_ylim(self.I_plot.ylim)
-        plot.set_xlabel(xaxis_label)
-        plot.set_ylabel(self.I_plot.type)
-        plot.set_title("Integrated {}".format(self.I_plot.type))
+        subplot.set_yscale(self.integration_plots[0].yaxis_type)
+        subplot.set_ylim(self.integration_plots[0].ylim)
+        subplot.set_xlabel(xaxis_label)
+        subplot.set_ylabel(datagroup.type)
+        subplot.set_title("Integrated {}".format(datagroup.type))
 
-        for key in self.I_plot.I_sets:
+        for key in datagroup.datasets:
 
             if self.PL_mode == "Current time step":
-                plot.scatter(self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data * self.convert_out_dict[self.I_plot.type], label=self.I_plot.I_sets[key].tag())
+                subplot.scatter(datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag())
 
             elif self.PL_mode == "All time steps":
-                plot.plot(self.I_plot.global_gridx, self.I_plot.I_sets[key].I_data * self.convert_out_dict[self.I_plot.type], label=self.I_plot.I_sets[key].tag())
-                self.I_plot.xlim = (0, np.amax(self.I_plot.global_gridx))
+                subplot.plot(self.integration_plots[0].global_gridx, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag())
+                self.integration_plots[0].xlim = (0, np.amax(self.integration_plots[0].global_gridx))
                 
-        plot.legend()
+        subplot.legend()
+        
+        self.taudiff_subplot.cla()
+        if self.integration_plots[1].datagroup.size():
+            self.taudiff_subplot.set_ylabel("tau_diff")
+            self.taudiff_subplot.set_xlabel("Time [ns]")
+            self.taudiff_subplot.set_title("-(dln(PL)/dt)^(-1)")
+            for key in self.integration_plots[1].datagroup.datasets:
+                self.taudiff_subplot.plot(self.integration_plots[1].global_gridx, self.integration_plots[1].datagroup.datasets[key].data, label=self.integration_plots[1].datagroup.datasets[key].tag())
+        
+            self.taudiff_subplot.legend()
+
         self.integration_fig.tight_layout()
         self.integration_fig.canvas.draw()
         
@@ -3859,20 +3861,22 @@ class Notebook:
     def export_plot(self, from_integration):
 
         if from_integration:
-            if self.I_plot.size() == 0: return
-            if self.I_plot.mode == "Current time step": 
-                paired_data = [[self.I_plot.I_sets[key].grid_x, self.I_plot.I_sets[key].I_data * self.convert_out_dict[self.I_plot.type]] for key in self.I_plot.I_sets]
+            datagroup = self.integration_plots[0].datagroup
+            plot_info = self.integration_plots[0]
+            if datagroup.size() == 0: return
+            if plot_info.mode == "Current time step": 
+                paired_data = [[datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type]] for key in datagroup.datasets]
 
                 # TODO: Write both of these values with their units
-                header = "{}, {}".format(self.I_plot.x_param, self.I_plot.type)
+                header = "{}, {}".format(plot_info.x_param, datagroup.type)
 
             else: # if self.I_plot.mode == "All time steps"
-                raw_data = np.array([self.I_plot.I_sets[key].I_data * self.convert_out_dict[self.I_plot.type] for key in self.I_plot.I_sets])
-                grid_x = np.reshape(self.I_plot.global_gridx, (1,self.I_plot.global_gridx.__len__()))
+                raw_data = np.array([datagroup.datasets[key].data * self.convert_out_dict[datagroup.type] for key in datagroup.datasets])
+                grid_x = np.reshape(plot_info.global_gridx, (1,plot_info.global_gridx.__len__()))
                 paired_data = np.concatenate((grid_x, raw_data), axis=0).T
                 header = "Time [ns],"
-                for key in self.I_plot.I_sets:
-                    header += self.I_plot.I_sets[key].tag().replace("Δ", "") + ","
+                for key in datagroup.datasets:
+                    header += datagroup.datasets[key].tag().replace("Δ", "") + ","
 
         else:
             plot_ID = self.active_analysisplot_ID.get()
@@ -3899,20 +3903,22 @@ class Notebook:
 
     def export_for_bayesim(self):
         # Note: DO NOT convert_out any of these values - bayesim models are created in TEDs units.
-        if self.I_plot.size() == 0: return
+        datagroup = self.integration_plots[0].datagroup
+        plot_info = self.integration_plots[0]
+        if datagroup.size() == 0: return
             
-        if (self.I_plot.mode == "All time steps"):
+        if (plot_info.mode == "All time steps"):
             if self.bay_mode.get() == "obs":
-                for key in self.I_plot.I_sets:  # For each curve on the integration plot
-                    raw_data = self.I_plot.I_sets[key].I_data
-                    grid_x = self.I_plot.global_gridx   # grid_x refers to what is on the x-axis, which in this case is technically 'time'
+                for key in datagroup.datasets:  # For each curve on the integration plot
+                    raw_data = datagroup.datasets[key].data
+                    grid_x = plot_info.global_gridx   # grid_x refers to what is on the x-axis, which in this case is technically 'time'
                     unc = raw_data * 0.1
                     full_data = np.vstack((grid_x, raw_data, unc)).T
-                    full_data = pd.DataFrame.from_records(data=full_data,columns=['time', self.I_plot.type, 'uncertainty'])
+                    full_data = pd.DataFrame.from_records(data=full_data,columns=['time', datagroup.type, 'uncertainty'])
                     
                     #FIXME: dd.save has no visible file overwrite handler
                     # If the file name already exists, dd.save will simply not save anything
-                    dd.save("{}//{}.h5".format(self.default_dirs["PL"], self.I_plot.I_sets[key].tag()), full_data)
+                    dd.save("{}//{}.h5".format(self.default_dirs["PL"], datagroup.datasets[key].tag()), full_data)
 
             elif self.bay_mode.get() == "model":
                 active_bay_params = []
@@ -3920,13 +3926,13 @@ class Notebook:
                     if self.check_bay_params[param].get(): active_bay_params.append(param)
 
                 is_first = True
-                for key in self.I_plot.I_sets:
-                    raw_data = self.I_plot.I_sets[key].I_data
-                    grid_x = self.I_plot.global_gridx
+                for key in datagroup.datasets:
+                    raw_data = datagroup.datasets[key].data
+                    grid_x = plot_info.global_gridx
                     paired_data = np.vstack((grid_x, raw_data))
 
                     for param in active_bay_params:
-                        param_column = np.ones((1,raw_data.__len__())) * self.I_plot.I_sets[key].params_dict[param] * self.convert_out_dict[param]
+                        param_column = np.ones((1,raw_data.__len__())) * datagroup.datasets[key].params_dict[param] * self.convert_out_dict[param]
                         paired_data = np.concatenate((param_column, paired_data), axis=0)
 
                     paired_data = paired_data.T
@@ -3943,7 +3949,7 @@ class Notebook:
                     panda_columns.insert(0,param)
 
                 panda_columns.append('time')
-                panda_columns.append(self.I_plot.type)
+                panda_columns.append(datagroup.type)
 
                 full_data = pd.DataFrame.from_records(data=full_data, columns=panda_columns)
                 
