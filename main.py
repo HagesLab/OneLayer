@@ -2555,15 +2555,18 @@ class Notebook:
         if (IC_files.__len__() == 0): return
 
         batch_num = 0
+        self.error_states = []
         for IC in IC_files:
             batch_num += 1
             self.IC_file_name = IC
             self.load_ICfile()
             self.write(self.status, "Now calculating {} : ({} of {})".format(self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")], str(batch_num), str(IC_files.__len__())))
             self.do_Calculate()
-            time.sleep(1)
             
-        self.write(self.status, "Simulations complete")
+        if not len(self.error_states):
+            self.write(self.status, "Simulations complete")
+        else:
+            self.write(self.status, "Warning: fatal errors logged in console for {} simulations".format(len(self.error_states)))
 
         return
 
@@ -2572,6 +2575,10 @@ class Notebook:
     def do_Calculate(self):
         ## Setup parameters
         try:
+            # Construct the data folder's name from the corresponding IC file's name
+            shortened_IC_name = self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")]
+            data_file_name = shortened_IC_name
+            
             self.m = int(0.5 + self.nanowire.total_length / self.nanowire.dx)         # Number of space steps
             self.n = int(0.5 + self.simtime / self.dt)           # Number of time steps
 
@@ -2600,17 +2607,16 @@ class Notebook:
                 self.init_E_field = np.ones(self.nanowire.grid_x_edges.__len__()) * self.init_E_field
         
         except ValueError:
-            self.write(self.status, "Error: Invalid parameters")
+            print("Error: Invalid parameters for {}".format(data_file_name))
+            self.error_states.append(data_file_name)
             return
 
         except Exception as oops:
-            self.write(self.status, oops)
+            print("{} for {}".format(oops, data_file_name))
+            self.error_states.append(data_file_name)
             return
     
         try:
-            # Construct the data folder's name from the corresponding IC file's name
-            shortened_IC_name = self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")]
-            data_file_name = shortened_IC_name
 
             print("Attempting to create {} data folder".format(data_file_name))
 
@@ -2631,86 +2637,84 @@ class Notebook:
 
         except FileExistsError:
             print("Error: unable to create directory for results of simulation {}".format(shortened_IC_name))
+            self.error_states.append(data_file_name)
             return
 
+
+        ## Calculate!
+        atom = tables.Float64Atom()
+
+        ## Create data files
+        with tables.open_file(full_path_name + "\\" + data_file_name + "-n.h5", mode='w') as ofstream_N, \
+            tables.open_file(full_path_name + "\\" + data_file_name + "-p.h5", mode='w') as ofstream_P, \
+            tables.open_file(full_path_name + "\\" + data_file_name + "-E_field.h5", mode='w') as ofstream_E_field:
+            array_N = ofstream_N.create_earray(ofstream_N.root, "N", atom, (0, self.m))
+            array_P = ofstream_P.create_earray(ofstream_P.root, "P", atom, (0, self.m))
+            array_E_field = ofstream_E_field.create_earray(ofstream_E_field.root, "E_field", atom, (0, self.m+1))
+            array_N.append(np.reshape(self.init_N, (1, self.m)))
+            array_P.append(np.reshape(self.init_P, (1, self.m)))
+            array_E_field.append(np.reshape(self.init_E_field, (1, self.m + 1)))
+        
+        ## Setup simulation plots and plot initial
+        
+        self.sim_N = self.init_N
+        self.sim_P = self.init_P
+        self.sim_E_field = self.init_E_field
+        self.update_sim_plots(0)
+
+        numTimeStepsDone = 0
+
+        # WIP: Option for staggered calculate/plot: In this mode the program calculates a block of time steps, plots intermediate (N, P, E), and calculates the next block 
+        # using the final time step from the previous block as the initial condition.
+        # This mode can be disabled by inputting numPartitions = 1.
+        #for i in range(1, self.numPartitions):
+            
+        #    #finite.simulate_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, self.max_iter, self.init_N, self.init_P, self.init_E_field)
+        #    finite.ode_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, self.init_N, self.init_P, self.init_E_field)
+
+        #    numTimeStepsDone += int(self.n / self.numPartitions)
+        #    self.write(self.status, "Calculations {:.1f}% complete".format(100 * i / self.numPartitions))
+            
+
+        #    with tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-n.h5", mode='r') as ifstream_N, \
+        #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-p.h5", mode='r') as ifstream_P, \
+        #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-E_field.h5", mode='r') as ifstream_E_field:
+        #        self.init_N = ifstream_N.root.N[-1]
+        #        self.init_P = ifstream_P.root.P[-1]
+        #        self.init_E_field = ifstream_E_field.root.E_field[-1]
+
+
+        #    self.update_sim_plots(int(self.n * i / self.numPartitions), self.numPartitions > 20)
+            #self.update_err_plots()
+
+        write_output = True
+
         try:
-            ## Calculate!
-            atom = tables.Float64Atom()
-
-            ## Create data files
-            with tables.open_file(full_path_name + "\\" + data_file_name + "-n.h5", mode='w') as ofstream_N, \
-                tables.open_file(full_path_name + "\\" + data_file_name + "-p.h5", mode='w') as ofstream_P, \
-                tables.open_file(full_path_name + "\\" + data_file_name + "-E_field.h5", mode='w') as ofstream_E_field:
-                array_N = ofstream_N.create_earray(ofstream_N.root, "N", atom, (0, self.m))
-                array_P = ofstream_P.create_earray(ofstream_P.root, "P", atom, (0, self.m))
-                array_E_field = ofstream_E_field.create_earray(ofstream_E_field.root, "E_field", atom, (0, self.m+1))
-                array_N.append(np.reshape(self.init_N, (1, self.m)))
-                array_P.append(np.reshape(self.init_P, (1, self.m)))
-                array_E_field.append(np.reshape(self.init_E_field, (1, self.m + 1)))
-            
-            ## Setup simulation plots and plot initial
-            
-            self.sim_N = self.init_N
-            self.sim_P = self.init_P
-            self.sim_E_field = self.init_E_field
-            self.update_sim_plots(0)
-
-            numTimeStepsDone = 0
-
-            # WIP: Option for staggered calculate/plot: In this mode the program calculates a block of time steps, plots intermediate (N, P, E), and calculates the next block 
-            # using the final time step from the previous block as the initial condition.
-            # This mode can be disabled by inputting numPartitions = 1.
-            #for i in range(1, self.numPartitions):
-                
-            #    #finite.simulate_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, self.max_iter, self.init_N, self.init_P, self.init_E_field)
-            #    finite.ode_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, self.init_N, self.init_P, self.init_E_field)
-
-            #    numTimeStepsDone += int(self.n / self.numPartitions)
-            #    self.write(self.status, "Calculations {:.1f}% complete".format(100 * i / self.numPartitions))
-                
-
-            #    with tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-n.h5", mode='r') as ifstream_N, \
-            #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-p.h5", mode='r') as ifstream_P, \
-            #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-E_field.h5", mode='r') as ifstream_E_field:
-            #        self.init_N = ifstream_N.root.N[-1]
-            #        self.init_P = ifstream_P.root.P[-1]
-            #        self.init_E_field = ifstream_E_field.root.E_field[-1]
-
-
-            #    self.update_sim_plots(int(self.n * i / self.numPartitions), self.numPartitions > 20)
-                #self.update_err_plots()
-
-            write_output = True
-
             error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict,
                                              not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), write_output,
                                              self.init_N, self.init_P, self.init_E_field)
-            
-            
-            grid_t = np.linspace(self.dt, self.simtime, self.n)
-
-            try:
-                np.savetxt(full_path_name + "\\convergence.csv", np.vstack((grid_t, error_dict['hu'], error_dict['tcur'],\
-                    error_dict['tolsf'], error_dict['tsw'], error_dict['nst'], error_dict['nfe'], error_dict['nje'], error_dict['nqu'],\
-                    error_dict['mused'])).transpose(), fmt='%.4e', delimiter=',', header="t, hu, tcur, tolsf, tsw, nst, nfe, nje, nqu, mused")
-            except PermissionError:
-                self.write(self.status, "Error: unable to access convergence data export destination")
-            self.write(self.status, "Finalizing...")
-
-            #self.read_TS(self.n)
-            #self.update_sim_plots(self.n, self.numPartitions > 20)
-
-            for i in range(1,6):
-                self.read_TS(data_file_name, int(self.n * i / 5))
-                self.update_sim_plots(self.n, do_clear_plots=False)
-
-            #time.sleep(3)
-            
-            
         except FloatingPointError:
-            self.write(self.status, "Overflow detected - calculation aborted")
+            print("Error: an unusual value occurred while simulating {}".format(data_file_name))
+            self.error_states.append(data_file_name)
             return
+        
+        grid_t = np.linspace(self.dt, self.simtime, self.n)
 
+        try:
+            np.savetxt(full_path_name + "\\convergence.csv", np.vstack((grid_t, error_dict['hu'], error_dict['tcur'],\
+                error_dict['tolsf'], error_dict['tsw'], error_dict['nst'], error_dict['nfe'], error_dict['nje'], error_dict['nqu'],\
+                error_dict['mused'])).transpose(), fmt='%.4e', delimiter=',', header="t, hu, tcur, tolsf, tsw, nst, nfe, nje, nqu, mused")
+        except PermissionError:
+            print(self.status, "Error: unable to access convergence data export destination")
+        
+        self.write(self.status, "Finalizing...")
+
+        #self.read_TS(self.n)
+        #self.update_sim_plots(self.n, self.numPartitions > 20)
+
+        for i in range(1,6):
+            self.read_TS(data_file_name, int(self.n * i / 5))
+            self.update_sim_plots(self.n, do_clear_plots=False)
 
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
@@ -3637,7 +3641,7 @@ class Notebook:
         for batch_set in batch_combinations:
             filename = ""
             for param in batch_set:
-                filename += str("__{}_{:.0e}".format(param, batch_set[param]))
+                filename += str("__{}_{:.8e}".format(param, batch_set[param]))
                 
                 if param in self.analytical_entryboxes_dict:
                     self.enter(self.analytical_entryboxes_dict[param], str(batch_set[param]))
