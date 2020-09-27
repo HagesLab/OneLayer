@@ -438,6 +438,7 @@ class Notebook:
         self.AIC_stim_mode = tk.StringVar()
         self.AIC_gen_power_mode = tk.StringVar()
         self.active_analysisplot_ID = tk.IntVar()
+        self.active_integrationplot_ID = tk.IntVar()
 
         self.init_shape_selection = tk.StringVar()
         self.init_var_selection = tk.StringVar()
@@ -1099,7 +1100,7 @@ class Notebook:
         self.analysisplot_bottomright_label.grid(row=1,column=3)
         
         self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
-        self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=2,columnspan=4)
+        self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=3,columnspan=4)
         self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
         self.analyze_toolbar.grid(row=0,column=0,columnspan=6)
 
@@ -1134,8 +1135,23 @@ class Notebook:
         self.integration_widget = self.integration_canvas.get_tk_widget()
         self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
 
+        self.integration_plotselector_frame = tk.ttk.Frame(master=self.tab_analyze)
+        self.integration_plotselector_frame.grid(row=2,column=5)
+        
+        self.integrationplot_left = tk.ttk.Radiobutton(self.integration_plotselector_frame, variable=self.active_integrationplot_ID, value=0)
+        self.integrationplot_left.grid(row=0,column=0)
+
+        self.integrationplot_topleft_label = tk.ttk.Label(self.integration_plotselector_frame, text="Use: Integration")
+        self.integrationplot_topleft_label.grid(row=0,column=1)
+        
+        self.integrationplot_topright = tk.ttk.Radiobutton(self.integration_plotselector_frame, variable=self.active_integrationplot_ID, value=1)
+        self.integrationplot_topright.grid(row=0,column=2)
+
+        self.integrationplot_topright_label = tk.ttk.Label(self.integration_plotselector_frame, text="Use: Tau_Diff")
+        self.integrationplot_topright_label.grid(row=0,column=3)
+
         self.integration_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
-        self.integration_toolbar_frame.grid(row=2,column=5, rowspan=2,columnspan=1)
+        self.integration_toolbar_frame.grid(row=3,column=5, rowspan=2,columnspan=1)
         self.integration_toolbar = tkagg.NavigationToolbar2Tk(self.integration_canvas, self.integration_toolbar_frame)
         self.integration_toolbar.grid(row=0,column=0,columnspan=5)
 
@@ -1149,7 +1165,7 @@ class Notebook:
         self.integration_bayesim_button.grid(row=1,column=2)
 
         self.analysis_status = tk.Text(self.tab_analyze, width=28,height=3)
-        self.analysis_status.grid(row=4,rowspan=3,column=5,columnspan=1)
+        self.analysis_status.grid(row=5,rowspan=3,column=5,columnspan=1)
         self.analysis_status.configure(state="disabled")
 
         self.notebook.add(self.tab_analyze, text="Analyze")
@@ -1714,7 +1730,8 @@ class Notebook:
     def do_change_axis_popup(self, from_integration):
         # Don't open if no data plotted
         if from_integration:
-            if self.integration_plots[0].datagroup.size() == 0: return
+            plot_ID = self.active_integrationplot_ID.get()
+            if self.integration_plots[plot_ID].datagroup.size() == 0: return
 
         else:
             plot_ID = self.active_analysisplot_ID.get()
@@ -1801,7 +1818,7 @@ class Notebook:
                 active_plot = self.analysis_plots[plot_ID]
 
             else:
-                active_plot = self.integration_plots[0]
+                active_plot = self.integration_plots[plot_ID]
 
             self.enter(self.xlbound, active_plot.xlim[0])
             self.enter(self.xubound, active_plot.xlim[1])
@@ -1830,7 +1847,8 @@ class Notebook:
                     plot = self.analysis_plots[plot_ID].plot_obj
                     
                 else:
-                    plot = self.integration_plots[0].plot_obj
+                    plot_ID = self.active_integrationplot_ID.get()
+                    plot = self.integration_plots[plot_ID].plot_obj
 
                 # Set plot axis params and save in corresponding plot state object, if the selected plot has such an object
                 plot.set_yscale(self.yaxis_type.get())
@@ -1844,7 +1862,6 @@ class Notebook:
                     
                 else:
                     plot.legend('', frameon=False)
-
 
                 if not (from_integration):
                     self.analyze_fig.tight_layout()
@@ -1862,11 +1879,11 @@ class Notebook:
                     self.analysis_plots[plot_ID].xlim = (bounds[0], bounds[1])
                     self.analysis_plots[plot_ID].display_legend = self.check_display_legend.get()
                 else:
-                    self.integration_plots[0].yaxis_type = self.yaxis_type.get()
-                    self.integration_plots[0].xaxis_type = self.xaxis_type.get()
-                    self.integration_plots[0].ylim = (bounds[2], bounds[3])
-                    self.integration_plots[0].xlim = (bounds[0], bounds[1])
-                    self.integration_plots[0].display_legend = self.check_display_legend.get()
+                    self.integration_plots[plot_ID].yaxis_type = self.yaxis_type.get()
+                    self.integration_plots[plot_ID].xaxis_type = self.xaxis_type.get()
+                    self.integration_plots[plot_ID].ylim = (bounds[2], bounds[3])
+                    self.integration_plots[plot_ID].xlim = (bounds[0], bounds[1])
+                    self.integration_plots[plot_ID].display_legend = self.check_display_legend.get()
 
             self.change_axis_popup.destroy()
             print("PL change axis popup closed")
@@ -2173,8 +2190,8 @@ class Notebook:
             subplot.set_xscale(active_plot_data.xaxis_type)
             active_datagroup = active_plot_data.datagroup
 
-            subplot.set_ylim(*active_plot_data.ylim)
-            subplot.set_xlim(*active_plot_data.xlim)
+            # subplot.set_ylim(*active_plot_data.ylim)
+            # subplot.set_xlim(*active_plot_data.xlim)
 
             # This data is in TEDs units since we just used it in a calculation - convert back to common units first
             for dataset in active_datagroup.datasets.values():
@@ -2187,6 +2204,9 @@ class Notebook:
             subplot.set_title("Time: " + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) + " / " + str(active_datagroup.get_maxtime()) + "ns")
             self.analyze_fig.tight_layout()
             self.analyze_fig.canvas.draw()
+            
+            active_plot_data.ylim = subplot.get_ylim()
+            active_plot_data.xlim = subplot.get_xlim()
 
         except:
             self.write(self.analysis_status, "Error #106: Plot failed")
@@ -2310,7 +2330,6 @@ class Notebook:
                 # Make room for one more value than necessary - this value at index j+1 will be used to pad the upper correction
                 distance_matrix = np.zeros((data_m, data_m))
                 lf_distance_matrix = np.zeros((data_m, data_m))
-                rf_distance_matrix = np.zeros((data_m, data_m))
 
                 # Each row in weight will represent the weight function centered around a different position
                 # Total reflection is assumed to occur at either end of the system: 
@@ -2318,7 +2337,6 @@ class Notebook:
                 for n in range(0, data_m):
                     distance_matrix[n] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:data_m - n]))
                     lf_distance_matrix[n] = distance + (n * dx)
-                    rf_distance_matrix[n] = (max - distance) + (max - n * dx)
 
                 weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
                 lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix) if symmetric_system else 0
@@ -2371,9 +2389,9 @@ class Notebook:
             self.read_data(short_filename, plot_ID, do_overlay=True)
 
         
-        active_plot.xlim = (0, active_plot.datagroup.get_max_x())
-        max_val = active_plot.datagroup.get_maxval() * self.convert_out_dict[active_plot.datagroup.type]
-        active_plot.ylim = (max_val * 1e-11, max_val * 10)
+        #active_plot.xlim = (0, active_plot.datagroup.get_max_x())
+        #max_val = active_plot.datagroup.get_maxval() * self.convert_out_dict[active_plot.datagroup.type]
+        #active_plot.ylim = (max_val * 1e-11, max_val * 10)
         active_plot.xaxis_type = 'linear'
         active_plot.yaxis_type = 'log'
         self.plot_analyze(plot_ID, clear_plot=True)
@@ -2941,14 +2959,15 @@ class Notebook:
         datagroup = self.integration_plots[0].datagroup
         subplot.cla()
         
-        max = datagroup.get_maxval() * self.convert_out_dict[datagroup.type]
+        #max = datagroup.get_maxval() * self.convert_out_dict[datagroup.type]
         
+
         self.integration_plots[0].xaxis_type = 'linear'
         self.integration_plots[0].yaxis_type = 'log'
-        self.integration_plots[0].ylim = max * 1e-12, max * 10
+        #self.integration_plots[0].ylim = max * 1e-12, max * 10
 
         subplot.set_yscale(self.integration_plots[0].yaxis_type)
-        subplot.set_ylim(self.integration_plots[0].ylim)
+        #subplot.set_ylim(self.integration_plots[0].ylim)
         subplot.set_xlabel(xaxis_label)
         subplot.set_ylabel(datagroup.type)
         subplot.set_title("Integrated {}".format(datagroup.type))
@@ -2960,12 +2979,14 @@ class Notebook:
 
             elif self.PL_mode == "All time steps":
                 subplot.plot(self.integration_plots[0].global_gridx, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag(for_matplotlib=True))
-                self.integration_plots[0].xlim = (0, np.amax(self.integration_plots[0].global_gridx))
+                
+        self.integration_plots[0].xlim = subplot.get_xlim()
+        self.integration_plots[0].ylim = subplot.get_ylim()
                 
         subplot.legend().set_draggable(True)
         
         self.taudiff_subplot.cla()
-        if self.integration_plots[1].datagroup.size():
+        if self.integration_plots[1].datagroup.size(): # If has tau_diff data to plot
             self.taudiff_subplot.set_ylabel("tau_diff")
             self.taudiff_subplot.set_xlabel("Time [ns]")
             self.taudiff_subplot.set_title("-(dln(PL)/dt)^(-1)")
@@ -2973,6 +2994,11 @@ class Notebook:
                 self.taudiff_subplot.plot(self.integration_plots[1].global_gridx, self.integration_plots[1].datagroup.datasets[key].data, label=self.integration_plots[1].datagroup.datasets[key].tag(for_matplotlib=True))
         
             self.taudiff_subplot.legend().set_draggable(True)
+            
+            self.integration_plots[1].xaxis_type = 'linear'
+            self.integration_plots[1].yaxis_type = 'linear'
+            self.integration_plots[1].ylim = self.taudiff_subplot.get_ylim()
+            self.integration_plots[1].xlim = self.taudiff_subplot.get_xlim()
 
         self.integration_fig.tight_layout()
         self.integration_fig.canvas.draw()
