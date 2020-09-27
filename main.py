@@ -201,9 +201,14 @@ class Data_Set:
         self.filename = filename
         return
     
-    def tag(self):
-        return self.filename + "_" + self.type
-    
+    def tag(self, for_matplotlib=False):
+        # For some reason, Matplotlib legends don't like leading underscores
+        if not for_matplotlib:
+            return self.filename + "_" + self.type
+        else:
+            return (self.filename + "_" + self.type).strip('_')
+        
+
 class Raw_Data_Set(Data_Set):
     # Object containing all the metadata required to plot and integrate saved data sets
     def __init__(self, data, grid_x, node_x, edge_x, params_dict, type, filename, show_index):
@@ -2171,9 +2176,9 @@ class Notebook:
             subplot.set_xlim(*active_plot_data.xlim)
 
             # This data is in TEDs units since we just used it in a calculation - convert back to common units first
-            for tag in active_datagroup.datasets:
-                label = tag + "*" if active_datagroup.datasets[tag].params_dict["symmetric_system"] else tag
-                subplot.plot(active_datagroup.datasets[tag].grid_x, active_datagroup.datasets[tag].data * self.convert_out_dict[active_datagroup.type], label=label)
+            for dataset in active_datagroup.datasets.values():
+                label = dataset.tag(for_matplotlib=True) + "*" if dataset.params_dict["symmetric_system"] else dataset.tag(for_matplotlib=True)
+                subplot.plot(dataset.grid_x, dataset.data * self.convert_out_dict[active_datagroup.type], label=label)
 
             subplot.set_xlabel("x [nm]")
             subplot.set_ylabel(active_datagroup.type)
@@ -2919,13 +2924,13 @@ class Notebook:
                     grid_xaxis = -1 # A dummy value for the I_Set constructor
                     xaxis_label = "Time [ns]"
 
-                self.integration_plots[0].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(l_bound) + "_to_" + str(u_bound)))
+                self.integration_plots[0].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
 
                 # Do some bonus calculations involving PL's time derivative
                 if (self.PL_mode == "All time steps" and datatype == "PL"):
                     self.integration_plots[1].global_gridx = np.linspace(0, total_time, n + 1)
                     tau_diff = finite.tau_diff(I_data, dt)
-                    self.integration_plots[1].datagroup.add(Integrated_Data_Set(tau_diff, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, tips(data_filename, 4) + "__" + str(l_bound) + "_to_" + str(u_bound)))
+                    self.integration_plots[1].datagroup.add(Integrated_Data_Set(tau_diff, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
                         
                 counter += 1
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
@@ -2950,10 +2955,10 @@ class Notebook:
         for key in datagroup.datasets:
 
             if self.PL_mode == "Current time step":
-                subplot.scatter(datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag())
+                subplot.scatter(datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag(for_matplotlib=True))
 
             elif self.PL_mode == "All time steps":
-                subplot.plot(self.integration_plots[0].global_gridx, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag())
+                subplot.plot(self.integration_plots[0].global_gridx, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag(for_matplotlib=True))
                 self.integration_plots[0].xlim = (0, np.amax(self.integration_plots[0].global_gridx))
                 
         subplot.legend()
@@ -2964,7 +2969,7 @@ class Notebook:
             self.taudiff_subplot.set_xlabel("Time [ns]")
             self.taudiff_subplot.set_title("-(dln(PL)/dt)^(-1)")
             for key in self.integration_plots[1].datagroup.datasets:
-                self.taudiff_subplot.plot(self.integration_plots[1].global_gridx, self.integration_plots[1].datagroup.datasets[key].data, label=self.integration_plots[1].datagroup.datasets[key].tag())
+                self.taudiff_subplot.plot(self.integration_plots[1].global_gridx, self.integration_plots[1].datagroup.datasets[key].data, label=self.integration_plots[1].datagroup.datasets[key].tag(for_matplotlib=True))
         
             self.taudiff_subplot.legend()
 
@@ -3641,7 +3646,7 @@ class Notebook:
         for batch_set in batch_combinations:
             filename = ""
             for param in batch_set:
-                filename += str("__{}_{:.8e}".format(param, batch_set[param]))
+                filename += str("__{}_{:.4e}".format(param, batch_set[param]))
                 
                 if param in self.analytical_entryboxes_dict:
                     self.enter(self.analytical_entryboxes_dict[param], str(batch_set[param]))
