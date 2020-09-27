@@ -1840,7 +1840,8 @@ class Notebook:
                 plot.set_xlim(bounds[0], bounds[1])
 
                 if self.check_display_legend.get():
-                    plot.legend()
+                    plot.legend().set_draggable(True)
+                    
                 else:
                     plot.legend('', frameon=False)
 
@@ -2182,7 +2183,7 @@ class Notebook:
 
             subplot.set_xlabel("x [nm]")
             subplot.set_ylabel(active_datagroup.type)
-            subplot.legend()
+            subplot.legend().set_draggable(True)
             subplot.set_title("Time: " + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) + " / " + str(active_datagroup.get_maxtime()) + "ns")
             self.analyze_fig.tight_layout()
             self.analyze_fig.canvas.draw()
@@ -2961,7 +2962,7 @@ class Notebook:
                 subplot.plot(self.integration_plots[0].global_gridx, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag(for_matplotlib=True))
                 self.integration_plots[0].xlim = (0, np.amax(self.integration_plots[0].global_gridx))
                 
-        subplot.legend()
+        subplot.legend().set_draggable(True)
         
         self.taudiff_subplot.cla()
         if self.integration_plots[1].datagroup.size():
@@ -2971,7 +2972,7 @@ class Notebook:
             for key in self.integration_plots[1].datagroup.datasets:
                 self.taudiff_subplot.plot(self.integration_plots[1].global_gridx, self.integration_plots[1].datagroup.datasets[key].data, label=self.integration_plots[1].datagroup.datasets[key].tag(for_matplotlib=True))
         
-            self.taudiff_subplot.legend()
+            self.taudiff_subplot.legend().set_draggable(True)
 
         self.integration_fig.tight_layout()
         self.integration_fig.canvas.draw()
