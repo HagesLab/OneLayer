@@ -412,7 +412,8 @@ class Notebook:
                                 "init_deltaN": ((1e-7) ** 3), "init_deltaP": ((1e-7) ** 3),
                                 "init_E_field": 1, "Ec": 1, "electron_affinity": 1,
                                 "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
-                                "E_field": 1}
+                                "E_field": 1, 
+                                "tau_diff": 1}
         
         # FIXME: Check these
         self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
@@ -2949,7 +2950,7 @@ class Notebook:
                 if (self.PL_mode == "All time steps" and datatype == "PL"):
                     self.integration_plots[1].global_gridx = np.linspace(0, total_time, n + 1)
                     tau_diff = finite.tau_diff(I_data, dt)
-                    self.integration_plots[1].datagroup.add(Integrated_Data_Set(tau_diff, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
+                    self.integration_plots[1].datagroup.add(Integrated_Data_Set(tau_diff, grid_xaxis, active_datagroup.datasets[tag].params_dict, "tau_diff", data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
                         
                 counter += 1
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
@@ -3897,9 +3898,11 @@ class Notebook:
     def export_plot(self, from_integration):
 
         if from_integration:
-            datagroup = self.integration_plots[0].datagroup
-            plot_info = self.integration_plots[0]
+            plot_ID = self.active_integrationplot_ID.get()
+            datagroup = self.integration_plots[plot_ID].datagroup
+            plot_info = self.integration_plots[plot_ID]
             if datagroup.size() == 0: return
+            
             if plot_info.mode == "Current time step": 
                 paired_data = [[datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type]] for key in datagroup.datasets]
 
@@ -3922,15 +3925,13 @@ class Notebook:
             paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
             header = "".join(["x [nm]," + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
-        PL_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save data", filetypes=[("csv (comma-separated-values)","*.csv")])
+        export_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save data", filetypes=[("csv (comma-separated-values)","*.csv")])
         
         # Export to .csv
-        # TODO: Fix export for over time mode
-        if not (PL_filename == ""):
+        if not (export_filename == ""):
             try:
-                if PL_filename.endswith(".csv"): PL_filename = PL_filename[:-4]
-                #np.savetxt("{}.csv".format(PL_filename), np.vstack((self.grid_xaxis, data)).transpose(), fmt='%.4e', delimiter=',', header='t,PL from [nm],' + str(self.integration_lbound) + ',to,' + str(self.integration_ubound))
-                np.savetxt("{}.csv".format(PL_filename), paired_data, fmt='%.4e', delimiter=',', header=header)
+                if export_filename.endswith(".csv"): export_filename = export_filename[:-4]
+                np.savetxt("{}.csv".format(export_filename), paired_data, fmt='%.4e', delimiter=',', header=header)
                 self.write(self.analysis_status, "Export complete")
             except PermissionError:
                 self.write(self.analysis_status, "Error: unable to access PL export destination")
