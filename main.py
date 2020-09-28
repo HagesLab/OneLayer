@@ -93,6 +93,7 @@ class Nanowire:
                             "init_E_field":Parameter(is_edge=True, units="[WIP]"), "Ec":Parameter(is_edge=True, units="[WIP]"),
                             "electron_affinity":Parameter(is_edge=True, units="[WIP]")}
 
+        self.param_count = len(self.param_dict)
         # This tells TEDs what flags there will be, but isn't used for storage until a simulation begins.
         # The reason why is that outside of simulations, we care more about whether a flag appears visually selected than its value
         self.flags_dict = {"ignore_alpha":0,
@@ -507,7 +508,8 @@ class Notebook:
         #self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
         # Check when popup menus open and close
-        self.sys_summary_popup_isopen = False
+        self.sys_printsummary_popup_isopen = False
+        self.sys_plotsummary_popup_isopen = False
         self.sys_param_shortcut_popup_isopen = False
         self.batch_popup_isopen = False
         self.resetIC_popup_isopen = False
@@ -636,7 +638,7 @@ class Notebook:
         self.spacegrid_frame = tk.ttk.Frame(self.tab_inputs)
         self.spacegrid_frame.grid(row=1,column=0,columnspan=2)
 
-        self.steps_head = tk.ttk.Label(self.spacegrid_frame, text="Space Grid", style="Header.TLabel")
+        self.steps_head = tk.ttk.Label(self.spacegrid_frame, text="Space Grid - Start Here", style="Header.TLabel")
         self.steps_head.grid(row=0,column=0,columnspan=2)
 
         self.thickness_label = tk.ttk.Label(self.spacegrid_frame, text="Thickness [nm]")
@@ -654,10 +656,10 @@ class Notebook:
         self.params_frame = tk.ttk.Frame(self.tab_inputs)
         self.params_frame.grid(row=2,column=0,columnspan=2, rowspan=4)
 
-        self.system_params_head = tk.ttk.Label(self.params_frame, text="System Parameters",style="Header.TLabel")
+        self.system_params_head = tk.ttk.Label(self.params_frame, text="Constant-value Parameters",style="Header.TLabel")
         self.system_params_head.grid(row=0, column=0,columnspan=2)
         
-        self.system_params_shortcut_button = tk.ttk.Button(self.params_frame, text="Short-cut Param Entry Tool", command=self.do_sys_param_shortcut_popup)
+        self.system_params_shortcut_button = tk.ttk.Button(self.params_frame, text="Fast Param Entry Tool", command=self.do_sys_param_shortcut_popup)
         self.system_params_shortcut_button.grid(row=1,column=0,columnspan=2)
 
         self.flags_frame = tk.ttk.Frame(self.tab_inputs)
@@ -673,12 +675,15 @@ class Notebook:
         self.symmetry_checkbutton = tk.ttk.Checkbutton(self.flags_frame, text="Symmetric system?", variable=self.check_symmetric, onvalue=1, offvalue=0)
         self.symmetry_checkbutton.grid(row=2,column=0)
 
-        self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=4)
+        self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=8)
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
         
-        self.system_log_button = tk.ttk.Button(self.tab_inputs, text="Print System Summary", command=self.do_sys_summary_popup)
-        self.system_log_button.grid(row=8,column=0,columnspan=2)
+        self.system_printout_button = tk.ttk.Button(self.tab_inputs, text="Print Init. State Summary", command=self.do_sys_printsummary_popup)
+        self.system_printout_button.grid(row=8,column=0,columnspan=2)
+        
+        self.system_plotout_button = tk.ttk.Button(self.tab_inputs, text="Show Init. State Plots", command=self.do_sys_plotsummary_popup)
+        self.system_plotout_button.grid(row=9,column=0,columnspan=2)
 
         self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", style="Grey Bar.TSeparator")
         self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
@@ -866,7 +871,7 @@ class Notebook:
         self.param_rules_frame = tk.ttk.Frame(self.tab_rules_init)
         self.param_rules_frame.grid(row=0,column=0,padx=(370,0))
 
-        self.HIC_list_title = tk.ttk.Label(self.param_rules_frame, text="Parameter Rules", style="Header.TLabel")
+        self.HIC_list_title = tk.ttk.Label(self.param_rules_frame, text="Add/Edit/Remove Space-Dependent Parameters", style="Header.TLabel")
         self.HIC_list_title.grid(row=0,column=0,columnspan=3)
 
         self.HIC_listbox = tk.Listbox(self.param_rules_frame, width=86,height=8)
@@ -965,7 +970,7 @@ class Notebook:
         self.listupload_frame = tk.ttk.Frame(self.tab_explicit_init)
         self.listupload_frame.grid(row=0,column=0,padx=(440,0))
 
-        self.EIC_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified spacing mesh.", width=360)
+        self.EIC_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified space grid.", width=360)
         self.EIC_description.grid(row=0,column=0)
         
         self.EIC_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.EIC_var_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
@@ -1177,32 +1182,86 @@ class Notebook:
         return
 
     def update_system_summary(self):
-        if self.sys_summary_popup_isopen:
-            self.write(self.summary_textbox, self.nanowire.DEBUG_print())
+        if self.sys_printsummary_popup_isopen:
+            self.write(self.printsummary_textbox, self.nanowire.DEBUG_print())
             
+        if self.sys_plotsummary_popup_isopen:
+            for param_name in self.nanowire.param_dict:
+                param = self.nanowire.param_dict[param_name]
+                val = param.value if isinstance(param.value, np.ndarray) else finite.toArray(param.value, len(self.nanowire.grid_x_nodes), param.is_edge)
+                grid_x = self.nanowire.grid_x_nodes if not param.is_edge else self.nanowire.grid_x_edges
+                self.sys_param_summaryplots[param_name].plot(grid_x, val)
+            
+            self.plotsummary_fig.tight_layout()
+            self.plotsummary_fig.canvas.draw()
+
         return
     ## Functions to create popups and manage
     
-    def do_sys_summary_popup(self):
-        if not self.sys_summary_popup_isopen: # Don't open more than one of this window at a time
-            self.sys_summary_popup = tk.Toplevel(self.root)
+    def do_sys_printsummary_popup(self):
+        if not self.sys_printsummary_popup_isopen: # Don't open more than one of this window at a time
+            self.sys_printsummary_popup = tk.Toplevel(self.root)
             
-            self.summary_textbox = tkscrolledtext.ScrolledText(self.sys_summary_popup, width=100,height=30)
-            self.summary_textbox.grid(row=0,column=0,padx=(20,0), pady=(20,20))
+            self.printsummary_textbox = tkscrolledtext.ScrolledText(self.sys_printsummary_popup, width=100,height=30)
+            self.printsummary_textbox.grid(row=0,column=0,padx=(20,0), pady=(20,20))
             
-            self.sys_summary_popup_isopen = True
+            self.sys_printsummary_popup_isopen = True
             
             self.update_system_summary()
             
-            self.sys_summary_popup.protocol("WM_DELETE_WINDOW", self.on_sys_summary_popup_close)
+            self.sys_printsummary_popup.protocol("WM_DELETE_WINDOW", self.on_sys_printsummary_popup_close)
             return
         
-    def on_sys_summary_popup_close(self):
+    def on_sys_printsummary_popup_close(self):
         try:
-            self.sys_summary_popup.destroy()
-            self.sys_summary_popup_isopen = False
-        except FloatingPointError:
+            self.sys_printsummary_popup.destroy()
+            self.sys_printsummary_popup_isopen = False
+        except:
             print("Error #2022: Failed to close shortcut popup.")
+        return
+    
+    def do_sys_plotsummary_popup(self):
+        if not self.nanowire.spacegrid_is_set: return
+        
+        if not self.sys_plotsummary_popup_isopen:
+            self.sys_plotsummary_popup = tk.Toplevel(self.root)
+
+            count = 1
+            rdim = np.floor(np.sqrt(self.nanowire.param_count))
+            #rdim = 4
+            cdim = np.ceil(self.nanowire.param_count / rdim)
+            
+            if self.check_symmetric.get():
+                self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, text="Note: All distributions are symmetric about x=0")
+                self.plotsummary_symmetriclabel.grid(row=0,column=0)
+
+            self.plotsummary_fig = Figure(figsize=(20,10))
+            self.sys_param_summaryplots = {}
+            for param_name in self.nanowire.param_dict:
+                
+                self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(rdim, cdim, count)
+                self.sys_param_summaryplots[param_name].set_title(param_name)
+                count += 1
+            
+            self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, master=self.sys_plotsummary_popup)
+            self.plotsummary_plotwidget = self.plotsummary_canvas.get_tk_widget()
+            self.plotsummary_plotwidget.grid(row=1,column=0)
+            
+            self.sys_plotsummary_popup_isopen = True
+            self.update_system_summary()
+            
+            self.sys_plotsummary_popup.protocol("WM_DELETE_WINDOW", self.on_sys_plotsummary_popup_close)
+            ## Temporarily disable the main window while this popup is active
+            self.sys_plotsummary_popup.grab_set()
+            
+            return
+        
+    def on_sys_plotsummary_popup_close(self):
+        try:
+            self.sys_plotsummary_popup.destroy()
+            self.sys_plotsummary_popup_isopen = False
+        except:
+            print("Error #2023: Failed to close plotsummary popup.")
         return
         
     def do_sys_param_shortcut_popup(self):
@@ -1241,6 +1300,12 @@ class Notebook:
                 self.sys_param_labels_dict[param].grid(row=row_count, column=col_count)
                 self.sys_param_entryboxes_dict[param] = tk.ttk.Entry(self.sys_param_list_frame, width=9)
                 self.sys_param_entryboxes_dict[param].grid(row=row_count, column=col_count + 1)
+                
+                if isinstance(self.nanowire.param_dict[param].value, (float, int)):
+                    self.enter(self.sys_param_entryboxes_dict[param], str(self.nanowire.param_dict[param].value))
+                
+                else:
+                    self.enter(self.sys_param_entryboxes_dict[param], "[list]")
                 row_count += 1
                 if row_count == max_per_col:
                     row_count = 0
@@ -1250,11 +1315,11 @@ class Notebook:
             self.shortcut_continue_button.grid(row=2,column=1)
                     
             self.sys_param_shortcut_popup.protocol("WM_DELETE_WINDOW", self.on_sys_param_shortcut_popup_close)
-            
+            self.sys_param_shortcut_popup_isopen = True
             ## Temporarily disable the main window while this popup is active
             self.sys_param_shortcut_popup.grab_set()
             
-            self.sys_param_shortcut_popup_isopen = True
+            return
                     
         else:
             print("Error #2020: Opened more than one sys param shortcut popup at a time")
@@ -1288,7 +1353,7 @@ class Notebook:
                     
             self.sys_param_shortcut_popup.destroy()
             self.sys_param_shortcut_popup_isopen = False
-        except FloatingPointError:
+        except:
             print("Error #2021: Failed to close shortcut popup.")
         
         return
