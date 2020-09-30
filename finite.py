@@ -229,7 +229,8 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
     if radrec_fromfile:
         with tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
-            radRec = B * ((np.array(ifstream_N.root.N)) * (np.array(ifstream_P.root.P)) - n0 * p0)
+            radRec = radiative_recombination(np.array(ifstream_N.root.N), np.array(ifstream_P.root.P), B, n0, p0)
+            #radRec = B * ((np.array(ifstream_N.root.N)) * (np.array(ifstream_P.root.P)) - n0 * p0)
 
     else:
         radRec = rad_rec
@@ -408,6 +409,11 @@ def tau_diff(PL, dt):
     dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)
     return -(dln_PLdt ** -1)
     
+def radiative_recombination(N, P, B, N0, P0):
+    return B * (N * P - N0 * P0)
+
+def nonradiative_recombination(N, P, N0, P0, tau_N, tau_P):
+    return (N * P - N0 * P0) / ((tau_N * P) + (tau_P * N))
 
 def CalcInt(input_array,spacing):
     # FIXME: NEEDS TESTING WITH bay.py

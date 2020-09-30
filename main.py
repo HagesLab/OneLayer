@@ -1,7 +1,7 @@
 #################################################
 # Transient Electron Dynamics Simulator
 # Model photoluminescent behavior in one-dimensional nanowire
-# Last modified: Sep 12, 2020
+# Last modified: Sep 30, 2020
 # Author: Calvin Fai, Charles Hages
 # Contact:
 ################################################# 
@@ -418,7 +418,7 @@ class Notebook:
         
         # FIXME: Check these
         self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
-        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] * self.convert_in_dict["Tau_N"]
+        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["Tau_N"]
         self.convert_in_dict["PL"] = self.convert_in_dict["RR"] * self.convert_in_dict["Theta"]
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
         self.convert_out_dict = {}
@@ -1072,6 +1072,11 @@ class Notebook:
         self.overview_subplot_nrr = self.analyze_overview_fig.add_subplot(337)
         self.overview_subplot_pl = self.analyze_overview_fig.add_subplot(338)
         self.overview_subplot_taudiff = self.analyze_overview_fig.add_subplot(339)
+        self.overview_subplots = [self.overview_subplot_n, self.overview_subplot_p,
+                                  self.overview_subplot_efield, self.overview_subplot_deltan,
+                                  self.overview_subplot_deltap, self.overview_subplot_rr,
+                                  self.overview_subplot_nrr, self.overview_subplot_pl,
+                                  self.overview_subplot_taudiff]
         
         self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.do_overview_analysis)
         self.analyze_overview_button.grid(row=0,column=0)
@@ -1080,6 +1085,11 @@ class Notebook:
         self.analyze_overview_widget = self.analyze_overview_canvas.get_tk_widget()
         self.analyze_overview_widget.grid(row=1,column=0)
 
+        self.overview_toolbar_frame = tk.ttk.Frame(self.tab_overview_analysis)
+        self.overview_toolbar_frame.grid(row=2,column=0)
+        self.overview_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, self.overview_toolbar_frame)
+        self.overview_toolbar.grid(row=0,column=0)
+        
         self.analysis_title = tk.ttk.Label(self.tab_detailed_analysis, text="Plot and Integrate Saved Datasets", style="Header.TLabel")
         self.analysis_title.grid(row=0,column=0,columnspan=8)
         
@@ -2230,6 +2240,7 @@ class Notebook:
     def update_sim_plots(self, index, do_clear_plots=True):
         ## V2: Update plots on Simulate tab
         ## FIXME: This abomination of 1x3 arrays
+        ## FIXME: Make E-field not log scaled
         
         # Why + 1e-30?
         # We want a log-scaled plot, and adding a tiny number to the y limits avoids the edge case of every value being zero.
@@ -2298,29 +2309,49 @@ class Notebook:
         data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
 
         tstep_list = np.linspace(0, data_n, num=5, dtype=int)
-        n_list = []
-        p_list = []
-        efield_list = []
+
         # Convert from cm, V, s to nm, V, ns
         for param in param_values_dict:
             if param in self.convert_in_dict:
                 param_values_dict[param] *= self.convert_in_dict[param]
+                
+        for subplot in self.overview_subplots:
+            subplot.cla()
+            
+        self.overview_subplot_n.set_yscale('log')
+        self.overview_subplot_p.set_yscale('log')
+        
+        self.overview_subplot_n.set_title("N [cm^-3]")
+        self.overview_subplot_p.set_title("P [cm^-3]")
+        self.overview_subplot_efield.set_title("E-field []")
+        self.overview_subplot_deltan.set_title("delta_N [cm^-3]")
+        self.overview_subplot_deltap.set_title("delta_P [cm^-3]")
+        self.overview_subplot_rr.set_title("Rad. Rec. [cm^-3 s^-1]")
+        self.overview_subplot_nrr.set_title("Non Rad. Rec. [cm^-3 s^-1]")
         
         for i in range(len(tstep_list)):
-            n_list.append(self.read_N(data_filename, tstep_list[i]))
-            p_list.append(self.read_P(data_filename, tstep_list[i]))
-            efield_list.append(self.read_E_field(data_filename, tstep_list[i]))
+            n_list = self.read_N(data_filename, tstep_list[i])
+            p_list = self.read_P(data_filename, tstep_list[i])
+            efield_list = self.read_E_field(data_filename, tstep_list[i])
         
-            self.overview_subplot_n.plot(data_node_x, n_list[i])
-            self.overview_subplot_p.plot(data_node_x, p_list[i])
-            self.overview_subplot_efield.plot(data_edge_x, efield_list[i])
-        # self.overview_subplot_deltan = self.analyze_overview_fig.add_subplot(333)
-        # self.overview_subplot_deltap = self.analyze_overview_fig.add_subplot(334)
-        # self.overview_subplot_efield = self.analyze_overview_fig.add_subplot(335)
-        # self.overview_subplot_rr = self.analyze_overview_fig.add_subplot(336)
-        # self.overview_subplot_nrr = self.analyze_overview_fig.add_subplot(337)
+            self.overview_subplot_n.plot(data_node_x, n_list * self.convert_out_dict['N'], label="{} ns".format(tstep_list[i] * param_values_dict["dt"]))
+            self.overview_subplot_p.plot(data_node_x, p_list * self.convert_out_dict['P'])
+            self.overview_subplot_efield.plot(data_edge_x, efield_list)
+            
+            deltan_list = n_list - param_values_dict["N0"]
+            deltap_list = p_list - param_values_dict["P0"]
+            
+            self.overview_subplot_deltan.plot(data_node_x, deltan_list * self.convert_out_dict['N'])
+            self.overview_subplot_deltap.plot(data_node_x, deltap_list * self.convert_out_dict['P'])
+        
+            rr_list = finite.radiative_recombination(n_list, p_list, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"])
+            self.overview_subplot_rr.plot(data_node_x, rr_list * self.convert_out_dict['RR'])
+            
+            nrr_list = finite.nonradiative_recombination(n_list, p_list, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"])
+            self.overview_subplot_nrr.plot(data_node_x, nrr_list * self.convert_out_dict['NRR'])
         # self.overview_subplot_pl = self.analyze_overview_fig.add_subplot(338)
         # self.overview_subplot_taudiff = self.analyze_overview_fig.add_subplot(339)
+        self.overview_subplot_n.legend().set_draggable(True)
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
         return
@@ -2443,7 +2474,9 @@ class Notebook:
         
         elif (datatype == "RR"):
             try:
-                new_data = Raw_Data_Set(param_values_dict["B"] * ((self.read_N(data_filename, active_show_index)) * (self.read_P(data_filename, active_show_index)) - param_values_dict["N0"] * param_values_dict["P0"]), 
+                temp_N = self.read_N(data_filename, active_show_index)
+                temp_P = self.read_P(data_filename, active_show_index)
+                new_data = Raw_Data_Set(finite.radiative_recombination(temp_N, temp_P, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"]), 
                                     data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
@@ -2454,8 +2487,7 @@ class Notebook:
             try:
                 temp_N = self.read_N(data_filename, active_show_index)
                 temp_P = self.read_P(data_filename, active_show_index)
-                new_data = Raw_Data_Set((temp_N * temp_P - param_values_dict["N0"] * param_values_dict["P0"]) / 
-                                    ((param_values_dict["Tau_N"] * temp_P) + (param_values_dict["Tau_P"] * temp_N)), 
+                new_data = Raw_Data_Set(finite.nonradiative_recombination(temp_N, temp_P, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"]),  
                                     data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
@@ -2464,8 +2496,10 @@ class Notebook:
 
         elif (datatype == "PL"):
             try:
-                rad_rec = param_values_dict["B"] * (self.read_N(data_filename, active_show_index) * self.read_P(data_filename, active_show_index) - \
-                    param_values_dict["N0"] * param_values_dict["P0"])
+                temp_N = self.read_N(data_filename, active_show_index)
+                temp_P = self.read_P(data_filename, active_show_index)
+                
+                rad_rec = finite.radiative_recombination(temp_N, temp_P, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"])
 
                 max = param_values_dict["Total_length"]
                 dx = param_values_dict["Node_width"]
@@ -2585,10 +2619,12 @@ class Notebook:
 
         elif active_datagroup.type == "RR":
             for tag in active_datagroup.datasets:
+                temp_N = self.read_N(active_datagroup.datasets[tag].filename, active_show_index)
+                temp_P = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 B = active_datagroup.datasets[tag].params_dict["B"]
-                active_datagroup.datasets[tag].data = B * (self.read_N(active_datagroup.datasets[tag].filename, active_show_index) * self.read_P(active_datagroup.datasets[tag].filename, active_show_index) - n0 * p0)
+                active_datagroup.datasets[tag].data = finite.radiative_recombination(temp_N, temp_P, B, n0, p0)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "NRR":
@@ -2599,16 +2635,17 @@ class Notebook:
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 tauN = active_datagroup.datasets[tag].params_dict["Tau_N"]
                 tauP = active_datagroup.datasets[tag].params_dict["Tau_P"]
-                active_datagroup.datasets[tag].data = (temp_N * temp_P - n0 * p0) / ((tauN * temp_P) + (tauP * temp_N))
+                active_datagroup.datasets[tag].data = finite.nonradiative_recombination(temp_N, temp_P, n0, p0, tauN, tauP)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "PL":
             for tag in active_datagroup.datasets:
-                filename = active_datagroup.datasets[tag].filename
+                temp_N = self.read_N(active_datagroup.datasets[tag].filename, active_show_index)
+                temp_P = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
                 B = active_datagroup.datasets[tag].params_dict["B"]
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
-                rad_rec = B * ((self.read_N(filename, active_show_index) * self.read_P(filename, active_show_index)) - n0 * p0)
+                rad_rec = finite.radiative_recombination(temp_N, temp_P, B, n0, p0)
 
                 max = active_datagroup.datasets[tag].params_dict["Total_length"]
                 dx = active_datagroup.datasets[tag].params_dict["Node_width"]
@@ -3050,7 +3087,7 @@ class Notebook:
                         temp_N = np.array(ifstream_N.root.N)
                         temp_P = np.array(ifstream_P.root.P)
 
-                        data = B_param * (temp_N) * (temp_P) - n0 * p0
+                        data = finite.radiative_recombination(temp_N, temp_P, B_param, n0, p0)
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
@@ -3062,7 +3099,7 @@ class Notebook:
                         tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.N)
                         temp_P = np.array(ifstream_P.root.P)
-                        data = ((temp_N) * (temp_P) - n0 * p0) / (tauN * (temp_P) + tauP * (temp_N))
+                        data = finite.nonradiative_recombination(temp_N,temp_P, n0, p0, tauN, tauP)
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
