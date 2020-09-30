@@ -1,6 +1,6 @@
 #################################################
 # Wrapper functions for calculations, as well as
-# non-differential equation calculations.
+# standalone non-differential equation calculations.
 # The differential equations are located in odefuncs.py, 
 # while these do the rest of the math.
 ################################################# 
@@ -14,7 +14,6 @@ def check_valid_dx(length, dx):
     return (dx <= length)
 
 def toIndex(x,dx, absUpperBound, is_edge=False):
-    # Warning: this and toCoord() always round x down to the nearest node (or edge if is_edge=True)!
     absLowerBound = dx / 2 if not is_edge else 0
     if (x < absLowerBound):
         return 0
@@ -24,22 +23,11 @@ def toIndex(x,dx, absUpperBound, is_edge=False):
 
     return int((x - absLowerBound) / dx)
 
-
 def toCoord(i,dx, is_edge=False):
     absLowerBound = dx / 2 if not is_edge else 0
     return (absLowerBound + i * dx)
 
-def toArray(value, m, is_edge):
-    if not isinstance(value, np.ndarray):
-        if is_edge:
-            return np.ones(m+1) * value
-        else:
-            return np.ones(m) * value
-        
-    else:
-        return value
-
-
+## For various initial condition profiles
 def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
     # h and c are Planck's const and speed of light, respectively. These default to common units [J*s] and [m/s] but
     # they may be passed in with different units.
@@ -54,12 +42,14 @@ def pulse_laser_maxgen(max_gen, alpha, x_array, hc=6.626e-34*2.997e8):
 def pulse_laser_totalgen(total_gen, total_length, alpha, x_array, hc=6.626e-34*2.997e8):
     return ((total_gen * total_length * alpha * np.exp(alpha * total_length)) / (np.exp(alpha * total_length) - 1) * np.exp(-alpha * x_array))
 
+
+## Determine the proportion of recycled carriers that reach any location of the nanowire, generated from any location
 def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, symmetric=True):
     distance = np.arange(0, m*dx, dx)
     distance_matrix = np.zeros((m, m))
     lf_distance_matrix = np.zeros((m, m)) # Account for "other half" of a symmetric system
 
-    # Each row in distance_matrix represents the weight function centered around a different position
+    # Each row in distance_matrix represents the weight function centered around a different location
     for i in range(0,m):
         distance_matrix[i] = np.concatenate((np.flip(distance[0:i+1], 0), distance[1:m - i]))
         if symmetric: lf_distance_matrix[i] = distance + ((i+1) * dx)
@@ -69,7 +59,7 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmi
     combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * (weight + lf_weight)
     return combined_weight
 
-def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, params, recycle_photons=True, symmetric=True, do_ss=False, write_output=True, init_N=0, init_P=0, init_E_field=0):
+def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, recycle_photons=True, symmetric=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, E_field_ext=0, init_N=0, init_P=0, init_E_field=0, init_Ec=0, init_Chi=0, write_output=True):
     ## Problem statement:
     # Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
     # Space step size is dx, time step is dt
@@ -79,28 +69,7 @@ def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, params, recycle_p
     ## Set data type of array files
     atom = tables.Float64Atom()
 
-    ## Unpack params; typecast non-array params to arrays if needed
-    Sf = params["Sf"]
-    Sb = params["Sb"]
-    mu_n = toArray(params["Mu_N"], m, True)
-    mu_p = toArray(params["Mu_P"], m, True)
-    T = toArray(params["Temperature"], m, True)
-    n0 = toArray(params["N0"], m, False)
-    p0 = toArray(params["P0"], m, False)
-    tauN = toArray(params["Tau_N"], m, False)
-    tauP = toArray(params["Tau_P"], m, False)
-    B = toArray(params["B"], m, False)
-    eps = toArray(params["Rel-Permitivity"], m, True)
-    E_field_ext = toArray(params["Ext_E-Field"], m, True)
-    alphaCof = toArray(params["Alpha"], m, False) if recycle_photons else np.zeros(m)
-    thetaCof = toArray(params["Theta"], m, False)
-    delta_frac = toArray(params["Delta"], m, False)
-    fracEmitted = toArray(params["Frac-Emitted"], m, False)
-    init_Ec = toArray(params["Ec"], m, True)
-    init_Chi = toArray(params["electron_affinity"], m, True)
-           
     ## Define constants
-    eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
     q = 1.0 # [e]
     q_C = 1.602e-19 # [C]
     kB = 8.61773e-5  # [eV / K]
@@ -168,9 +137,10 @@ def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, params, recycle_p
         array_P = data[:,m:2*(m)]
 
         return array_N, array_P, error_data
+    
 
 def ode_twolayer(m, f, dm, df, thickness_Layer1, thickness_Layer2, z0, dt, total_time, Cn, Cp, tauN, tauP, tauT, tauS, tauD, tauD_FRET, mu_n, mu_p, mu_S, mu_T, n0, p0, Sf, Sb, B, k_fusion, kstar_tgen, Theta_Tgenb, kB, T, T0, q, q_C, eps, eps0, do_Fret, init_N, init_P):
-    # FIXME: NEEDS TESTING WITH bay.py
+    # FIXME: Needs testing with bay.py
     init_E = np.zeros(m+1)
     init_T = np.zeros(f)
     init_S = np.zeros(f)
@@ -224,12 +194,13 @@ def ode_twolayer(m, f, dm, df, thickness_Layer1, thickness_Layer2, z0, dt, total
         eta_UC= PL_Layer2_array / integrated_init_N*100    #[%]
     return
 
+## Calculate PL(t) by integrating radiative recombination over space, taking into account a photon recycle term 
 def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alphaCof, thetaCof, delta_frac, fracEmitted, symmetric_flag, radrec_fromfile=True, rad_rec=0):
     #note: first dimension of radRec is time, second dimension is space
     if radrec_fromfile:
         with tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
-            radRec = B * ((np.array(ifstream_N.root.N)) * (np.array(ifstream_P.root.P)) - n0 * p0)
+            radRec = B * ((n0 + np.array(ifstream_N.root.N)) * (p0 + np.array(ifstream_P.root.P)) - n0 * p0)
 
     else:
         radRec = rad_rec
@@ -241,7 +212,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
 
     # i and j here illustrate a problem - we would love to integrate from "l_bound" to "u_bound" exactly, but we only have a discrete list of values with spacing dx.
     # The best we can really do is to map our bounds to the greatest space node less than or equal to the bounds, such that for example,
-    # with PL data at x = [10, 30, 50, ...] nm,
+    # with PL data at node x = [10, 30, 50, 70...] nm,
     # an integral from x = 15 to x = 65 will map to i = 0 (the node at x = 10) and j = 2 (the node at x = 50).
 
     # Thus, an integral from x = 15 to x = 65 would actually get you the integral from x = 10 to x = 50, but with a principal assumption of finite difference methods - 
@@ -270,6 +241,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
     else: # if we don't need the extra node
         distance_matrix = np.zeros((j - i + 1, m))
         lf_distance_matrix = np.zeros((j - i + 1, m))
+        rf_distance_matrix = np.zeros((j - i + 1, m))
 
         for n in range(i, j + 1):
             distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
@@ -290,11 +262,10 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
         # Technically an integral with identical bounds is zero, but it is far more useful to return the value at that point instead
         # Because of how nodes work, this should just return the value of the appropriate node, or (and this may be controversial) the average of two adjacent nodes if it lies on an edge
 
-        # Even more controversial is how to handle the cases of integrating from x = 0 to x = 0 and vice versa at the far end of the system -
+        # Even more strange is how to handle the cases of integrating from x = 0 to x = 0 and vice versa at the far end of the system -
         # these lie on edges but there are no adjacent nodes to average with!
         # We decide for now that x = 0 yields the value of the leftmost node and x = (far end) yields the value of the rightmost node.
 
-        # Ghost nodes are a possibility but eww
         PL_base = fracEmitted * radRec[:,i] + intg.trapz(combined_weight[0] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * radRec[:,i] + \
             intg.trapz(combined_weight2[0] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * radRec[:,i]
 
@@ -318,7 +289,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
             # This is a little memory optimization to make narrow integrals faster - we could do calculations on the entire radRec and take out a slice corresponding to our bounds,
             # but by slicing radRec first we avoid doing unnecessary calculations on regions of the system we aren't integrating over
 
-            # The downside of this is all the indices of PL_base end up shifted left by i: PL_base[0] contains data regarding the ith node while PL_base[j-i] contains data regarding the jth node
+            # The downside of this is all the indices of PL_base end up shifted left by i: PL_base[0] contains data regarding the nanowire's ith node while PL_base[j-i] contains data regarding the jth node
             PL_base = fracEmitted * radRec[:, i:j+1+1]
 
             for p in range(0,j - i + 1 + 1):
@@ -399,15 +370,6 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
         u_bound_correction += integrand[j-i+1] * ufrac2
 
     return u_bound_correction - l_bound_correction
-
-def tau_diff(PL, dt):
-    ln_PL = np.log(PL)
-    dln_PLdt = np.zeros(ln_PL.__len__())
-    dln_PLdt[0] = (ln_PL[1] - ln_PL[0]) / dt
-    dln_PLdt[-1] = (ln_PL[-1] - ln_PL[-2]) / dt
-    dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)
-    return -(dln_PLdt ** -1)
-    
 
 def CalcInt(input_array,spacing):
     # FIXME: NEEDS TESTING WITH bay.py
