@@ -2278,7 +2278,6 @@ class Notebook:
     ## Func for overview analyze tab
     
     def do_overview_analysis(self):
-        print("Red was not the imposter")
         data_dirname = tk.filedialog.askdirectory(title="Select a dataset", initialdir=self.default_dirs["Data"])
         if not data_dirname:
             print("No data set selected :(")
@@ -2302,24 +2301,27 @@ class Notebook:
                     if '\t' in new_value:
                         param_values_dict[param] = np.array(extract_values(new_value, '\t'))
                     else: param_values_dict[param] = float(new_value)
+                    
+        # Convert from cm, V, s to nm, V, ns
+        for param in param_values_dict:
+            if param in self.convert_in_dict:
+                param_values_dict[param] *= self.convert_in_dict[param]
              
         data_n = int(0.5 + param_values_dict["Total-Time"] / param_values_dict["dt"])
         data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
         data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
         data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
-
-        tstep_list = np.linspace(0, data_n, num=5, dtype=int)
-
-        # Convert from cm, V, s to nm, V, ns
-        for param in param_values_dict:
-            if param in self.convert_in_dict:
-                param_values_dict[param] *= self.convert_in_dict[param]
+        data_node_t = np.linspace(0, param_values_dict["Total-Time"], data_n + 1)
+        tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
                 
         for subplot in self.overview_subplots:
             subplot.cla()
             
+        self.overview_subplot_n.set_xlabel('nm')
+        self.overview_subplot_pl.set_xlabel('ns')
         self.overview_subplot_n.set_yscale('log')
         self.overview_subplot_p.set_yscale('log')
+        self.overview_subplot_pl.set_yscale('log')
         
         self.overview_subplot_n.set_title("N [cm^-3]")
         self.overview_subplot_p.set_title("P [cm^-3]")
@@ -2328,15 +2330,17 @@ class Notebook:
         self.overview_subplot_deltap.set_title("delta_P [cm^-3]")
         self.overview_subplot_rr.set_title("Rad. Rec. [cm^-3 s^-1]")
         self.overview_subplot_nrr.set_title("Non Rad. Rec. [cm^-3 s^-1]")
+        self.overview_subplot_pl.set_title("PL integrated over total length []")
+        self.overview_subplot_taudiff.set_title("-(dln(PL)/dt)^-1")
         
         for i in range(len(tstep_list)):
             n_list = self.read_N(data_filename, tstep_list[i])
             p_list = self.read_P(data_filename, tstep_list[i])
             efield_list = self.read_E_field(data_filename, tstep_list[i])
         
-            self.overview_subplot_n.plot(data_node_x, n_list * self.convert_out_dict['N'], label="{} ns".format(tstep_list[i] * param_values_dict["dt"]))
+            self.overview_subplot_n.plot(data_node_x, n_list * self.convert_out_dict['N'], label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
             self.overview_subplot_p.plot(data_node_x, p_list * self.convert_out_dict['P'])
-            self.overview_subplot_efield.plot(data_edge_x, efield_list)
+            self.overview_subplot_efield.plot(data_edge_x, efield_list * self.convert_out_dict['E_field'])
             
             deltan_list = n_list - param_values_dict["N0"]
             deltap_list = p_list - param_values_dict["P0"]
@@ -2349,8 +2353,16 @@ class Notebook:
             
             nrr_list = finite.nonradiative_recombination(n_list, p_list, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"])
             self.overview_subplot_nrr.plot(data_node_x, nrr_list * self.convert_out_dict['NRR'])
-        # self.overview_subplot_pl = self.analyze_overview_fig.add_subplot(338)
-        # self.overview_subplot_taudiff = self.analyze_overview_fig.add_subplot(339)
+        
+        pl_list = finite.propagatingPL(data_filename, 0, param_values_dict["Total_length"], param_values_dict["Node_width"], 0, param_values_dict["Total_length"], 
+                                       param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Alpha"], param_values_dict["Theta"], param_values_dict["Delta"],
+                                       param_values_dict["Frac-Emitted"], param_values_dict["symmetric_system"])
+                
+        self.overview_subplot_pl.plot(data_node_t, pl_list * self.convert_out_dict['PL'])
+        
+        taudiff_list = finite.tau_diff(pl_list, param_values_dict['dt'])
+        self.overview_subplot_taudiff.plot(data_node_t, taudiff_list * self.convert_out_dict['tau_diff'])
+        
         self.overview_subplot_n.legend().set_draggable(True)
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
