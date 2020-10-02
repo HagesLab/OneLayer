@@ -2276,17 +2276,7 @@ class Notebook:
         return
     
     ## Func for overview analyze tab
-    
-    def do_overview_analysis(self):
-        data_dirname = tk.filedialog.askdirectory(title="Select a dataset", initialdir=self.default_dirs["Data"])
-        if not data_dirname:
-            print("No data set selected :(")
-            return
-        
-        print("Selected: {}".format(data_dirname))
-        
-        data_filename = data_dirname[data_dirname.rfind('/')+1:]
-        
+    def fetch_metadata(self, data_filename):
         with open(self.default_dirs["Data"] + "\\" + data_filename + "\\" + "metadata.txt", "r") as ifstream:
             param_values_dict = {}
             for line in ifstream:
@@ -2306,14 +2296,32 @@ class Notebook:
         for param in param_values_dict:
             if param in self.convert_in_dict:
                 param_values_dict[param] *= self.convert_in_dict[param]
-             
-        data_n = int(0.5 + param_values_dict["Total-Time"] / param_values_dict["dt"])
-        data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
-        data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
-        data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
-        data_node_t = np.linspace(0, param_values_dict["Total-Time"], data_n + 1)
-        tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
-                
+                    
+        return param_values_dict
+    
+    def do_overview_analysis(self):
+        data_dirname = tk.filedialog.askdirectory(title="Select a dataset", initialdir=self.default_dirs["Data"])
+        if not data_dirname:
+            print("No data set selected :(")
+            return
+        
+        print("Selected: {}".format(data_dirname))
+        
+        data_filename = data_dirname[data_dirname.rfind('/')+1:]
+        
+        try:
+            param_values_dict = self.fetch_metadata(data_filename)
+                 
+            data_n = int(0.5 + param_values_dict["Total-Time"] / param_values_dict["dt"])
+            data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
+            data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
+            data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
+            data_node_t = np.linspace(0, param_values_dict["Total-Time"], data_n + 1)
+            tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
+        except:
+            self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
+            return
+        
         for subplot in self.overview_subplots:
             subplot.cla()
             
@@ -2421,30 +2429,13 @@ class Notebook:
                 return
 
         try:
-            with open(self.default_dirs["Data"] + "\\" + data_filename + "\\" + "metadata.txt", "r") as ifstream:
-                param_values_dict = {}
-                for line in ifstream:
-                    if "$" in line: continue
-
-                    elif "#" in line: continue
-
-                    else:
-                        param = line[0:line.find(':')]
-                        new_value = line[line.find(' ') + 1:].strip('\n')
-
-                        if '\t' in new_value:
-                            param_values_dict[param] = np.array(extract_values(new_value, '\t'))
-                        else: param_values_dict[param] = float(new_value)
-
+            param_values_dict = self.fetch_metadata(data_filename)
+                    
             data_n = int(0.5 + param_values_dict["Total-Time"] / param_values_dict["dt"])
             data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
             data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
             data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
 
-            # Convert from cm, V, s to nm, V, ns
-            for param in param_values_dict:
-                if param in self.convert_in_dict:
-                    param_values_dict[param] *= self.convert_in_dict[param]
 
         except:
             self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
