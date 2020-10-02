@@ -111,12 +111,15 @@ class Nanowire:
         return
 
     def remove_param_rule(self, param_name, i):
-        # TODO: Only one updated needed for multiple removals
-        # Add shortcut for remove_all
         self.param_dict[param_name].param_rules.pop(i)
         self.update_param_toarray(param_name)
         return
-
+    
+    def removeall_param_rules(self, param_name):
+        self.param_dict[param_name].param_rules = []
+        self.param_dict[param_name].value = 0
+        return
+    
     def update_param_toarray(self, param_name):
         # Recalculate a Parameter from its Param_Rules
         # This should be done every time the Param_Rules are changed
@@ -444,7 +447,7 @@ class Notebook:
 
         self.init_shape_selection = tk.StringVar()
         self.init_var_selection = tk.StringVar()
-        self.HIC_viewer_selection = tk.StringVar()
+        self.paramtoolkit_viewer_selection = tk.StringVar()
         self.EIC_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
@@ -458,8 +461,8 @@ class Notebook:
         # Flags and containers for IC arrays
         self.nanowire = Nanowire()
 
-        self.HIC_list = []
-        self.HIC_listbox_currentparam = ""
+        self.active_paramrule_list = []
+        self.paramtoolkit_currentparam = ""
         self.IC_file_list = None
         self.init_N = None
         self.init_P = None
@@ -608,7 +611,7 @@ class Notebook:
         self.tab_explicit_init = tk.ttk.Frame(self.tab_inputs)
 
         var_dropdown_list = [str(param + self.nanowire.param_dict[param].units) for param in self.nanowire.param_dict]
-        HIC_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
+        paramtoolkit_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
         unitless_dropdown_list = [param for param in self.nanowire.param_dict]
         
         self.line_sep_style = tk.ttk.Style()
@@ -866,67 +869,67 @@ class Notebook:
         self.AIC_toolbar_frame.grid(row=5,column=0,columnspan=3)
         self.AIC_toolbar = tkagg.NavigationToolbar2Tk(self.AIC_canvas, self.AIC_toolbar_frame)
         
-        ## Heuristic Initial Condition(HIC):
+        ## Parameter Toolkit:
 
         self.param_rules_frame = tk.ttk.Frame(self.tab_rules_init)
         self.param_rules_frame.grid(row=0,column=0,padx=(370,0))
 
-        self.HIC_list_title = tk.ttk.Label(self.param_rules_frame, text="Add/Edit/Remove Space-Dependent Parameters", style="Header.TLabel")
-        self.HIC_list_title.grid(row=0,column=0,columnspan=3)
+        self.active_paramrule_list_title = tk.ttk.Label(self.param_rules_frame, text="Add/Edit/Remove Space-Dependent Parameters", style="Header.TLabel")
+        self.active_paramrule_list_title.grid(row=0,column=0,columnspan=3)
 
-        self.HIC_listbox = tk.Listbox(self.param_rules_frame, width=86,height=8)
-        self.HIC_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, padx=(32,32))
+        self.active_paramrule_listbox = tk.Listbox(self.param_rules_frame, width=86,height=8)
+        self.active_paramrule_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, padx=(32,32))
 
-        self.HIC_var_label = tk.ttk.Label(self.param_rules_frame, text="Select parameter to edit:")
-        self.HIC_var_label.grid(row=4,column=0)
+        self.paramrule_var_label = tk.ttk.Label(self.param_rules_frame, text="Select parameter to edit:")
+        self.paramrule_var_label.grid(row=4,column=0)
         
-        self.HIC_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_var_selection, var_dropdown_list[0], *var_dropdown_list)
-        self.HIC_var_dropdown.grid(row=4,column=1)
+        self.paramrule_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_var_selection, var_dropdown_list[0], *var_dropdown_list)
+        self.paramrule_var_dropdown.grid(row=4,column=1)
 
-        self.HIC_method_label = tk.ttk.Label(self.param_rules_frame, text="Select calculation method:")
-        self.HIC_method_label.grid(row=5,column=0)
+        self.paramrule_method_label = tk.ttk.Label(self.param_rules_frame, text="Select calculation method:")
+        self.paramrule_method_label.grid(row=5,column=0)
 
-        self.HIC_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_shape_selection, HIC_method_dropdown_list[0], *HIC_method_dropdown_list)
-        self.HIC_method_dropdown.grid(row=5, column=1)
+        self.paramrule_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_shape_selection, paramtoolkit_method_dropdown_list[0], *paramtoolkit_method_dropdown_list)
+        self.paramrule_method_dropdown.grid(row=5, column=1)
 
-        self.HIC_lbound_label = tk.ttk.Label(self.param_rules_frame, text="Left bound coordinate:")
-        self.HIC_lbound_label.grid(row=6, column=0)
+        self.paramrule_lbound_label = tk.ttk.Label(self.param_rules_frame, text="Left bound coordinate:")
+        self.paramrule_lbound_label.grid(row=6, column=0)
 
-        self.HIC_lbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.HIC_lbound_entry.grid(row=6,column=1)
+        self.paramrule_lbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.paramrule_lbound_entry.grid(row=6,column=1)
 
-        self.HIC_rbound_label = tk.ttk.Label(self.param_rules_frame, text="Right bound coordinate:")
-        self.HIC_rbound_label.grid(row=7, column=0)
+        self.paramrule_rbound_label = tk.ttk.Label(self.param_rules_frame, text="Right bound coordinate:")
+        self.paramrule_rbound_label.grid(row=7, column=0)
 
-        self.HIC_rbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.HIC_rbound_entry.grid(row=7,column=1)
+        self.paramrule_rbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.paramrule_rbound_entry.grid(row=7,column=1)
 
-        self.HIC_lvalue_label = tk.ttk.Label(self.param_rules_frame, text="Left bound value:")
-        self.HIC_lvalue_label.grid(row=8, column=0)
+        self.paramrule_lvalue_label = tk.ttk.Label(self.param_rules_frame, text="Left bound value:")
+        self.paramrule_lvalue_label.grid(row=8, column=0)
 
-        self.HIC_lvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.HIC_lvalue_entry.grid(row=8,column=1)
+        self.paramrule_lvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.paramrule_lvalue_entry.grid(row=8,column=1)
 
-        self.HIC_rvalue_label = tk.ttk.Label(self.param_rules_frame, text="Right bound value:")
-        self.HIC_rvalue_label.grid(row=9, column=0)
+        self.paramrule_rvalue_label = tk.ttk.Label(self.param_rules_frame, text="Right bound value:")
+        self.paramrule_rvalue_label.grid(row=9, column=0)
 
-        self.HIC_rvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.HIC_rvalue_entry.grid(row=9,column=1)
+        self.paramrule_rvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.paramrule_rvalue_entry.grid(row=9,column=1)
 
-        self.add_HIC_button = tk.ttk.Button(self.param_rules_frame, text="Add new parameter rule", command=self.add_HIC)
-        self.add_HIC_button.grid(row=10,column=0,columnspan=2)
+        self.add_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Add new parameter rule", command=self.add_paramrule)
+        self.add_paramrule_button.grid(row=10,column=0,columnspan=2)
 
-        self.delete_HIC_button = tk.ttk.Button(self.param_rules_frame, text="Delete highlighted rule", command=self.delete_HIC)
-        self.delete_HIC_button.grid(row=4,column=2)
+        self.delete_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete highlighted rule", command=self.delete_paramrule)
+        self.delete_paramrule_button.grid(row=4,column=2)
 
-        self.deleteall_HIC_button = tk.ttk.Button(self.param_rules_frame, text="Delete all rules for this parameter", command=self.deleteall_HIC)
-        self.deleteall_HIC_button.grid(row=5,column=2)
+        self.deleteall_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete all rules for this parameter", command=self.deleteall_paramrule)
+        self.deleteall_paramrule_button.grid(row=5,column=2)
 
-        self.HIC_description = tk.Message(self.param_rules_frame, text="The Parameter Toolkit uses a series of rules and patterns to build a spatially dependent distribution for any parameter.", width=250)
-        self.HIC_description.grid(row=6,rowspan=3,column=2,columnspan=2)
+        self.paramtoolkit_description = tk.Message(self.param_rules_frame, text="The Parameter Toolkit uses a series of rules and patterns to build a spatially dependent distribution for any parameter.", width=250)
+        self.paramtoolkit_description.grid(row=6,rowspan=3,column=2,columnspan=2)
 
-        self.HIC_description2 = tk.Message(self.param_rules_frame, text="Warning: Rules are applied from top to bottom. Order matters!", width=250)
-        self.HIC_description2.grid(row=9,rowspan=3,column=2,columnspan=2)
+        self.paramtoolkit_description2 = tk.Message(self.param_rules_frame, text="Warning: Rules are applied from top to bottom. Order matters!", width=250)
+        self.paramtoolkit_description2.grid(row=9,rowspan=3,column=2,columnspan=2)
         
         # These plots were previously attached to self.tab_inputs so that it was visible on all three IC tabs,
         # but it was hard to position them correctly.
@@ -953,17 +956,17 @@ class Notebook:
         self.recent_param_toolbar_frame.grid(row=13,column=2,columnspan=2)
         self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, self.recent_param_toolbar_frame)
 
-        self.moveup_HIC_button = tk.ttk.Button(self.param_rules_frame, text="⇧", command=self.moveup_HIC)
-        self.moveup_HIC_button.grid(row=1,column=4)
+        self.moveup_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇧", command=self.moveup_paramrule)
+        self.moveup_paramrule_button.grid(row=1,column=4)
 
-        self.HIC_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.HIC_viewer_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
-        self.HIC_viewer_dropdown.grid(row=2,column=4)
+        self.paramrule_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.paramtoolkit_viewer_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
+        self.paramrule_viewer_dropdown.grid(row=2,column=4)
 
-        self.HIC_view_button = tk.ttk.Button(self.param_rules_frame, text="Change view", command=self.refresh_paramrule_listbox)
-        self.HIC_view_button.grid(row=2,column=5)
+        self.paramrule_view_button = tk.ttk.Button(self.param_rules_frame, text="Change view", command=self.refresh_paramrule_listbox)
+        self.paramrule_view_button.grid(row=2,column=5)
 
-        self.movedown_HIC_button = tk.ttk.Button(self.param_rules_frame, text="⇩", command=self.movedown_HIC)
-        self.movedown_HIC_button.grid(row=3,column=4)
+        self.movedown_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇩", command=self.movedown_paramrule)
+        self.movedown_paramrule_button.grid(row=3,column=4)
 
         ## Explicit Inital Condition(EIC):
 
@@ -1371,8 +1374,8 @@ class Notebook:
                         except:
                             continue
                     
-                    self.HIC_listbox_currentparam = param
-                    self.deleteall_HIC()
+                    self.paramtoolkit_currentparam = param
+                    self.deleteall_paramrule()
                     self.nanowire.param_dict[param].value = val
                     changed_params.append(param)
                     
@@ -3214,13 +3217,13 @@ class Notebook:
 
         for param in self.resetIC_selected_params:
             # Step 1 and 2
-            self.HIC_listbox_currentparam = param
+            self.paramtoolkit_currentparam = param
             
             # These two lines changes the text displayed in the param_rule display box's menu and is for cosmetic purposes only
             self.update_paramrule_listbox(param)
-            self.HIC_viewer_selection.set(param)
+            self.paramtoolkit_viewer_selection.set(param)
             
-            self.deleteall_HIC()
+            self.deleteall_paramrule()
             
             # Step 3
             self.nanowire.param_dict[param].value = 0
@@ -3310,10 +3313,10 @@ class Notebook:
             return
 
         # Remove all param_rules for init_deltaN and init_deltaP, as we will be reassigning them shortly.
-        self.HIC_listbox_currentparam = "init_deltaN"
-        self.deleteall_HIC()
-        self.HIC_listbox_currentparam = "init_deltaP"
-        self.deleteall_HIC()
+        self.paramtoolkit_currentparam = "init_deltaN"
+        self.deleteall_paramrule()
+        self.paramtoolkit_currentparam = "init_deltaP"
+        self.deleteall_paramrule()
 
         # Establish constants; calculate alpha
         h = 6.626e-34   # [J*s]
@@ -3432,22 +3435,22 @@ class Notebook:
         self.nanowire.param_dict["init_deltaP"].value = self.nanowire.param_dict["init_deltaN"].value
 
         self.update_IC_plot(plot_ID="AIC")
-        self.HIC_listbox_currentparam = "init_deltaN"
+        self.paramtoolkit_currentparam = "init_deltaN"
         self.update_IC_plot(plot_ID="custom")
-        self.HIC_listbox_currentparam = "init_deltaP"
+        self.paramtoolkit_currentparam = "init_deltaP"
         self.update_IC_plot(plot_ID="recent")
         self.using_AIC = True
         return
 
     ## Special functions for Parameter Toolkit:
-    def add_HIC(self):
+    def add_paramrule(self):
         # V2 update
         # Set the value of one of Nanowire's Parameters
 
         # TODO: This check may be deprecated
-        if (self.HIC_list.__len__() > 0 and isinstance(self.HIC_list[0], str)):
+        if (self.active_paramrule_list.__len__() > 0 and isinstance(self.active_paramrule_list[0], str)):
             print("Something happened!")
-            self.deleteall_HIC(False)
+            self.deleteall_paramrule(False)
 
         try:
             self.set_init_x()
@@ -3466,51 +3469,51 @@ class Notebook:
 
             if (self.init_shape_selection.get() == "POINT"):
 
-                if (float(self.HIC_lbound_entry.get()) < 0):
+                if (float(self.paramrule_lbound_entry.get()) < 0):
                     raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
-                if (float(self.HIC_lbound_entry.get()) < 0):
+                if (float(self.paramrule_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.HIC_lbound_entry.get()), -1, float(self.HIC_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.paramrule_lbound_entry.get()), -1, float(self.paramrule_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
-                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
+                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
                 	raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
-                if (float(self.HIC_lbound_entry.get()) > float(self.HIC_rbound_entry.get())):
+                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
                 	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
 
-                if (float(self.HIC_lbound_entry.get()) < 0):
+                if (float(self.paramrule_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), float(self.paramrule_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
-                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
+                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
                 	raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
-                if (float(self.HIC_lbound_entry.get()) > float(self.HIC_rbound_entry.get())):
+                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
                 	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
 
-                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) < 0):
+                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "LINE", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), 
-                                            float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "LINE", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
+                                            float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
 
             elif (self.init_shape_selection.get() == "EXP"):
-                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
+                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
                     raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
-                if (float(self.HIC_lbound_entry.get()) > float(self.HIC_rbound_entry.get())):
+                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
                 	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
 
-                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) < 0):
+                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "EXP", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), 
-                                            float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "EXP", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
+                                            float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
 
             else:
                 raise Exception("Error: No init. type selected")
@@ -3524,22 +3527,21 @@ class Notebook:
             return
 
 
-        #self.HIC_list.append(new_param_rule)
-        #self.HIC_listbox.insert(self.HIC_list.__len__() - 1, new_param_rule.get())
+        #self.active_paramrule_list.append(new_param_rule)
+        #self.active_paramrule_listbox.insert(self.active_paramrule_list.__len__() - 1, new_param_rule.get())
 
         self.nanowire.add_param_rule(new_param_name, new_param_rule)
 
-        self.HIC_viewer_selection.set(new_param_name)
+        self.paramtoolkit_viewer_selection.set(new_param_name)
         self.update_paramrule_listbox(new_param_name)
 
-        #self.recalc_HIC()
         if new_param_name == "init_deltaN" or new_param_name == "init_deltaP": self.using_AIC = False
         self.update_IC_plot(plot_ID="recent")
         return
 
     def refresh_paramrule_listbox(self):
         # The View button has two jobs: change the listbox to the new param and display a snapshot of it
-        self.update_paramrule_listbox(self.HIC_viewer_selection.get())
+        self.update_paramrule_listbox(self.paramtoolkit_viewer_selection.get())
         self.update_IC_plot(plot_ID="custom")
         return
     
@@ -3550,15 +3552,15 @@ class Notebook:
             return
 
         # 1. Clear the viewer
-        self.hideall_HIC()
+        self.hideall_paramrules()
 
         # 2. Write in the new rules
         current_param_rules = self.nanowire.param_dict[param_name].param_rules
-        self.HIC_listbox_currentparam = param_name
+        self.paramtoolkit_currentparam = param_name
 
         for param_rule in current_param_rules:
-            self.HIC_list.append(param_rule)
-            self.HIC_listbox.insert(self.HIC_list.__len__() - 1, param_rule.get())
+            self.active_paramrule_list.append(param_rule)
+            self.active_paramrule_listbox.insert(self.active_paramrule_list.__len__() - 1, param_rule.get())
 
         
         self.write(self.ICtab_status, "")
@@ -3566,66 +3568,72 @@ class Notebook:
         return
 
     # These two reposition the order of param_rules
-    def moveup_HIC(self):
-        currentSelectionIndex = self.HIC_listbox.curselection()[0]
+    def moveup_paramrule(self):
+        try:
+            currentSelectionIndex = self.active_paramrule_listbox.curselection()[0]
+        except IndexError:
+            return
         
         if (currentSelectionIndex > 0):
             # Two things must be done here for a complete swap:
             # 1. Change the order param rules appear in the box
-            self.HIC_list[currentSelectionIndex], self.HIC_list[currentSelectionIndex - 1] = self.HIC_list[currentSelectionIndex - 1], self.HIC_list[currentSelectionIndex]
-            self.HIC_listbox.delete(currentSelectionIndex)
-            self.HIC_listbox.insert(currentSelectionIndex - 1, self.HIC_list[currentSelectionIndex - 1].get())
-            self.HIC_listbox.selection_set(currentSelectionIndex - 1)
+            self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
+            self.active_paramrule_listbox.delete(currentSelectionIndex)
+            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, self.active_paramrule_list[currentSelectionIndex - 1].get())
+            self.active_paramrule_listbox.selection_set(currentSelectionIndex - 1)
 
             # 2. Change the order param rules are applied when calculating Parameter's values
-            self.nanowire.swap_param_rules(self.HIC_listbox_currentparam, currentSelectionIndex)
+            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
 
-    def movedown_HIC(self):
-        currentSelectionIndex = self.HIC_listbox.curselection()[0] + 1
+    def movedown_paramrule(self):
+        try:
+            currentSelectionIndex = self.active_paramrule_listbox.curselection()[0] + 1
+        except IndexError:
+            return
         
-        if (currentSelectionIndex < self.HIC_list.__len__()):
-            self.HIC_list[currentSelectionIndex], self.HIC_list[currentSelectionIndex - 1] = self.HIC_list[currentSelectionIndex - 1], self.HIC_list[currentSelectionIndex]
-            self.HIC_listbox.delete(currentSelectionIndex)
-            self.HIC_listbox.insert(currentSelectionIndex - 1, self.HIC_list[currentSelectionIndex - 1].get())
-            self.HIC_listbox.selection_set(currentSelectionIndex)
+        if (currentSelectionIndex < self.active_paramrule_list.__len__()):
+            self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
+            self.active_paramrule_listbox.delete(currentSelectionIndex)
+            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, self.active_paramrule_list[currentSelectionIndex - 1].get())
+            self.active_paramrule_listbox.selection_set(currentSelectionIndex)
             
-            self.nanowire.swap_param_rules(self.HIC_listbox_currentparam, currentSelectionIndex)
+            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
 
-    def hideall_HIC(self, doPlotUpdate=True):
-        # Wrapper - Call hide_HIC() until listbox is empty
-        while (self.HIC_list.__len__() > 0):
-            # These first two lines mimic user repeatedly selecting topmost HIC in listbox
-            self.HIC_listbox.select_set(0)
-            self.HIC_listbox.event_generate("<<ListboxSelect>>")
+    def hideall_paramrules(self, doPlotUpdate=True):
+        # Wrapper - Call hide_paramrule() until listbox is empty
+        while (self.active_paramrule_list.__len__() > 0):
+            # These first two lines mimic user repeatedly selecting topmost paramrule in listbox
+            self.active_paramrule_listbox.select_set(0)
+            self.active_paramrule_listbox.event_generate("<<ListboxSelect>>")
 
-            self.hide_HIC()
+            self.hide_paramrule()
         return
 
-    def hide_HIC(self):
+    def hide_paramrule(self):
         # Remove user-selected param rule from box (but don't touch Nanowire's saved info)
-        self.HIC_list.pop(self.HIC_listbox.curselection()[0])
-        self.HIC_listbox.delete(self.HIC_listbox.curselection()[0])
+        self.active_paramrule_list.pop(self.active_paramrule_listbox.curselection()[0])
+        self.active_paramrule_listbox.delete(self.active_paramrule_listbox.curselection()[0])
         return
     
-    def deleteall_HIC(self, doPlotUpdate=True):
-        # Wrapper - Call delete_HIC until Nanowire's list of param_rules is empty for current param
-        while (self.nanowire.param_dict[self.HIC_listbox_currentparam].param_rules.__len__() > 0):
-            self.HIC_listbox.select_set(0)
-            self.HIC_listbox.event_generate("<<ListboxSelect>>")
-
-            self.delete_HIC()
+    def deleteall_paramrule(self, doPlotUpdate=True):
+        # Note: deletes all rules for currentparam
+        # Use reset_IC instead to delete all rules for every param
+        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
+            self.nanowire.removeall_param_rules(self.paramtoolkit_currentparam)
+            self.hideall_paramrules()
+            self.update_IC_plot(plot_ID="recent")
         return
 
-    def delete_HIC(self):
+    def delete_paramrule(self):
         # Remove user-selected param rule from box AND from Nanowire's list of param_rules
-        if (self.nanowire.param_dict[self.HIC_listbox_currentparam].param_rules.__len__() > 0):
+        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
             try:
-                self.nanowire.remove_param_rule(self.HIC_listbox_currentparam, self.HIC_listbox.curselection()[0])
-                self.hide_HIC()
+                self.nanowire.remove_param_rule(self.paramtoolkit_currentparam, self.active_paramrule_listbox.curselection()[0])
+                self.hide_paramrule()
                 self.update_IC_plot(plot_ID="recent")
             except IndexError:
                 self.write(self.ICtab_status, "No rule selected")
@@ -3703,8 +3711,8 @@ class Notebook:
                 
         if var == "init_deltaN" or var == "init_deltaP": self.using_AIC = False
         
-        self.HIC_listbox_currentparam = var
-        self.deleteall_HIC()
+        self.paramtoolkit_currentparam = var
+        self.deleteall_paramrule()
         self.nanowire.param_dict[var].value = temp_IC_values
         self.update_IC_plot(plot_ID="EIC", warn=warning_flag)
         self.update_IC_plot(plot_ID="recent", warn=warning_flag)
@@ -3722,7 +3730,7 @@ class Notebook:
         plot.set_yscale('log')
 
         if plot_ID=="AIC": param_name="init_deltaN"
-        else: param_name = self.HIC_listbox_currentparam
+        else: param_name = self.paramtoolkit_currentparam
         
         param_obj = self.nanowire.param_dict[param_name]
         grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
@@ -4030,10 +4038,10 @@ class Notebook:
             self.enter(self.analytical_entryboxes_dict[key], "")
             
         for param in self.nanowire.param_dict:
-            self.HIC_listbox_currentparam = param
+            self.paramtoolkit_currentparam = param
             
             self.update_paramrule_listbox(param)            
-            self.deleteall_HIC()
+            self.deleteall_paramrule()
             
             self.nanowire.param_dict[param].value = 0
 
@@ -4069,7 +4077,7 @@ class Notebook:
                     self.nanowire.param_dict[param].value = np.array(extract_values(new_value, '\t'))
                 else: self.nanowire.param_dict[param].value = float(new_value)
                 
-                self.HIC_listbox_currentparam = param
+                self.paramtoolkit_currentparam = param
                 if cycle_through_IC_plots: self.update_IC_plot(plot_ID="recent")
             except:
                 print("Warning: could not apply value for param: {}".format(param))
