@@ -212,16 +212,14 @@ class Data_Set:
         else:
             return (self.filename + "_" + self.type).strip('_')
         
-
 class Raw_Data_Set(Data_Set):
     # Object containing all the metadata required to plot and integrate saved data sets
-    def __init__(self, data, grid_x, node_x, edge_x, params_dict, type, filename, show_index):
+    def __init__(self, data, grid_x, node_x, params_dict, type, filename, show_index):
         super().__init__(data, grid_x, params_dict, type, filename)
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
-        self.edge_x = edge_x        # node_x but for system node edges - also needed to regenerate ICs
 
         # node_x and grid_x will usually be identical, unless the data is a type (like E-field) that exists on edges
-        # There's a little optimization that can be made here because grid_x will either be identical to node_x or edge_x, but that makes the code harder to follow
+        # There's a little optimization that can be made here because grid_x will either be identical to node_x or not, but that makes the code harder to follow
 
         self.show_index = show_index # Time step number data belongs to
 
@@ -2048,10 +2046,9 @@ class Notebook:
                     param_dict_copy = dict(active_sets[key].params_dict)
 
                     node_x = active_sets[key].node_x
-                    edge_x = active_sets[key].edge_x
                     param_dict_copy["init_deltaN"] = self.read_N(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
                     param_dict_copy["init_deltaP"] = self.read_P(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
-                    param_dict_copy["init_E_field"] = self.read_E_field(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(edge_x.__len__())
+                    param_dict_copy["init_E_field"] = self.read_E_field(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
 
                     with open(new_filename + ".txt", "w+") as ofstream:
                         ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
@@ -2456,7 +2453,7 @@ class Notebook:
         if (datatype == "N"):
             try:
                 # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
-                new_data = Raw_Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
@@ -2464,7 +2461,7 @@ class Notebook:
 
         elif (datatype == "P"):
             try:
-                new_data = Raw_Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
@@ -2472,7 +2469,7 @@ class Notebook:
 
         elif (datatype == "E_field"):
             try:
-                new_data = Raw_Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
@@ -2483,7 +2480,7 @@ class Notebook:
                 temp_N = self.read_N(data_filename, active_show_index)
                 temp_P = self.read_P(data_filename, active_show_index)
                 new_data = Raw_Data_Set(finite.radiative_recombination(temp_N, temp_P, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"]), 
-                                    data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                                    data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: Unable to calculate Rad Rec")
@@ -2494,7 +2491,7 @@ class Notebook:
                 temp_N = self.read_N(data_filename, active_show_index)
                 temp_P = self.read_P(data_filename, active_show_index)
                 new_data = Raw_Data_Set(finite.nonradiative_recombination(temp_N, temp_P, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"]),  
-                                    data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                                    data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: Unable to calculate Non Rad Rec")
@@ -2544,7 +2541,7 @@ class Notebook:
                     PL_base[p] += intg.trapz(combined_weight[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * rad_rec[p] + \
                         intg.trapz(combined_weight2[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * rad_rec[p]
 
-                new_data = Raw_Data_Set(PL_base, data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(PL_base, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except OSError:
                 self.write(self.analysis_status, "Error: Unable to calculate PL")
