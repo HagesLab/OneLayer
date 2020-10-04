@@ -30,8 +30,7 @@ import bayesim.hdf5io as dd
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
 class Param_Rule:
-    # V2 Update
-    # This class stores info to help Nanowire calculate Parameter values
+    # The Parameter Toolkit uses these to build Parameter()'s values
     def __init__(self, variable, type, l_bound, r_bound=-1, l_boundval=-1, r_boundval=-1):
         self.variable = variable # e.g. N, P, E-Field
         self.type = type
@@ -61,6 +60,7 @@ class Param_Rule:
 
     def is_edge(self):
         return (self.variable == "dEc" or self.variable == "chi")
+
 
 class Parameter:
     # Helper class to store info about each of a Nanowire's parameters and initial distributions
@@ -94,10 +94,12 @@ class Nanowire:
                             "electron_affinity":Parameter(is_edge=True, units="[WIP]")}
 
         self.param_count = len(self.param_dict)
-        # This tells TEDs what flags there will be, but isn't used for storage until a simulation begins.
-        # The reason why is that outside of simulations, we care more about whether a flag appears visually selected than its value
-        self.flags_dict = {"ignore_alpha":0,
-                           "symmetric_system":0}
+        # This tells TEDs what flags there will be and their 'layman's name' shown on the interface as,
+        # but we actually don't need to store the flag values here
+        # The reason why is that info is already stored in whether a flag appears visually selected on the interface
+
+        self.flags_dict = {"ignore_alpha":"Ignore Photon Recycle",
+                           "symmetric_system":"Symmetric System"}
         return
 
     def add_param_rule(self, param_name, new_rule):
@@ -182,11 +184,13 @@ class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
     # but we interact with the checkbutton using the actual tk.CheckButton() element
     # So wrap both of those together in a single object and call it a day
-    def __init__(self, tk_element, tk_var, value=0):
-        self.tk_element = tk_element
-        self.tk_var = tk_var
-        self.value = value
+    def __init__(self, master, display_name):
+        self.tk_var = tk.IntVar()
+        self.tk_element = tk.ttk.Checkbutton(master=master, text=display_name, variable=self.tk_var, onvalue=1, offvalue=0)
         return
+    
+    def value(self):
+        return self.tk_var.get()
 
 class Batchable:
     # Much like the flag class, the Batchable() serves to collect together various tk elements and values for the batch IC tool.
@@ -429,8 +433,6 @@ class Notebook:
         # Tkinter checkboxes and radiobuttons require special variables to extract user input
         # IntVars or BooleanVars are sufficient for binary choices e.g. whether a checkbox is checked
         # while StringVars are more suitable for open-ended choices e.g. selecting one mode from a list
-        self.check_ignore_recycle = tk.IntVar()
-        self.check_symmetric = tk.IntVar()
         self.check_do_ss = tk.IntVar()
         self.check_reset_params = tk.IntVar()
         self.check_reset_inits = tk.IntVar()
@@ -670,12 +672,13 @@ class Notebook:
         self.flags_head.grid(row=0,column=0,columnspan=2)
         
         # TODO: Procedurally generated elements for flags
-        self.ignore_recycle_checkbutton = tk.ttk.Checkbutton(self.flags_frame, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
-        self.ignore_recycle_checkbutton.grid(row=1,column=0)
-
-        self.symmetry_checkbutton = tk.ttk.Checkbutton(self.flags_frame, text="Symmetric system?", variable=self.check_symmetric, onvalue=1, offvalue=0)
-        self.symmetry_checkbutton.grid(row=2,column=0)
-
+        i = 1
+        self.sys_flag_dict = {}
+        for flag in self.nanowire.flags_dict:
+            self.sys_flag_dict[flag] = Flag(self.flags_frame, self.nanowire.flags_dict[flag])
+            self.sys_flag_dict[flag].tk_element.grid(row=i,column=0)
+            i += 1
+            
         self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=8)
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
@@ -992,9 +995,6 @@ class Notebook:
 
         # Dictionaries of parameter entry boxes
         
-        self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle),
-                              "symmetric_system":Flag(self.symmetry_checkbutton, self.check_symmetric)}
-
         self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "AIC_expfactor":self.AIC_expfactor_entry, "Pulse_Freq":self.pulse_freq_entry, 
                                            "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
                                            "Max_Gen":self.max_gen_entry, "Total_Gen":self.total_gen_entry}
@@ -1264,7 +1264,7 @@ class Notebook:
             #rdim = 4
             cdim = np.ceil(self.nanowire.param_count / rdim)
             
-            if self.check_symmetric.get():
+            if self.sys_flag_dict['symmetric_system'].value():
                 self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, text="Note: All distributions are symmetric about x=0")
                 self.plotsummary_symmetriclabel.grid(row=0,column=0)
 
@@ -2072,7 +2072,7 @@ class Notebook:
                         
                         for param in param_dict_copy:
                             if param in self.nanowire.flags_dict: 
-                                ofstream.write("{}: {}\n".format(param, param_dict_copy[param]))
+                                ofstream.write("{}: {}\n".format(param, int(param_dict_copy[param])))
 
                 self.write(self.analysis_status, "IC file generated")
 
@@ -2904,7 +2904,7 @@ class Notebook:
 
         try:
             error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict,
-                                             not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), write_output,
+                                             not self.sys_flag_dict['ignore_alpha'].value(), self.sys_flag_dict['symmetric_system'].value(), self.check_do_ss.get(), write_output,
                                              self.init_N, self.init_P, self.init_E_field)
         except FloatingPointError:
             print("Error: an unusual value occurred while simulating {}".format(data_file_name))
@@ -2951,10 +2951,10 @@ class Notebook:
             # The following params are exclusive to metadata files
             ofstream.write("Total-Time: " + str(self.simtime) + "\n")
             ofstream.write("dt: " + str(self.dt) + "\n")
-            if self.check_ignore_recycle.get(): ofstream.write("ignore_alpha: 1\n")
+            if self.sys_flag_dict['ignore_alpha'].value(): ofstream.write("ignore_alpha: 1\n")
             else: ofstream.write("ignore_alpha: 0\n")
 
-            if self.check_symmetric.get(): ofstream.write("symmetric_system: 1\n")
+            if self.sys_flag_dict['symmetric_system'].value(): ofstream.write("symmetric_system: 1\n")
             else: ofstream.write("symmetric_system: 0\n")
             
             if self.check_do_ss.get(): ofstream.write("steady_state_exc: 1\n")
@@ -3742,7 +3742,7 @@ class Notebook:
         plot.set_ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
 
 
-        if self.check_symmetric.get():
+        if self.sys_flag_dict['symmetric_system'].value():
             plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(val_array), val_array), axis=0), label=param_name)
 
             ymin, ymax = plot.get_ylim()
@@ -3938,7 +3938,7 @@ class Notebook:
                 ofstream.write("$ System Flags:\n")
                 
                 for flag in self.nanowire.flags_dict:
-                    ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].tk_var.get()))
+                    ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
                 
         except OSError:
             self.write(self.ICtab_status, "Error: failed to create IC file")
@@ -4063,9 +4063,13 @@ class Notebook:
             return
 
         for flag in self.nanowire.flags_dict:
-            # Again, we don't bother with Nanowire's flags_dict until it's time to simulate
             # All we need to do here is mark the appropriate GUI elements as selected
-            self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
+            try:
+                self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
+            except:
+                print("Warning: could not apply value for flag: {}".format(flag))
+                print("Flags must have integer value 1 or 0")
+                warning_flag += 1
             
         for param in self.nanowire.param_dict:
             new_value = init_param_values_dict[param]
