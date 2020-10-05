@@ -100,6 +100,34 @@ class Nanowire:
 
         self.flags_dict = {"ignore_alpha":"Ignore Photon Recycle",
                            "symmetric_system":"Symmetric System"}
+        
+        ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
+        # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
+        self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
+                                "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
+                                "Thickness": 1, "dx": 1,
+                                "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
+                                "Tau_N": 1, "Tau_P": 1,                                     # [ns]
+                                "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
+                                "Temperature": 1, "Rel-Permitivity": 1, 
+                                "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
+                                "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
+                                "Delta": 1, "Frac-Emitted": 1,
+                                "init_deltaN": ((1e-7) ** 3), "init_deltaP": ((1e-7) ** 3),
+                                "init_E_field": 1, "Ec": 1, "electron_affinity": 1,
+                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
+                                "E_field": 1, 
+                                "tau_diff": 1}
+        
+        # FIXME: Check these
+        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
+        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["Tau_N"]
+        self.convert_in_dict["PL"] = self.convert_in_dict["RR"] * self.convert_in_dict["Theta"]
+        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
+        self.convert_out_dict = {}
+        for param in self.convert_in_dict:
+            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
+
         return
 
     def add_param_rule(self, param_name, new_rule):
@@ -378,13 +406,6 @@ def check_valid_filename(file_name):
 
     return True
 
-def tips(string, new_length):
-    if string.__len__() > new_length * 2:
-        return string[:new_length] + "..." + string[-new_length:]
-
-    else:
-        return string
-
 class Notebook:
 	# This is somewhat Java-like: everything about the GUI exists inside a class
     # A goal is to achieve total separation between this class (i.e. the GUI) and all mathematical operations, which makes this GUI reusable for different problems
@@ -402,33 +423,6 @@ class Notebook:
 
         # List of default directories for most I/O operations
         self.get_default_dirs()
-
-        # Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
-        # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
-        self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
-                                "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
-                                "Thickness": 1, "dx": 1,
-                                "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
-                                "Tau_N": 1, "Tau_P": 1,                                     # [ns]
-                                "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
-                                "Temperature": 1, "Rel-Permitivity": 1, 
-                                "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
-                                "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
-                                "Delta": 1, "Frac-Emitted": 1,
-                                "init_deltaN": ((1e-7) ** 3), "init_deltaP": ((1e-7) ** 3),
-                                "init_E_field": 1, "Ec": 1, "electron_affinity": 1,
-                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
-                                "E_field": 1, 
-                                "tau_diff": 1}
-        
-        # FIXME: Check these
-        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
-        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["Tau_N"]
-        self.convert_in_dict["PL"] = self.convert_in_dict["RR"] * self.convert_in_dict["Theta"]
-        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
-        self.convert_out_dict = {}
-        for param in self.convert_in_dict:
-            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
 
         # Tkinter checkboxes and radiobuttons require special variables to extract user input
         # IntVars or BooleanVars are sufficient for binary choices e.g. whether a checkbox is checked
@@ -460,6 +454,8 @@ class Notebook:
 
         # Flags and containers for IC arrays
         self.nanowire = Nanowire()
+        self.convert_in_dict = self.nanowire.convert_in_dict
+        self.convert_out_dict = self.nanowire.convert_out_dict
 
         self.active_paramrule_list = []
         self.paramtoolkit_currentparam = ""
@@ -467,8 +463,6 @@ class Notebook:
         self.init_N = None
         self.init_P = None
         self.init_E_field = None
-        self.init_Ec = None
-        self.init_Chi = None
         self.IC_file_name = ""
         self.using_AIC = False
 
@@ -3523,10 +3517,6 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-
-        #self.active_paramrule_list.append(new_param_rule)
-        #self.active_paramrule_listbox.insert(self.active_paramrule_list.__len__() - 1, new_param_rule.get())
-
         self.nanowire.add_param_rule(new_param_name, new_param_rule)
 
         self.paramtoolkit_viewer_selection.set(new_param_name)
@@ -3778,6 +3768,7 @@ class Notebook:
     ## Initial Condition I/O
 
     def create_batch_init(self):
+        warning_flag = 0
         try:
             batch_values = {}
 
@@ -3811,17 +3802,11 @@ class Notebook:
         original_param_values = {}
         for param in self.nanowire.param_dict:
             original_param_values[param] = self.nanowire.param_dict[param].value
-        
-        
-        # This algorithm was shamelessly stolen from our bay.py script...
-        # TODO: ...and should really, really be a standalone function!!
-        # def get_all_combinations(param_values)
                 
-        batch_combinations = finite.get_all_combinations(batch_values)
-        
+        # This algorithm was shamelessly stolen from our bay.py script...                
+        batch_combinations = finite.get_all_combinations(batch_values)        
                 
         # Apply each combination to Nanowire, going through AIC if necessary
-
         for batch_set in batch_combinations:
             filename = ""
             for param in batch_set:
@@ -3839,14 +3824,17 @@ class Notebook:
             try:
                 self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], batch_dir_name, filename))
             except:
-                self.write(self.batch_status, "Error: failed to create batch file {}".format(filename))
+                print("Error: failed to create batch file {}".format(filename))
+                warning_flag += 1
                 
         # Restore the original values of Nanowire
         for param in self.nanowire.param_dict:
             self.nanowire.param_dict[param].value = original_param_values[param]
         
-        self.write(self.batch_status, "Batch \"{}\" created successfully".format(batch_dir_name))
-
+        if not warning_flag:
+            self.write(self.batch_status, "Batch \"{}\" created successfully".format(batch_dir_name))
+        else:
+            self.write(self.batch_status, "Warning: failed to create some batch files - see console")
         return
 
 	# Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked
