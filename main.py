@@ -1,7 +1,7 @@
 #################################################
 # Transient Electron Dynamics Simulator
 # Model photoluminescent behavior in one-dimensional nanowire
-# Last modified: Sep 30, 2020
+# Last modified: Oct 5, 2020
 # Author: Calvin Fai, Charles Hages
 # Contact:
 ################################################# 
@@ -100,6 +100,8 @@ class Nanowire:
 
         self.flags_dict = {"ignore_alpha":"Ignore Photon Recycle",
                            "symmetric_system":"Symmetric System"}
+        
+        
         
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
@@ -442,7 +444,7 @@ class Notebook:
         self.init_shape_selection = tk.StringVar()
         self.init_var_selection = tk.StringVar()
         self.paramtoolkit_viewer_selection = tk.StringVar()
-        self.EIC_var_selection = tk.StringVar()
+        self.listupload_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
         self.check_bay_params = {"Mu_N":tk.IntVar(), "Mu_P":tk.IntVar(), "N0":tk.IntVar(), "P0":tk.IntVar(),
@@ -931,6 +933,7 @@ class Notebook:
         # Attaching to the Parameter Toolkit makes them easier to position
         self.custom_param_fig = Figure(figsize=(5,3.1))
         self.custom_param_subplot = self.custom_param_fig.add_subplot(111)
+        # Prevent coordinate values from appearing in the toolbar; this would sometimes jostle GUI elements around
         self.custom_param_subplot.format_coord = lambda x, y: ""
         self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, master=self.param_rules_frame)
         self.custom_param_plotwidget = self.custom_param_canvas.get_tk_widget()
@@ -963,29 +966,29 @@ class Notebook:
         self.movedown_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇩", command=self.movedown_paramrule)
         self.movedown_paramrule_button.grid(row=3,column=4)
 
-        ## Explicit Inital Condition(EIC):
+        ## Param List Upload:
 
         self.listupload_frame = tk.ttk.Frame(self.tab_explicit_init)
         self.listupload_frame.grid(row=0,column=0,padx=(440,0))
 
-        self.EIC_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified space grid.", width=360)
-        self.EIC_description.grid(row=0,column=0)
+        self.listupload_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified space grid.", width=360)
+        self.listupload_description.grid(row=0,column=0)
         
-        self.EIC_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.EIC_var_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
-        self.EIC_dropdown.grid(row=1,column=0)
+        self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.listupload_var_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
+        self.listupload_dropdown.grid(row=1,column=0)
 
-        self.add_EIC_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_EIC)
-        self.add_EIC_button.grid(row=2,column=0)
+        self.add_listupload_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_listupload)
+        self.add_listupload_button.grid(row=2,column=0)
         
-        self.EIC_fig = Figure(figsize=(6,3.8))
-        self.EIC_subplot = self.EIC_fig.add_subplot(111)
-        self.EIC_canvas = tkagg.FigureCanvasTkAgg(self.EIC_fig, master=self.listupload_frame)
-        self.EIC_plotwidget = self.EIC_canvas.get_tk_widget()
-        self.EIC_plotwidget.grid(row=0, rowspan=3,column=1)
+        self.listupload_fig = Figure(figsize=(6,3.8))
+        self.listupload_subplot = self.listupload_fig.add_subplot(111)
+        self.listupload_canvas = tkagg.FigureCanvasTkAgg(self.listupload_fig, master=self.listupload_frame)
+        self.listupload_plotwidget = self.listupload_canvas.get_tk_widget()
+        self.listupload_plotwidget.grid(row=0, rowspan=3,column=1)
         
-        self.EIC_toolbar_frame = tk.ttk.Frame(master=self.listupload_frame)
-        self.EIC_toolbar_frame.grid(row=3,column=1)
-        self.EIC_toolbar = tkagg.NavigationToolbar2Tk(self.EIC_canvas, self.EIC_toolbar_frame)
+        self.listupload_toolbar_frame = tk.ttk.Frame(master=self.listupload_frame)
+        self.listupload_toolbar_frame.grid(row=3,column=1)
+        self.listupload_toolbar = tkagg.NavigationToolbar2Tk(self.listupload_canvas, self.listupload_toolbar_frame)
 
         # Dictionaries of parameter entry boxes
         
@@ -1021,7 +1024,7 @@ class Notebook:
         self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
         self.do_ss_checkbutton.grid(row=5,column=0)
 
-        self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Calculate ΔN,ΔP", command=self.do_Batch)
+        self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", command=self.do_Batch)
         self.calculate_NP.grid(row=6,column=0,columnspan=2,padx=(9,12))
 
         self.status_label = tk.ttk.Label(self.tab_simulate, text="Status")
@@ -3628,7 +3631,7 @@ class Notebook:
         return
 
     # Fill IC arrays using list from .txt file
-    def add_EIC(self):
+    def add_listupload(self):
         try:
             self.set_init_x()
 
@@ -3641,7 +3644,7 @@ class Notebook:
             return
         
         warning_flag = False
-        var = self.EIC_var_selection.get()
+        var = self.listupload_var_selection.get()
         is_edge = self.nanowire.param_dict[var].is_edge
         
         valuelist_filename = tk.filedialog.askopenfilename(initialdir="", title="Select Values from text file", filetypes=[("Text files","*.txt")])
@@ -3677,7 +3680,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Warning: Unusual point list content")
                 warning_flag = True
 
-            # Linear interpolate from provided EIC list to specified grid points
+            # Linear interpolate from provided param list to specified grid points
             lindex = finite.toIndex(first_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
             rindex = finite.toIndex(second_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
             
@@ -3701,7 +3704,7 @@ class Notebook:
         self.paramtoolkit_currentparam = var
         self.deleteall_paramrule()
         self.nanowire.param_dict[var].value = temp_IC_values
-        self.update_IC_plot(plot_ID="EIC", warn=warning_flag)
+        self.update_IC_plot(plot_ID="listupload", warn=warning_flag)
         self.update_IC_plot(plot_ID="recent", warn=warning_flag)
         return
 
@@ -3712,7 +3715,7 @@ class Notebook:
         if plot_ID=="recent": plot = self.recent_param_subplot
         elif plot_ID=="custom": plot = self.custom_param_subplot
         elif plot_ID=="AIC": plot = self.AIC_subplot
-        elif plot_ID=="EIC": plot = self.EIC_subplot
+        elif plot_ID=="listupload": plot = self.listupload_subplot
         plot.cla()
         plot.set_yscale('log')
 
@@ -3757,10 +3760,10 @@ class Notebook:
             plot.set_title("Recent AIC")
             self.AIC_fig.tight_layout()
             self.AIC_fig.canvas.draw()
-        elif plot_ID=="EIC": 
+        elif plot_ID=="listupload": 
             plot.set_title("Recent list upload")
-            self.EIC_fig.tight_layout()
-            self.EIC_fig.canvas.draw()
+            self.listupload_fig.tight_layout()
+            self.listupload_fig.canvas.draw()
 
         if not warn: self.write(self.ICtab_status, "Initial Condition Updated")
         return
