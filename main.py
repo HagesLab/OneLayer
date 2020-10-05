@@ -1,7 +1,7 @@
 #################################################
 # Transient Electron Dynamics Simulator
 # Model photoluminescent behavior in one-dimensional nanowire
-# Last modified: Sep 30, 2020
+# Last modified: Sep 12, 2020
 # Author: Calvin Fai, Charles Hages
 # Contact:
 ################################################# 
@@ -30,7 +30,8 @@ import bayesim.hdf5io as dd
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
 class Param_Rule:
-    # The Parameter Toolkit uses these to build Parameter()'s values
+    # V2 Update
+    # This class stores info to help Nanowire calculate Parameter values
     def __init__(self, variable, type, l_bound, r_bound=-1, l_boundval=-1, r_boundval=-1):
         self.variable = variable # e.g. N, P, E-Field
         self.type = type
@@ -60,7 +61,6 @@ class Param_Rule:
 
     def is_edge(self):
         return (self.variable == "dEc" or self.variable == "chi")
-
 
 class Parameter:
     # Helper class to store info about each of a Nanowire's parameters and initial distributions
@@ -93,43 +93,10 @@ class Nanowire:
                             "init_E_field":Parameter(is_edge=True, units="[WIP]"), "Ec":Parameter(is_edge=True, units="[WIP]"),
                             "electron_affinity":Parameter(is_edge=True, units="[WIP]")}
 
-        self.param_count = len(self.param_dict)
-        # This tells TEDs what flags there will be and their 'layman's name' shown on the interface as,
-        # but we actually don't need to store the flag values here
-        # The reason why is that info is already stored in whether a flag appears visually selected on the interface
-
-        self.flags_dict = {"ignore_alpha":"Ignore Photon Recycle",
-                           "symmetric_system":"Symmetric System"}
-        
-        
-        
-        ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
-        # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
-        self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
-                                "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
-                                "Thickness": 1, "dx": 1,
-                                "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
-                                "Tau_N": 1, "Tau_P": 1,                                     # [ns]
-                                "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
-                                "Temperature": 1, "Rel-Permitivity": 1, 
-                                "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
-                                "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
-                                "Delta": 1, "Frac-Emitted": 1,
-                                "init_deltaN": ((1e-7) ** 3), "init_deltaP": ((1e-7) ** 3),
-                                "init_E_field": 1, "Ec": 1, "electron_affinity": 1,
-                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
-                                "E_field": 1, 
-                                "tau_diff": 1}
-        
-        # FIXME: Check these
-        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
-        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["Tau_N"]
-        self.convert_in_dict["PL"] = self.convert_in_dict["RR"] * self.convert_in_dict["Theta"]
-        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
-        self.convert_out_dict = {}
-        for param in self.convert_in_dict:
-            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
-
+        # This tells TEDs what flags there will be, but isn't used for storage until a simulation begins.
+        # The reason why is that outside of simulations, we care more about whether a flag appears visually selected than its value
+        self.flags_dict = {"ignore_alpha":0,
+                           "symmetric_system":0}
         return
 
     def add_param_rule(self, param_name, new_rule):
@@ -143,15 +110,12 @@ class Nanowire:
         return
 
     def remove_param_rule(self, param_name, i):
+        # TODO: Only one updated needed for multiple removals
+        # Add shortcut for remove_all
         self.param_dict[param_name].param_rules.pop(i)
         self.update_param_toarray(param_name)
         return
-    
-    def removeall_param_rules(self, param_name):
-        self.param_dict[param_name].param_rules = []
-        self.param_dict[param_name].value = 0
-        return
-    
+
     def update_param_toarray(self, param_name):
         # Recalculate a Parameter from its Param_Rules
         # This should be done every time the Param_Rules are changed
@@ -214,13 +178,11 @@ class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
     # but we interact with the checkbutton using the actual tk.CheckButton() element
     # So wrap both of those together in a single object and call it a day
-    def __init__(self, master, display_name):
-        self.tk_var = tk.IntVar()
-        self.tk_element = tk.ttk.Checkbutton(master=master, text=display_name, variable=self.tk_var, onvalue=1, offvalue=0)
+    def __init__(self, tk_element, tk_var, value=0):
+        self.tk_element = tk_element
+        self.tk_var = tk_var
+        self.value = value
         return
-    
-    def value(self):
-        return self.tk_var.get()
 
 class Batchable:
     # Much like the flag class, the Batchable() serves to collect together various tk elements and values for the batch IC tool.
@@ -246,14 +208,16 @@ class Data_Set:
         else:
             return (self.filename + "_" + self.type).strip('_')
         
+
 class Raw_Data_Set(Data_Set):
     # Object containing all the metadata required to plot and integrate saved data sets
-    def __init__(self, data, grid_x, node_x, params_dict, type, filename, show_index):
+    def __init__(self, data, grid_x, node_x, edge_x, params_dict, type, filename, show_index):
         super().__init__(data, grid_x, params_dict, type, filename)
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
+        self.edge_x = edge_x        # node_x but for system node edges - also needed to regenerate ICs
 
         # node_x and grid_x will usually be identical, unless the data is a type (like E-field) that exists on edges
-        # There's a little optimization that can be made here because grid_x will either be identical to node_x or not, but that makes the code harder to follow
+        # There's a little optimization that can be made here because grid_x will either be identical to node_x or edge_x, but that makes the code harder to follow
 
         self.show_index = show_index # Time step number data belongs to
 
@@ -408,6 +372,13 @@ def check_valid_filename(file_name):
 
     return True
 
+def tips(string, new_length):
+    if string.__len__() > new_length * 2:
+        return string[:new_length] + "..." + string[-new_length:]
+
+    else:
+        return string
+
 class Notebook:
 	# This is somewhat Java-like: everything about the GUI exists inside a class
     # A goal is to achieve total separation between this class (i.e. the GUI) and all mathematical operations, which makes this GUI reusable for different problems
@@ -426,9 +397,38 @@ class Notebook:
         # List of default directories for most I/O operations
         self.get_default_dirs()
 
+        # Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
+        # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
+        self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
+                                "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
+                                "Thickness": 1, "dx": 1,
+                                "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
+                                "Tau_N": 1, "Tau_P": 1,                                     # [ns]
+                                "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
+                                "Temperature": 1, "Rel-Permitivity": 1, 
+                                "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
+                                "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
+                                "Delta": 1, "Frac-Emitted": 1,
+                                "init_deltaN": ((1e-7) ** 3), "init_deltaP": ((1e-7) ** 3),
+                                "init_E_field": 1, "Ec": 1, "electron_affinity": 1,
+                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
+                                "E_field": 1, 
+                                "tau_diff": 1}
+        
+        # FIXME: Check these
+        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
+        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] * self.convert_in_dict["Tau_N"]
+        self.convert_in_dict["PL"] = self.convert_in_dict["RR"] * self.convert_in_dict["Theta"]
+        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
+        self.convert_out_dict = {}
+        for param in self.convert_in_dict:
+            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
+
         # Tkinter checkboxes and radiobuttons require special variables to extract user input
         # IntVars or BooleanVars are sufficient for binary choices e.g. whether a checkbox is checked
         # while StringVars are more suitable for open-ended choices e.g. selecting one mode from a list
+        self.check_ignore_recycle = tk.IntVar()
+        self.check_symmetric = tk.IntVar()
         self.check_do_ss = tk.IntVar()
         self.check_reset_params = tk.IntVar()
         self.check_reset_inits = tk.IntVar()
@@ -443,8 +443,8 @@ class Notebook:
 
         self.init_shape_selection = tk.StringVar()
         self.init_var_selection = tk.StringVar()
-        self.paramtoolkit_viewer_selection = tk.StringVar()
-        self.listupload_var_selection = tk.StringVar()
+        self.HIC_viewer_selection = tk.StringVar()
+        self.EIC_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
         self.check_bay_params = {"Mu_N":tk.IntVar(), "Mu_P":tk.IntVar(), "N0":tk.IntVar(), "P0":tk.IntVar(),
@@ -456,15 +456,15 @@ class Notebook:
 
         # Flags and containers for IC arrays
         self.nanowire = Nanowire()
-        self.convert_in_dict = self.nanowire.convert_in_dict
-        self.convert_out_dict = self.nanowire.convert_out_dict
 
-        self.active_paramrule_list = []
-        self.paramtoolkit_currentparam = ""
+        self.HIC_list = []
+        self.HIC_listbox_currentparam = ""
         self.IC_file_list = None
         self.init_N = None
         self.init_P = None
         self.init_E_field = None
+        self.init_Ec = None
+        self.init_Chi = None
         self.IC_file_name = ""
         self.using_AIC = False
 
@@ -507,8 +507,7 @@ class Notebook:
         #self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
         # Check when popup menus open and close
-        self.sys_printsummary_popup_isopen = False
-        self.sys_plotsummary_popup_isopen = False
+        self.sys_summary_popup_isopen = False
         self.sys_param_shortcut_popup_isopen = False
         self.batch_popup_isopen = False
         self.resetIC_popup_isopen = False
@@ -607,7 +606,7 @@ class Notebook:
         self.tab_explicit_init = tk.ttk.Frame(self.tab_inputs)
 
         var_dropdown_list = [str(param + self.nanowire.param_dict[param].units) for param in self.nanowire.param_dict]
-        paramtoolkit_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
+        HIC_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
         unitless_dropdown_list = [param for param in self.nanowire.param_dict]
         
         self.line_sep_style = tk.ttk.Style()
@@ -637,7 +636,7 @@ class Notebook:
         self.spacegrid_frame = tk.ttk.Frame(self.tab_inputs)
         self.spacegrid_frame.grid(row=1,column=0,columnspan=2)
 
-        self.steps_head = tk.ttk.Label(self.spacegrid_frame, text="Space Grid - Start Here", style="Header.TLabel")
+        self.steps_head = tk.ttk.Label(self.spacegrid_frame, text="Space Grid", style="Header.TLabel")
         self.steps_head.grid(row=0,column=0,columnspan=2)
 
         self.thickness_label = tk.ttk.Label(self.spacegrid_frame, text="Thickness [nm]")
@@ -655,10 +654,10 @@ class Notebook:
         self.params_frame = tk.ttk.Frame(self.tab_inputs)
         self.params_frame.grid(row=2,column=0,columnspan=2, rowspan=4)
 
-        self.system_params_head = tk.ttk.Label(self.params_frame, text="Constant-value Parameters",style="Header.TLabel")
+        self.system_params_head = tk.ttk.Label(self.params_frame, text="System Parameters",style="Header.TLabel")
         self.system_params_head.grid(row=0, column=0,columnspan=2)
         
-        self.system_params_shortcut_button = tk.ttk.Button(self.params_frame, text="Fast Param Entry Tool", command=self.do_sys_param_shortcut_popup)
+        self.system_params_shortcut_button = tk.ttk.Button(self.params_frame, text="Short-cut Param Entry Tool", command=self.do_sys_param_shortcut_popup)
         self.system_params_shortcut_button.grid(row=1,column=0,columnspan=2)
 
         self.flags_frame = tk.ttk.Frame(self.tab_inputs)
@@ -667,23 +666,19 @@ class Notebook:
         self.flags_head = tk.ttk.Label(self.flags_frame, text="Flags", style="Header.TLabel")
         self.flags_head.grid(row=0,column=0,columnspan=2)
         
-        # Procedurally generated elements for flags
-        i = 1
-        self.sys_flag_dict = {}
-        for flag in self.nanowire.flags_dict:
-            self.sys_flag_dict[flag] = Flag(self.flags_frame, self.nanowire.flags_dict[flag])
-            self.sys_flag_dict[flag].tk_element.grid(row=i,column=0)
-            i += 1
-            
-        self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=8)
+        # TODO: Procedurally generated elements for flags
+        self.ignore_recycle_checkbutton = tk.ttk.Checkbutton(self.flags_frame, text="Ignore photon recycle?", variable=self.check_ignore_recycle, onvalue=1, offvalue=0)
+        self.ignore_recycle_checkbutton.grid(row=1,column=0)
+
+        self.symmetry_checkbutton = tk.ttk.Checkbutton(self.flags_frame, text="Symmetric system?", variable=self.check_symmetric, onvalue=1, offvalue=0)
+        self.symmetry_checkbutton.grid(row=2,column=0)
+
+        self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=4)
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
         
-        self.system_printout_button = tk.ttk.Button(self.tab_inputs, text="Print Init. State Summary", command=self.do_sys_printsummary_popup)
-        self.system_printout_button.grid(row=8,column=0,columnspan=2)
-        
-        self.system_plotout_button = tk.ttk.Button(self.tab_inputs, text="Show Init. State Plots", command=self.do_sys_plotsummary_popup)
-        self.system_plotout_button.grid(row=9,column=0,columnspan=2)
+        self.system_log_button = tk.ttk.Button(self.tab_inputs, text="Print System Summary", command=self.do_sys_summary_popup)
+        self.system_log_button.grid(row=8,column=0,columnspan=2)
 
         self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", style="Grey Bar.TSeparator")
         self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
@@ -866,74 +861,73 @@ class Notebook:
         self.AIC_toolbar_frame.grid(row=5,column=0,columnspan=3)
         self.AIC_toolbar = tkagg.NavigationToolbar2Tk(self.AIC_canvas, self.AIC_toolbar_frame)
         
-        ## Parameter Toolkit:
+        ## Heuristic Initial Condition(HIC):
 
         self.param_rules_frame = tk.ttk.Frame(self.tab_rules_init)
         self.param_rules_frame.grid(row=0,column=0,padx=(370,0))
 
-        self.active_paramrule_list_title = tk.ttk.Label(self.param_rules_frame, text="Add/Edit/Remove Space-Dependent Parameters", style="Header.TLabel")
-        self.active_paramrule_list_title.grid(row=0,column=0,columnspan=3)
+        self.HIC_list_title = tk.ttk.Label(self.param_rules_frame, text="Parameter Rules", style="Header.TLabel")
+        self.HIC_list_title.grid(row=0,column=0,columnspan=3)
 
-        self.active_paramrule_listbox = tk.Listbox(self.param_rules_frame, width=86,height=8)
-        self.active_paramrule_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, padx=(32,32))
+        self.HIC_listbox = tk.Listbox(self.param_rules_frame, width=86,height=8)
+        self.HIC_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, padx=(32,32))
 
-        self.paramrule_var_label = tk.ttk.Label(self.param_rules_frame, text="Select parameter to edit:")
-        self.paramrule_var_label.grid(row=4,column=0)
+        self.HIC_var_label = tk.ttk.Label(self.param_rules_frame, text="Select parameter to edit:")
+        self.HIC_var_label.grid(row=4,column=0)
         
-        self.paramrule_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_var_selection, var_dropdown_list[0], *var_dropdown_list)
-        self.paramrule_var_dropdown.grid(row=4,column=1)
+        self.HIC_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_var_selection, var_dropdown_list[0], *var_dropdown_list)
+        self.HIC_var_dropdown.grid(row=4,column=1)
 
-        self.paramrule_method_label = tk.ttk.Label(self.param_rules_frame, text="Select calculation method:")
-        self.paramrule_method_label.grid(row=5,column=0)
+        self.HIC_method_label = tk.ttk.Label(self.param_rules_frame, text="Select calculation method:")
+        self.HIC_method_label.grid(row=5,column=0)
 
-        self.paramrule_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_shape_selection, paramtoolkit_method_dropdown_list[0], *paramtoolkit_method_dropdown_list)
-        self.paramrule_method_dropdown.grid(row=5, column=1)
+        self.HIC_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_shape_selection, HIC_method_dropdown_list[0], *HIC_method_dropdown_list)
+        self.HIC_method_dropdown.grid(row=5, column=1)
 
-        self.paramrule_lbound_label = tk.ttk.Label(self.param_rules_frame, text="Left bound coordinate:")
-        self.paramrule_lbound_label.grid(row=6, column=0)
+        self.HIC_lbound_label = tk.ttk.Label(self.param_rules_frame, text="Left bound coordinate:")
+        self.HIC_lbound_label.grid(row=6, column=0)
 
-        self.paramrule_lbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.paramrule_lbound_entry.grid(row=6,column=1)
+        self.HIC_lbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.HIC_lbound_entry.grid(row=6,column=1)
 
-        self.paramrule_rbound_label = tk.ttk.Label(self.param_rules_frame, text="Right bound coordinate:")
-        self.paramrule_rbound_label.grid(row=7, column=0)
+        self.HIC_rbound_label = tk.ttk.Label(self.param_rules_frame, text="Right bound coordinate:")
+        self.HIC_rbound_label.grid(row=7, column=0)
 
-        self.paramrule_rbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.paramrule_rbound_entry.grid(row=7,column=1)
+        self.HIC_rbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.HIC_rbound_entry.grid(row=7,column=1)
 
-        self.paramrule_lvalue_label = tk.ttk.Label(self.param_rules_frame, text="Left bound value:")
-        self.paramrule_lvalue_label.grid(row=8, column=0)
+        self.HIC_lvalue_label = tk.ttk.Label(self.param_rules_frame, text="Left bound value:")
+        self.HIC_lvalue_label.grid(row=8, column=0)
 
-        self.paramrule_lvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.paramrule_lvalue_entry.grid(row=8,column=1)
+        self.HIC_lvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.HIC_lvalue_entry.grid(row=8,column=1)
 
-        self.paramrule_rvalue_label = tk.ttk.Label(self.param_rules_frame, text="Right bound value:")
-        self.paramrule_rvalue_label.grid(row=9, column=0)
+        self.HIC_rvalue_label = tk.ttk.Label(self.param_rules_frame, text="Right bound value:")
+        self.HIC_rvalue_label.grid(row=9, column=0)
 
-        self.paramrule_rvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.paramrule_rvalue_entry.grid(row=9,column=1)
+        self.HIC_rvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.HIC_rvalue_entry.grid(row=9,column=1)
 
-        self.add_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Add new parameter rule", command=self.add_paramrule)
-        self.add_paramrule_button.grid(row=10,column=0,columnspan=2)
+        self.add_HIC_button = tk.ttk.Button(self.param_rules_frame, text="Add new parameter rule", command=self.add_HIC)
+        self.add_HIC_button.grid(row=10,column=0,columnspan=2)
 
-        self.delete_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete highlighted rule", command=self.delete_paramrule)
-        self.delete_paramrule_button.grid(row=4,column=2)
+        self.delete_HIC_button = tk.ttk.Button(self.param_rules_frame, text="Delete highlighted rule", command=self.delete_HIC)
+        self.delete_HIC_button.grid(row=4,column=2)
 
-        self.deleteall_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete all rules for this parameter", command=self.deleteall_paramrule)
-        self.deleteall_paramrule_button.grid(row=5,column=2)
+        self.deleteall_HIC_button = tk.ttk.Button(self.param_rules_frame, text="Delete all rules for this parameter", command=self.deleteall_HIC)
+        self.deleteall_HIC_button.grid(row=5,column=2)
 
-        self.paramtoolkit_description = tk.Message(self.param_rules_frame, text="The Parameter Toolkit uses a series of rules and patterns to build a spatially dependent distribution for any parameter.", width=250)
-        self.paramtoolkit_description.grid(row=6,rowspan=3,column=2,columnspan=2)
+        self.HIC_description = tk.Message(self.param_rules_frame, text="The Parameter Toolkit uses a series of rules and patterns to build a spatially dependent distribution for any parameter.", width=250)
+        self.HIC_description.grid(row=6,rowspan=3,column=2,columnspan=2)
 
-        self.paramtoolkit_description2 = tk.Message(self.param_rules_frame, text="Warning: Rules are applied from top to bottom. Order matters!", width=250)
-        self.paramtoolkit_description2.grid(row=9,rowspan=3,column=2,columnspan=2)
+        self.HIC_description2 = tk.Message(self.param_rules_frame, text="Warning: Rules are applied from top to bottom. Order matters!", width=250)
+        self.HIC_description2.grid(row=9,rowspan=3,column=2,columnspan=2)
         
         # These plots were previously attached to self.tab_inputs so that it was visible on all three IC tabs,
         # but it was hard to position them correctly.
         # Attaching to the Parameter Toolkit makes them easier to position
         self.custom_param_fig = Figure(figsize=(5,3.1))
         self.custom_param_subplot = self.custom_param_fig.add_subplot(111)
-        # Prevent coordinate values from appearing in the toolbar; this would sometimes jostle GUI elements around
         self.custom_param_subplot.format_coord = lambda x, y: ""
         self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, master=self.param_rules_frame)
         self.custom_param_plotwidget = self.custom_param_canvas.get_tk_widget()
@@ -954,44 +948,47 @@ class Notebook:
         self.recent_param_toolbar_frame.grid(row=13,column=2,columnspan=2)
         self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, self.recent_param_toolbar_frame)
 
-        self.moveup_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇧", command=self.moveup_paramrule)
-        self.moveup_paramrule_button.grid(row=1,column=4)
+        self.moveup_HIC_button = tk.ttk.Button(self.param_rules_frame, text="⇧", command=self.moveup_HIC)
+        self.moveup_HIC_button.grid(row=1,column=4)
 
-        self.paramrule_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.paramtoolkit_viewer_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
-        self.paramrule_viewer_dropdown.grid(row=2,column=4)
+        self.HIC_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.HIC_viewer_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
+        self.HIC_viewer_dropdown.grid(row=2,column=4)
 
-        self.paramrule_view_button = tk.ttk.Button(self.param_rules_frame, text="Change view", command=self.refresh_paramrule_listbox)
-        self.paramrule_view_button.grid(row=2,column=5)
+        self.HIC_view_button = tk.ttk.Button(self.param_rules_frame, text="Change view", command=self.refresh_paramrule_listbox)
+        self.HIC_view_button.grid(row=2,column=5)
 
-        self.movedown_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇩", command=self.movedown_paramrule)
-        self.movedown_paramrule_button.grid(row=3,column=4)
+        self.movedown_HIC_button = tk.ttk.Button(self.param_rules_frame, text="⇩", command=self.movedown_HIC)
+        self.movedown_HIC_button.grid(row=3,column=4)
 
-        ## Param List Upload:
+        ## Explicit Inital Condition(EIC):
 
         self.listupload_frame = tk.ttk.Frame(self.tab_explicit_init)
         self.listupload_frame.grid(row=0,column=0,padx=(440,0))
 
-        self.listupload_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified space grid.", width=360)
-        self.listupload_description.grid(row=0,column=0)
+        self.EIC_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified spacing mesh.", width=360)
+        self.EIC_description.grid(row=0,column=0)
         
-        self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.listupload_var_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
-        self.listupload_dropdown.grid(row=1,column=0)
+        self.EIC_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.EIC_var_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
+        self.EIC_dropdown.grid(row=1,column=0)
 
-        self.add_listupload_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_listupload)
-        self.add_listupload_button.grid(row=2,column=0)
+        self.add_EIC_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_EIC)
+        self.add_EIC_button.grid(row=2,column=0)
         
-        self.listupload_fig = Figure(figsize=(6,3.8))
-        self.listupload_subplot = self.listupload_fig.add_subplot(111)
-        self.listupload_canvas = tkagg.FigureCanvasTkAgg(self.listupload_fig, master=self.listupload_frame)
-        self.listupload_plotwidget = self.listupload_canvas.get_tk_widget()
-        self.listupload_plotwidget.grid(row=0, rowspan=3,column=1)
+        self.EIC_fig = Figure(figsize=(6,3.8))
+        self.EIC_subplot = self.EIC_fig.add_subplot(111)
+        self.EIC_canvas = tkagg.FigureCanvasTkAgg(self.EIC_fig, master=self.listupload_frame)
+        self.EIC_plotwidget = self.EIC_canvas.get_tk_widget()
+        self.EIC_plotwidget.grid(row=0, rowspan=3,column=1)
         
-        self.listupload_toolbar_frame = tk.ttk.Frame(master=self.listupload_frame)
-        self.listupload_toolbar_frame.grid(row=3,column=1)
-        self.listupload_toolbar = tkagg.NavigationToolbar2Tk(self.listupload_canvas, self.listupload_toolbar_frame)
+        self.EIC_toolbar_frame = tk.ttk.Frame(master=self.listupload_frame)
+        self.EIC_toolbar_frame.grid(row=3,column=1)
+        self.EIC_toolbar = tkagg.NavigationToolbar2Tk(self.EIC_canvas, self.EIC_toolbar_frame)
 
         # Dictionaries of parameter entry boxes
         
+        self.sys_flag_dict = {"ignore_alpha":Flag(self.ignore_recycle_checkbutton, self.check_ignore_recycle),
+                              "symmetric_system":Flag(self.symmetry_checkbutton, self.check_symmetric)}
+
         self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "AIC_expfactor":self.AIC_expfactor_entry, "Pulse_Freq":self.pulse_freq_entry, 
                                            "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
                                            "Max_Gen":self.max_gen_entry, "Total_Gen":self.total_gen_entry}
@@ -1024,7 +1021,7 @@ class Notebook:
         self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
         self.do_ss_checkbutton.grid(row=5,column=0)
 
-        self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", command=self.do_Batch)
+        self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Calculate ΔN,ΔP", command=self.do_Batch)
         self.calculate_NP.grid(row=6,column=0,columnspan=2,padx=(9,12))
 
         self.status_label = tk.ttk.Label(self.tab_simulate, text="Status")
@@ -1056,39 +1053,9 @@ class Notebook:
         return
 
     def add_tab_analyze(self):
-        self.tab_analyze = tk.ttk.Notebook(self.notebook)
-        self.tab_overview_analysis = tk.ttk.Frame(self.tab_analyze)
-        self.tab_detailed_analysis = tk.ttk.Frame(self.tab_analyze)
-        
-        self.analyze_overview_fig = Figure(figsize=(15,8))
-        self.overview_subplot_n = self.analyze_overview_fig.add_subplot(331)
-        self.overview_subplot_p = self.analyze_overview_fig.add_subplot(332)
-        self.overview_subplot_efield = self.analyze_overview_fig.add_subplot(333)
-        self.overview_subplot_deltan = self.analyze_overview_fig.add_subplot(334)
-        self.overview_subplot_deltap = self.analyze_overview_fig.add_subplot(335)
-        self.overview_subplot_rr = self.analyze_overview_fig.add_subplot(336)
-        self.overview_subplot_nrr = self.analyze_overview_fig.add_subplot(337)
-        self.overview_subplot_pl = self.analyze_overview_fig.add_subplot(338)
-        self.overview_subplot_taudiff = self.analyze_overview_fig.add_subplot(339)
-        self.overview_subplots = [self.overview_subplot_n, self.overview_subplot_p,
-                                  self.overview_subplot_efield, self.overview_subplot_deltan,
-                                  self.overview_subplot_deltap, self.overview_subplot_rr,
-                                  self.overview_subplot_nrr, self.overview_subplot_pl,
-                                  self.overview_subplot_taudiff]
-        
-        self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.do_overview_analysis)
-        self.analyze_overview_button.grid(row=0,column=0)
-        
-        self.analyze_overview_canvas = tkagg.FigureCanvasTkAgg(self.analyze_overview_fig, master=self.tab_overview_analysis)
-        self.analyze_overview_widget = self.analyze_overview_canvas.get_tk_widget()
-        self.analyze_overview_widget.grid(row=1,column=0)
+        self.tab_analyze = tk.ttk.Frame(self.notebook)
 
-        self.overview_toolbar_frame = tk.ttk.Frame(self.tab_overview_analysis)
-        self.overview_toolbar_frame.grid(row=2,column=0)
-        self.overview_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, self.overview_toolbar_frame)
-        self.overview_toolbar.grid(row=0,column=0)
-        
-        self.analysis_title = tk.ttk.Label(self.tab_detailed_analysis, text="Plot and Integrate Saved Datasets", style="Header.TLabel")
+        self.analysis_title = tk.ttk.Label(self.tab_analyze, text="Plot and Integrate Saved Datasets", style="Header.TLabel")
         self.analysis_title.grid(row=0,column=0,columnspan=8)
         
         self.analyze_fig = Figure(figsize=(9.8,6))
@@ -1102,11 +1069,11 @@ class Notebook:
         self.analysis_plots[2].plot_obj = self.analyze_subplot2
         self.analysis_plots[3].plot_obj = self.analyze_subplot3
         
-        self.analyze_canvas = tkagg.FigureCanvasTkAgg(self.analyze_fig, master=self.tab_detailed_analysis)
+        self.analyze_canvas = tkagg.FigureCanvasTkAgg(self.analyze_fig, master=self.tab_analyze)
         self.analyze_widget = self.analyze_canvas.get_tk_widget()
         self.analyze_widget.grid(row=1,column=0,rowspan=1,columnspan=4, padx=(12,0))
 
-        self.analyze_plotselector_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
+        self.analyze_plotselector_frame = tk.ttk.Frame(master=self.tab_analyze)
         self.analyze_plotselector_frame.grid(row=2,rowspan=2,column=0,columnspan=4)
         
         self.analysisplot_topleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=0)
@@ -1133,7 +1100,7 @@ class Notebook:
         self.analysisplot_bottomright_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Bottom Right")
         self.analysisplot_bottomright_label.grid(row=1,column=3)
         
-        self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
+        self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
         self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=3,columnspan=4)
         self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
         self.analyze_toolbar.grid(row=0,column=0,columnspan=6)
@@ -1165,11 +1132,11 @@ class Notebook:
         self.integration_plots[0].plot_obj = self.integration_subplot
         self.integration_plots[1].plot_obj = self.taudiff_subplot
         
-        self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_detailed_analysis)
+        self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_analyze)
         self.integration_widget = self.integration_canvas.get_tk_widget()
         self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
 
-        self.integration_plotselector_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
+        self.integration_plotselector_frame = tk.ttk.Frame(master=self.tab_analyze)
         self.integration_plotselector_frame.grid(row=2,column=5)
         
         self.integrationplot_left = tk.ttk.Radiobutton(self.integration_plotselector_frame, variable=self.active_integrationplot_ID, value=0)
@@ -1184,7 +1151,7 @@ class Notebook:
         self.integrationplot_topright_label = tk.ttk.Label(self.integration_plotselector_frame, text="Use: Tau_Diff")
         self.integrationplot_topright_label.grid(row=0,column=3)
 
-        self.integration_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
+        self.integration_toolbar_frame = tk.ttk.Frame(master=self.tab_analyze)
         self.integration_toolbar_frame.grid(row=3,column=5, rowspan=2,columnspan=1)
         self.integration_toolbar = tkagg.NavigationToolbar2Tk(self.integration_canvas, self.integration_toolbar_frame)
         self.integration_toolbar.grid(row=0,column=0,columnspan=5)
@@ -1198,12 +1165,10 @@ class Notebook:
         self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
         self.integration_bayesim_button.grid(row=1,column=2)
 
-        self.analysis_status = tk.Text(self.tab_detailed_analysis, width=28,height=3)
+        self.analysis_status = tk.Text(self.tab_analyze, width=28,height=3)
         self.analysis_status.grid(row=5,rowspan=3,column=5,columnspan=1)
         self.analysis_status.configure(state="disabled")
 
-        self.tab_analyze.add(self.tab_overview_analysis, text="Overview")
-        self.tab_analyze.add(self.tab_detailed_analysis, text="Detailed Analysis")
         self.notebook.add(self.tab_analyze, text="Analyze")
         return
 
@@ -1212,86 +1177,32 @@ class Notebook:
         return
 
     def update_system_summary(self):
-        if self.sys_printsummary_popup_isopen:
-            self.write(self.printsummary_textbox, self.nanowire.DEBUG_print())
+        if self.sys_summary_popup_isopen:
+            self.write(self.summary_textbox, self.nanowire.DEBUG_print())
             
-        if self.sys_plotsummary_popup_isopen:
-            for param_name in self.nanowire.param_dict:
-                param = self.nanowire.param_dict[param_name]
-                val = param.value if isinstance(param.value, np.ndarray) else finite.toArray(param.value, len(self.nanowire.grid_x_nodes), param.is_edge)
-                grid_x = self.nanowire.grid_x_nodes if not param.is_edge else self.nanowire.grid_x_edges
-                self.sys_param_summaryplots[param_name].plot(grid_x, val)
-            
-            self.plotsummary_fig.tight_layout()
-            self.plotsummary_fig.canvas.draw()
-
         return
     ## Functions to create popups and manage
     
-    def do_sys_printsummary_popup(self):
-        if not self.sys_printsummary_popup_isopen: # Don't open more than one of this window at a time
-            self.sys_printsummary_popup = tk.Toplevel(self.root)
+    def do_sys_summary_popup(self):
+        if not self.sys_summary_popup_isopen: # Don't open more than one of this window at a time
+            self.sys_summary_popup = tk.Toplevel(self.root)
             
-            self.printsummary_textbox = tkscrolledtext.ScrolledText(self.sys_printsummary_popup, width=100,height=30)
-            self.printsummary_textbox.grid(row=0,column=0,padx=(20,0), pady=(20,20))
+            self.summary_textbox = tkscrolledtext.ScrolledText(self.sys_summary_popup, width=100,height=30)
+            self.summary_textbox.grid(row=0,column=0,padx=(20,0), pady=(20,20))
             
-            self.sys_printsummary_popup_isopen = True
+            self.sys_summary_popup_isopen = True
             
             self.update_system_summary()
             
-            self.sys_printsummary_popup.protocol("WM_DELETE_WINDOW", self.on_sys_printsummary_popup_close)
+            self.sys_summary_popup.protocol("WM_DELETE_WINDOW", self.on_sys_summary_popup_close)
             return
         
-    def on_sys_printsummary_popup_close(self):
+    def on_sys_summary_popup_close(self):
         try:
-            self.sys_printsummary_popup.destroy()
-            self.sys_printsummary_popup_isopen = False
-        except:
+            self.sys_summary_popup.destroy()
+            self.sys_summary_popup_isopen = False
+        except FloatingPointError:
             print("Error #2022: Failed to close shortcut popup.")
-        return
-    
-    def do_sys_plotsummary_popup(self):
-        if not self.nanowire.spacegrid_is_set: return
-        
-        if not self.sys_plotsummary_popup_isopen:
-            self.sys_plotsummary_popup = tk.Toplevel(self.root)
-
-            count = 1
-            rdim = np.floor(np.sqrt(self.nanowire.param_count))
-            #rdim = 4
-            cdim = np.ceil(self.nanowire.param_count / rdim)
-            
-            if self.sys_flag_dict['symmetric_system'].value():
-                self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, text="Note: All distributions are symmetric about x=0")
-                self.plotsummary_symmetriclabel.grid(row=0,column=0)
-
-            self.plotsummary_fig = Figure(figsize=(20,10))
-            self.sys_param_summaryplots = {}
-            for param_name in self.nanowire.param_dict:
-                
-                self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(rdim, cdim, count)
-                self.sys_param_summaryplots[param_name].set_title(param_name)
-                count += 1
-            
-            self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, master=self.sys_plotsummary_popup)
-            self.plotsummary_plotwidget = self.plotsummary_canvas.get_tk_widget()
-            self.plotsummary_plotwidget.grid(row=1,column=0)
-            
-            self.sys_plotsummary_popup_isopen = True
-            self.update_system_summary()
-            
-            self.sys_plotsummary_popup.protocol("WM_DELETE_WINDOW", self.on_sys_plotsummary_popup_close)
-            ## Temporarily disable the main window while this popup is active
-            self.sys_plotsummary_popup.grab_set()
-            
-            return
-        
-    def on_sys_plotsummary_popup_close(self):
-        try:
-            self.sys_plotsummary_popup.destroy()
-            self.sys_plotsummary_popup_isopen = False
-        except:
-            print("Error #2023: Failed to close plotsummary popup.")
         return
         
     def do_sys_param_shortcut_popup(self):
@@ -1330,12 +1241,6 @@ class Notebook:
                 self.sys_param_labels_dict[param].grid(row=row_count, column=col_count)
                 self.sys_param_entryboxes_dict[param] = tk.ttk.Entry(self.sys_param_list_frame, width=9)
                 self.sys_param_entryboxes_dict[param].grid(row=row_count, column=col_count + 1)
-                
-                if isinstance(self.nanowire.param_dict[param].value, (float, int)):
-                    self.enter(self.sys_param_entryboxes_dict[param], str(self.nanowire.param_dict[param].value))
-                
-                else:
-                    self.enter(self.sys_param_entryboxes_dict[param], "[list]")
                 row_count += 1
                 if row_count == max_per_col:
                     row_count = 0
@@ -1345,11 +1250,11 @@ class Notebook:
             self.shortcut_continue_button.grid(row=2,column=1)
                     
             self.sys_param_shortcut_popup.protocol("WM_DELETE_WINDOW", self.on_sys_param_shortcut_popup_close)
-            self.sys_param_shortcut_popup_isopen = True
+            
             ## Temporarily disable the main window while this popup is active
             self.sys_param_shortcut_popup.grab_set()
             
-            return
+            self.sys_param_shortcut_popup_isopen = True
                     
         else:
             print("Error #2020: Opened more than one sys param shortcut popup at a time")
@@ -1369,8 +1274,8 @@ class Notebook:
                         except:
                             continue
                     
-                    self.paramtoolkit_currentparam = param
-                    self.deleteall_paramrule()
+                    self.HIC_listbox_currentparam = param
+                    self.deleteall_HIC()
                     self.nanowire.param_dict[param].value = val
                     changed_params.append(param)
                     
@@ -1383,7 +1288,7 @@ class Notebook:
                     
             self.sys_param_shortcut_popup.destroy()
             self.sys_param_shortcut_popup_isopen = False
-        except:
+        except FloatingPointError:
             print("Error #2021: Failed to close shortcut popup.")
         
         return
@@ -2043,9 +1948,10 @@ class Notebook:
                     param_dict_copy = dict(active_sets[key].params_dict)
 
                     node_x = active_sets[key].node_x
+                    edge_x = active_sets[key].edge_x
                     param_dict_copy["init_deltaN"] = self.read_N(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
                     param_dict_copy["init_deltaP"] = self.read_P(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
-                    param_dict_copy["init_E_field"] = self.read_E_field(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
+                    param_dict_copy["init_E_field"] = self.read_E_field(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(edge_x.__len__())
 
                     with open(new_filename + ".txt", "w+") as ofstream:
                         ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
@@ -2069,7 +1975,7 @@ class Notebook:
                         
                         for param in param_dict_copy:
                             if param in self.nanowire.flags_dict: 
-                                ofstream.write("{}: {}\n".format(param, int(param_dict_copy[param])))
+                                ofstream.write("{}: {}\n".format(param, param_dict_copy[param]))
 
                 self.write(self.analysis_status, "IC file generated")
 
@@ -2237,7 +2143,6 @@ class Notebook:
     def update_sim_plots(self, index, do_clear_plots=True):
         ## V2: Update plots on Simulate tab
         ## FIXME: This abomination of 1x3 arrays
-        ## FIXME: Make E-field not log scaled
         
         # Why + 1e-30?
         # We want a log-scaled plot, and adding a tiny number to the y limits avoids the edge case of every value being zero.
@@ -2271,109 +2176,8 @@ class Notebook:
         self.sim_fig.tight_layout()
         self.sim_fig.canvas.draw()
         return
-    
-    ## Func for overview analyze tab
-    def fetch_metadata(self, data_filename):
-        with open(self.default_dirs["Data"] + "\\" + data_filename + "\\" + "metadata.txt", "r") as ifstream:
-            param_values_dict = {}
-            for line in ifstream:
-                if "$" in line: continue
 
-                elif "#" in line: continue
-
-                else:
-                    param = line[0:line.find(':')]
-                    new_value = line[line.find(' ') + 1:].strip('\n')
-
-                    if '\t' in new_value:
-                        param_values_dict[param] = np.array(extract_values(new_value, '\t'))
-                    else: param_values_dict[param] = float(new_value)
-                    
-        # Convert from cm, V, s to nm, V, ns
-        for param in param_values_dict:
-            if param in self.convert_in_dict:
-                param_values_dict[param] *= self.convert_in_dict[param]
-                    
-        return param_values_dict
-    
-    def do_overview_analysis(self):
-        data_dirname = tk.filedialog.askdirectory(title="Select a dataset", initialdir=self.default_dirs["Data"])
-        if not data_dirname:
-            print("No data set selected :(")
-            return
-        
-        print("Selected: {}".format(data_dirname))
-        
-        data_filename = data_dirname[data_dirname.rfind('/')+1:]
-        
-        try:
-            param_values_dict = self.fetch_metadata(data_filename)
-                 
-            data_n = int(0.5 + param_values_dict["Total-Time"] / param_values_dict["dt"])
-            data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
-            data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
-            data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
-            data_node_t = np.linspace(0, param_values_dict["Total-Time"], data_n + 1)
-            tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
-        except:
-            self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
-            return
-        
-        for subplot in self.overview_subplots:
-            subplot.cla()
-            
-        self.overview_subplot_n.set_xlabel('nm')
-        self.overview_subplot_pl.set_xlabel('ns')
-        self.overview_subplot_n.set_yscale('log')
-        self.overview_subplot_p.set_yscale('log')
-        self.overview_subplot_pl.set_yscale('log')
-        
-        self.overview_subplot_n.set_title("N [cm^-3]")
-        self.overview_subplot_p.set_title("P [cm^-3]")
-        self.overview_subplot_efield.set_title("E-field []")
-        self.overview_subplot_deltan.set_title("delta_N [cm^-3]")
-        self.overview_subplot_deltap.set_title("delta_P [cm^-3]")
-        self.overview_subplot_rr.set_title("Rad. Rec. [cm^-3 s^-1]")
-        self.overview_subplot_nrr.set_title("Non Rad. Rec. [cm^-3 s^-1]")
-        self.overview_subplot_pl.set_title("PL integrated over total length []")
-        self.overview_subplot_taudiff.set_title("-(dln(PL)/dt)^-1")
-        
-        for i in range(len(tstep_list)):
-            n_list = self.read_N(data_filename, tstep_list[i])
-            p_list = self.read_P(data_filename, tstep_list[i])
-            efield_list = self.read_E_field(data_filename, tstep_list[i])
-        
-            self.overview_subplot_n.plot(data_node_x, n_list * self.convert_out_dict['N'], label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
-            self.overview_subplot_p.plot(data_node_x, p_list * self.convert_out_dict['P'])
-            self.overview_subplot_efield.plot(data_edge_x, efield_list * self.convert_out_dict['E_field'])
-            
-            deltan_list = n_list - param_values_dict["N0"]
-            deltap_list = p_list - param_values_dict["P0"]
-            
-            self.overview_subplot_deltan.plot(data_node_x, deltan_list * self.convert_out_dict['N'])
-            self.overview_subplot_deltap.plot(data_node_x, deltap_list * self.convert_out_dict['P'])
-        
-            rr_list = finite.radiative_recombination(n_list, p_list, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"])
-            self.overview_subplot_rr.plot(data_node_x, rr_list * self.convert_out_dict['RR'])
-            
-            nrr_list = finite.nonradiative_recombination(n_list, p_list, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"])
-            self.overview_subplot_nrr.plot(data_node_x, nrr_list * self.convert_out_dict['NRR'])
-        
-        pl_list = finite.propagatingPL(data_filename, 0, param_values_dict["Total_length"], param_values_dict["Node_width"], 0, param_values_dict["Total_length"], 
-                                       param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Alpha"], param_values_dict["Theta"], param_values_dict["Delta"],
-                                       param_values_dict["Frac-Emitted"], param_values_dict["symmetric_system"])
-                
-        self.overview_subplot_pl.plot(data_node_t, pl_list * self.convert_out_dict['PL'])
-        
-        taudiff_list = finite.tau_diff(pl_list, param_values_dict['dt'])
-        self.overview_subplot_taudiff.plot(data_node_t, taudiff_list * self.convert_out_dict['tau_diff'])
-        
-        self.overview_subplot_n.legend().set_draggable(True)
-        self.analyze_overview_fig.tight_layout()
-        self.analyze_overview_fig.canvas.draw()
-        return
-
-    ## Funcs for detailed analyze tab
+    ## Sub plotters for analyze tab
 
     def plot_analyze(self, plot_ID, clear_plot=True):
         # Draw on analysis tab
@@ -2426,13 +2230,30 @@ class Notebook:
                 return
 
         try:
-            param_values_dict = self.fetch_metadata(data_filename)
-                    
+            with open(self.default_dirs["Data"] + "\\" + data_filename + "\\" + "metadata.txt", "r") as ifstream:
+                param_values_dict = {}
+                for line in ifstream:
+                    if "$" in line: continue
+
+                    elif "#" in line: continue
+
+                    else:
+                        param = line[0:line.find(':')]
+                        new_value = line[line.find(' ') + 1:].strip('\n')
+
+                        if '\t' in new_value:
+                            param_values_dict[param] = np.array(extract_values(new_value, '\t'))
+                        else: param_values_dict[param] = float(new_value)
+
             data_n = int(0.5 + param_values_dict["Total-Time"] / param_values_dict["dt"])
             data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
             data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
             data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
 
+            # Convert from cm, V, s to nm, V, ns
+            for param in param_values_dict:
+                if param in self.convert_in_dict:
+                    param_values_dict[param] *= self.convert_in_dict[param]
 
         except:
             self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
@@ -2450,7 +2271,7 @@ class Notebook:
         if (datatype == "N"):
             try:
                 # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
-                new_data = Raw_Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
@@ -2458,7 +2279,7 @@ class Notebook:
 
         elif (datatype == "P"):
             try:
-                new_data = Raw_Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
@@ -2466,7 +2287,7 @@ class Notebook:
 
         elif (datatype == "E_field"):
             try:
-                new_data = Raw_Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
@@ -2474,10 +2295,8 @@ class Notebook:
         
         elif (datatype == "RR"):
             try:
-                temp_N = self.read_N(data_filename, active_show_index)
-                temp_P = self.read_P(data_filename, active_show_index)
-                new_data = Raw_Data_Set(finite.radiative_recombination(temp_N, temp_P, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"]), 
-                                    data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(param_values_dict["B"] * ((self.read_N(data_filename, active_show_index)) * (self.read_P(data_filename, active_show_index)) - param_values_dict["N0"] * param_values_dict["P0"]), 
+                                    data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: Unable to calculate Rad Rec")
@@ -2487,8 +2306,9 @@ class Notebook:
             try:
                 temp_N = self.read_N(data_filename, active_show_index)
                 temp_P = self.read_P(data_filename, active_show_index)
-                new_data = Raw_Data_Set(finite.nonradiative_recombination(temp_N, temp_P, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"]),  
-                                    data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set((temp_N * temp_P - param_values_dict["N0"] * param_values_dict["P0"]) / 
+                                    ((param_values_dict["Tau_N"] * temp_P) + (param_values_dict["Tau_P"] * temp_N)), 
+                                    data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: Unable to calculate Non Rad Rec")
@@ -2496,10 +2316,8 @@ class Notebook:
 
         elif (datatype == "PL"):
             try:
-                temp_N = self.read_N(data_filename, active_show_index)
-                temp_P = self.read_P(data_filename, active_show_index)
-                
-                rad_rec = finite.radiative_recombination(temp_N, temp_P, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"])
+                rad_rec = param_values_dict["B"] * (self.read_N(data_filename, active_show_index) * self.read_P(data_filename, active_show_index) - \
+                    param_values_dict["N0"] * param_values_dict["P0"])
 
                 max = param_values_dict["Total_length"]
                 dx = param_values_dict["Node_width"]
@@ -2538,7 +2356,7 @@ class Notebook:
                     PL_base[p] += intg.trapz(combined_weight[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * rad_rec[p] + \
                         intg.trapz(combined_weight2[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * rad_rec[p]
 
-                new_data = Raw_Data_Set(PL_base, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(PL_base, data_node_x, data_node_x, data_edge_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except OSError:
                 self.write(self.analysis_status, "Error: Unable to calculate PL")
@@ -2619,12 +2437,10 @@ class Notebook:
 
         elif active_datagroup.type == "RR":
             for tag in active_datagroup.datasets:
-                temp_N = self.read_N(active_datagroup.datasets[tag].filename, active_show_index)
-                temp_P = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 B = active_datagroup.datasets[tag].params_dict["B"]
-                active_datagroup.datasets[tag].data = finite.radiative_recombination(temp_N, temp_P, B, n0, p0)
+                active_datagroup.datasets[tag].data = B * (self.read_N(active_datagroup.datasets[tag].filename, active_show_index) * self.read_P(active_datagroup.datasets[tag].filename, active_show_index) - n0 * p0)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "NRR":
@@ -2635,17 +2451,16 @@ class Notebook:
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 tauN = active_datagroup.datasets[tag].params_dict["Tau_N"]
                 tauP = active_datagroup.datasets[tag].params_dict["Tau_P"]
-                active_datagroup.datasets[tag].data = finite.nonradiative_recombination(temp_N, temp_P, n0, p0, tauN, tauP)
+                active_datagroup.datasets[tag].data = (temp_N * temp_P - n0 * p0) / ((tauN * temp_P) + (tauP * temp_N))
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "PL":
             for tag in active_datagroup.datasets:
-                temp_N = self.read_N(active_datagroup.datasets[tag].filename, active_show_index)
-                temp_P = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
+                filename = active_datagroup.datasets[tag].filename
                 B = active_datagroup.datasets[tag].params_dict["B"]
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
-                rad_rec = finite.radiative_recombination(temp_N, temp_P, B, n0, p0)
+                rad_rec = B * ((self.read_N(filename, active_show_index) * self.read_P(filename, active_show_index)) - n0 * p0)
 
                 max = active_datagroup.datasets[tag].params_dict["Total_length"]
                 dx = active_datagroup.datasets[tag].params_dict["Node_width"]
@@ -2901,7 +2716,7 @@ class Notebook:
 
         try:
             error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict,
-                                             not self.sys_flag_dict['ignore_alpha'].value(), self.sys_flag_dict['symmetric_system'].value(), self.check_do_ss.get(), write_output,
+                                             not self.check_ignore_recycle.get(), self.check_symmetric.get(), self.check_do_ss.get(), write_output,
                                              self.init_N, self.init_P, self.init_E_field)
         except FloatingPointError:
             print("Error: an unusual value occurred while simulating {}".format(data_file_name))
@@ -2948,10 +2763,10 @@ class Notebook:
             # The following params are exclusive to metadata files
             ofstream.write("Total-Time: " + str(self.simtime) + "\n")
             ofstream.write("dt: " + str(self.dt) + "\n")
-            if self.sys_flag_dict['ignore_alpha'].value(): ofstream.write("ignore_alpha: 1\n")
+            if self.check_ignore_recycle.get(): ofstream.write("ignore_alpha: 1\n")
             else: ofstream.write("ignore_alpha: 0\n")
 
-            if self.sys_flag_dict['symmetric_system'].value(): ofstream.write("symmetric_system: 1\n")
+            if self.check_symmetric.get(): ofstream.write("symmetric_system: 1\n")
             else: ofstream.write("symmetric_system: 0\n")
             
             if self.check_do_ss.get(): ofstream.write("steady_state_exc: 1\n")
@@ -3087,7 +2902,7 @@ class Notebook:
                         temp_N = np.array(ifstream_N.root.N)
                         temp_P = np.array(ifstream_P.root.P)
 
-                        data = finite.radiative_recombination(temp_N, temp_P, B_param, n0, p0)
+                        data = B_param * (temp_N) * (temp_P) - n0 * p0
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
@@ -3099,7 +2914,7 @@ class Notebook:
                         tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.N)
                         temp_P = np.array(ifstream_P.root.P)
-                        data = finite.nonradiative_recombination(temp_N,temp_P, n0, p0, tauN, tauP)
+                        data = ((temp_N) * (temp_P) - n0 * p0) / (tauN * (temp_P) + tauP * (temp_N))
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
@@ -3211,13 +3026,13 @@ class Notebook:
 
         for param in self.resetIC_selected_params:
             # Step 1 and 2
-            self.paramtoolkit_currentparam = param
+            self.HIC_listbox_currentparam = param
             
             # These two lines changes the text displayed in the param_rule display box's menu and is for cosmetic purposes only
             self.update_paramrule_listbox(param)
-            self.paramtoolkit_viewer_selection.set(param)
+            self.HIC_viewer_selection.set(param)
             
-            self.deleteall_paramrule()
+            self.deleteall_HIC()
             
             # Step 3
             self.nanowire.param_dict[param].value = 0
@@ -3307,10 +3122,10 @@ class Notebook:
             return
 
         # Remove all param_rules for init_deltaN and init_deltaP, as we will be reassigning them shortly.
-        self.paramtoolkit_currentparam = "init_deltaN"
-        self.deleteall_paramrule()
-        self.paramtoolkit_currentparam = "init_deltaP"
-        self.deleteall_paramrule()
+        self.HIC_listbox_currentparam = "init_deltaN"
+        self.deleteall_HIC()
+        self.HIC_listbox_currentparam = "init_deltaP"
+        self.deleteall_HIC()
 
         # Establish constants; calculate alpha
         h = 6.626e-34   # [J*s]
@@ -3429,22 +3244,22 @@ class Notebook:
         self.nanowire.param_dict["init_deltaP"].value = self.nanowire.param_dict["init_deltaN"].value
 
         self.update_IC_plot(plot_ID="AIC")
-        self.paramtoolkit_currentparam = "init_deltaN"
+        self.HIC_listbox_currentparam = "init_deltaN"
         self.update_IC_plot(plot_ID="custom")
-        self.paramtoolkit_currentparam = "init_deltaP"
+        self.HIC_listbox_currentparam = "init_deltaP"
         self.update_IC_plot(plot_ID="recent")
         self.using_AIC = True
         return
 
     ## Special functions for Parameter Toolkit:
-    def add_paramrule(self):
+    def add_HIC(self):
         # V2 update
         # Set the value of one of Nanowire's Parameters
 
         # TODO: This check may be deprecated
-        if (self.active_paramrule_list.__len__() > 0 and isinstance(self.active_paramrule_list[0], str)):
+        if (self.HIC_list.__len__() > 0 and isinstance(self.HIC_list[0], str)):
             print("Something happened!")
-            self.deleteall_paramrule(False)
+            self.deleteall_HIC(False)
 
         try:
             self.set_init_x()
@@ -3463,51 +3278,51 @@ class Notebook:
 
             if (self.init_shape_selection.get() == "POINT"):
 
-                if (float(self.paramrule_lbound_entry.get()) < 0):
+                if (float(self.HIC_lbound_entry.get()) < 0):
                     raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
-                if (float(self.paramrule_lbound_entry.get()) < 0):
+                if (float(self.HIC_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.paramrule_lbound_entry.get()), -1, float(self.paramrule_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.HIC_lbound_entry.get()), -1, float(self.HIC_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
+                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
                 	raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
-                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
+                if (float(self.HIC_lbound_entry.get()) > float(self.HIC_rbound_entry.get())):
                 	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
 
-                if (float(self.paramrule_lbound_entry.get()) < 0):
+                if (float(self.HIC_lbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), float(self.paramrule_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), float(self.HIC_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
+                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
                 	raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
-                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
+                if (float(self.HIC_lbound_entry.get()) > float(self.HIC_rbound_entry.get())):
                 	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
 
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) < 0):
+                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "LINE", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
-                                            float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "LINE", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), 
+                                            float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
 
             elif (self.init_shape_selection.get() == "EXP"):
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
+                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) > self.nanowire.total_length):
                     raise Exception("Error: Bound coordinates exceed system thickness specifications")
 
-                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
+                if (float(self.HIC_lbound_entry.get()) > float(self.HIC_rbound_entry.get())):
                 	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
 
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) < 0):
+                if (float(self.HIC_lbound_entry.get()) < 0 or float(self.HIC_rbound_entry.get()) < 0):
                 	self.write(self.ICtab_status, "Warning: negative initial condition value")
 
-                new_param_rule = Param_Rule(new_param_name, "EXP", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
-                                            float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "EXP", float(self.HIC_lbound_entry.get()), float(self.HIC_rbound_entry.get()), 
+                                            float(self.HIC_lvalue_entry.get()), float(self.HIC_rvalue_entry.get()))
 
             else:
                 raise Exception("Error: No init. type selected")
@@ -3520,18 +3335,23 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
+
+        #self.HIC_list.append(new_param_rule)
+        #self.HIC_listbox.insert(self.HIC_list.__len__() - 1, new_param_rule.get())
+
         self.nanowire.add_param_rule(new_param_name, new_param_rule)
 
-        self.paramtoolkit_viewer_selection.set(new_param_name)
+        self.HIC_viewer_selection.set(new_param_name)
         self.update_paramrule_listbox(new_param_name)
 
+        #self.recalc_HIC()
         if new_param_name == "init_deltaN" or new_param_name == "init_deltaP": self.using_AIC = False
         self.update_IC_plot(plot_ID="recent")
         return
 
     def refresh_paramrule_listbox(self):
         # The View button has two jobs: change the listbox to the new param and display a snapshot of it
-        self.update_paramrule_listbox(self.paramtoolkit_viewer_selection.get())
+        self.update_paramrule_listbox(self.HIC_viewer_selection.get())
         self.update_IC_plot(plot_ID="custom")
         return
     
@@ -3542,15 +3362,15 @@ class Notebook:
             return
 
         # 1. Clear the viewer
-        self.hideall_paramrules()
+        self.hideall_HIC()
 
         # 2. Write in the new rules
         current_param_rules = self.nanowire.param_dict[param_name].param_rules
-        self.paramtoolkit_currentparam = param_name
+        self.HIC_listbox_currentparam = param_name
 
         for param_rule in current_param_rules:
-            self.active_paramrule_list.append(param_rule)
-            self.active_paramrule_listbox.insert(self.active_paramrule_list.__len__() - 1, param_rule.get())
+            self.HIC_list.append(param_rule)
+            self.HIC_listbox.insert(self.HIC_list.__len__() - 1, param_rule.get())
 
         
         self.write(self.ICtab_status, "")
@@ -3558,72 +3378,66 @@ class Notebook:
         return
 
     # These two reposition the order of param_rules
-    def moveup_paramrule(self):
-        try:
-            currentSelectionIndex = self.active_paramrule_listbox.curselection()[0]
-        except IndexError:
-            return
+    def moveup_HIC(self):
+        currentSelectionIndex = self.HIC_listbox.curselection()[0]
         
         if (currentSelectionIndex > 0):
             # Two things must be done here for a complete swap:
             # 1. Change the order param rules appear in the box
-            self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
-            self.active_paramrule_listbox.delete(currentSelectionIndex)
-            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, self.active_paramrule_list[currentSelectionIndex - 1].get())
-            self.active_paramrule_listbox.selection_set(currentSelectionIndex - 1)
+            self.HIC_list[currentSelectionIndex], self.HIC_list[currentSelectionIndex - 1] = self.HIC_list[currentSelectionIndex - 1], self.HIC_list[currentSelectionIndex]
+            self.HIC_listbox.delete(currentSelectionIndex)
+            self.HIC_listbox.insert(currentSelectionIndex - 1, self.HIC_list[currentSelectionIndex - 1].get())
+            self.HIC_listbox.selection_set(currentSelectionIndex - 1)
 
             # 2. Change the order param rules are applied when calculating Parameter's values
-            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, currentSelectionIndex)
+            self.nanowire.swap_param_rules(self.HIC_listbox_currentparam, currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
 
-    def movedown_paramrule(self):
-        try:
-            currentSelectionIndex = self.active_paramrule_listbox.curselection()[0] + 1
-        except IndexError:
-            return
+    def movedown_HIC(self):
+        currentSelectionIndex = self.HIC_listbox.curselection()[0] + 1
         
-        if (currentSelectionIndex < self.active_paramrule_list.__len__()):
-            self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
-            self.active_paramrule_listbox.delete(currentSelectionIndex)
-            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, self.active_paramrule_list[currentSelectionIndex - 1].get())
-            self.active_paramrule_listbox.selection_set(currentSelectionIndex)
+        if (currentSelectionIndex < self.HIC_list.__len__()):
+            self.HIC_list[currentSelectionIndex], self.HIC_list[currentSelectionIndex - 1] = self.HIC_list[currentSelectionIndex - 1], self.HIC_list[currentSelectionIndex]
+            self.HIC_listbox.delete(currentSelectionIndex)
+            self.HIC_listbox.insert(currentSelectionIndex - 1, self.HIC_list[currentSelectionIndex - 1].get())
+            self.HIC_listbox.selection_set(currentSelectionIndex)
             
-            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, currentSelectionIndex)
+            self.nanowire.swap_param_rules(self.HIC_listbox_currentparam, currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
 
-    def hideall_paramrules(self, doPlotUpdate=True):
-        # Wrapper - Call hide_paramrule() until listbox is empty
-        while (self.active_paramrule_list.__len__() > 0):
-            # These first two lines mimic user repeatedly selecting topmost paramrule in listbox
-            self.active_paramrule_listbox.select_set(0)
-            self.active_paramrule_listbox.event_generate("<<ListboxSelect>>")
+    def hideall_HIC(self, doPlotUpdate=True):
+        # Wrapper - Call hide_HIC() until listbox is empty
+        while (self.HIC_list.__len__() > 0):
+            # These first two lines mimic user repeatedly selecting topmost HIC in listbox
+            self.HIC_listbox.select_set(0)
+            self.HIC_listbox.event_generate("<<ListboxSelect>>")
 
-            self.hide_paramrule()
+            self.hide_HIC()
         return
 
-    def hide_paramrule(self):
+    def hide_HIC(self):
         # Remove user-selected param rule from box (but don't touch Nanowire's saved info)
-        self.active_paramrule_list.pop(self.active_paramrule_listbox.curselection()[0])
-        self.active_paramrule_listbox.delete(self.active_paramrule_listbox.curselection()[0])
+        self.HIC_list.pop(self.HIC_listbox.curselection()[0])
+        self.HIC_listbox.delete(self.HIC_listbox.curselection()[0])
         return
     
-    def deleteall_paramrule(self, doPlotUpdate=True):
-        # Note: deletes all rules for currentparam
-        # Use reset_IC instead to delete all rules for every param
-        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
-            self.nanowire.removeall_param_rules(self.paramtoolkit_currentparam)
-            self.hideall_paramrules()
-            self.update_IC_plot(plot_ID="recent")
+    def deleteall_HIC(self, doPlotUpdate=True):
+        # Wrapper - Call delete_HIC until Nanowire's list of param_rules is empty for current param
+        while (self.nanowire.param_dict[self.HIC_listbox_currentparam].param_rules.__len__() > 0):
+            self.HIC_listbox.select_set(0)
+            self.HIC_listbox.event_generate("<<ListboxSelect>>")
+
+            self.delete_HIC()
         return
 
-    def delete_paramrule(self):
+    def delete_HIC(self):
         # Remove user-selected param rule from box AND from Nanowire's list of param_rules
-        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
+        if (self.nanowire.param_dict[self.HIC_listbox_currentparam].param_rules.__len__() > 0):
             try:
-                self.nanowire.remove_param_rule(self.paramtoolkit_currentparam, self.active_paramrule_listbox.curselection()[0])
-                self.hide_paramrule()
+                self.nanowire.remove_param_rule(self.HIC_listbox_currentparam, self.HIC_listbox.curselection()[0])
+                self.hide_HIC()
                 self.update_IC_plot(plot_ID="recent")
             except IndexError:
                 self.write(self.ICtab_status, "No rule selected")
@@ -3631,7 +3445,7 @@ class Notebook:
         return
 
     # Fill IC arrays using list from .txt file
-    def add_listupload(self):
+    def add_EIC(self):
         try:
             self.set_init_x()
 
@@ -3644,7 +3458,7 @@ class Notebook:
             return
         
         warning_flag = False
-        var = self.listupload_var_selection.get()
+        var = self.EIC_var_selection.get()
         is_edge = self.nanowire.param_dict[var].is_edge
         
         valuelist_filename = tk.filedialog.askopenfilename(initialdir="", title="Select Values from text file", filetypes=[("Text files","*.txt")])
@@ -3680,7 +3494,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Warning: Unusual point list content")
                 warning_flag = True
 
-            # Linear interpolate from provided param list to specified grid points
+            # Linear interpolate from provided EIC list to specified grid points
             lindex = finite.toIndex(first_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
             rindex = finite.toIndex(second_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
             
@@ -3701,10 +3515,10 @@ class Notebook:
                 
         if var == "init_deltaN" or var == "init_deltaP": self.using_AIC = False
         
-        self.paramtoolkit_currentparam = var
-        self.deleteall_paramrule()
+        self.HIC_listbox_currentparam = var
+        self.deleteall_HIC()
         self.nanowire.param_dict[var].value = temp_IC_values
-        self.update_IC_plot(plot_ID="listupload", warn=warning_flag)
+        self.update_IC_plot(plot_ID="EIC", warn=warning_flag)
         self.update_IC_plot(plot_ID="recent", warn=warning_flag)
         return
 
@@ -3715,12 +3529,12 @@ class Notebook:
         if plot_ID=="recent": plot = self.recent_param_subplot
         elif plot_ID=="custom": plot = self.custom_param_subplot
         elif plot_ID=="AIC": plot = self.AIC_subplot
-        elif plot_ID=="listupload": plot = self.listupload_subplot
+        elif plot_ID=="EIC": plot = self.EIC_subplot
         plot.cla()
         plot.set_yscale('log')
 
         if plot_ID=="AIC": param_name="init_deltaN"
-        else: param_name = self.paramtoolkit_currentparam
+        else: param_name = self.HIC_listbox_currentparam
         
         param_obj = self.nanowire.param_dict[param_name]
         grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
@@ -3735,7 +3549,7 @@ class Notebook:
         plot.set_ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
 
 
-        if self.sys_flag_dict['symmetric_system'].value():
+        if self.check_symmetric.get():
             plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(val_array), val_array), axis=0), label=param_name)
 
             ymin, ymax = plot.get_ylim()
@@ -3760,10 +3574,10 @@ class Notebook:
             plot.set_title("Recent AIC")
             self.AIC_fig.tight_layout()
             self.AIC_fig.canvas.draw()
-        elif plot_ID=="listupload": 
+        elif plot_ID=="EIC": 
             plot.set_title("Recent list upload")
-            self.listupload_fig.tight_layout()
-            self.listupload_fig.canvas.draw()
+            self.EIC_fig.tight_layout()
+            self.EIC_fig.canvas.draw()
 
         if not warn: self.write(self.ICtab_status, "Initial Condition Updated")
         return
@@ -3771,13 +3585,15 @@ class Notebook:
     ## Initial Condition I/O
 
     def create_batch_init(self):
-        warning_flag = 0
         try:
             batch_values = {}
-
             for batchable in self.batchables_array:
                 if batchable.param_name.get():
-                    batch_values[batchable.param_name.get()] = extract_values(batchable.tk_entrybox.get(), ' ')
+                    batch_values[batchable.param_name.get()] = []
+                    
+            for batchable in self.batchables_array:
+                if batchable.param_name.get():
+                    batch_values[batchable.param_name.get()] += extract_values(batchable.tk_entrybox.get(), ' ')
             
             if not batch_values: # If no batch params were selected
                 raise ValueError
@@ -3805,11 +3621,56 @@ class Notebook:
         original_param_values = {}
         for param in self.nanowire.param_dict:
             original_param_values[param] = self.nanowire.param_dict[param].value
+        
+        
+        # This algorithm was shamelessly stolen from our bay.py script...
+        # TODO: ...and should really, really be a standalone function!!
+        # def get_all_combinations(param_values)
                 
-        # This algorithm was shamelessly stolen from our bay.py script...                
-        batch_combinations = finite.get_all_combinations(batch_values)        
+        batch_combinations = []
+        batch_param_names = list(batch_values.keys())
+        
+        iterable_param_indexes = {}
+        iterable_param_lengths = {}
+        for param in batch_param_names:
+            iterable_param_indexes[param] = 0
+            iterable_param_lengths[param] = batch_values[param].__len__()
+        
+        pivot_index = batch_param_names.__len__() - 1
+
+        current_params = dict(batch_values)
+        # Create a list of all combinations of parameter values
+        while(pivot_index >= 0):
+
+            # Generate the next parameter set using lists of indices stored in the helper structures
+            for iterable_param in batch_param_names:
+                current_params[iterable_param] = batch_values[iterable_param][iterable_param_indexes[iterable_param]]
+
+            batch_combinations.append(dict(current_params))
+
+            # Determine the next iterable parameter using a "reverse search" amd update indices from right to left
+            # For example, given Param_A = [1,2,3], Param_B = [4,5,6], Param_C = [7,8]:
+            # The order {A, B, C} this algorithm will run is: 
+            # {1,4,7}, 
+            # {1,4,8}, 
+            # {1,5,7}, 
+            # {1,5,8}, 
+            # {1,6,7}, 
+            # {1,6,8},
+            # ...
+            # {3,6,7},
+            # {3,6,8}
+            pivot_index = batch_param_names.__len__() - 1
+            while (pivot_index >= 0 and iterable_param_indexes[batch_param_names[pivot_index]] == iterable_param_lengths[batch_param_names[pivot_index]] - 1):
+                pivot_index -= 1
+
+            iterable_param_indexes[batch_param_names[pivot_index]] += 1
+
+            for i in range(pivot_index + 1, batch_param_names.__len__()):
+                iterable_param_indexes[batch_param_names[i]] = 0
                 
         # Apply each combination to Nanowire, going through AIC if necessary
+
         for batch_set in batch_combinations:
             filename = ""
             for param in batch_set:
@@ -3827,17 +3688,14 @@ class Notebook:
             try:
                 self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], batch_dir_name, filename))
             except:
-                print("Error: failed to create batch file {}".format(filename))
-                warning_flag += 1
+                self.write(self.batch_status, "Error: failed to create batch file {}".format(filename))
                 
         # Restore the original values of Nanowire
         for param in self.nanowire.param_dict:
             self.nanowire.param_dict[param].value = original_param_values[param]
         
-        if not warning_flag:
-            self.write(self.batch_status, "Batch \"{}\" created successfully".format(batch_dir_name))
-        else:
-            self.write(self.batch_status, "Warning: failed to create some batch files - see console")
+        self.write(self.batch_status, "Batch \"{}\" created successfully".format(batch_dir_name))
+
         return
 
 	# Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked
@@ -3887,7 +3745,7 @@ class Notebook:
                 ofstream.write("$ System Flags:\n")
                 
                 for flag in self.nanowire.flags_dict:
-                    ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
+                    ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].tk_var.get()))
                 
         except OSError:
             self.write(self.ICtab_status, "Error: failed to create IC file")
@@ -3984,10 +3842,10 @@ class Notebook:
             self.enter(self.analytical_entryboxes_dict[key], "")
             
         for param in self.nanowire.param_dict:
-            self.paramtoolkit_currentparam = param
+            self.HIC_listbox_currentparam = param
             
             self.update_paramrule_listbox(param)            
-            self.deleteall_paramrule()
+            self.deleteall_HIC()
             
             self.nanowire.param_dict[param].value = 0
 
@@ -4012,13 +3870,9 @@ class Notebook:
             return
 
         for flag in self.nanowire.flags_dict:
+            # Again, we don't bother with Nanowire's flags_dict until it's time to simulate
             # All we need to do here is mark the appropriate GUI elements as selected
-            try:
-                self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
-            except:
-                print("Warning: could not apply value for flag: {}".format(flag))
-                print("Flags must have integer value 1 or 0")
-                warning_flag += 1
+            self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
             
         for param in self.nanowire.param_dict:
             new_value = init_param_values_dict[param]
@@ -4027,7 +3881,7 @@ class Notebook:
                     self.nanowire.param_dict[param].value = np.array(extract_values(new_value, '\t'))
                 else: self.nanowire.param_dict[param].value = float(new_value)
                 
-                self.paramtoolkit_currentparam = param
+                self.HIC_listbox_currentparam = param
                 if cycle_through_IC_plots: self.update_IC_plot(plot_ID="recent")
             except:
                 print("Warning: could not apply value for param: {}".format(param))
