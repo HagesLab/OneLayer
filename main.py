@@ -671,7 +671,7 @@ class Notebook:
         self.flags_head = tk.ttk.Label(self.flags_frame, text="Flags", style="Header.TLabel")
         self.flags_head.grid(row=0,column=0,columnspan=2)
         
-        # TODO: Procedurally generated elements for flags
+        # Procedurally generated elements for flags
         i = 1
         self.sys_flag_dict = {}
         for flag in self.nanowire.flags_dict:
@@ -3780,13 +3780,10 @@ class Notebook:
     def create_batch_init(self):
         try:
             batch_values = {}
+
             for batchable in self.batchables_array:
                 if batchable.param_name.get():
-                    batch_values[batchable.param_name.get()] = []
-                    
-            for batchable in self.batchables_array:
-                if batchable.param_name.get():
-                    batch_values[batchable.param_name.get()] += extract_values(batchable.tk_entrybox.get(), ' ')
+                    batch_values[batchable.param_name.get()] = extract_values(batchable.tk_entrybox.get(), ' ')
             
             if not batch_values: # If no batch params were selected
                 raise ValueError
@@ -3820,47 +3817,8 @@ class Notebook:
         # TODO: ...and should really, really be a standalone function!!
         # def get_all_combinations(param_values)
                 
-        batch_combinations = []
-        batch_param_names = list(batch_values.keys())
+        batch_combinations = finite.get_all_combinations(batch_values)
         
-        iterable_param_indexes = {}
-        iterable_param_lengths = {}
-        for param in batch_param_names:
-            iterable_param_indexes[param] = 0
-            iterable_param_lengths[param] = batch_values[param].__len__()
-        
-        pivot_index = batch_param_names.__len__() - 1
-
-        current_params = dict(batch_values)
-        # Create a list of all combinations of parameter values
-        while(pivot_index >= 0):
-
-            # Generate the next parameter set using lists of indices stored in the helper structures
-            for iterable_param in batch_param_names:
-                current_params[iterable_param] = batch_values[iterable_param][iterable_param_indexes[iterable_param]]
-
-            batch_combinations.append(dict(current_params))
-
-            # Determine the next iterable parameter using a "reverse search" amd update indices from right to left
-            # For example, given Param_A = [1,2,3], Param_B = [4,5,6], Param_C = [7,8]:
-            # The order {A, B, C} this algorithm will run is: 
-            # {1,4,7}, 
-            # {1,4,8}, 
-            # {1,5,7}, 
-            # {1,5,8}, 
-            # {1,6,7}, 
-            # {1,6,8},
-            # ...
-            # {3,6,7},
-            # {3,6,8}
-            pivot_index = batch_param_names.__len__() - 1
-            while (pivot_index >= 0 and iterable_param_indexes[batch_param_names[pivot_index]] == iterable_param_lengths[batch_param_names[pivot_index]] - 1):
-                pivot_index -= 1
-
-            iterable_param_indexes[batch_param_names[pivot_index]] += 1
-
-            for i in range(pivot_index + 1, batch_param_names.__len__()):
-                iterable_param_indexes[batch_param_names[i]] = 0
                 
         # Apply each combination to Nanowire, going through AIC if necessary
 

@@ -39,6 +39,50 @@ def toArray(value, m, is_edge):
     else:
         return value
 
+def get_all_combinations(value_dict):
+    combinations = []
+    param_names = list(value_dict.keys())
+        
+    iterable_param_indexes = {}
+    iterable_param_lengths = {}
+    for param in param_names:
+        iterable_param_indexes[param] = 0
+        iterable_param_lengths[param] = value_dict[param].__len__()
+    
+    pivot_index = param_names.__len__() - 1
+
+    current_params = dict(value_dict)
+    # Create a list of all combinations of parameter values
+    while(pivot_index >= 0):
+
+        # Generate the next parameter set using lists of indices stored in the helper structures
+        for iterable_param in param_names:
+            current_params[iterable_param] = value_dict[iterable_param][iterable_param_indexes[iterable_param]]
+
+        combinations.append(dict(current_params))
+
+        # Determine the next iterable parameter using a "reverse search" amd update indices from right to left
+        # For example, given Param_A = [1,2,3], Param_B = [4,5,6], Param_C = [7,8]:
+        # The order {A, B, C} this algorithm will run is: 
+        # {1,4,7}, 
+        # {1,4,8}, 
+        # {1,5,7}, 
+        # {1,5,8}, 
+        # {1,6,7}, 
+        # {1,6,8},
+        # ...
+        # {3,6,7},
+        # {3,6,8}
+        pivot_index = param_names.__len__() - 1
+        while (pivot_index >= 0 and iterable_param_indexes[param_names[pivot_index]] == iterable_param_lengths[param_names[pivot_index]] - 1):
+            pivot_index -= 1
+
+        iterable_param_indexes[param_names[pivot_index]] += 1
+
+        for i in range(pivot_index + 1, param_names.__len__()):
+            iterable_param_indexes[param_names[i]] = 0
+            
+    return combinations
 
 def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
     # h and c are Planck's const and speed of light, respectively. These default to common units [J*s] and [m/s] but
