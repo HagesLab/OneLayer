@@ -61,17 +61,31 @@ class Param_Rule:
     def is_edge(self):
         return (self.variable == "dEc" or self.variable == "chi")
 
-
-class Parameter:
-    # Helper class to store info about each of a Nanowire's parameters and initial distributions
-    def __init__(self, is_edge, units):
+class Characteristic:
+    def __init__(self, units, is_edge):
+        self.units = units
         self.is_edge = is_edge
+        return
+
+class Parameter(Characteristic):
+    # Helper class to store info about each of a Nanowire's parameters and initial distributions
+    def __init__(self, units, is_edge):
+        super().__init__(units, is_edge)
         # self.value can be a number (i.e. the parameter value is constant across the length of the nanowire)
         # or an array (i.e. the parameter value is spatially dependent)
-        self.units = units
         self.value = 0
         self.param_rules = []
         return
+    
+class Output(Characteristic):
+    
+    def __init__(self, display_name, units, is_edge, is_calculated, is_integrated):
+        super().__init__(units, is_edge)
+        self.display_name = display_name
+        self.is_calculated = is_calculated
+        self.is_integrated = is_integrated
+        return
+
 
 class Nanowire:
     # A Nanowire object contains all information regarding the initial state of a nanowire
@@ -81,17 +95,17 @@ class Nanowire:
         self.grid_x_nodes = -1
         self.grid_x_edges = -1
         self.spacegrid_is_set = False
-        self.param_dict = {"Mu_N":Parameter(is_edge=True, units="[cm^2 / V s]"), "Mu_P":Parameter(is_edge=True, units="[cm^2 / V s]"), 
-                            "N0":Parameter(is_edge=False, units="[cm^-3]"), "P0":Parameter(is_edge=False, units="[cm^-3]"), 
-                            "B":Parameter(is_edge=False, units="[cm^3 / s]"), "Tau_N":Parameter(is_edge=False, units="[ns]"), 
-                            "Tau_P":Parameter(is_edge=False, units="[ns]"), "Sf":Parameter(is_edge=False, units="[cm / s]"), 
-                            "Sb":Parameter(is_edge=False, units="[cm / s]"), "Temperature":Parameter(is_edge=True, units="[K]"), 
-                            "Rel-Permitivity":Parameter(is_edge=True, units=""), "Ext_E-Field":Parameter(is_edge=True, units="[V/um]"),
-                            "Theta":Parameter(is_edge=False, units="[cm^-1]"), "Alpha":Parameter(is_edge=False, units="[cm^-1]"), 
-                            "Delta":Parameter(is_edge=False, units=""), "Frac-Emitted":Parameter(is_edge=False, units=""),
-                            "init_deltaN":Parameter(is_edge=False, units="[cm^-3]"), "init_deltaP":Parameter(is_edge=False, units="[cm^-3]"), 
-                            "init_E_field":Parameter(is_edge=True, units="[WIP]"), "Ec":Parameter(is_edge=True, units="[WIP]"),
-                            "electron_affinity":Parameter(is_edge=True, units="[WIP]")}
+        self.param_dict = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True), "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True), 
+                            "N0":Parameter(units="[cm^-3]", is_edge=False), "P0":Parameter(units="[cm^-3]", is_edge=False), 
+                            "B":Parameter(units="[cm^3 / s]", is_edge=False), "Tau_N":Parameter(units="[ns]", is_edge=False), 
+                            "Tau_P":Parameter(units="[ns]", is_edge=False), "Sf":Parameter(units="[cm / s]", is_edge=False), 
+                            "Sb":Parameter(units="[cm / s]", is_edge=False), "Temperature":Parameter(units="[K]", is_edge=True), 
+                            "Rel-Permitivity":Parameter(units="", is_edge=True), "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
+                            "Theta":Parameter(units="[cm^-1]", is_edge=False), "Alpha":Parameter(units="[cm^-1]", is_edge=False), 
+                            "Delta":Parameter(units="", is_edge=False), "Frac-Emitted":Parameter(units="", is_edge=False),
+                            "deltaN":Parameter(units="[cm^-3]", is_edge=False), "deltaP":Parameter(units="[cm^-3]", is_edge=False), 
+                            "E_field":Parameter(units="[WIP]", is_edge=True), "Ec":Parameter(units="[WIP]", is_edge=True),
+                            "electron_affinity":Parameter(units="[WIP]", is_edge=True)}
 
         self.param_count = len(self.param_dict)
         # This tells TEDs what flags there will be and their 'layman's name' shown on the interface as,
@@ -101,7 +115,19 @@ class Nanowire:
         self.flags_dict = {"ignore_alpha":"Ignore Photon Recycle",
                            "symmetric_system":"Symmetric System"}
         
+        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False), 
+                                        "P":Output("P", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False), 
+                                        "E_field":Output("Electric Field", units="[WIP]", is_edge=True, is_calculated=False,is_integrated=False)}
         
+        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", is_edge=False, is_calculated=True,is_integrated=False),
+                                         "deltaP":Output("delta_P", units="[cm^-3]", is_edge=False, is_calculated=True,is_integrated=False),
+                                         "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", is_edge=False, is_calculated=True,is_integrated=False),
+                                         "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", is_edge=False, is_calculated=True,is_integrated=False),
+                                         "PL":Output("TRPL", units="[WIP]", is_edge=False, is_calculated=True,is_integrated=True),
+                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", is_edge=False, is_calculated=True,is_integrated=True)}
+        
+        self.simulation_outputs_count = len(self.simulation_outputs_dict)
+        self.calculated_outputs_count = len(self.calculated_outputs_dict)
         
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
@@ -115,8 +141,8 @@ class Nanowire:
                                 "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
                                 "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
                                 "Delta": 1, "Frac-Emitted": 1,
-                                "init_deltaN": ((1e-7) ** 3), "init_deltaP": ((1e-7) ** 3),
-                                "init_E_field": 1, "Ec": 1, "electron_affinity": 1,
+                                "deltaN": ((1e-7) ** 3), "deltaP": ((1e-7) ** 3),
+                                "Ec": 1, "electron_affinity": 1,
                                 "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
                                 "E_field": 1, 
                                 "tau_diff": 1}
@@ -1422,11 +1448,11 @@ class Notebook:
 
             # Contextually-dependent options for batchable params
             self.batchables_array = []
-            batchable_params = [param for param in self.nanowire.param_dict if not (self.using_AIC and (param == "init_deltaN" or param == "init_deltaP"))]
+            batchable_params = [param for param in self.nanowire.param_dict if not (self.using_AIC and (param == "deltaN" or param == "deltaP"))]
             
             if self.using_AIC:
                 
-                self.AIC_instruction1 = tk.Message(self.batch_popup, text="Additional options for generating init_deltaN and init_deltaP batches " +
+                self.AIC_instruction1 = tk.Message(self.batch_popup, text="Additional options for generating deltaN and deltaP batches " +
                                                   "are available when using the Analytical Initial Condition tool", width=300)
                 self.AIC_instruction1.grid(row=4,column=0)
                 
@@ -2043,9 +2069,9 @@ class Notebook:
                     param_dict_copy = dict(active_sets[key].params_dict)
 
                     node_x = active_sets[key].node_x
-                    param_dict_copy["init_deltaN"] = self.read_N(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
-                    param_dict_copy["init_deltaP"] = self.read_P(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
-                    param_dict_copy["init_E_field"] = self.read_E_field(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
+                    param_dict_copy["deltaN"] = self.read_N(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
+                    param_dict_copy["deltaP"] = self.read_P(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
+                    param_dict_copy["E_field"] = self.read_E_field(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
 
                     with open(new_filename + ".txt", "w+") as ofstream:
                         ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
@@ -2803,9 +2829,9 @@ class Notebook:
 
             # The three true initial conditions for our three coupled ODEs
             # N = N0 + delta_N
-            self.init_N = (self.nanowire.param_dict["N0"].value + self.nanowire.param_dict["init_deltaN"].value) * self.convert_in_dict["N"]
-            self.init_P = (self.nanowire.param_dict["P0"].value + self.nanowire.param_dict["init_deltaP"].value) * self.convert_in_dict["P"]
-            self.init_E_field = self.nanowire.param_dict["init_E_field"].value * self.convert_in_dict["E_field"]
+            self.init_N = (self.nanowire.param_dict["N0"].value + self.nanowire.param_dict["deltaN"].value) * self.convert_in_dict["N"]
+            self.init_P = (self.nanowire.param_dict["P0"].value + self.nanowire.param_dict["deltaP"].value) * self.convert_in_dict["P"]
+            self.init_E_field = self.nanowire.param_dict["E_field"].value * self.convert_in_dict["E_field"]
             # "Typecast" single values to uniform arrays
             if not isinstance(self.init_N, np.ndarray):
                 self.init_N = np.ones(self.nanowire.grid_x_nodes.__len__()) * self.init_N
@@ -3306,10 +3332,10 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-        # Remove all param_rules for init_deltaN and init_deltaP, as we will be reassigning them shortly.
-        self.paramtoolkit_currentparam = "init_deltaN"
+        # Remove all param_rules for deltaN and deltaP, as we will be reassigning them shortly.
+        self.paramtoolkit_currentparam = "deltaN"
         self.deleteall_paramrule()
-        self.paramtoolkit_currentparam = "init_deltaP"
+        self.paramtoolkit_currentparam = "deltaP"
         self.deleteall_paramrule()
 
         # Establish constants; calculate alpha
@@ -3377,7 +3403,7 @@ class Notebook:
                     return
 
             # Note: add_AIC() automatically converts into TEDs units. For consistency add_AIC should really deposit values in common units.
-            self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
+            self.nanowire.param_dict["deltaN"].value = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
@@ -3399,7 +3425,7 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_powerdensity(power_density, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
+            self.nanowire.param_dict["deltaN"].value = finite.pulse_laser_powerdensity(power_density, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
@@ -3407,7 +3433,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
-            self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_maxgen(max_gen, alpha_nm, self.nanowire.grid_x_nodes)
+            self.nanowire.param_dict["deltaN"].value = finite.pulse_laser_maxgen(max_gen, alpha_nm, self.nanowire.grid_x_nodes)
         
 
         elif (AIC_options["power_mode"] == "total-gen"):
@@ -3416,7 +3442,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
-            self.nanowire.param_dict["init_deltaN"].value = finite.pulse_laser_totalgen(total_gen, self.nanowire.total_length, alpha_nm, self.nanowire.grid_x_nodes)
+            self.nanowire.param_dict["deltaN"].value = finite.pulse_laser_totalgen(total_gen, self.nanowire.total_length, alpha_nm, self.nanowire.grid_x_nodes)
         
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
@@ -3424,14 +3450,14 @@ class Notebook:
         
         
         ## TODO: Make AIC deposit in common units, so this patch isn't required
-        self.nanowire.param_dict["init_deltaN"].value *= self.convert_out_dict["init_deltaN"]
+        self.nanowire.param_dict["deltaN"].value *= self.convert_out_dict["deltaN"]
         ## Assuming that the initial distributions of holes and electrons are identical
-        self.nanowire.param_dict["init_deltaP"].value = self.nanowire.param_dict["init_deltaN"].value
+        self.nanowire.param_dict["deltaP"].value = self.nanowire.param_dict["deltaN"].value
 
         self.update_IC_plot(plot_ID="AIC")
-        self.paramtoolkit_currentparam = "init_deltaN"
+        self.paramtoolkit_currentparam = "deltaN"
         self.update_IC_plot(plot_ID="custom")
-        self.paramtoolkit_currentparam = "init_deltaP"
+        self.paramtoolkit_currentparam = "deltaP"
         self.update_IC_plot(plot_ID="recent")
         self.using_AIC = True
         return
@@ -3525,7 +3551,7 @@ class Notebook:
         self.paramtoolkit_viewer_selection.set(new_param_name)
         self.update_paramrule_listbox(new_param_name)
 
-        if new_param_name == "init_deltaN" or new_param_name == "init_deltaP": self.using_AIC = False
+        if new_param_name == "deltaN" or new_param_name == "deltaP": self.using_AIC = False
         self.update_IC_plot(plot_ID="recent")
         return
 
@@ -3699,7 +3725,7 @@ class Notebook:
                     temp_IC_values[j] = 0
                     warning_flag = True
                 
-        if var == "init_deltaN" or var == "init_deltaP": self.using_AIC = False
+        if var == "deltaN" or var == "deltaP": self.using_AIC = False
         
         self.paramtoolkit_currentparam = var
         self.deleteall_paramrule()
@@ -3719,7 +3745,7 @@ class Notebook:
         plot.cla()
         plot.set_yscale('log')
 
-        if plot_ID=="AIC": param_name="init_deltaN"
+        if plot_ID=="AIC": param_name="deltaN"
         else: param_name = self.paramtoolkit_currentparam
         
         param_obj = self.nanowire.param_dict[param_name]
