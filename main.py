@@ -236,6 +236,24 @@ class Nanowire:
 
         return mssg
     
+    def calc_inits(self):
+        # The three true initial conditions for our three coupled ODEs
+        # N = N0 + delta_N
+        init_N = (self.param_dict["N0"].value + self.param_dict["deltaN"].value) * self.convert_in_dict["N"]
+        init_P = (self.param_dict["P0"].value + self.param_dict["deltaP"].value) * self.convert_in_dict["P"]
+        init_E_field = self.param_dict["E_field"].value * self.convert_in_dict["E_field"]
+        # "Typecast" single values to uniform arrays
+        if not isinstance(init_N, np.ndarray):
+            init_N = np.ones(self.grid_x_nodes.__len__()) * init_N
+            
+        if not isinstance(init_P, np.ndarray):
+            init_P = np.ones(self.grid_x_nodes.__len__()) * init_P
+            
+        if not isinstance(init_E_field, np.ndarray):
+            init_E_field = np.ones(self.grid_x_edges.__len__()) * init_E_field
+        
+        return {"N":init_N, "P":init_P, "E_field":init_E_field}
+    
 class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
     # but we interact with the checkbutton using the actual tk.CheckButton() element
@@ -488,9 +506,9 @@ class Notebook:
         self.active_paramrule_list = []
         self.paramtoolkit_currentparam = ""
         self.IC_file_list = None
-        self.init_N = None
-        self.init_P = None
-        self.init_E_field = None
+        # self.init_N = None
+        # self.init_P = None
+        # self.init_E_field = None
         self.IC_file_name = ""
         self.using_AIC = False
 
@@ -2827,21 +2845,8 @@ class Notebook:
             for param in self.nanowire.param_dict:
                 temp_sim_dict[param] = self.nanowire.param_dict[param].value * self.convert_in_dict[param]
 
-            # The three true initial conditions for our three coupled ODEs
-            # N = N0 + delta_N
-            self.init_N = (self.nanowire.param_dict["N0"].value + self.nanowire.param_dict["deltaN"].value) * self.convert_in_dict["N"]
-            self.init_P = (self.nanowire.param_dict["P0"].value + self.nanowire.param_dict["deltaP"].value) * self.convert_in_dict["P"]
-            self.init_E_field = self.nanowire.param_dict["E_field"].value * self.convert_in_dict["E_field"]
-            # "Typecast" single values to uniform arrays
-            if not isinstance(self.init_N, np.ndarray):
-                self.init_N = np.ones(self.nanowire.grid_x_nodes.__len__()) * self.init_N
-                
-            if not isinstance(self.init_P, np.ndarray):
-                self.init_P = np.ones(self.nanowire.grid_x_nodes.__len__()) * self.init_P
-                
-            if not isinstance(self.init_E_field, np.ndarray):
-                self.init_E_field = np.ones(self.nanowire.grid_x_edges.__len__()) * self.init_E_field
-        
+            init_conditions = self.nanowire.calc_inits()
+            
         except ValueError:
             print("Error: Invalid parameters for {}".format(data_file_name))
             self.error_states.append(data_file_name)
@@ -2887,15 +2892,15 @@ class Notebook:
             array_N = ofstream_N.create_earray(ofstream_N.root, "N", atom, (0, self.m))
             array_P = ofstream_P.create_earray(ofstream_P.root, "P", atom, (0, self.m))
             array_E_field = ofstream_E_field.create_earray(ofstream_E_field.root, "E_field", atom, (0, self.m+1))
-            array_N.append(np.reshape(self.init_N, (1, self.m)))
-            array_P.append(np.reshape(self.init_P, (1, self.m)))
-            array_E_field.append(np.reshape(self.init_E_field, (1, self.m + 1)))
+            array_N.append(np.reshape(init_conditions["N"], (1, self.m)))
+            array_P.append(np.reshape(init_conditions["P"], (1, self.m)))
+            array_E_field.append(np.reshape(init_conditions["E_field"], (1, self.m + 1)))
         
         ## Setup simulation plots and plot initial
         
-        self.sim_N = self.init_N
-        self.sim_P = self.init_P
-        self.sim_E_field = self.init_E_field
+        self.sim_N = init_conditions["N"]
+        self.sim_P = init_conditions["P"]
+        self.sim_E_field = init_conditions["E_field"]
         self.update_sim_plots(0)
 
         numTimeStepsDone = 0
@@ -2905,8 +2910,8 @@ class Notebook:
         # This mode can be disabled by inputting numPartitions = 1.
         #for i in range(1, self.numPartitions):
             
-        #    #finite.simulate_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, self.max_iter, self.init_N, self.init_P, self.init_E_field)
-        #    finite.ode_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, self.init_N, self.init_P, self.init_E_field)
+        #    #finite.simulate_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, self.max_iter, init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
+        #    finite.ode_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
 
         #    numTimeStepsDone += int(self.n / self.numPartitions)
         #    self.write(self.status, "Calculations {:.1f}% complete".format(100 * i / self.numPartitions))
@@ -2915,9 +2920,9 @@ class Notebook:
         #    with tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-n.h5", mode='r') as ifstream_N, \
         #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-p.h5", mode='r') as ifstream_P, \
         #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-E_field.h5", mode='r') as ifstream_E_field:
-        #        self.init_N = ifstream_N.root.N[-1]
-        #        self.init_P = ifstream_P.root.P[-1]
-        #        self.init_E_field = ifstream_E_field.root.E_field[-1]
+        #        init_conditions["N"] = ifstream_N.root.N[-1]
+        #        init_conditions["P"] = ifstream_P.root.P[-1]
+        #        init_conditions["E_field"] = ifstream_E_field.root.E_field[-1]
 
 
         #    self.update_sim_plots(int(self.n * i / self.numPartitions), self.numPartitions > 20)
@@ -2928,7 +2933,7 @@ class Notebook:
         try:
             error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict,
                                              not self.sys_flag_dict['ignore_alpha'].value(), self.sys_flag_dict['symmetric_system'].value(), self.check_do_ss.get(), write_output,
-                                             self.init_N, self.init_P, self.init_E_field)
+                                             init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
         except FloatingPointError:
             print("Error: an unusual value occurred while simulating {}".format(data_file_name))
             self.error_states.append(data_file_name)
