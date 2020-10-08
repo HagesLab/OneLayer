@@ -89,6 +89,8 @@ class Output(Characteristic):
 
 class Nanowire:
     # A Nanowire object contains all information regarding the initial state of a nanowire
+    # All such state classes must uniquely define a param_dict, flags_dict, simulation_outputs_dict,
+    # convert_in_dict, and calc_inits()
     def __init__(self):
         self.total_length = -1
         self.dx = -1
@@ -114,11 +116,14 @@ class Nanowire:
 
         self.flags_dict = {"ignore_alpha":"Ignore Photon Recycle",
                            "symmetric_system":"Symmetric System"}
-        
+
+        # List of all variables active during the finite difference simulating        
+        # calc_inits() must return values for each of these or an error will be raised!
         self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False), 
                                         "P":Output("P", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False), 
                                         "E_field":Output("Electric Field", units="[WIP]", is_edge=True, is_calculated=False,is_integrated=False)}
         
+        # List of all variables calculated from those in simulation_outputs_dict
         self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", is_edge=False, is_calculated=True,is_integrated=False),
                                          "deltaP":Output("delta_P", units="[cm^-3]", is_edge=False, is_calculated=True,is_integrated=False),
                                          "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", is_edge=False, is_calculated=True,is_integrated=False),
@@ -506,9 +511,6 @@ class Notebook:
         self.active_paramrule_list = []
         self.paramtoolkit_currentparam = ""
         self.IC_file_list = None
-        # self.init_N = None
-        # self.init_P = None
-        # self.init_E_field = None
         self.IC_file_name = ""
         self.using_AIC = False
 
@@ -2847,8 +2849,17 @@ class Notebook:
 
             init_conditions = self.nanowire.calc_inits()
             
+            for variable in self.nanowire.simulation_outputs_dict:
+                if not variable in init_conditions:
+                    raise KeyError
+            
         except ValueError:
             print("Error: Invalid parameters for {}".format(data_file_name))
+            self.error_states.append(data_file_name)
+            return
+        
+        except KeyError:
+            print("Error: Nanowire() calc_inits() did not return values for all simulation output variables")
             self.error_states.append(data_file_name)
             return
 
@@ -2886,15 +2897,12 @@ class Notebook:
         atom = tables.Float64Atom()
 
         ## Create data files
-        with tables.open_file(full_path_name + "\\" + data_file_name + "-n.h5", mode='w') as ofstream_N, \
-            tables.open_file(full_path_name + "\\" + data_file_name + "-p.h5", mode='w') as ofstream_P, \
-            tables.open_file(full_path_name + "\\" + data_file_name + "-E_field.h5", mode='w') as ofstream_E_field:
-            array_N = ofstream_N.create_earray(ofstream_N.root, "N", atom, (0, self.m))
-            array_P = ofstream_P.create_earray(ofstream_P.root, "P", atom, (0, self.m))
-            array_E_field = ofstream_E_field.create_earray(ofstream_E_field.root, "E_field", atom, (0, self.m+1))
-            array_N.append(np.reshape(init_conditions["N"], (1, self.m)))
-            array_P.append(np.reshape(init_conditions["P"], (1, self.m)))
-            array_E_field.append(np.reshape(init_conditions["E_field"], (1, self.m + 1)))
+        for variable in self.nanowire.simulation_outputs_dict:
+            with tables.open_file("{}\\{}-{}.h5".format(full_path_name, data_file_name, variable), mode='w') as ofstream:
+                length = self.m if not self.nanowire.simulation_outputs_dict[variable].is_edge else self.m + 1
+
+                earray = ofstream.create_earray(ofstream.root, variable, atom, (0, length))
+                earray.append(np.reshape(init_conditions[variable], (1, length)))
         
         ## Setup simulation plots and plot initial
         

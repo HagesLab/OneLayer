@@ -185,8 +185,8 @@ def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, params, recycle_p
     if write_output:
         ## Prep output files
 
-        with tables.open_file(full_path_name + "\\" + file_name_base + "-n.h5", mode='a') as ofstream_N, \
-            tables.open_file(full_path_name + "\\" + file_name_base + "-p.h5", mode='a') as ofstream_P, \
+        with tables.open_file(full_path_name + "\\" + file_name_base + "-N.h5", mode='a') as ofstream_N, \
+            tables.open_file(full_path_name + "\\" + file_name_base + "-P.h5", mode='a') as ofstream_P, \
             tables.open_file(full_path_name + "\\" + file_name_base + "-E_field.h5", mode='a') as ofstream_E_field:
             array_N = ofstream_N.root.N
             array_P = ofstream_P.root.P
