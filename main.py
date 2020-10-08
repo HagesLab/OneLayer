@@ -79,11 +79,13 @@ class Parameter(Characteristic):
     
 class Output(Characteristic):
     
-    def __init__(self, display_name, units, is_edge, is_calculated, is_integrated):
+    def __init__(self, display_name, units, is_edge, is_calculated, is_integrated, yscale='log', yfactors=(1,1)):
         super().__init__(units, is_edge)
         self.display_name = display_name
         self.is_calculated = is_calculated
         self.is_integrated = is_integrated
+        self.yscale = yscale
+        self.yfactors = yfactors
         return
 
 
@@ -119,9 +121,9 @@ class Nanowire:
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False), 
-                                        "P":Output("P", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False), 
-                                        "E_field":Output("Electric Field", units="[WIP]", is_edge=True, is_calculated=False,is_integrated=False)}
+        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
+                                        "P":Output("P", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
+                                        "E_field":Output("Electric Field", units="[WIP]", is_edge=True, is_calculated=False,is_integrated=False, yscale='linear')}
         
         # List of all variables calculated from those in simulation_outputs_dict
         self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", is_edge=False, is_calculated=True,is_integrated=False),
@@ -513,10 +515,6 @@ class Notebook:
         self.IC_file_list = None
         self.IC_file_name = ""
         self.using_AIC = False
-
-        self.sim_N = None
-        self.sim_P = None
-        self.sim_E_field = None
 
         self.carry_include_N = tk.IntVar()
         self.carry_include_P = tk.IntVar()
@@ -1086,10 +1084,17 @@ class Notebook:
         self.subtitle = tk.ttk.Label(self.tab_simulate, text="1-D Carrier Sim (rk4 mtd), with photon propagation")
         self.subtitle.grid(row=0,column=3,columnspan=3)
         
-        self.sim_fig = Figure(figsize=(10,6.2))
-        self.n_subplot = self.sim_fig.add_subplot(221)
-        self.p_subplot = self.sim_fig.add_subplot(222)
-        self.E_subplot = self.sim_fig.add_subplot(223)
+        self.sim_fig = Figure(figsize=(12, 8))
+        count = 1
+        cdim = np.ceil(np.sqrt(self.nanowire.simulation_outputs_count))
+        
+        rdim = np.ceil(self.nanowire.simulation_outputs_count / cdim)
+        self.sim_subplots = {}
+        for variable in self.nanowire.simulation_outputs_dict:
+            self.sim_subplots[variable] = self.sim_fig.add_subplot(rdim, cdim, count)
+            self.sim_subplots[variable].set_title(variable)
+            count += 1
+
         self.sim_canvas = tkagg.FigureCanvasTkAgg(self.sim_fig, master=self.tab_simulate)
         self.sim_plot_widget = self.sim_canvas.get_tk_widget()
         self.sim_plot_widget.grid(row=1,column=3,rowspan=12,columnspan=2)
@@ -1402,7 +1407,6 @@ class Notebook:
             
     def on_sys_param_shortcut_popup_close(self, continue_=False):
         try:
-
             if continue_:
                 changed_params = []
                 for param in self.nanowire.param_dict:
@@ -2253,21 +2257,21 @@ class Notebook:
 
     def read_TS(self, filename, index):
         ## Wrapper function: read a single time step from each of the data files
-        self.sim_N = self.read_N(filename, index)
-        self.sim_P = self.read_P(filename, index)
-        self.sim_E_field = self.read_E_field(filename, index)
+        self.sim_data["N"] = self.read_N(filename, index)
+        self.sim_data["P"] = self.read_P(filename, index)
+        self.sim_data["E_field"] = self.read_E_field(filename, index)
         return
 
     def read_N(self, filename, index):
         ## Read one time step's worth of data from N
-        with tables.open_file(self.default_dirs["Data"] + "\\" + filename + "\\" + filename + "-n.h5", mode='r') as ifstream_N:
+        with tables.open_file(self.default_dirs["Data"] + "\\" + filename + "\\" + filename + "-N.h5", mode='r') as ifstream_N:
             return np.array(ifstream_N.root.N[index])
 
         return
 
     def read_P(self, filename, index):
         ## Read one time step from P
-        with tables.open_file(self.default_dirs["Data"] + "\\" + filename + "\\" + filename + "-p.h5", mode='r') as ifstream_P:
+        with tables.open_file(self.default_dirs["Data"] + "\\" + filename + "\\" + filename + "-P.h5", mode='r') as ifstream_P:
             return np.array(ifstream_P.root.P[index])
 
         return
@@ -2282,38 +2286,35 @@ class Notebook:
     ## Plotter for simulation tab    
     def update_sim_plots(self, index, do_clear_plots=True):
         ## V2: Update plots on Simulate tab
-        ## FIXME: This abomination of 1x3 arrays
-        ## FIXME: Make E-field not log scaled
         
-        # Why + 1e-30?
-        # We want a log-scaled plot, and adding a tiny number to the y limits avoids the edge case of every value being zero.
-        self.N_limits = [np.abs(np.amin(self.sim_N + 1e-30) * 1e-1), np.amax(self.sim_N + 1e-30) * 10]
-        self.P_limits = [np.abs(np.amin(self.sim_P + 1e-30) * 1e-1), np.amax(self.sim_P + 1e-30) * 10]
-        self.E_field_limits = [np.abs(np.amax(self.sim_E_field + 1e-30) * 1e-11), np.amax(self.sim_E_field + 1e-30) * 10]
-
-        
-        plot_list = [self.n_subplot, self.p_subplot, self.E_subplot]
-        plot_ylabels = ["N", "P", "E_field"]
-        plot_yunits = ["[cm^-3]", "[cm^-3]", "WIP"]
-        plot_ylimits = np.array([self.N_limits, self.P_limits, self.E_field_limits])
-        plot_ydata = [self.sim_N, self.sim_P, self.sim_E_field]
-        plot_xdata = [self.nanowire.grid_x_nodes, self.nanowire.grid_x_nodes, self.nanowire.grid_x_edges]
-        
-        for i in range(plot_list.__len__()):
+        for variable, output_obj in self.nanowire.simulation_outputs_dict.items():
             
-            plot = plot_list[i]
+            plot = self.sim_subplots[variable]
             
-            if do_clear_plots: plot.cla()
-        
-            plot.set_ylim(plot_ylimits[i,0] * self.convert_out_dict[plot_ylabels[i]], plot_ylimits[i,1] * self.convert_out_dict[plot_ylabels[i]])
-            plot.set_yscale('log')
+            if do_clear_plots: 
+                plot.cla()
 
-            plot.plot(plot_xdata[i], plot_ydata[i] * self.convert_out_dict[plot_ylabels[i]])
+                if output_obj.yscale == 'log':
+                    # Why + 1e-30?
+                    # We want a log-scaled plot, and adding a tiny number to the y limits avoids the edge case of every value being zero.
+                    ymin = np.amin(self.sim_data[variable] + 1e-30) * output_obj.yfactors[0]
+                    ymax = np.amax(self.sim_data[variable] + 1e-30) * output_obj.yfactors[1]
+                    
+                else:
+                    ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
+                    ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
+                plot.set_ylim(ymin * self.convert_out_dict[variable], ymax * self.convert_out_dict[variable])
+
+            plot.set_yscale(output_obj.yscale)
+            
+            grid_x = self.nanowire.grid_x_nodes if not output_obj.is_edge else self.nanowire.grid_x_edges
+            plot.plot(grid_x, self.sim_data[variable] * self.convert_out_dict[variable])
 
             plot.set_xlabel("x [nm]")
-            plot.set_ylabel("{} {}".format(plot_ylabels[i], plot_yunits[i]))
+            plot.set_ylabel("{} {}".format(variable, output_obj.units))
 
             plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
+            
         self.sim_fig.tight_layout()
         self.sim_fig.canvas.draw()
         return
@@ -2906,9 +2907,7 @@ class Notebook:
         
         ## Setup simulation plots and plot initial
         
-        self.sim_N = init_conditions["N"]
-        self.sim_P = init_conditions["P"]
-        self.sim_E_field = init_conditions["E_field"]
+        self.sim_data = dict(init_conditions)
         self.update_sim_plots(0)
 
         numTimeStepsDone = 0
