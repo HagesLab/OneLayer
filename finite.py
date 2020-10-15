@@ -113,7 +113,7 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmi
     combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * (weight + lf_weight)
     return combined_weight
 
-def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, params, recycle_photons=True, symmetric=True, do_ss=False, write_output=True, init_N=0, init_P=0, init_E_field=0):
+def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, symmetric=True, do_ss=False, write_output=True, init_N=0, init_P=0, init_E_field=0):
     ## Problem statement:
     # Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
     # Space step size is dx, time step is dt
@@ -185,12 +185,12 @@ def ode_nanowire(full_path_name, file_name_base, m, n, dx, dt, params, recycle_p
     if write_output:
         ## Prep output files
 
-        with tables.open_file(full_path_name + "\\" + file_name_base + "-N.h5", mode='a') as ofstream_N, \
-            tables.open_file(full_path_name + "\\" + file_name_base + "-P.h5", mode='a') as ofstream_P, \
-            tables.open_file(full_path_name + "\\" + file_name_base + "-E_field.h5", mode='a') as ofstream_E_field:
-            array_N = ofstream_N.root.N
-            array_P = ofstream_P.root.P
-            array_E_field = ofstream_E_field.root.E_field
+        with tables.open_file(data_path_name + "-N.h5", mode='a') as ofstream_N, \
+            tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P, \
+            tables.open_file(data_path_name + "-E_field.h5", mode='a') as ofstream_E_field:
+            array_N = ofstream_N.root.data
+            array_P = ofstream_P.root.data
+            array_E_field = ofstream_E_field.root.data
 
             ## Do n time steps
             tSteps = np.linspace(0, n*dt, n+1)
@@ -273,8 +273,7 @@ def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alp
     if radrec_fromfile:
         with tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
-            radRec = radiative_recombination(np.array(ifstream_N.root.N), np.array(ifstream_P.root.P), B, n0, p0)
-            #radRec = B * ((np.array(ifstream_N.root.N)) * (np.array(ifstream_P.root.P)) - n0 * p0)
+            radRec = radiative_recombination(np.array(ifstream_N.root.data), np.array(ifstream_P.root.data), B, n0, p0)
 
     else:
         radRec = rad_rec

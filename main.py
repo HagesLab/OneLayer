@@ -261,6 +261,12 @@ class Nanowire:
         
         return {"N":init_N, "P":init_P, "E_field":init_E_field}
     
+    def simulate(self, data_path, m, n, dt, params, flags, do_ss, init_conditions, write_output):
+        # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from finite.py with the correct args
+        return finite.ode_nanowire(data_path, m, n, self.dx, dt, params,
+                                    not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), do_ss, write_output,
+                                    init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
+    
 class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
     # but we interact with the checkbutton using the actual tk.CheckButton() element
@@ -575,7 +581,7 @@ class Notebook:
         self.add_tab_simulate()
         self.add_tab_analyze()
         self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_selected)
-        self.tab_inputs.bind("<<NotebookTabChanged>>", self.on_input_subtab_selected)
+        #self.tab_inputs.bind("<<NotebookTabChanged>>", self.on_input_subtab_selected)
 
         print("Initialization complete")
         print("Detecting Initial Condition and Data Directories...")
@@ -2093,9 +2099,9 @@ class Notebook:
                     param_dict_copy = dict(active_sets[key].params_dict)
 
                     node_x = active_sets[key].node_x
-                    param_dict_copy["deltaN"] = self.read_N(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
-                    param_dict_copy["deltaP"] = self.read_P(active_sets[key].filename, active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
-                    param_dict_copy["E_field"] = self.read_E_field(active_sets[key].filename, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
+                    param_dict_copy["deltaN"] = self.read_TS(active_sets[key].filename, "N", active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
+                    param_dict_copy["deltaP"] = self.read_TS(active_sets[key].filename, "P", active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
+                    param_dict_copy["E_field"] = self.read_TS(active_sets[key].filename, "E_field", active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
 
                     with open(new_filename + ".txt", "w+") as ofstream:
                         ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
@@ -2255,33 +2261,10 @@ class Notebook:
         return
     ## Data File Readers for simulation and analysis tabs
 
-    def read_TS(self, filename, index):
-        ## Wrapper function: read a single time step from each of the data files
-        self.sim_data["N"] = self.read_N(filename, index)
-        self.sim_data["P"] = self.read_P(filename, index)
-        self.sim_data["E_field"] = self.read_E_field(filename, index)
-        return
-
-    def read_N(self, filename, index):
-        ## Read one time step's worth of data from N
-        with tables.open_file(self.default_dirs["Data"] + "\\" + filename + "\\" + filename + "-N.h5", mode='r') as ifstream_N:
-            return np.array(ifstream_N.root.N[index])
-
-        return
-
-    def read_P(self, filename, index):
-        ## Read one time step from P
-        with tables.open_file(self.default_dirs["Data"] + "\\" + filename + "\\" + filename + "-P.h5", mode='r') as ifstream_P:
-            return np.array(ifstream_P.root.P[index])
-
-        return
-
-    def read_E_field(self, filename, index):
-        ## Read one TS from E-Field
-        with tables.open_file(self.default_dirs["Data"] + "\\" + filename + "\\" + filename + "-E_field.h5", mode='r') as ifstream_E_field:
-            return np.array(ifstream_E_field.root.E_field[index])
-
-        return
+    def read_TS(self, filename, var, index):
+        ## Read one time step's worth of data from a particular variable
+        with tables.open_file("{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], filename, filename, var), mode='r') as ifstream:
+            return np.array(ifstream.root.data[index])
 
     ## Plotter for simulation tab    
     def update_sim_plots(self, index, do_clear_plots=True):
@@ -2386,9 +2369,9 @@ class Notebook:
         self.overview_subplot_taudiff.set_title("-(dln(PL)/dt)^-1")
         
         for i in range(len(tstep_list)):
-            n_list = self.read_N(data_filename, tstep_list[i])
-            p_list = self.read_P(data_filename, tstep_list[i])
-            efield_list = self.read_E_field(data_filename, tstep_list[i])
+            n_list = self.read_TS(data_filename, "N", tstep_list[i])
+            p_list = self.read_TS(data_filename, "P", tstep_list[i])
+            efield_list = self.read_TS(data_filename, "E_field", tstep_list[i])
         
             self.overview_subplot_n.plot(data_node_x, n_list * self.convert_out_dict['N'], label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
             self.overview_subplot_p.plot(data_node_x, p_list * self.convert_out_dict['P'])
@@ -2497,7 +2480,7 @@ class Notebook:
         if (datatype == "N"):
             try:
                 # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
-                new_data = Raw_Data_Set(self.read_N(data_filename, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_TS(data_filename, "N", active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
@@ -2505,7 +2488,7 @@ class Notebook:
 
         elif (datatype == "P"):
             try:
-                new_data = Raw_Data_Set(self.read_P(data_filename, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_TS(data_filename, "P", active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
@@ -2513,7 +2496,7 @@ class Notebook:
 
         elif (datatype == "E_field"):
             try:
-                new_data = Raw_Data_Set(self.read_E_field(data_filename, active_show_index), data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(self.read_TS(data_filename, "E_field", active_show_index), data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
@@ -2521,8 +2504,8 @@ class Notebook:
         
         elif (datatype == "RR"):
             try:
-                temp_N = self.read_N(data_filename, active_show_index)
-                temp_P = self.read_P(data_filename, active_show_index)
+                temp_N = self.read_TS(data_filename, "N", active_show_index)
+                temp_P = self.read_TS(data_filename, "P", active_show_index)
                 new_data = Raw_Data_Set(finite.radiative_recombination(temp_N, temp_P, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"]), 
                                     data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
@@ -2532,8 +2515,8 @@ class Notebook:
 
         elif (datatype == "NRR"):
             try:
-                temp_N = self.read_N(data_filename, active_show_index)
-                temp_P = self.read_P(data_filename, active_show_index)
+                temp_N = self.read_TS(data_filename, "N", active_show_index)
+                temp_P = self.read_TS(data_filename, "P", active_show_index)
                 new_data = Raw_Data_Set(finite.nonradiative_recombination(temp_N, temp_P, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"]),  
                                     data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
@@ -2543,8 +2526,8 @@ class Notebook:
 
         elif (datatype == "PL"):
             try:
-                temp_N = self.read_N(data_filename, active_show_index)
-                temp_P = self.read_P(data_filename, active_show_index)
+                temp_N = self.read_TS(data_filename, "N", active_show_index)
+                temp_P = self.read_TS(data_filename, "P", active_show_index)
                 
                 rad_rec = finite.radiative_recombination(temp_N, temp_P, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"])
 
@@ -2651,23 +2634,23 @@ class Notebook:
         # Search data files for data at new time step
         if active_datagroup.type == "N":
             for tag in active_datagroup.datasets:
-                active_datagroup.datasets[tag].data = self.read_N(active_datagroup.datasets[tag].filename, active_show_index)
+                active_datagroup.datasets[tag].data = self.read_TS(active_datagroup.datasets[tag].filename, "N", active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "P":
             for tag in active_datagroup.datasets:
-                active_datagroup.datasets[tag].data = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
+                active_datagroup.datasets[tag].data = self.read_TS(active_datagroup.datasets[tag].filename, "P", active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "E_field":
             for tag in active_datagroup.datasets:
-                active_datagroup.datasets[tag].data = self.read_E_field(active_datagroup.datasets[tag].filename, active_show_index)
+                active_datagroup.datasets[tag].data = self.read_TS(active_datagroup.datasets[tag].filename, "E_field", active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "RR":
             for tag in active_datagroup.datasets:
-                temp_N = self.read_N(active_datagroup.datasets[tag].filename, active_show_index)
-                temp_P = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
+                temp_N = self.read_TS(active_datagroup.datasets[tag].filename, "N", active_show_index)
+                temp_P = self.read_TS(active_datagroup.datasets[tag].filename, "P", active_show_index)
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 B = active_datagroup.datasets[tag].params_dict["B"]
@@ -2676,8 +2659,8 @@ class Notebook:
 
         elif active_datagroup.type == "NRR":
             for tag in active_datagroup.datasets:
-                temp_N = self.read_N(active_datagroup.datasets[tag].filename, active_show_index)
-                temp_P = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
+                temp_N = self.read_TS(active_datagroup.datasets[tag].filename, "N", active_show_index)
+                temp_P = self.read_TS(active_datagroup.datasets[tag].filename, "P", active_show_index)
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 tauN = active_datagroup.datasets[tag].params_dict["Tau_N"]
@@ -2687,8 +2670,8 @@ class Notebook:
 
         elif active_datagroup.type == "PL":
             for tag in active_datagroup.datasets:
-                temp_N = self.read_N(active_datagroup.datasets[tag].filename, active_show_index)
-                temp_P = self.read_P(active_datagroup.datasets[tag].filename, active_show_index)
+                temp_N = self.read_TS(active_datagroup.datasets[tag].filename, "N", active_show_index)
+                temp_P = self.read_TS(active_datagroup.datasets[tag].filename, "P", active_show_index)
                 B = active_datagroup.datasets[tag].params_dict["B"]
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
@@ -2774,18 +2757,6 @@ class Notebook:
 
         elif (tab_text == "Analyze"):
             print("Analzye tab selected")
-
-        return
-
-    def on_input_subtab_selected(self, event):
-        selected_tab = event.widget.select()
-        tab_text = event.widget.tab(selected_tab, "text")
-
-        if (tab_text == "Analytical Init. Cond."):
-            print("Analytical subtab selected")
-
-        elif (tab_text == "Heuristic Init. Cond."):
-            print("Heuristic subtab selected")
 
         return
 
@@ -2902,7 +2873,9 @@ class Notebook:
             with tables.open_file("{}\\{}-{}.h5".format(full_path_name, data_file_name, variable), mode='w') as ofstream:
                 length = self.m if not self.nanowire.simulation_outputs_dict[variable].is_edge else self.m + 1
 
-                earray = ofstream.create_earray(ofstream.root, variable, atom, (0, length))
+                # Important - "data" must be used as the array name here, as pytables will use the string "data" 
+                # to name the attribute earray.data, which is then used to access the array
+                earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
                 earray.append(np.reshape(init_conditions[variable], (1, length)))
         
         ## Setup simulation plots and plot initial
@@ -2910,7 +2883,7 @@ class Notebook:
         self.sim_data = dict(init_conditions)
         self.update_sim_plots(0)
 
-        numTimeStepsDone = 0
+        # numTimeStepsDone = 0
 
         # WIP: Option for staggered calculate/plot: In this mode the program calculates a block of time steps, plots intermediate (N, P, E), and calculates the next block 
         # using the final time step from the previous block as the initial condition.
@@ -2927,9 +2900,9 @@ class Notebook:
         #    with tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-n.h5", mode='r') as ifstream_N, \
         #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-p.h5", mode='r') as ifstream_P, \
         #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-E_field.h5", mode='r') as ifstream_E_field:
-        #        init_conditions["N"] = ifstream_N.root.N[-1]
-        #        init_conditions["P"] = ifstream_P.root.P[-1]
-        #        init_conditions["E_field"] = ifstream_E_field.root.E_field[-1]
+        #        init_conditions["N"] = ifstream_N.root.data[-1]
+        #        init_conditions["P"] = ifstream_P.root.data[-1]
+        #        init_conditions["E_field"] = ifstream_E_field.root.data[-1]
 
 
         #    self.update_sim_plots(int(self.n * i / self.numPartitions), self.numPartitions > 20)
@@ -2938,9 +2911,9 @@ class Notebook:
         write_output = True
 
         try:
-            error_dict = finite.ode_nanowire(full_path_name,data_file_name,self.m,self.n - numTimeStepsDone,self.nanowire.dx,self.dt, temp_sim_dict,
-                                             not self.sys_flag_dict['ignore_alpha'].value(), self.sys_flag_dict['symmetric_system'].value(), self.check_do_ss.get(), write_output,
-                                             init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
+            error_dict = self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), self.m, self.n, self.dt, 
+                                                temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), init_conditions, write_output)
+            
         except FloatingPointError:
             print("Error: an unusual value occurred while simulating {}".format(data_file_name))
             self.error_states.append(data_file_name)
@@ -2957,11 +2930,9 @@ class Notebook:
         
         self.write(self.status, "Finalizing...")
 
-        #self.read_TS(self.n)
-        #self.update_sim_plots(self.n, self.numPartitions > 20)
-
         for i in range(1,6):
-            self.read_TS(data_file_name, int(self.n * i / 5))
+            for var in self.sim_data:
+                self.sim_data[var] = self.read_TS(data_file_name, var, int(self.n * i / 5))
             self.update_sim_plots(self.n, do_clear_plots=False)
 
         # Save metadata: list of param values used for the simulation
@@ -3094,7 +3065,7 @@ class Notebook:
 
                 if (datatype == "N"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
-                        data = ifstream_N.root.N
+                        data = ifstream_N.root.data
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
@@ -3103,7 +3074,7 @@ class Notebook:
             
                 elif (datatype == "P"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                        data = ifstream_P.root.P
+                        data = ifstream_P.root.data
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
@@ -3112,7 +3083,7 @@ class Notebook:
 
                 elif (datatype == "E_field"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
-                        data = ifstream_E_field.root.E_field
+                        data = ifstream_E_field.root.data
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
@@ -3122,8 +3093,8 @@ class Notebook:
                 elif (datatype == "RR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
                         tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                        temp_N = np.array(ifstream_N.root.N)
-                        temp_P = np.array(ifstream_P.root.P)
+                        temp_N = np.array(ifstream_N.root.data)
+                        temp_P = np.array(ifstream_P.root.data)
 
                         data = finite.radiative_recombination(temp_N, temp_P, B_param, n0, p0)
                         if include_negative:
@@ -3135,8 +3106,8 @@ class Notebook:
                 elif (datatype == "NRR"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
                         tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                        temp_N = np.array(ifstream_N.root.N)
-                        temp_P = np.array(ifstream_P.root.P)
+                        temp_N = np.array(ifstream_N.root.data)
+                        temp_P = np.array(ifstream_P.root.data)
                         data = finite.nonradiative_recombination(temp_N,temp_P, n0, p0, tauN, tauP)
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
