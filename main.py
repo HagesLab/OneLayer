@@ -94,6 +94,7 @@ class Nanowire:
     # All such state classes must uniquely define a param_dict, flags_dict, simulation_outputs_dict,
     # convert_in_dict, and calc_inits()
     def __init__(self):
+        self.system_ID = "Nanowire"
         self.total_length = -1
         self.dx = -1
         self.grid_x_nodes = -1
@@ -2939,9 +2940,10 @@ class Notebook:
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
 
         with open(full_path_name + "\\metadata.txt", "w+") as ofstream:
-            ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
-            ofstream.write("Total_length: " + str(self.nanowire.total_length) + "\n")
-            ofstream.write("Node_width: " + str(self.nanowire.dx) + "\n")
+            ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON {} AT {}\n".format(datetime.datetime.now().date(),datetime.datetime.now().time()))
+            ofstream.write("System_class: {}\n".format(self.nanowire.system_ID))
+            ofstream.write("Total_length: {}\n".format(self.nanowire.total_length))
+            ofstream.write("Node_width: {}\n".format(self.nanowire.dx))
             
             for param in temp_sim_dict:
                 param_values = temp_sim_dict[param] * self.convert_out_dict[param]
@@ -2955,16 +2957,12 @@ class Notebook:
                     ofstream.write("{}: {}\n".format(param, param_values))
 
             # The following params are exclusive to metadata files
-            ofstream.write("Total-Time: " + str(self.simtime) + "\n")
-            ofstream.write("dt: " + str(self.dt) + "\n")
-            if self.sys_flag_dict['ignore_alpha'].value(): ofstream.write("ignore_alpha: 1\n")
-            else: ofstream.write("ignore_alpha: 0\n")
-
-            if self.sys_flag_dict['symmetric_system'].value(): ofstream.write("symmetric_system: 1\n")
-            else: ofstream.write("symmetric_system: 0\n")
+            ofstream.write("Total-Time: {}\n".format(self.simtime))
+            ofstream.write("dt: {}\n".format(self.dt))
+            for flag in self.sys_flag_dict:
+                ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
             
-            if self.check_do_ss.get(): ofstream.write("steady_state_exc: 1\n")
-            else: ofstream.write("steady_state_exc: 0\n")
+            ofstream.write("steady_state_exc: {}\n".format(self.check_do_ss.get()))
 
         return
 
@@ -3873,6 +3871,7 @@ class Notebook:
 
                 # We don't really need to note down the time of creation, but it could be useful for interaction with other programs.
                 ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
+                ofstream.write("System_class: {}\n".format(self.nanowire.system_ID))
                 ofstream.write("$ Space Grid:\n")
                 ofstream.write("Total_length: {}\n".format(self.nanowire.total_length))
                 ofstream.write("Node_width: {}\n".format(self.nanowire.dx))
@@ -3926,18 +3925,18 @@ class Notebook:
                 dx = 0
 
                 initFlag = 0
-                file_is_valid = False
+                
+                if not ("$$ INITIAL CONDITION FILE CREATED ON") in next(ifstream):
+                    raise OSError("Error: this file is not a valid TEDs file")
+                
+                system_class = next(ifstream).strip('\n')
+                system_class = system_class[system_class.find(' ') + 1:]
+                if not system_class == self.nanowire.system_ID:
+                    raise ValueError("Error: selected file is not a {}".format(self.nanowire.system_ID))
+                                
                 # Extract parameters, ICs
                 for line in ifstream:
-                    # Attempt to determine if loaded file is valid initial condition.
-                    # i.e. if the user mis-clicks on a non-TEDs file
-                    if not(file_is_valid):
-                        if ("$$ INITIAL CONDITION FILE CREATED ON" in line):
-                            file_is_valid = True
-                            continue
-                        else:
-                            raise OSError("Error: unable to read selected file")
-
+                    
                     if ("#" in line) or (line.strip('\n').__len__() == 0):
                         continue
 
@@ -3955,7 +3954,7 @@ class Notebook:
                     elif "$ System Flags" in line:
                         print("Now searching for flag values...")
                         initFlag = 3
-
+                        
                     elif (initFlag == 1):
                         line = line.strip('\n')
                         if line[0:line.find(':')] == "Total_length":
@@ -3967,7 +3966,6 @@ class Notebook:
                     elif (initFlag == 2):
                         line = line.strip('\n')
                         init_param_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
-
 
                     elif (initFlag == 3):
                         line = line.strip('\n')
