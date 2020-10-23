@@ -364,13 +364,11 @@ class Raw_Data_Group(Data_Group):
 
         return
 
-    def build(self):
-        # FIXME: Needs to convert_out data
-        #result = [item for item in self.datasets[key].build() for key in self.datasets]
+    def build(self, convert_out_dict):
         result = []
         for key in self.datasets:
             result.append(self.datasets[key].grid_x)
-            result.append(self.datasets[key].data)
+            result.append(self.datasets[key].data * convert_out_dict[self.type])
         return result
 
     def get_max_x(self):
@@ -603,6 +601,13 @@ class Notebook:
             print("No PL Directory detected; automatically creating...")
         except FileExistsError:
             print("PL Directory detected")
+            
+        print("Checking whether the current system class ({}) has a dedicated data subdirectory...".format(self.nanowire.system_ID))
+        try:
+            os.mkdir(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID)
+            print("No such subdirectory detected; automatically creating...")
+        except FileExistsError:
+            print("Subdirectory detected")
 
         return
 
@@ -1636,7 +1641,7 @@ class Notebook:
             self.data_listbox = tk.Listbox(self.plotter_popup, width=20, height=20, selectmode="extended")
             self.data_listbox.grid(row=2,rowspan=13,column=0)
             self.data_listbox.delete(0,tk.END)
-            self.data_list = [file for file in os.listdir(self.default_dirs["Data"]) if not file.endswith(".txt")]
+            self.data_list = [file for file in os.listdir(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID) if not file.endswith(".txt")]
             self.data_listbox.insert(0,*(self.data_list))
 
             self.plotter_status = tk.Text(self.plotter_popup, width=24,height=2)
@@ -2257,14 +2262,14 @@ class Notebook:
             print("Bayesim popup closed")
             self.bayesim_popup_isopen = False
 
-        except:
+        except FloatingPointError:
             print("Error #601: Failed to close Bayesim popup")
         return
     ## Data File Readers for simulation and analysis tabs
 
     def read_TS(self, filename, var, index):
         ## Read one time step's worth of data from a particular variable
-        with tables.open_file("{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], filename, filename, var), mode='r') as ifstream:
+        with tables.open_file("{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var), mode='r') as ifstream:
             return np.array(ifstream.root.data[index])
 
     ## Plotter for simulation tab    
@@ -2305,12 +2310,17 @@ class Notebook:
     
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
-        with open(self.default_dirs["Data"] + "\\" + data_filename + "\\" + "metadata.txt", "r") as ifstream:
+        with open(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + "metadata.txt", "r") as ifstream:
             param_values_dict = {}
             for line in ifstream:
                 if "$" in line: continue
 
                 elif "#" in line: continue
+            
+                elif "System_class" in line:
+                    system_class = line[line.find(' ') + 1:].strip('\n')
+                    if not (self.nanowire.system_ID == system_class):
+                        raise ValueError
 
                 else:
                     param = line[0:line.find(':')]
@@ -2390,7 +2400,7 @@ class Notebook:
             nrr_list = finite.nonradiative_recombination(n_list, p_list, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"])
             self.overview_subplot_nrr.plot(data_node_x, nrr_list * self.convert_out_dict['NRR'])
         
-        pl_list = finite.propagatingPL(data_filename, 0, param_values_dict["Total_length"], param_values_dict["Node_width"], 0, param_values_dict["Total_length"], 
+        pl_list = finite.propagatingPL(data_dirname, data_filename, 0, param_values_dict["Total_length"], param_values_dict["Node_width"], 0, param_values_dict["Total_length"], 
                                        param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Alpha"], param_values_dict["Theta"], param_values_dict["Delta"],
                                        param_values_dict["Frac-Emitted"], param_values_dict["symmetric_system"])
                 
@@ -2413,13 +2423,13 @@ class Notebook:
             subplot = active_plot_data.plot_obj
             
             if clear_plot: subplot.cla()
-            
+
             subplot.set_yscale(active_plot_data.yaxis_type)
             subplot.set_xscale(active_plot_data.xaxis_type)
             active_datagroup = active_plot_data.datagroup
 
-            # subplot.set_ylim(*active_plot_data.ylim)
-            # subplot.set_xlim(*active_plot_data.xlim)
+            subplot.set_ylim(*active_plot_data.ylim)
+            subplot.set_xlim(*active_plot_data.xlim)
 
             # This data is in TEDs units since we just used it in a calculation - convert back to common units first
             for dataset in active_datagroup.datasets.values():
@@ -2603,9 +2613,9 @@ class Notebook:
             self.read_data(short_filename, plot_ID, do_overlay=True)
 
         
-        #active_plot.xlim = (0, active_plot.datagroup.get_max_x())
-        #max_val = active_plot.datagroup.get_maxval() * self.convert_out_dict[active_plot.datagroup.type]
-        #active_plot.ylim = (max_val * 1e-11, max_val * 10)
+        active_plot.xlim = (0, active_plot.datagroup.get_max_x())
+        max_val = active_plot.datagroup.get_maxval() * self.convert_out_dict[active_plot.datagroup.type]
+        active_plot.ylim = (max_val * 1e-11, max_val * 10)
         active_plot.xaxis_type = 'linear'
         active_plot.yaxis_type = 'log'
         self.plot_analyze(plot_ID, clear_plot=True)
@@ -2800,7 +2810,6 @@ class Notebook:
         return
 
 	# The big function that does all the simulating
-    # TODO: This should belong to Nanowire(), not Notebook()
     def do_Calculate(self):
         ## Setup parameters
         try:
@@ -2842,13 +2851,11 @@ class Notebook:
             return
     
         try:
-
             print("Attempting to create {} data folder".format(data_file_name))
 
-            full_path_name = "{}\\{}".format(self.default_dirs["Data"], data_file_name)
+            full_path_name = "{}\\{}\\{}".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
-            ## TODO: Overwrite warning - alert user when this happens
             if os.path.isdir(full_path_name):
                 print("{} folder already exists; trying alternate name".format(data_file_name))
                 append = 1
@@ -2856,8 +2863,13 @@ class Notebook:
                     append += 1
 
                 full_path_name = "{}({})".format(full_path_name, append)
-                data_file_name = "{}({})".format(data_file_name, append)
+                
+                overwrite_warning_popup = tk.Toplevel(self.root)
+                overwrite_warning_text = tk.ttk.Label(overwrite_warning_popup, text="Overwrite warning - {} already exists in Data directory\nSaving as {} instead".format(data_file_name, full_path_name))
+                overwrite_warning_text.grid(row=0,column=0)
 
+                data_file_name = "{}({})".format(data_file_name, append)
+                
             os.mkdir("{}".format(full_path_name))
 
         except FileExistsError:
@@ -3061,8 +3073,9 @@ class Notebook:
 
                 print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
+                ## TODO: Clean up these filenames
                 if (datatype == "N"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
                         data = ifstream_N.root.data
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
@@ -3071,7 +3084,7 @@ class Notebook:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
             
                 elif (datatype == "P"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         data = ifstream_P.root.data
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
@@ -3080,7 +3093,7 @@ class Notebook:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (datatype == "E_field"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
                         data = ifstream_E_field.root.data
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
@@ -3089,8 +3102,8 @@ class Notebook:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (datatype == "RR"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
-                        tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
+                        tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.data)
                         temp_P = np.array(ifstream_P.root.data)
 
@@ -3102,8 +3115,8 @@ class Notebook:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 elif (datatype == "NRR"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
-                        tables.open_file(self.default_dirs["Data"] + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
+                        tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.data)
                         temp_P = np.array(ifstream_P.root.data)
                         data = finite.nonradiative_recombination(temp_N,temp_P, n0, p0, tauN, tauP)
@@ -3115,10 +3128,10 @@ class Notebook:
 
                 else: # datatype = "PL"
                     if include_negative:
-                        I_data = finite.propagatingPL(data_filename, 0, -l_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag) + \
-                            finite.propagatingPL(data_filename, 0, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
+                        I_data = finite.propagatingPL(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename, data_filename, 0, -l_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag) + \
+                            finite.propagatingPL(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename, data_filename, 0, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
                     else:
-                        I_data = finite.propagatingPL(data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
+                        I_data = finite.propagatingPL(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename, data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
                             
 
                 if self.PL_mode == "Current time step":
@@ -3447,11 +3460,6 @@ class Notebook:
     def add_paramrule(self):
         # V2 update
         # Set the value of one of Nanowire's Parameters
-
-        # TODO: This check may be deprecated
-        if (self.active_paramrule_list.__len__() > 0 and isinstance(self.active_paramrule_list[0], str)):
-            print("Something happened!")
-            self.deleteall_paramrule(False)
 
         try:
             self.set_init_x()
@@ -4073,7 +4081,7 @@ class Notebook:
         else:
             plot_ID = self.active_analysisplot_ID.get()
             if self.analysis_plots[plot_ID].datagroup.size() == 0: return
-            paired_data = self.analysis_plots[plot_ID].datagroup.build()
+            paired_data = self.analysis_plots[plot_ID].datagroup.build(self.convert_out_dict)
             # We need some fancy footwork using itertools to transpose a non-rectangular array
             paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
             header = "".join(["x [nm]," + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
@@ -4106,9 +4114,8 @@ class Notebook:
                     full_data = np.vstack((grid_x, raw_data, unc)).T
                     full_data = pd.DataFrame.from_records(data=full_data,columns=['time', datagroup.type, 'uncertainty'])
                     
-                    #FIXME: dd.save has no visible file overwrite handler
-                    # If the file name already exists, dd.save will simply not save anything
-                    dd.save("{}//{}.h5".format(self.default_dirs["PL"], datagroup.datasets[key].tag()), full_data)
+                    filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
+                    dd.save("{}.h5".format(filename.strip('.h5')), full_data)
 
             elif self.bay_mode.get() == "model":
                 active_bay_params = []
