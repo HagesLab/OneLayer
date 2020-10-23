@@ -268,11 +268,11 @@ def ode_twolayer(m, f, dm, df, thickness_Layer1, thickness_Layer2, z0, dt, total
         eta_UC= PL_Layer2_array / integrated_init_N*100    #[%]
     return
 
-def propagatingPL(file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alphaCof, thetaCof, delta_frac, fracEmitted, symmetric_flag, radrec_fromfile=True, rad_rec=0):
+def propagatingPL(dir_name, file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alphaCof, thetaCof, delta_frac, fracEmitted, symmetric_flag, radrec_fromfile=True, rad_rec=0):
     #note: first dimension of radRec is time, second dimension is space
     if radrec_fromfile:
-        with tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
-            tables.open_file("Data\\" + file_name_base + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
+        with tables.open_file(dir_name + "\\" + file_name_base + "-N.h5", mode='r') as ifstream_N, \
+            tables.open_file(dir_name + "\\" + file_name_base + "-P.h5", mode='r') as ifstream_P:
             radRec = radiative_recombination(np.array(ifstream_N.root.data), np.array(ifstream_P.root.data), B, n0, p0)
 
     else:
