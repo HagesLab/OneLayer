@@ -134,9 +134,11 @@ class Nanowire:
                                          "PL":Output("TRPL", units="[WIP]", is_edge=False, is_calculated=True,is_integrated=True),
                                          "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", is_edge=False, is_calculated=True,is_integrated=True)}
         
+        self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
+        
         self.simulation_outputs_count = len(self.simulation_outputs_dict)
         self.calculated_outputs_count = len(self.calculated_outputs_dict)
-        
+        self.total_outputs_count = self.simulation_outputs_count + self.calculated_outputs_count
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
         self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
@@ -1124,20 +1126,17 @@ class Notebook:
         self.tab_detailed_analysis = tk.ttk.Frame(self.tab_analyze)
         
         self.analyze_overview_fig = Figure(figsize=(15,8))
-        self.overview_subplot_n = self.analyze_overview_fig.add_subplot(331)
-        self.overview_subplot_p = self.analyze_overview_fig.add_subplot(332)
-        self.overview_subplot_efield = self.analyze_overview_fig.add_subplot(333)
-        self.overview_subplot_deltan = self.analyze_overview_fig.add_subplot(334)
-        self.overview_subplot_deltap = self.analyze_overview_fig.add_subplot(335)
-        self.overview_subplot_rr = self.analyze_overview_fig.add_subplot(336)
-        self.overview_subplot_nrr = self.analyze_overview_fig.add_subplot(337)
-        self.overview_subplot_pl = self.analyze_overview_fig.add_subplot(338)
-        self.overview_subplot_taudiff = self.analyze_overview_fig.add_subplot(339)
-        self.overview_subplots = [self.overview_subplot_n, self.overview_subplot_p,
-                                  self.overview_subplot_efield, self.overview_subplot_deltan,
-                                  self.overview_subplot_deltap, self.overview_subplot_rr,
-                                  self.overview_subplot_nrr, self.overview_subplot_pl,
-                                  self.overview_subplot_taudiff]
+        self.overview_subplots = {}
+        count = 1
+        rdim = np.floor(np.sqrt(self.nanowire.total_outputs_count))
+        cdim = np.ceil(self.nanowire.total_outputs_count / rdim)
+        for output in self.nanowire.simulation_outputs_dict:
+            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(rdim, cdim, count)
+            count += 1
+            
+        for output in self.nanowire.calculated_outputs_dict:
+            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(rdim, cdim, count)
+            count += 1
         
         self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.do_overview_analysis)
         self.analyze_overview_button.grid(row=0,column=0)
@@ -2361,55 +2360,46 @@ class Notebook:
             return
         
         for subplot in self.overview_subplots:
-            subplot.cla()
+            plot_obj = self.overview_subplots[subplot]
+            output_info_obj = self.nanowire.outputs_dict[subplot]
+            plot_obj.cla()
+            plot_obj.set_yscale(output_info_obj.yscale)
+            plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
             
-        self.overview_subplot_n.set_xlabel('nm')
-        self.overview_subplot_pl.set_xlabel('ns')
-        self.overview_subplot_n.set_yscale('log')
-        self.overview_subplot_p.set_yscale('log')
-        self.overview_subplot_pl.set_yscale('log')
-        
-        self.overview_subplot_n.set_title("N [cm^-3]")
-        self.overview_subplot_p.set_title("P [cm^-3]")
-        self.overview_subplot_efield.set_title("E-field []")
-        self.overview_subplot_deltan.set_title("delta_N [cm^-3]")
-        self.overview_subplot_deltap.set_title("delta_P [cm^-3]")
-        self.overview_subplot_rr.set_title("Rad. Rec. [cm^-3 s^-1]")
-        self.overview_subplot_nrr.set_title("Non Rad. Rec. [cm^-3 s^-1]")
-        self.overview_subplot_pl.set_title("PL integrated over total length []")
-        self.overview_subplot_taudiff.set_title("-(dln(PL)/dt)^-1")
+        self.overview_subplots["N"].set_xlabel('nm')
+        self.overview_subplots["PL"].set_xlabel('ns')
         
         for i in range(len(tstep_list)):
             n_list = self.read_TS(data_filename, "N", tstep_list[i])
             p_list = self.read_TS(data_filename, "P", tstep_list[i])
             efield_list = self.read_TS(data_filename, "E_field", tstep_list[i])
         
-            self.overview_subplot_n.plot(data_node_x, n_list * self.convert_out_dict['N'], label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
-            self.overview_subplot_p.plot(data_node_x, p_list * self.convert_out_dict['P'])
-            self.overview_subplot_efield.plot(data_edge_x, efield_list * self.convert_out_dict['E_field'])
+            self.overview_subplots["N"].plot(data_node_x, n_list * self.convert_out_dict['N'], label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
+            self.overview_subplots["P"].plot(data_node_x, p_list * self.convert_out_dict['P'])
+            self.overview_subplots["E_field"].plot(data_edge_x, efield_list * self.convert_out_dict['E_field'])
             
             deltan_list = n_list - param_values_dict["N0"]
             deltap_list = p_list - param_values_dict["P0"]
             
-            self.overview_subplot_deltan.plot(data_node_x, deltan_list * self.convert_out_dict['N'])
-            self.overview_subplot_deltap.plot(data_node_x, deltap_list * self.convert_out_dict['P'])
+            self.overview_subplots["deltaN"].plot(data_node_x, deltan_list * self.convert_out_dict['N'])
+            self.overview_subplots["deltaP"].plot(data_node_x, deltap_list * self.convert_out_dict['P'])
         
             rr_list = finite.radiative_recombination(n_list, p_list, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"])
-            self.overview_subplot_rr.plot(data_node_x, rr_list * self.convert_out_dict['RR'])
+            self.overview_subplots["RR"].plot(data_node_x, rr_list * self.convert_out_dict['RR'])
             
             nrr_list = finite.nonradiative_recombination(n_list, p_list, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"])
-            self.overview_subplot_nrr.plot(data_node_x, nrr_list * self.convert_out_dict['NRR'])
+            self.overview_subplots["NRR"].plot(data_node_x, nrr_list * self.convert_out_dict['NRR'])
         
         pl_list = finite.propagatingPL(data_dirname, data_filename, 0, param_values_dict["Total_length"], param_values_dict["Node_width"], 0, param_values_dict["Total_length"], 
                                        param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Alpha"], param_values_dict["Theta"], param_values_dict["Delta"],
                                        param_values_dict["Frac-Emitted"], param_values_dict["symmetric_system"])
                 
-        self.overview_subplot_pl.plot(data_node_t, pl_list * self.convert_out_dict['PL'])
+        self.overview_subplots["PL"].plot(data_node_t, pl_list * self.convert_out_dict['PL'])
         
         taudiff_list = finite.tau_diff(pl_list, param_values_dict['dt'])
-        self.overview_subplot_taudiff.plot(data_node_t, taudiff_list * self.convert_out_dict['tau_diff'])
+        self.overview_subplots["tau_diff"].plot(data_node_t, taudiff_list * self.convert_out_dict['tau_diff'])
         
-        self.overview_subplot_n.legend().set_draggable(True)
+        self.overview_subplots["N"].legend().set_draggable(True)
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
         return
