@@ -79,13 +79,15 @@ class Parameter(Characteristic):
     
 class Output(Characteristic):
     
-    def __init__(self, display_name, units, is_edge, is_calculated, is_integrated, yscale='log', yfactors=(1,1)):
+    def __init__(self, display_name, units, xlabel, is_edge, is_calculated=False, calc_func=None, is_integrated=False, yscale='log', yfactors=(1,1)):
         super().__init__(units, is_edge)
         self.display_name = display_name
+        self.xlabel = xlabel
         self.is_calculated = is_calculated
         self.is_integrated = is_integrated
         self.yscale = yscale
         self.yfactors = yfactors
+        self.calc_func = calc_func
         return
 
 
@@ -122,17 +124,17 @@ class Nanowire:
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[cm^-3]", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
-                                        "E_field":Output("Electric Field", units="[WIP]", is_edge=True, is_calculated=False,is_integrated=False, yscale='linear')}
+        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
+                                        "P":Output("P", units="[cm^-3]", xlabel="nm", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
+                                        "E_field":Output("Electric Field", units="[WIP]", xlabel="nm", is_edge=True, is_calculated=False,is_integrated=False, yscale='linear')}
         
         # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", is_edge=False, is_calculated=True,is_integrated=False),
-                                         "deltaP":Output("delta_P", units="[cm^-3]", is_edge=False, is_calculated=True,is_integrated=False),
-                                         "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", is_edge=False, is_calculated=True,is_integrated=False),
-                                         "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", is_edge=False, is_calculated=True,is_integrated=False),
-                                         "PL":Output("TRPL", units="[WIP]", is_edge=False, is_calculated=True,is_integrated=True),
-                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", is_edge=False, is_calculated=True,is_integrated=True)}
+        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", is_edge=False, is_calculated=True, calc_func=finite.delta_n, is_integrated=False),
+                                         "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", is_edge=False, is_calculated=True, calc_func=finite.delta_p, is_integrated=False),
+                                         "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", is_edge=False, is_calculated=True, calc_func=finite.radiative_recombination, is_integrated=False),
+                                         "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", is_edge=False, is_calculated=True, calc_func=finite.nonradiative_recombination, is_integrated=False),
+                                         "PL":Output("TRPL", units="[WIP]", xlabel="ns", is_edge=False, is_calculated=True, calc_func=finite.propagatingPL, is_integrated=True),
+                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", is_edge=False, is_calculated=True, calc_func=finite.tau_diff, is_integrated=True)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         
@@ -2364,32 +2366,24 @@ class Notebook:
             output_info_obj = self.nanowire.outputs_dict[subplot]
             plot_obj.cla()
             plot_obj.set_yscale(output_info_obj.yscale)
+            plot_obj.set_xlabel(output_info_obj.xlabel)
             plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
             
-        self.overview_subplots["N"].set_xlabel('nm')
-        self.overview_subplots["PL"].set_xlabel('ns')
-        
+        raw_outputs = {}
         for i in range(len(tstep_list)):
-            n_list = self.read_TS(data_filename, "N", tstep_list[i])
-            p_list = self.read_TS(data_filename, "P", tstep_list[i])
-            efield_list = self.read_TS(data_filename, "E_field", tstep_list[i])
-        
-            self.overview_subplots["N"].plot(data_node_x, n_list * self.convert_out_dict['N'], label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
-            self.overview_subplots["P"].plot(data_node_x, p_list * self.convert_out_dict['P'])
-            self.overview_subplots["E_field"].plot(data_edge_x, efield_list * self.convert_out_dict['E_field'])
-            
-            deltan_list = n_list - param_values_dict["N0"]
-            deltap_list = p_list - param_values_dict["P0"]
-            
-            self.overview_subplots["deltaN"].plot(data_node_x, deltan_list * self.convert_out_dict['N'])
-            self.overview_subplots["deltaP"].plot(data_node_x, deltap_list * self.convert_out_dict['P'])
-        
-            rr_list = finite.radiative_recombination(n_list, p_list, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"])
-            self.overview_subplots["RR"].plot(data_node_x, rr_list * self.convert_out_dict['RR'])
-            
-            nrr_list = finite.nonradiative_recombination(n_list, p_list, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"])
-            self.overview_subplots["NRR"].plot(data_node_x, nrr_list * self.convert_out_dict['NRR'])
-        
+            for output_name, output_info in self.nanowire.simulation_outputs_dict.items():
+                raw_outputs[output_name] = self.read_TS(data_filename, output_name, tstep_list[i])
+                self.overview_subplots[output_name].plot(data_node_x if not output_info.is_edge else data_edge_x,
+                                                         raw_outputs[output_name] * self.convert_out_dict[output_name], 
+                                                         label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
+                
+            for output_name, output_info in self.nanowire.calculated_outputs_dict.items():
+                if not output_info.is_integrated:
+                    values = output_info.calc_func(raw_outputs, param_values_dict)
+                    self.overview_subplots[output_name].plot(data_node_x if not output_info.is_edge else data_edge_x,
+                                                             values * self.convert_out_dict[output_name])
+                 
+        # TODO: Loop over output_info.is_integrated to get PL and tau_diff
         pl_list = finite.propagatingPL(data_dirname, data_filename, 0, param_values_dict["Total_length"], param_values_dict["Node_width"], 0, param_values_dict["Total_length"], 
                                        param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Alpha"], param_values_dict["Theta"], param_values_dict["Delta"],
                                        param_values_dict["Frac-Emitted"], param_values_dict["symmetric_system"])
@@ -2507,7 +2501,7 @@ class Notebook:
             try:
                 temp_N = self.read_TS(data_filename, "N", active_show_index)
                 temp_P = self.read_TS(data_filename, "P", active_show_index)
-                new_data = Raw_Data_Set(finite.radiative_recombination(temp_N, temp_P, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"]), 
+                new_data = Raw_Data_Set(finite.radiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict), 
                                     data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
@@ -2518,7 +2512,7 @@ class Notebook:
             try:
                 temp_N = self.read_TS(data_filename, "N", active_show_index)
                 temp_P = self.read_TS(data_filename, "P", active_show_index)
-                new_data = Raw_Data_Set(finite.nonradiative_recombination(temp_N, temp_P, param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Tau_N"], param_values_dict["Tau_P"]),  
+                new_data = Raw_Data_Set(finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict),  
                                     data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
@@ -2530,7 +2524,7 @@ class Notebook:
                 temp_N = self.read_TS(data_filename, "N", active_show_index)
                 temp_P = self.read_TS(data_filename, "P", active_show_index)
                 
-                rad_rec = finite.radiative_recombination(temp_N, temp_P, param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"])
+                rad_rec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict)
 
                 max = param_values_dict["Total_length"]
                 dx = param_values_dict["Node_width"]
@@ -2655,7 +2649,7 @@ class Notebook:
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 B = active_datagroup.datasets[tag].params_dict["B"]
-                active_datagroup.datasets[tag].data = finite.radiative_recombination(temp_N, temp_P, B, n0, p0)
+                active_datagroup.datasets[tag].data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "NRR":
@@ -2666,7 +2660,7 @@ class Notebook:
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 tauN = active_datagroup.datasets[tag].params_dict["Tau_N"]
                 tauP = active_datagroup.datasets[tag].params_dict["Tau_P"]
-                active_datagroup.datasets[tag].data = finite.nonradiative_recombination(temp_N, temp_P, n0, p0, tauN, tauP)
+                active_datagroup.datasets[tag].data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "PL":
@@ -2676,7 +2670,7 @@ class Notebook:
                 B = active_datagroup.datasets[tag].params_dict["B"]
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
-                rad_rec = finite.radiative_recombination(temp_N, temp_P, B, n0, p0)
+                rad_rec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
 
                 max = active_datagroup.datasets[tag].params_dict["Total_length"]
                 dx = active_datagroup.datasets[tag].params_dict["Node_width"]
@@ -3097,7 +3091,7 @@ class Notebook:
                         temp_N = np.array(ifstream_N.root.data)
                         temp_P = np.array(ifstream_P.root.data)
 
-                        data = finite.radiative_recombination(temp_N, temp_P, B_param, n0, p0)
+                        data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)
@@ -3109,7 +3103,7 @@ class Notebook:
                         tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         temp_N = np.array(ifstream_N.root.data)
                         temp_P = np.array(ifstream_P.root.data)
-                        data = finite.nonradiative_recombination(temp_N,temp_P, n0, p0, tauN, tauP)
+                        data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         if include_negative:
                             I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
                                 finite.integrate(data, 0, u_bound, dx, total_length)

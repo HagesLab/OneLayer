@@ -273,7 +273,7 @@ def propagatingPL(dir_name, file_name_base, l_bound, u_bound, dx, min, max, B, n
     if radrec_fromfile:
         with tables.open_file(dir_name + "\\" + file_name_base + "-N.h5", mode='r') as ifstream_N, \
             tables.open_file(dir_name + "\\" + file_name_base + "-P.h5", mode='r') as ifstream_P:
-            radRec = radiative_recombination(np.array(ifstream_N.root.data), np.array(ifstream_P.root.data), B, n0, p0)
+            radRec = radiative_recombination({"N":np.array(ifstream_N.root.data), "P":np.array(ifstream_P.root.data)}, {"B":B, "N0":n0, "P0":p0})
 
     else:
         radRec = rad_rec
@@ -452,11 +452,17 @@ def tau_diff(PL, dt):
     dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)
     return -(dln_PLdt ** -1)
     
-def radiative_recombination(N, P, B, N0, P0):
-    return B * (N * P - N0 * P0)
+def delta_n(sim_outputs, params):
+    return sim_outputs["N"] - params["N0"]
 
-def nonradiative_recombination(N, P, N0, P0, tau_N, tau_P):
-    return (N * P - N0 * P0) / ((tau_N * P) + (tau_P * N))
+def delta_p(sim_outputs, params):
+    return sim_outputs["P"] - params["P0"]
+
+def radiative_recombination(sim_outputs, params):
+    return params["B"] * (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"])
+
+def nonradiative_recombination(sim_outputs, params):
+    return (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"]) / ((params["Tau_N"] * sim_outputs["P"]) + (params["Tau_P"] * sim_outputs["N"]))
 
 def CalcInt(input_array,spacing):
     # FIXME: NEEDS TESTING WITH bay.py
