@@ -79,10 +79,11 @@ class Parameter(Characteristic):
     
 class Output(Characteristic):
     
-    def __init__(self, display_name, units, xlabel, is_edge, is_calculated=False, calc_func=None, is_integrated=False, yscale='log', yfactors=(1,1)):
+    def __init__(self, display_name, units, xlabel, xvar, is_edge, is_calculated=False, calc_func=None, is_integrated=False, yscale='log', yfactors=(1,1)):
         super().__init__(units, is_edge)
         self.display_name = display_name
         self.xlabel = xlabel
+        self.xvar = xvar
         self.is_calculated = is_calculated
         self.is_integrated = is_integrated
         self.yscale = yscale
@@ -124,17 +125,17 @@ class Nanowire:
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[cm^-3]", xlabel="nm", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
-                                        "E_field":Output("Electric Field", units="[WIP]", xlabel="nm", is_edge=True, is_calculated=False,is_integrated=False, yscale='linear')}
+        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
+                                        "P":Output("P", units="[cm^-3]", xlabel="nm", xvar="position",is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
+                                        "E_field":Output("Electric Field", units="[WIP]", xlabel="nm", xvar="position",is_edge=True, is_calculated=False,is_integrated=False, yscale='linear')}
         
         # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", is_edge=False, is_calculated=True, calc_func=finite.delta_n, is_integrated=False),
-                                         "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", is_edge=False, is_calculated=True, calc_func=finite.delta_p, is_integrated=False),
-                                         "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", is_edge=False, is_calculated=True, calc_func=finite.radiative_recombination, is_integrated=False),
-                                         "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", is_edge=False, is_calculated=True, calc_func=finite.nonradiative_recombination, is_integrated=False),
-                                         "PL":Output("TRPL", units="[WIP]", xlabel="ns", is_edge=False, is_calculated=True, calc_func=finite.propagatingPL, is_integrated=True),
-                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", is_edge=False, is_calculated=True, calc_func=finite.tau_diff, is_integrated=True)}
+        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_n, is_integrated=False),
+                                         "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_p, is_integrated=False),
+                                         "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, is_calculated=True, calc_func=finite.radiative_recombination, is_integrated=False),
+                                         "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.nonradiative_recombination, is_integrated=False),
+                                         "PL":Output("TRPL", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.propagatingPL, is_integrated=True),
+                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.tau_diff, is_integrated=True)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         
@@ -271,6 +272,36 @@ class Nanowire:
         return finite.ode_nanowire(data_path, m, n, self.dx, dt, params,
                                     not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), do_ss, write_output,
                                     init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
+    
+    def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
+        # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
+        data_dict = {}
+        
+        for raw_output_name in self.simulation_outputs_dict:
+            data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, raw_output_name)
+            data = []
+            for tstep in tsteps:
+                data.append(read_TS(data_filename, tstep))
+            
+            data_dict[raw_output_name] = np.array(data)
+            
+        for calculated_output_name, output_obj in self.calculated_outputs_dict.items():
+            if not output_obj.is_integrated:
+                data_dict[calculated_output_name] = output_obj.calc_func(data_dict, params)
+                
+                
+        with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
+            tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
+            temp_N = np.array(ifstream_N.root.data)
+            temp_P = np.array(ifstream_P.root.data)
+        data_dict["PL"] = self.calculated_outputs_dict["PL"].calc_func({"N":temp_N, "P":temp_P}, params, 0, params["Total_length"])
+        
+        data_dict["tau_diff"] = self.calculated_outputs_dict["tau_diff"].calc_func(data_dict["PL"], params["dt"])
+        
+        for data in data_dict:
+            data_dict[data] *= self.convert_out_dict[data]
+            
+        return data_dict
     
 class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
@@ -468,6 +499,15 @@ def check_valid_filename(file_name):
 
     return True
 
+def read_TS(filename, index=None):
+    ## Read one time step's worth of data from a particular variable
+    with tables.open_file(filename, mode='r') as ifstream:
+        if index is None:
+            return np.array(ifstream.root.data)
+        
+        else:
+            return np.array(ifstream.root.data[index])
+        
 class Notebook:
 	# This is somewhat Java-like: everything about the GUI exists inside a class
     # A goal is to achieve total separation between this class (i.e. the GUI) and all mathematical operations, which makes this GUI reusable for different problems
@@ -1140,7 +1180,7 @@ class Notebook:
             self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(rdim, cdim, count)
             count += 1
         
-        self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.do_overview_analysis)
+        self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.plot_overview_analysis)
         self.analyze_overview_button.grid(row=0,column=0)
         
         self.analyze_overview_canvas = tkagg.FigureCanvasTkAgg(self.analyze_overview_fig, master=self.tab_overview_analysis)
@@ -2106,9 +2146,20 @@ class Notebook:
                     param_dict_copy = dict(active_sets[key].params_dict)
 
                     node_x = active_sets[key].node_x
-                    param_dict_copy["deltaN"] = self.read_TS(active_sets[key].filename, "N", active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
-                    param_dict_copy["deltaP"] = self.read_TS(active_sets[key].filename, "P", active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
-                    param_dict_copy["E_field"] = self.read_TS(active_sets[key].filename, "E_field", active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
+                    
+                    filename = active_sets[key].filename
+                    
+                    var = "N"
+                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
+                    param_dict_copy["deltaN"] = read_TS(path_name, active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
+                    
+                    var = "P"
+                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
+                    param_dict_copy["deltaP"] = read_TS(path_name, active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
+                    
+                    var = "E_field"
+                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
+                    param_dict_copy["E_field"] = read_TS(path_name, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
 
                     with open(new_filename + ".txt", "w+") as ofstream:
                         ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
@@ -2160,7 +2211,7 @@ class Notebook:
 
             self.bay_text1 = tk.Message(self.bay_popup, text=
                                         "Select \"Observation\" to save each curve as an experimentally observed data set or " +
-                                        "(WIP) Model to combine all curves into a single model set.", width=320)
+                                        "Model to combine all curves into a single model set.", width=320)
             self.bay_text1.grid(row=1,column=0)
 
             self.bay_text2 = tk.Message(self.bay_popup, text=
@@ -2186,7 +2237,7 @@ class Notebook:
             self.bay_mod_mode = tk.ttk.Radiobutton(self.bay_popup, variable=self.bay_mode, value="model")
             self.bay_mod_mode.grid(row=2,column=2)
 
-            self.bay_mod_header = tk.Label(self.bay_popup, text="(WIP) Model")
+            self.bay_mod_header = tk.Label(self.bay_popup, text="Model")
             self.bay_mod_header.grid(row=2,column=3)
 
             self.bay_title_label3 = tk.ttk.Label(self.bay_popup, text="Model Params", style="Header.TLabel")
@@ -2266,12 +2317,6 @@ class Notebook:
         except FloatingPointError:
             print("Error #601: Failed to close Bayesim popup")
         return
-    ## Data File Readers for simulation and analysis tabs
-
-    def read_TS(self, filename, var, index):
-        ## Read one time step's worth of data from a particular variable
-        with tables.open_file("{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var), mode='r') as ifstream:
-            return np.array(ifstream.root.data[index])
 
     ## Plotter for simulation tab    
     def update_sim_plots(self, index, do_clear_plots=True):
@@ -2338,14 +2383,12 @@ class Notebook:
                     
         return param_values_dict
     
-    def do_overview_analysis(self):
+    def plot_overview_analysis(self):
         data_dirname = tk.filedialog.askdirectory(title="Select a dataset", initialdir=self.default_dirs["Data"])
         if not data_dirname:
             print("No data set selected :(")
             return
-        
-        print("Selected: {}".format(data_dirname))
-        
+
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
         
         try:
@@ -2369,31 +2412,39 @@ class Notebook:
             plot_obj.set_xlabel(output_info_obj.xlabel)
             plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
             
-        raw_outputs = {}
-        for i in range(len(tstep_list)):
-            for output_name, output_info in self.nanowire.simulation_outputs_dict.items():
-                raw_outputs[output_name] = self.read_TS(data_filename, output_name, tstep_list[i])
-                self.overview_subplots[output_name].plot(data_node_x if not output_info.is_edge else data_edge_x,
-                                                         raw_outputs[output_name] * self.convert_out_dict[output_name], 
-                                                         label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
-                
-            for output_name, output_info in self.nanowire.calculated_outputs_dict.items():
-                if not output_info.is_integrated:
-                    values = output_info.calc_func(raw_outputs, param_values_dict)
-                    self.overview_subplots[output_name].plot(data_node_x if not output_info.is_edge else data_edge_x,
-                                                             values * self.convert_out_dict[output_name])
-                 
-        # TODO: Loop over output_info.is_integrated to get PL and tau_diff
-        pl_list = finite.propagatingPL(data_dirname, data_filename, 0, param_values_dict["Total_length"], param_values_dict["Node_width"], 0, param_values_dict["Total_length"], 
-                                       param_values_dict["B"], param_values_dict["N0"], param_values_dict["P0"], param_values_dict["Alpha"], param_values_dict["Theta"], param_values_dict["Delta"],
-                                       param_values_dict["Frac-Emitted"], param_values_dict["symmetric_system"])
-                
-        self.overview_subplots["PL"].plot(data_node_t, pl_list * self.convert_out_dict['PL'])
+            
+        data_dict = self.nanowire.get_overview_analysis(param_values_dict, tstep_list, data_dirname, data_filename)
         
-        taudiff_list = finite.tau_diff(pl_list, param_values_dict['dt'])
-        self.overview_subplots["tau_diff"].plot(data_node_t, taudiff_list * self.convert_out_dict['tau_diff'])
+        for output_name, output_info in self.nanowire.outputs_dict.items():
+            try:
+                values = data_dict[output_name]
+                
+                if not isinstance(values, np.ndarray): raise KeyError
+            except KeyError:
+                print("Warning: {}'s get_overview_analysis() did not return data for {}".format(self.nanowire.system_ID, output_name))
+                continue
+
+            if output_info.xvar == "time":
+                grid_x = data_node_t
+                
+            elif output_info.xvar == "position":
+                grid_x = data_node_x if not output_info.is_edge else data_edge_x
+                
+            else:
+                print("Warning: invalid xvar {} in system class definition for output {}".format(output_info.xvar, output_name))
+                continue
+            
+            if values.ndim == 2:
+                for i in range(len(values)):
+                    self.overview_subplots[output_name].plot(grid_x, values[i], label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
+                    
+            else:
+                self.overview_subplots[output_name].plot(grid_x, values)
+
+        for output_name in self.nanowire.simulation_outputs_dict:
+            self.overview_subplots[output_name].legend().set_draggable(True)
+            break
         
-        self.overview_subplots["N"].legend().set_draggable(True)
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
         return
@@ -2475,7 +2526,8 @@ class Notebook:
         if (datatype == "N"):
             try:
                 # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
-                new_data = Raw_Data_Set(self.read_TS(data_filename, "N", active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
+                new_data = Raw_Data_Set(read_TS(path_name, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
@@ -2483,7 +2535,8 @@ class Notebook:
 
         elif (datatype == "P"):
             try:
-                new_data = Raw_Data_Set(self.read_TS(data_filename, "P", active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
+                new_data = Raw_Data_Set(read_TS(path_name, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
@@ -2491,7 +2544,8 @@ class Notebook:
 
         elif (datatype == "E_field"):
             try:
-                new_data = Raw_Data_Set(self.read_TS(data_filename, "E_field", active_show_index), data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "E_field")
+                new_data = Raw_Data_Set(read_TS(path_name, active_show_index), data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
@@ -2499,8 +2553,10 @@ class Notebook:
         
         elif (datatype == "RR"):
             try:
-                temp_N = self.read_TS(data_filename, "N", active_show_index)
-                temp_P = self.read_TS(data_filename, "P", active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
+                temp_N = read_TS(path_name, active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
+                temp_P = read_TS(path_name, active_show_index)
                 new_data = Raw_Data_Set(finite.radiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict), 
                                     data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
@@ -2510,8 +2566,10 @@ class Notebook:
 
         elif (datatype == "NRR"):
             try:
-                temp_N = self.read_TS(data_filename, "N", active_show_index)
-                temp_P = self.read_TS(data_filename, "P", active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
+                temp_N = read_TS(path_name, active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
+                temp_P = read_TS(path_name, active_show_index)
                 new_data = Raw_Data_Set(finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict),  
                                     data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
@@ -2521,9 +2579,10 @@ class Notebook:
 
         elif (datatype == "PL"):
             try:
-                temp_N = self.read_TS(data_filename, "N", active_show_index)
-                temp_P = self.read_TS(data_filename, "P", active_show_index)
-                
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
+                temp_N = read_TS(path_name, active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
+                temp_P = read_TS(path_name, active_show_index)
                 rad_rec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict)
 
                 max = param_values_dict["Total_length"]
@@ -2629,23 +2688,28 @@ class Notebook:
         # Search data files for data at new time step
         if active_datagroup.type == "N":
             for tag in active_datagroup.datasets:
-                active_datagroup.datasets[tag].data = self.read_TS(active_datagroup.datasets[tag].filename, "N", active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
+                active_datagroup.datasets[tag].data = read_TS(path_name, active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "P":
             for tag in active_datagroup.datasets:
-                active_datagroup.datasets[tag].data = self.read_TS(active_datagroup.datasets[tag].filename, "P", active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
+                active_datagroup.datasets[tag].data = read_TS(path_name, active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "E_field":
             for tag in active_datagroup.datasets:
-                active_datagroup.datasets[tag].data = self.read_TS(active_datagroup.datasets[tag].filename, "E_field", active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "E_field")
+                active_datagroup.datasets[tag].data = read_TS(path_name, active_show_index)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "RR":
             for tag in active_datagroup.datasets:
-                temp_N = self.read_TS(active_datagroup.datasets[tag].filename, "N", active_show_index)
-                temp_P = self.read_TS(active_datagroup.datasets[tag].filename, "P", active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
+                temp_N = read_TS(path_name, active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
+                temp_P = read_TS(path_name, active_show_index)
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 B = active_datagroup.datasets[tag].params_dict["B"]
@@ -2654,8 +2718,10 @@ class Notebook:
 
         elif active_datagroup.type == "NRR":
             for tag in active_datagroup.datasets:
-                temp_N = self.read_TS(active_datagroup.datasets[tag].filename, "N", active_show_index)
-                temp_P = self.read_TS(active_datagroup.datasets[tag].filename, "P", active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
+                temp_N = read_TS(path_name, active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
+                temp_P = read_TS(path_name, active_show_index)
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 tauN = active_datagroup.datasets[tag].params_dict["Tau_N"]
@@ -2665,8 +2731,10 @@ class Notebook:
 
         elif active_datagroup.type == "PL":
             for tag in active_datagroup.datasets:
-                temp_N = self.read_TS(active_datagroup.datasets[tag].filename, "N", active_show_index)
-                temp_P = self.read_TS(active_datagroup.datasets[tag].filename, "P", active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
+                temp_N = read_TS(path_name, active_show_index)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
+                temp_P = read_TS(path_name, active_show_index)
                 B = active_datagroup.datasets[tag].params_dict["B"]
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
@@ -2929,7 +2997,8 @@ class Notebook:
 
         for i in range(1,6):
             for var in self.sim_data:
-                self.sim_data[var] = self.read_TS(data_file_name, var, int(self.n * i / 5))
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name, data_file_name, var)
+                self.sim_data[var] = read_TS(path_name, int(self.n * i / 5))
             self.update_sim_plots(self.n, do_clear_plots=False)
 
         # Save metadata: list of param values used for the simulation
@@ -3021,15 +3090,6 @@ class Notebook:
             total_length = active_datagroup.datasets[tag].params_dict["Total_length"]
             total_time = active_datagroup.datasets[tag].params_dict["Total-Time"]
             dt = active_datagroup.datasets[tag].params_dict["dt"]
-            B_param = active_datagroup.datasets[tag].params_dict["B"]
-            n0 = active_datagroup.datasets[tag].params_dict["N0"]
-            p0 = active_datagroup.datasets[tag].params_dict["P0"]
-            tauN = active_datagroup.datasets[tag].params_dict["Tau_N"]
-            tauP = active_datagroup.datasets[tag].params_dict["Tau_P"]
-            alpha = active_datagroup.datasets[tag].params_dict["Alpha"] if (active_datagroup.datasets[tag].params_dict["ignore_alpha"] == 0.0) else 0
-            theta = active_datagroup.datasets[tag].params_dict["Theta"]
-            delta = active_datagroup.datasets[tag].params_dict["Delta"]
-            frac_emitted = active_datagroup.datasets[tag].params_dict["Frac-Emitted"]
             symmetric_flag = active_datagroup.datasets[tag].params_dict["symmetric_system"]
 
             if self.PL_mode == "Current time step":
@@ -3111,11 +3171,15 @@ class Notebook:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 else: # datatype = "PL"
-                    if include_negative:
-                        I_data = finite.propagatingPL(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename, data_filename, 0, -l_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag) + \
-                            finite.propagatingPL(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename, data_filename, 0, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
-                    else:
-                        I_data = finite.propagatingPL(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename, data_filename, l_bound, u_bound, dx, 0, total_length, B_param, n0, p0, alpha, theta, delta, frac_emitted, symmetric_flag)
+                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
+                        tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
+                        temp_N = np.array(ifstream_N.root.data)
+                        temp_P = np.array(ifstream_P.root.data)
+                        if include_negative:
+                            I_data = finite.propagatingPL({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict, 0, -l_bound) + \
+                                finite.propagatingPL({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict, 0, u_bound)
+                        else:
+                            I_data = finite.propagatingPL({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict, l_bound, u_bound)
                             
 
                 if self.PL_mode == "Current time step":

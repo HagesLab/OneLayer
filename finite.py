@@ -268,20 +268,21 @@ def ode_twolayer(m, f, dm, df, thickness_Layer1, thickness_Layer2, z0, dt, total
         eta_UC= PL_Layer2_array / integrated_init_N*100    #[%]
     return
 
-def propagatingPL(dir_name, file_name_base, l_bound, u_bound, dx, min, max, B, n0, p0, alphaCof, thetaCof, delta_frac, fracEmitted, symmetric_flag, radrec_fromfile=True, rad_rec=0):
+def propagatingPL(sim_outputs, params, l_bound, u_bound):
     #note: first dimension of radRec is time, second dimension is space
-    if radrec_fromfile:
-        with tables.open_file(dir_name + "\\" + file_name_base + "-N.h5", mode='r') as ifstream_N, \
-            tables.open_file(dir_name + "\\" + file_name_base + "-P.h5", mode='r') as ifstream_P:
-            radRec = radiative_recombination({"N":np.array(ifstream_N.root.data), "P":np.array(ifstream_P.root.data)}, {"B":B, "N0":n0, "P0":p0})
-
-    else:
-        radRec = rad_rec
-
-    i = toIndex(l_bound, dx, max)
-    j = toIndex(u_bound, dx, max)
+    radRec = radiative_recombination(sim_outputs, params)
+    
+    alpha = 0 if params["ignore_alpha"] else params["Alpha"]
+    theta = params["Theta"]
+    delta = params["Delta"]
+    frac_emitted = params["Frac-Emitted"]
+    total_length = params["Total_length"]
+    dx = params["Node_width"]
+    
+    i = toIndex(l_bound, dx, total_length)
+    j = toIndex(u_bound, dx, total_length)
     #if l_bound == u_bound: j += 1
-    m = int(max / dx)
+    m = int(total_length / dx)
 
     # i and j here illustrate a problem - we would love to integrate from "l_bound" to "u_bound" exactly, but we only have a discrete list of values with spacing dx.
     # The best we can really do is to map our bounds to the greatest space node less than or equal to the bounds, such that for example,
@@ -297,7 +298,7 @@ def propagatingPL(dir_name, file_name_base, l_bound, u_bound, dx, min, max, B, n
     # but we would need the node at x = 70 to calculate the portion from x = 60 to x = 65 (using PL[3]).
     need_extra_node = u_bound > toCoord(j, dx) + dx / 2 or l_bound == u_bound
 
-    distance = np.arange(0, max, dx)
+    distance = np.arange(0, total_length, dx)
 
     # Make room for the extra node if needed
     if need_extra_node:
@@ -310,7 +311,6 @@ def propagatingPL(dir_name, file_name_base, l_bound, u_bound, dx, min, max, B, n
             distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
             lf_distance_matrix[n - i] = distance + ((n+1) * dx)
 
-
     else: # if we don't need the extra node
         distance_matrix = np.zeros((j - i + 1, m))
         lf_distance_matrix = np.zeros((j - i + 1, m))
@@ -318,17 +318,19 @@ def propagatingPL(dir_name, file_name_base, l_bound, u_bound, dx, min, max, B, n
         for n in range(i, j + 1):
             distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
             lf_distance_matrix[n - i] = distance + ((n+1) * dx)
-
     
-    weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
-    lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix) if symmetric_flag else 0
+    weight = np.exp(-(alpha + theta) * distance_matrix)
+    weight2 = np.exp(-(theta) * distance_matrix)
+    
+    if params["symmetric_system"]:
+        lf_weight = np.exp(-(alpha + theta) * lf_distance_matrix) 
+        lf_weight2 = np.exp(-(theta) * lf_distance_matrix)
+    else: 
+        lf_weight = 0
+        lf_weight2 = 0
 
-    combined_weight = (1 - fracEmitted) * 0.5 * thetaCof * delta_frac * (weight + lf_weight)
-
-    weight2 = np.exp(-(thetaCof) * distance_matrix)
-    lf_weight2 = np.exp(-(thetaCof) * lf_distance_matrix) if symmetric_flag else 0
-
-    combined_weight2 = (1 - fracEmitted) * 0.5 * thetaCof * (1 - delta_frac) * (weight2 + lf_weight2)
+    combined_weight = (1 - frac_emitted) * 0.5 * theta * delta * (weight + lf_weight)
+    combined_weight2 = (1 - frac_emitted) * 0.5 * theta * (1 - delta) * (weight2 + lf_weight2)
 
     if (l_bound == u_bound):
         # Technically an integral with identical bounds is zero, but it is far more useful to return the value at that point instead
@@ -339,15 +341,15 @@ def propagatingPL(dir_name, file_name_base, l_bound, u_bound, dx, min, max, B, n
         # We decide for now that x = 0 yields the value of the leftmost node and x = (far end) yields the value of the rightmost node.
 
         # Ghost nodes are a possibility but eww
-        PL_base = fracEmitted * radRec[:,i] + intg.trapz(combined_weight[0] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * radRec[:,i] + \
-            intg.trapz(combined_weight2[0] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * radRec[:,i]
+        PL_base = frac_emitted * radRec[:,i] + intg.trapz(combined_weight[0] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * delta * radRec[:,i] + \
+            intg.trapz(combined_weight2[0] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * (1 - delta) * radRec[:,i]
 
-        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == max:
-            PL_plusOne = fracEmitted * radRec[:,i+1] + intg.trapz(combined_weight[1] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * radRec[:,i+1] + \
-                intg.trapz(combined_weight2[1] * radRec, dx=dx, axis=1) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * radRec[:,i+1]
+        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == total_length:
+            PL_plusOne = frac_emitted * radRec[:,i+1] + intg.trapz(combined_weight[1] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * delta * radRec[:,i+1] + \
+                intg.trapz(combined_weight2[1] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * (1 - delta) * radRec[:,i+1]
         
 
-        if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == max: # if the bound lies on an edge and isn't the far end special case
+        if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == total_length: # if the bound lies on an edge and isn't the far end special case
             PL = (PL_base + PL_plusOne) / 2
 
         elif l_bound > toCoord(i, dx) + dx / 2: # if the bound exceeds the radius of the node it mapped to
@@ -363,23 +365,23 @@ def propagatingPL(dir_name, file_name_base, l_bound, u_bound, dx, min, max, B, n
             # but by slicing radRec first we avoid doing unnecessary calculations on regions of the system we aren't integrating over
 
             # The downside of this is all the indices of PL_base end up shifted left by i: PL_base[0] contains data regarding the ith node while PL_base[j-i] contains data regarding the jth node
-            PL_base = fracEmitted * radRec[:, i:j+1+1]
+            PL_base = frac_emitted * radRec[:, i:j+1+1]
 
             for p in range(0,j - i + 1 + 1):
                 # To each value of the slice add the attenuation contribution with weight centered around that value's corresponding position
                 # And be careful of the fact that radRec is not shifted left like PL_base is
-                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).transpose() + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * radRec[:,i + p] + \
-                    intg.trapz(combined_weight2[p] * radRec, dx=dx, axis=1).transpose() + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * radRec[:,i + p]
+                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).transpose() + theta * (1 - frac_emitted) * 0.5 * delta * radRec[:,i + p] + \
+                    intg.trapz(combined_weight2[p] * radRec, dx=dx, axis=1).transpose() + theta * (1 - frac_emitted) * 0.5 * (1 - delta) * radRec[:,i + p]
 
             # Be careful not to include our "extra" node in the integral - that node is for corrections only
             PL = intg.trapz(PL_base[:, :-1], dx=dx, axis=1)
 
         else:
-            PL_base = fracEmitted * radRec[:, i:j+1]
+            PL_base = frac_emitted * radRec[:, i:j+1]
 
             for p in range(0,j - i + 1):
-                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).transpose() + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * radRec[:,i + p] + \
-                    intg.trapz(combined_weight2[p] * radRec, dx=dx, axis=1).transpose() + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * radRec[:,i + p]
+                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).transpose() + theta * (1 - frac_emitted) * 0.5 * delta * radRec[:,i + p] + \
+                    intg.trapz(combined_weight2[p] * radRec, dx=dx, axis=1).transpose() + theta * (1 - frac_emitted) * 0.5 * (1 - delta) * radRec[:,i + p]
 
 
             PL = intg.trapz(PL_base, dx=dx, axis=1)
@@ -388,20 +390,20 @@ def propagatingPL(dir_name, file_name_base, l_bound, u_bound, dx, min, max, B, n
 
     return PL
 
-def integrate(base_data, l_bound, u_bound, dx, max):
+def integrate(base_data, l_bound, u_bound, dx, total_length):
     # See propagatingPL() for additional info
-    i = toIndex(l_bound, dx, max)
-    j = toIndex(u_bound, dx, max)
-    m = int(max / dx)
+    i = toIndex(l_bound, dx, total_length)
+    j = toIndex(u_bound, dx, total_length)
+    m = int(total_length / dx)
 
     need_extra_node = u_bound > toCoord(j, dx) + dx / 2 or l_bound == u_bound
 
     if (l_bound == u_bound):
         I_base = base_data[:,i]
-        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == max:
+        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == total_length:
             I_plus_one = base_data[:,i+1]
 
-        if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == max:
+        if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == total_length:
             I_data = (I_base + I_plus_one) / 2
 
         elif l_bound > toCoord(i, dx) + dx / 2:
