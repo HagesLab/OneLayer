@@ -8,6 +8,7 @@
 
 import numpy as np
 import matplotlib
+starting_backend = matplotlib.get_backend()
 matplotlib.use("TkAgg")
 import matplotlib.backends.backend_tkagg as tkagg
 from matplotlib.figure import Figure
@@ -661,6 +662,8 @@ class Notebook:
 
         self.root.geometry('%dx%d+0+0' % (width,height))
         self.root.mainloop()
+        print("Closed TEDs")
+        matplotlib.use(starting_backend)
         return
 
     def toggle_fullscreen(self):
