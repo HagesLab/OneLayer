@@ -109,9 +109,40 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmi
         if symmetric: lf_distance_matrix[i] = distance + ((i+1) * dx)
     
     weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
-    lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix) if symmetric else 0
-    combined_weight = alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * (weight + lf_weight)
-    return combined_weight
+    if symmetric: weight += np.exp(-(alphaCof + thetaCof) * lf_distance_matrix)
+    return alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * weight
+
+
+def PL_weight_distribution(m, dx, total_length, i, j, alpha, theta, delta, frac_emitted, need_extra_node, symmetric=True):
+    distance = np.arange(0, total_length, dx)
+
+    # Make room for the extra node if needed
+    if need_extra_node:
+        distance_matrix = np.zeros((j - i + 1 + 1, m))
+        lf_distance_matrix = np.zeros((j - i + 1 + 1, m))
+
+        # Each row in weight will represent the weight function centered around a different position
+        # Additional lf_weight counted in if wire is symmetric
+        for n in range(i, j + 1 + 1):
+            distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
+            lf_distance_matrix[n - i] = distance + ((n+1) * dx)
+
+    else: # if we don't need the extra node
+        distance_matrix = np.zeros((j - i + 1, m))
+        lf_distance_matrix = np.zeros((j - i + 1, m))
+
+        for n in range(i, j + 1):
+            distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
+            lf_distance_matrix[n - i] = distance + ((n+1) * dx)
+    
+    weight = np.exp(-(alpha + theta) * distance_matrix)
+    weight2 = np.exp(-(theta) * distance_matrix)
+    
+    if symmetric:
+        weight += np.exp(-(alpha + theta) * lf_distance_matrix) 
+        weight2 += np.exp(-(theta) * lf_distance_matrix)
+        
+    return (1 - frac_emitted) * 0.5 * theta * (delta * weight + (1 - delta) * weight2)
 
 def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, symmetric=True, do_ss=False, write_output=True, init_N=0, init_P=0, init_E_field=0):
     ## Problem statement:
@@ -268,6 +299,8 @@ def ode_twolayer(m, f, dm, df, thickness_Layer1, thickness_Layer2, z0, dt, total
         eta_UC= PL_Layer2_array / integrated_init_N*100    #[%]
     return
 
+
+import time
 def propagatingPL(sim_outputs, params, l_bound, u_bound):
     #note: first dimension of radRec is time, second dimension is space
     radRec = radiative_recombination(sim_outputs, params)
@@ -298,39 +331,7 @@ def propagatingPL(sim_outputs, params, l_bound, u_bound):
     # but we would need the node at x = 70 to calculate the portion from x = 60 to x = 65 (using PL[3]).
     need_extra_node = u_bound > toCoord(j, dx) + dx / 2 or l_bound == u_bound
 
-    distance = np.arange(0, total_length, dx)
-
-    # Make room for the extra node if needed
-    if need_extra_node:
-        distance_matrix = np.zeros((j - i + 1 + 1, m))
-        lf_distance_matrix = np.zeros((j - i + 1 + 1, m))
-
-        # Each row in weight will represent the weight function centered around a different position
-        # Additional lf_weight counted in if wire is symmetric
-        for n in range(i, j + 1 + 1):
-            distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
-            lf_distance_matrix[n - i] = distance + ((n+1) * dx)
-
-    else: # if we don't need the extra node
-        distance_matrix = np.zeros((j - i + 1, m))
-        lf_distance_matrix = np.zeros((j - i + 1, m))
-
-        for n in range(i, j + 1):
-            distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
-            lf_distance_matrix[n - i] = distance + ((n+1) * dx)
-    
-    weight = np.exp(-(alpha + theta) * distance_matrix)
-    weight2 = np.exp(-(theta) * distance_matrix)
-    
-    if params["symmetric_system"]:
-        lf_weight = np.exp(-(alpha + theta) * lf_distance_matrix) 
-        lf_weight2 = np.exp(-(theta) * lf_distance_matrix)
-    else: 
-        lf_weight = 0
-        lf_weight2 = 0
-
-    combined_weight = (1 - frac_emitted) * 0.5 * theta * delta * (weight + lf_weight)
-    combined_weight2 = (1 - frac_emitted) * 0.5 * theta * (1 - delta) * (weight2 + lf_weight2)
+    combined_weight = PL_weight_distribution(m, dx, total_length, i, j, alpha, theta, delta, frac_emitted, need_extra_node, params["symmetric_system"])
 
     if (l_bound == u_bound):
         # Technically an integral with identical bounds is zero, but it is far more useful to return the value at that point instead
@@ -340,15 +341,11 @@ def propagatingPL(sim_outputs, params, l_bound, u_bound):
         # these lie on edges but there are no adjacent nodes to average with!
         # We decide for now that x = 0 yields the value of the leftmost node and x = (far end) yields the value of the rightmost node.
 
-        # Ghost nodes are a possibility but eww
-        PL_base = frac_emitted * radRec[:,i] + intg.trapz(combined_weight[0] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * delta * radRec[:,i] + \
-            intg.trapz(combined_weight2[0] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * (1 - delta) * radRec[:,i]
+        PL_base = frac_emitted * radRec[:,i] + intg.trapz(combined_weight[0] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * radRec[:,i]
 
         if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == total_length:
-            PL_plusOne = frac_emitted * radRec[:,i+1] + intg.trapz(combined_weight[1] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * delta * radRec[:,i+1] + \
-                intg.trapz(combined_weight2[1] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * (1 - delta) * radRec[:,i+1]
+            PL_plusOne = frac_emitted * radRec[:,i+1] + intg.trapz(combined_weight[1] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * radRec[:,i+1]
         
-
         if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == total_length: # if the bound lies on an edge and isn't the far end special case
             PL = (PL_base + PL_plusOne) / 2
 
@@ -358,31 +355,24 @@ def propagatingPL(sim_outputs, params, l_bound, u_bound):
         else:
             PL = PL_base
         
+    
     else:
         if need_extra_node:
-            # Take a vertical slice of the radRec array from position index i to j + 1
-            # This is a little memory optimization to make narrow integrals faster - we could do calculations on the entire radRec and take out a slice corresponding to our bounds,
-            # but by slicing radRec first we avoid doing unnecessary calculations on regions of the system we aren't integrating over
-
-            # The downside of this is all the indices of PL_base end up shifted left by i: PL_base[0] contains data regarding the ith node while PL_base[j-i] contains data regarding the jth node
             PL_base = frac_emitted * radRec[:, i:j+1+1]
 
-            for p in range(0,j - i + 1 + 1):
-                # To each value of the slice add the attenuation contribution with weight centered around that value's corresponding position
-                # And be careful of the fact that radRec is not shifted left like PL_base is
-                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).transpose() + theta * (1 - frac_emitted) * 0.5 * delta * radRec[:,i + p] + \
-                    intg.trapz(combined_weight2[p] * radRec, dx=dx, axis=1).transpose() + theta * (1 - frac_emitted) * 0.5 * (1 - delta) * radRec[:,i + p]
+            # To each value of the slice add the attenuation contribution with weight centered around that value's corresponding position
+            # And be careful of the fact that radRec is not shifted left like PL_base is
+            for p in range(len(PL_base[0])):
+                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).T + radRec[:,i+p] * theta * (1-frac_emitted) * 0.5
 
-            # Be careful not to include our "extra" node in the integral - that node is for corrections only
+
             PL = intg.trapz(PL_base[:, :-1], dx=dx, axis=1)
 
         else:
             PL_base = frac_emitted * radRec[:, i:j+1]
-
-            for p in range(0,j - i + 1):
-                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).transpose() + theta * (1 - frac_emitted) * 0.5 * delta * radRec[:,i + p] + \
-                    intg.trapz(combined_weight2[p] * radRec, dx=dx, axis=1).transpose() + theta * (1 - frac_emitted) * 0.5 * (1 - delta) * radRec[:,i + p]
-
+            
+            for p in range(len(PL_base[0])):
+                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).T + radRec[:,i+p] * theta * (1-frac_emitted) * 0.5
 
             PL = intg.trapz(PL_base, dx=dx, axis=1)
 
