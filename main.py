@@ -509,6 +509,14 @@ def read_TS(filename, index=None):
         else:
             return np.array(ifstream.root.data[index])
         
+def read_slice(filename, l, r, need_extra_node):
+    ## Read from space step l to space step r (or r+1) inclusive
+    with tables.open_file(filename, mode='r') as ifstream:
+        if need_extra_node:
+            return np.array(ifstream.root.data[:,l:r+2])
+        else:
+            return np.array(ifstream.root.data[:,l:r+1])
+        
 class Notebook:
 	# This is somewhat Java-like: everything about the GUI exists inside a class
     # A goal is to achieve total separation between this class (i.e. the GUI) and all mathematical operations, which makes this GUI reusable for different problems
@@ -3120,16 +3128,34 @@ class Notebook:
 
                 print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
-                ## TODO: Clean up these filenames
-                if (datatype == "N"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N:
-                        data = ifstream_N.root.data
-                        if include_negative:
-                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
-                                finite.integrate(data, 0, u_bound, dx, total_length)
-                        else:
-                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
+                if include_negative:
+                    i = finite.toIndex(-l_bound, dx, total_length)
+                else:
+                    i = finite.toIndex(l_bound, dx, total_length)
+                j = finite.toIndex(u_bound, dx, total_length)
+                m = int(total_length / dx)
             
+                
+                ## TODO: Clean up these filenames
+                pathname = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename
+                if (datatype == "N"):
+                    if include_negative:
+                        need_extra_node = -l_bound > finite.toCoord(i, dx) + dx / 2
+                        data = read_slice(pathname + "-N.h5", 0, i, need_extra_node)
+                        
+                        I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, need_extra_node)
+
+                        need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2
+                        data = read_slice(pathname + "-N.h5", 0, j, need_extra_node)
+                        
+                        I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, need_extra_node)
+
+                    else:
+                        need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2 or l_bound == u_bound
+                        data = data = read_slice(pathname + "-N.h5", i, j, need_extra_node) 
+                        
+                        I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, need_extra_node)
+
                 elif (datatype == "P"):
                     with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
                         data = ifstream_P.root.data
@@ -3174,17 +3200,27 @@ class Notebook:
                             I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
 
                 else: # datatype = "PL"
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
-                        tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                        temp_N = np.array(ifstream_N.root.data)
-                        temp_P = np.array(ifstream_P.root.data)
-                        if include_negative:
-                            I_data = finite.propagatingPL({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict, 0, -l_bound) + \
-                                finite.propagatingPL({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict, 0, u_bound)
-                        else:
-                            I_data = finite.propagatingPL({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict, l_bound, u_bound)
-                            
+                    temp_N = read_TS(pathname + "-N.h5")
+                    temp_P = read_TS(pathname + "-P.h5")
+                    
+                    params = active_datagroup.datasets[tag].params_dict
+                    radRec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, params)
+                        
+                    if include_negative:
+                        need_extra_node = -l_bound > finite.toCoord(i, dx) + dx / 2
+                        PL_base = finite.prep_PL(radRec, 0, i, need_extra_node, params)
+                        I_data = finite.new_integrate(PL_base, 0, -l_bound, 0, i, dx, total_length, need_extra_node)
 
+                        need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2
+                        PL_base = finite.prep_PL(radRec, 0, j, need_extra_node, params)
+                        I_data += finite.new_integrate(PL_base, 0, u_bound, 0, j, dx, total_length, need_extra_node)
+
+                    else:
+                        need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2 or l_bound == u_bound
+                        PL_base = finite.prep_PL(radRec, i, j, need_extra_node, params)
+                        I_data = finite.new_integrate(PL_base, l_bound, u_bound, i, j, dx, total_length, need_extra_node)
+
+                            
                 if self.PL_mode == "Current time step":
                     # FIXME: We don't need to integrate everything just to extract a single time step
                     # Change the integration procedure above to work only with the needed data

@@ -300,7 +300,6 @@ def ode_twolayer(m, f, dm, df, thickness_Layer1, thickness_Layer2, z0, dt, total
     return
 
 
-import time
 def propagatingPL(sim_outputs, params, l_bound, u_bound):
     #note: first dimension of radRec is time, second dimension is space
     radRec = radiative_recombination(sim_outputs, params)
@@ -380,6 +379,28 @@ def propagatingPL(sim_outputs, params, l_bound, u_bound):
 
     return PL
 
+def prep_PL(radRec, i, j, need_extra_node, params):
+    frac_emitted = params["Frac-Emitted"]
+    alpha = 0 if params["ignore_alpha"] else params["Alpha"]
+    theta = params["Theta"]
+    delta = params["Delta"]
+    dx = params["Node_width"]
+    total_length = params["Total_length"]
+    m = int(total_length / dx)
+            
+    if need_extra_node:
+        temp_RR = radRec[:, i:j+2]
+    else:
+        temp_RR = radRec[:, i:j+1]
+    PL_base = frac_emitted * temp_RR
+    
+    combined_weight = PL_weight_distribution(m, dx, total_length, i, j, alpha, theta, delta, frac_emitted, need_extra_node, params["symmetric_system"])
+
+    for p in range(len(PL_base[0])):
+        PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).T + radRec[:,i+p] * theta * (1-frac_emitted) * 0.5
+    
+    return PL_base
+
 def integrate(base_data, l_bound, u_bound, dx, total_length):
     # See propagatingPL() for additional info
     i = toIndex(l_bound, dx, total_length)
@@ -411,6 +432,32 @@ def integrate(base_data, l_bound, u_bound, dx, total_length):
             I_base = base_data[:, i:j+1]
             I_data = intg.trapz(I_base, dx=dx, axis=1)
 
+
+        I_data += correct_integral(I_base.T, l_bound, u_bound, i, j, dx)
+    return I_data
+
+def new_integrate(base_data, l_bound, u_bound, i, j, dx, total_length, need_extra_node):
+    if l_bound == u_bound:
+        I_base = base_data[:,0]
+        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == total_length:
+            I_plus_one = base_data[:,1]
+
+        if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == total_length:
+            I_data = (I_base + I_plus_one) / 2
+
+        elif l_bound > toCoord(i, dx) + dx / 2:
+            I_data = I_plus_one
+
+        else:
+            I_data = I_base
+    else:
+        if need_extra_node:
+            I_base = base_data
+            I_data = intg.trapz(I_base[:, :-1], dx=dx, axis=1)
+            
+        else:
+            I_base = base_data
+            I_data = intg.trapz(I_base, dx=dx, axis=1)
 
         I_data += correct_integral(I_base.T, l_bound, u_bound, i, j, dx)
     return I_data
