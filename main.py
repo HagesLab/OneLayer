@@ -3138,67 +3138,74 @@ class Notebook:
                 
                 ## TODO: Clean up these filenames
                 pathname = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename
-                if (datatype == "N"):
+                if (datatype in self.nanowire.simulation_outputs_dict):
                     if include_negative:
                         need_extra_node = -l_bound > finite.toCoord(i, dx) + dx / 2
-                        data = read_slice(pathname + "-N.h5", 0, i, need_extra_node)
+                        data = read_slice("{}-{}.h5".format(pathname, datatype), 0, i, need_extra_node)
                         
                         I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, need_extra_node)
 
                         need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2
-                        data = read_slice(pathname + "-N.h5", 0, j, need_extra_node)
+                        data = read_slice("{}-{}.h5".format(pathname, datatype), 0, j, need_extra_node)
                         
                         I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, need_extra_node)
 
                     else:
                         need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2 or l_bound == u_bound
-                        data = data = read_slice(pathname + "-N.h5", i, j, need_extra_node) 
+                        data = read_slice("{}-{}.h5".format(pathname, datatype), i, j, need_extra_node) 
                         
                         I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, need_extra_node)
 
-                elif (datatype == "P"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                        data = ifstream_P.root.data
-                        if include_negative:
-                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
-                                finite.integrate(data, 0, u_bound, dx, total_length)
-                        else:
-                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
-
-                elif (datatype == "E_field"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-E_field.h5", mode='r') as ifstream_E_field:
-                        data = ifstream_E_field.root.data
-                        if include_negative:
-                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
-                                finite.integrate(data, 0, u_bound, dx, total_length)
-                        else:
-                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
-
                 elif (datatype == "RR"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
-                        tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                        temp_N = np.array(ifstream_N.root.data)
-                        temp_P = np.array(ifstream_P.root.data)
-
+                    
+                    if include_negative:
+                        need_extra_node = -l_bound > finite.toCoord(i, dx) + dx / 2
+                        temp_N = read_slice("{}-N.h5".format(pathname), 0, i, need_extra_node)
+                        temp_P = read_slice("{}-P.h5".format(pathname), 0, i, need_extra_node)
                         data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                        if include_negative:
-                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
-                                finite.integrate(data, 0, u_bound, dx, total_length)
-                        else:
-                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
+                        
+                        I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, need_extra_node)
 
+                        need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2
+                        temp_N = read_slice("{}-N.h5".format(pathname), 0, j, need_extra_node)
+                        temp_P = read_slice("{}-P.h5".format(pathname), 0, j, need_extra_node)
+                        data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
+                        
+                        I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, need_extra_node)
+
+                    else:
+                        need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2 or l_bound == u_bound
+                        temp_N = read_slice("{}-N.h5".format(pathname), i, j, need_extra_node) 
+                        temp_P = read_slice("{}-P.h5".format(pathname), i, j, need_extra_node) 
+                        data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
+                        
+                        I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, need_extra_node)
+                    
                 elif (datatype == "NRR"):
-                    with tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-n.h5", mode='r') as ifstream_N, \
-                        tables.open_file(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename + "-p.h5", mode='r') as ifstream_P:
-                        temp_N = np.array(ifstream_N.root.data)
-                        temp_P = np.array(ifstream_P.root.data)
+                    if include_negative:
+                        need_extra_node = -l_bound > finite.toCoord(i, dx) + dx / 2
+                        temp_N = read_slice("{}-N.h5".format(pathname), 0, i, need_extra_node)
+                        temp_P = read_slice("{}-P.h5".format(pathname), 0, i, need_extra_node)
                         data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                        if include_negative:
-                            I_data = finite.integrate(data, 0, -l_bound, dx, total_length) + \
-                                finite.integrate(data, 0, u_bound, dx, total_length)
-                        else:
-                            I_data = finite.integrate(data, l_bound, u_bound, dx, total_length)
+                        
+                        I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, need_extra_node)
 
+                        need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2
+                        temp_N = read_slice("{}-N.h5".format(pathname), 0, j, need_extra_node)
+                        temp_P = read_slice("{}-P.h5".format(pathname), 0, j, need_extra_node)
+                        data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
+                        
+                        I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, need_extra_node)
+
+                    else:
+                        need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2 or l_bound == u_bound
+                        temp_N = read_slice("{}-N.h5".format(pathname), i, j, need_extra_node) 
+                        temp_P = read_slice("{}-P.h5".format(pathname), i, j, need_extra_node) 
+                        data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
+                        
+                        I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, need_extra_node)
+
+                    
                 else: # datatype = "PL"
                     temp_N = read_TS(pathname + "-N.h5")
                     temp_P = read_TS(pathname + "-P.h5")

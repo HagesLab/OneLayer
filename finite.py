@@ -401,41 +401,6 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     
     return PL_base
 
-def integrate(base_data, l_bound, u_bound, dx, total_length):
-    # See propagatingPL() for additional info
-    i = toIndex(l_bound, dx, total_length)
-    j = toIndex(u_bound, dx, total_length)
-    m = int(total_length / dx)
-
-    need_extra_node = u_bound > toCoord(j, dx) + dx / 2 or l_bound == u_bound
-
-    if (l_bound == u_bound):
-        I_base = base_data[:,i]
-        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == total_length:
-            I_plus_one = base_data[:,i+1]
-
-        if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == total_length:
-            I_data = (I_base + I_plus_one) / 2
-
-        elif l_bound > toCoord(i, dx) + dx / 2:
-            I_data = I_plus_one
-
-        else:
-            I_data = I_base
-
-    else:
-        if need_extra_node:
-            I_base = base_data[:, i:j+1+1]
-            I_data = intg.trapz(I_base[:, :-1], dx=dx, axis=1)
-
-        else:
-            I_base = base_data[:, i:j+1]
-            I_data = intg.trapz(I_base, dx=dx, axis=1)
-
-
-        I_data += correct_integral(I_base.T, l_bound, u_bound, i, j, dx)
-    return I_data
-
 def new_integrate(base_data, l_bound, u_bound, i, j, dx, total_length, need_extra_node):
     if l_bound == u_bound:
         I_base = base_data[:,0]
