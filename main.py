@@ -282,7 +282,7 @@ class Nanowire:
             data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, raw_output_name)
             data = []
             for tstep in tsteps:
-                data.append(read_TS(data_filename, tstep))
+                data.append(u_read(data_filename, t0=tstep, single_tstep=True))
             
             data_dict[raw_output_name] = np.array(data)
             
@@ -499,23 +499,20 @@ def check_valid_filename(file_name):
         return False
 
     return True
-
-def read_TS(filename, index=None):
-    ## Read one time step's worth of data from a particular variable
-    with tables.open_file(filename, mode='r') as ifstream:
-        if index is None:
-            return np.array(ifstream.root.data)
         
-        else:
-            return np.array(ifstream.root.data[index])
+def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, need_extra_node=False):
+    if not (t0 is None) and single_tstep:
+        t1 = t0 + 1
         
-def read_slice(filename, l, r, need_extra_node):
-    ## Read from space step l to space step r (or r+1) inclusive
+    if need_extra_node:
+        r = r + 1
+        
     with tables.open_file(filename, mode='r') as ifstream:
-        if need_extra_node:
-            return np.array(ifstream.root.data[:,l:r+2])
-        else:
-            return np.array(ifstream.root.data[:,l:r+1])
+        data = np.array(ifstream.root.data[t0:t1, l:r])
+        
+        if np.ndim(data) == 2 and len(data) == 1:
+            data = data.flatten()
+        return data
         
 class Notebook:
 	# This is somewhat Java-like: everything about the GUI exists inside a class
@@ -2162,15 +2159,15 @@ class Notebook:
                     
                     var = "N"
                     path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
-                    param_dict_copy["deltaN"] = read_TS(path_name, active_sets[key].show_index) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
+                    param_dict_copy["deltaN"] = u_read(path_name, t0=active_sets[key].show_index, single_tstep=True) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
                     
                     var = "P"
                     path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
-                    param_dict_copy["deltaP"] = read_TS(path_name, active_sets[key].show_index) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
+                    param_dict_copy["deltaP"] = u_read(path_name, t0=active_sets[key].show_index, single_tstep=True) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
                     
                     var = "E_field"
                     path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
-                    param_dict_copy["E_field"] = read_TS(path_name, active_sets[key].show_index) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
+                    param_dict_copy["E_field"] = u_read(path_name, t0=active_sets[key].show_index, single_tstep=True) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
 
                     with open(new_filename + ".txt", "w+") as ofstream:
                         ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
@@ -2538,7 +2535,7 @@ class Notebook:
             try:
                 # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
-                new_data = Raw_Data_Set(read_TS(path_name, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(u_read(path_name, t0=active_show_index, single_tstep=True), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
@@ -2547,7 +2544,7 @@ class Notebook:
         elif (datatype == "P"):
             try:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
-                new_data = Raw_Data_Set(read_TS(path_name, active_show_index), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(u_read(path_name, t0=active_show_index, single_tstep=True), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
@@ -2556,7 +2553,7 @@ class Notebook:
         elif (datatype == "E_field"):
             try:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "E_field")
-                new_data = Raw_Data_Set(read_TS(path_name, active_show_index), data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+                new_data = Raw_Data_Set(u_read(path_name, t0=active_show_index, single_tstep=True), data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except:
                 self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
@@ -2565,9 +2562,9 @@ class Notebook:
         elif (datatype == "RR"):
             try:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
-                temp_N = read_TS(path_name, active_show_index)
+                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
-                temp_P = read_TS(path_name, active_show_index)
+                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
                 new_data = Raw_Data_Set(finite.radiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict), 
                                     data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
@@ -2578,9 +2575,9 @@ class Notebook:
         elif (datatype == "NRR"):
             try:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
-                temp_N = read_TS(path_name, active_show_index)
+                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
-                temp_P = read_TS(path_name, active_show_index)
+                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
                 new_data = Raw_Data_Set(finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict),  
                                     data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
@@ -2591,9 +2588,9 @@ class Notebook:
         elif (datatype == "PL"):
             try:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
-                temp_N = read_TS(path_name, active_show_index)
+                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
-                temp_P = read_TS(path_name, active_show_index)
+                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
                 rad_rec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict)
 
                 max = param_values_dict["Total_length"]
@@ -2700,27 +2697,27 @@ class Notebook:
         if active_datagroup.type == "N":
             for tag in active_datagroup.datasets:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
-                active_datagroup.datasets[tag].data = read_TS(path_name, active_show_index)
+                active_datagroup.datasets[tag].data = u_read(path_name, t0=active_show_index, single_tstep=True)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "P":
             for tag in active_datagroup.datasets:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
-                active_datagroup.datasets[tag].data = read_TS(path_name, active_show_index)
+                active_datagroup.datasets[tag].data = u_read(path_name, t0=active_show_index, single_tstep=True)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "E_field":
             for tag in active_datagroup.datasets:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "E_field")
-                active_datagroup.datasets[tag].data = read_TS(path_name, active_show_index)
+                active_datagroup.datasets[tag].data = u_read(path_name, t0=active_show_index, single_tstep=True)
                 active_datagroup.datasets[tag].show_index = active_show_index
 
         elif active_datagroup.type == "RR":
             for tag in active_datagroup.datasets:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
-                temp_N = read_TS(path_name, active_show_index)
+                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
-                temp_P = read_TS(path_name, active_show_index)
+                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 B = active_datagroup.datasets[tag].params_dict["B"]
@@ -2730,9 +2727,9 @@ class Notebook:
         elif active_datagroup.type == "NRR":
             for tag in active_datagroup.datasets:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
-                temp_N = read_TS(path_name, active_show_index)
+                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
-                temp_P = read_TS(path_name, active_show_index)
+                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 tauN = active_datagroup.datasets[tag].params_dict["Tau_N"]
@@ -2743,9 +2740,9 @@ class Notebook:
         elif active_datagroup.type == "PL":
             for tag in active_datagroup.datasets:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
-                temp_N = read_TS(path_name, active_show_index)
+                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
-                temp_P = read_TS(path_name, active_show_index)
+                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
                 B = active_datagroup.datasets[tag].params_dict["B"]
                 n0 = active_datagroup.datasets[tag].params_dict["N0"]
                 p0 = active_datagroup.datasets[tag].params_dict["P0"]
@@ -3009,7 +3006,7 @@ class Notebook:
         for i in range(1,6):
             for var in self.sim_data:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name, data_file_name, var)
-                self.sim_data[var] = read_TS(path_name, int(self.n * i / 5))
+                self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), single_tstep=True)
             self.update_sim_plots(self.n, do_clear_plots=False)
 
         # Save metadata: list of param values used for the simulation
@@ -3141,18 +3138,18 @@ class Notebook:
                 if (datatype in self.nanowire.simulation_outputs_dict):
                     if include_negative:
                         need_extra_node = -l_bound > finite.toCoord(i, dx) + dx / 2
-                        data = read_slice("{}-{}.h5".format(pathname, datatype), 0, i, need_extra_node)
+                        data = u_read("{}-{}.h5".format(pathname, datatype), l=0, r=i+1, need_extra_node=need_extra_node)
                         
                         I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, need_extra_node)
 
                         need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2
-                        data = read_slice("{}-{}.h5".format(pathname, datatype), 0, j, need_extra_node)
+                        data = u_read("{}-{}.h5".format(pathname, datatype), l=0, r=j+1, need_extra_node=need_extra_node)
                         
                         I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, need_extra_node)
 
                     else:
                         need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2 or l_bound == u_bound
-                        data = read_slice("{}-{}.h5".format(pathname, datatype), i, j, need_extra_node) 
+                        data = u_read("{}-{}.h5".format(pathname, datatype), l=i, r=j+1, need_extra_node=need_extra_node) 
                         
                         I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, need_extra_node)
 
@@ -3160,23 +3157,23 @@ class Notebook:
                     
                     if include_negative:
                         need_extra_node = -l_bound > finite.toCoord(i, dx) + dx / 2
-                        temp_N = read_slice("{}-N.h5".format(pathname), 0, i, need_extra_node)
-                        temp_P = read_slice("{}-P.h5".format(pathname), 0, i, need_extra_node)
+                        temp_N = u_read("{}-N.h5".format(pathname), l=0, r=i+1, need_extra_node=need_extra_node)
+                        temp_P = u_read("{}-P.h5".format(pathname), l=0, r=i+1, need_extra_node=need_extra_node)
                         data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, need_extra_node)
 
                         need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2
-                        temp_N = read_slice("{}-N.h5".format(pathname), 0, j, need_extra_node)
-                        temp_P = read_slice("{}-P.h5".format(pathname), 0, j, need_extra_node)
+                        temp_N = u_read("{}-N.h5".format(pathname), l=0, r=j+1, need_extra_node=need_extra_node)
+                        temp_P = u_read("{}-P.h5".format(pathname), l=0, r=j+1, need_extra_node=need_extra_node)
                         data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, need_extra_node)
 
                     else:
                         need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2 or l_bound == u_bound
-                        temp_N = read_slice("{}-N.h5".format(pathname), i, j, need_extra_node) 
-                        temp_P = read_slice("{}-P.h5".format(pathname), i, j, need_extra_node) 
+                        temp_N = u_read("{}-N.h5".format(pathname), l=i, r=j+1, need_extra_node=need_extra_node) 
+                        temp_P = u_read("{}-P.h5".format(pathname), l=i, r=j+1, need_extra_node=need_extra_node) 
                         data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, need_extra_node)
@@ -3184,31 +3181,31 @@ class Notebook:
                 elif (datatype == "NRR"):
                     if include_negative:
                         need_extra_node = -l_bound > finite.toCoord(i, dx) + dx / 2
-                        temp_N = read_slice("{}-N.h5".format(pathname), 0, i, need_extra_node)
-                        temp_P = read_slice("{}-P.h5".format(pathname), 0, i, need_extra_node)
+                        temp_N = u_read("{}-N.h5".format(pathname), l=0, r=i+1, need_extra_node=need_extra_node)
+                        temp_P = u_read("{}-P.h5".format(pathname), l=0, r=i+1, need_extra_node=need_extra_node)
                         data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, need_extra_node)
 
                         need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2
-                        temp_N = read_slice("{}-N.h5".format(pathname), 0, j, need_extra_node)
-                        temp_P = read_slice("{}-P.h5".format(pathname), 0, j, need_extra_node)
+                        temp_N = u_read("{}-N.h5".format(pathname), l=0, r=j+1, need_extra_node=need_extra_node)
+                        temp_P = u_read("{}-P.h5".format(pathname), l=0, r=j+1, need_extra_node=need_extra_node)
                         data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, need_extra_node)
 
                     else:
                         need_extra_node = u_bound > finite.toCoord(j, dx) + dx / 2 or l_bound == u_bound
-                        temp_N = read_slice("{}-N.h5".format(pathname), i, j, need_extra_node) 
-                        temp_P = read_slice("{}-P.h5".format(pathname), i, j, need_extra_node) 
+                        temp_N = u_read("{}-N.h5".format(pathname), l=i, r=j+1, need_extra_node=need_extra_node) 
+                        temp_P = u_read("{}-P.h5".format(pathname), l=i, r=j+1, need_extra_node=need_extra_node) 
                         data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, need_extra_node)
 
                     
                 else: # datatype = "PL"
-                    temp_N = read_TS(pathname + "-N.h5")
-                    temp_P = read_TS(pathname + "-P.h5")
+                    temp_N = u_read(pathname + "-N.h5")
+                    temp_P = u_read(pathname + "-P.h5")
                     
                     params = active_datagroup.datasets[tag].params_dict
                     radRec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, params)
