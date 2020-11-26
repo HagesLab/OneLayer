@@ -1,7 +1,7 @@
 #################################################
 # Transient Electron Dynamics Simulator
 # Model photoluminescent behavior in one-dimensional nanowire
-# Last modified: Oct 5, 2020
+# Last modified: Nov 25, 2020
 # Author: Calvin Fai, Charles Hages
 # Contact:
 ################################################# 
@@ -2593,43 +2593,7 @@ class Notebook:
                 temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
                 rad_rec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict)
 
-                max = param_values_dict["Total_length"]
-                dx = param_values_dict["Node_width"]
-                distance = np.linspace(0, max - dx, data_m)
-                alphaCof = param_values_dict["Alpha"] if not param_values_dict["ignore_alpha"] else 0
-                thetaCof = param_values_dict["Theta"]
-                delta_frac = param_values_dict["Delta"]
-                fracEmitted = param_values_dict["Frac-Emitted"]
-                symmetric_system = param_values_dict["symmetric_system"]
-                
-                # Make room for one more value than necessary - this value at index j+1 will be used to pad the upper correction
-                distance_matrix = np.zeros((data_m, data_m))
-                lf_distance_matrix = np.zeros((data_m, data_m))
-
-                # Each row in weight will represent the weight function centered around a different position
-                # Total reflection is assumed to occur at either end of the system: 
-                # Left (x=0) reflection is equivalent to a symmetric wire situation while right reflection (x=thickness) is usually negligible
-                for n in range(0, data_m):
-                    distance_matrix[n] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:data_m - n]))
-                    lf_distance_matrix[n] = distance + (n * dx)
-
-                weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
-                lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix) if symmetric_system else 0
-
-                combined_weight = (1 - fracEmitted) * 0.5 * thetaCof * delta_frac * (weight + lf_weight)
-
-                weight2 = np.exp(-(thetaCof) * distance_matrix)
-                lf_weight2 = np.exp(-(thetaCof) * lf_distance_matrix) if symmetric_system else 0
-
-                combined_weight2 = (1 - fracEmitted) * 0.5 * thetaCof * (1 - delta_frac) * (weight2 + lf_weight2)
-
-                PL_base = fracEmitted * rad_rec
-
-                for p in range(0, data_m):
-                    # To each value of the slice add the attenuation contribution with weight centered around that value's corresponding position
-                    PL_base[p] += intg.trapz(combined_weight[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * rad_rec[p] + \
-                        intg.trapz(combined_weight2[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * rad_rec[p]
-
+                PL_base = finite.prep_PL(rad_rec, 0, data_m, need_extra_node=False, params=param_values_dict).flatten()
                 new_data = Raw_Data_Set(PL_base, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
 
             except OSError:
@@ -2743,48 +2707,13 @@ class Notebook:
                 temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
                 temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
-                B = active_datagroup.datasets[tag].params_dict["B"]
-                n0 = active_datagroup.datasets[tag].params_dict["N0"]
-                p0 = active_datagroup.datasets[tag].params_dict["P0"]
                 rad_rec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
 
                 max = active_datagroup.datasets[tag].params_dict["Total_length"]
                 dx = active_datagroup.datasets[tag].params_dict["Node_width"]
                 data_m = int(0.5 + max / dx)
-                distance = np.linspace(0, max - dx, data_m)
-                alphaCof = active_datagroup.datasets[tag].params_dict["Alpha"] if not active_datagroup.datasets[tag].params_dict["ignore_alpha"] else 0
-                thetaCof = active_datagroup.datasets[tag].params_dict["Theta"]
-                delta_frac = active_datagroup.datasets[tag].params_dict["Delta"]
-                fracEmitted = active_datagroup.datasets[tag].params_dict["Frac-Emitted"]
-
-                # Make room for one more value than necessary - this value at index j+1 will be used to pad the upper correction
-                distance_matrix = np.zeros((data_m, data_m))
-                lf_distance_matrix = np.zeros((data_m, data_m))
-
-                # Each row in weight will represent the weight function centered around a different position
-                # Total reflection is assumed to occur at either end of the system: 
-                # Left (x=0) reflection is equivalent to a symmetric wire situation while right reflection (x=thickness) is usually negligible
-                for n in range(0, data_m):
-                    distance_matrix[n] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:data_m - n]))
-                    lf_distance_matrix[n] = distance + (n * dx)
-
-                weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
-                lf_weight = np.exp(-(alphaCof + thetaCof) * lf_distance_matrix) if active_datagroup.datasets[tag].params_dict["symmetric_system"] else 0
-
-                combined_weight = (1 - fracEmitted) * 0.5 * thetaCof * delta_frac * (weight + lf_weight)
-
-                weight2 = np.exp(-(thetaCof) * distance_matrix)
-                lf_weight2 = np.exp(-(thetaCof) * lf_distance_matrix) if active_datagroup.datasets[tag].params_dict["symmetric_system"] else 0
-
-                combined_weight2 = (1 - fracEmitted) * 0.5 * thetaCof * (1 - delta_frac) * (weight2 + lf_weight2)
-
-                PL_base = fracEmitted * rad_rec
-
-                for p in range(0, data_m):
-                    # To each value of the slice add the attenuation contribution with weight centered around that value's corresponding position
-                    PL_base[p] += intg.trapz(combined_weight[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * delta_frac * rad_rec[p] + \
-                        intg.trapz(combined_weight2[p] * rad_rec, dx=dx) + thetaCof * (1 - fracEmitted) * 0.5 * (1 - delta_frac) * rad_rec[p]
-
+                
+                PL_base = finite.prep_PL(rad_rec, 0, data_m, need_extra_node=False, params=active_datagroup.datasets[tag].params_dict).flatten()
                 active_datagroup.datasets[tag].data = PL_base
                 active_datagroup.datasets[tag].show_index = active_show_index
 

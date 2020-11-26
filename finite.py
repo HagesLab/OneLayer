@@ -387,6 +387,9 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     dx = params["Node_width"]
     total_length = params["Total_length"]
     m = int(total_length / dx)
+    
+    if np.ndim(radRec) == 1:
+        radRec = radRec.reshape((1, len(radRec)))
             
     if need_extra_node:
         temp_RR = radRec[:, i:j+2]
