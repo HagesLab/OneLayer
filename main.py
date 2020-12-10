@@ -135,7 +135,7 @@ class Nanowire:
                                          "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_p, is_integrated=False),
                                          "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, is_calculated=True, calc_func=finite.radiative_recombination, is_integrated=False),
                                          "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.nonradiative_recombination, is_integrated=False),
-                                         "PL":Output("TRPL", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.propagatingPL, is_integrated=True),
+                                         "PL":Output("TRPL", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.new_integrate, is_integrated=True),
                                          "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.tau_diff, is_integrated=True)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
@@ -295,7 +295,10 @@ class Nanowire:
             tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
-        data_dict["PL"] = self.calculated_outputs_dict["PL"].calc_func({"N":temp_N, "P":temp_P}, params, 0, params["Total_length"])
+        temp_RR = finite.radiative_recombination({"N":temp_N, "P":temp_P}, params)
+        PL_base = finite.prep_PL(temp_RR, 0, finite.toIndex(params["Total_length"], params["Node_width"], params["Total_length"]), False, params)
+        data_dict["PL"] = self.calculated_outputs_dict["PL"].calc_func(PL_base, 0, params["Total_length"], 0, finite.toIndex(params["Total_length"], params["Node_width"], params["Total_length"]), 
+                                                                       params["Node_width"], params["Total_length"], False)
         
         data_dict["tau_diff"] = self.calculated_outputs_dict["tau_diff"].calc_func(data_dict["PL"], params["dt"])
         

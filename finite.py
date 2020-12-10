@@ -299,86 +299,6 @@ def ode_twolayer(m, f, dm, df, thickness_Layer1, thickness_Layer2, z0, dt, total
         eta_UC= PL_Layer2_array / integrated_init_N*100    #[%]
     return
 
-
-def propagatingPL(sim_outputs, params, l_bound, u_bound):
-    #note: first dimension of radRec is time, second dimension is space
-    radRec = radiative_recombination(sim_outputs, params)
-    
-    alpha = 0 if params["ignore_alpha"] else params["Alpha"]
-    theta = params["Theta"]
-    delta = params["Delta"]
-    frac_emitted = params["Frac-Emitted"]
-    total_length = params["Total_length"]
-    dx = params["Node_width"]
-    
-    i = toIndex(l_bound, dx, total_length)
-    j = toIndex(u_bound, dx, total_length)
-    #if l_bound == u_bound: j += 1
-    m = int(total_length / dx)
-
-    # i and j here illustrate a problem - we would love to integrate from "l_bound" to "u_bound" exactly, but we only have a discrete list of values with spacing dx.
-    # The best we can really do is to map our bounds to the greatest space node less than or equal to the bounds, such that for example,
-    # with PL data at x = [10, 30, 50, ...] nm,
-    # an integral from x = 15 to x = 65 will map to i = 0 (the node at x = 10) and j = 2 (the node at x = 50).
-
-    # Thus, an integral from x = 15 to x = 65 would actually get you the integral from x = 10 to x = 50, but with a principal assumption of finite difference methods - 
-    # that the value of each node extends to a radius of dx / 2 around the node,
-    # we can correct the integral by subtracting the integral of the x = 10 node from x = 10 to x = 15 and adding in something similar from x = 50 to x = 65.
-    # Because node values are constant within their radius, these correction integrals are just the node values multiplied by a distance
-
-    # We may need an extra node if the u_bound bound extends beyond the radius of the highest node - in the above example, we can calculate the portion from x = 50 to x = 60 using PL[j = 2], 
-    # but we would need the node at x = 70 to calculate the portion from x = 60 to x = 65 (using PL[3]).
-    need_extra_node = u_bound > toCoord(j, dx) + dx / 2 or l_bound == u_bound
-
-    combined_weight = PL_weight_distribution(m, dx, total_length, i, j, alpha, theta, delta, frac_emitted, need_extra_node, params["symmetric_system"])
-
-    if (l_bound == u_bound):
-        # Technically an integral with identical bounds is zero, but it is far more useful to return the value at that point instead
-        # Because of how nodes work, this should just return the value of the appropriate node, or (and this may be controversial) the average of two adjacent nodes if it lies on an edge
-
-        # Even more controversial is how to handle the cases of integrating from x = 0 to x = 0 and vice versa at the far end of the system -
-        # these lie on edges but there are no adjacent nodes to average with!
-        # We decide for now that x = 0 yields the value of the leftmost node and x = (far end) yields the value of the rightmost node.
-
-        PL_base = frac_emitted * radRec[:,i] + intg.trapz(combined_weight[0] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * radRec[:,i]
-
-        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == total_length:
-            PL_plusOne = frac_emitted * radRec[:,i+1] + intg.trapz(combined_weight[1] * radRec, dx=dx, axis=1) + theta * (1 - frac_emitted) * 0.5 * radRec[:,i+1]
-        
-        if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == total_length: # if the bound lies on an edge and isn't the far end special case
-            PL = (PL_base + PL_plusOne) / 2
-
-        elif l_bound > toCoord(i, dx) + dx / 2: # if the bound exceeds the radius of the node it mapped to
-            PL = PL_plusOne
-
-        else:
-            PL = PL_base
-        
-    
-    else:
-        if need_extra_node:
-            PL_base = frac_emitted * radRec[:, i:j+1+1]
-
-            # To each value of the slice add the attenuation contribution with weight centered around that value's corresponding position
-            # And be careful of the fact that radRec is not shifted left like PL_base is
-            for p in range(len(PL_base[0])):
-                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).T + radRec[:,i+p] * theta * (1-frac_emitted) * 0.5
-
-
-            PL = intg.trapz(PL_base[:, :-1], dx=dx, axis=1)
-
-        else:
-            PL_base = frac_emitted * radRec[:, i:j+1]
-            
-            for p in range(len(PL_base[0])):
-                PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).T + radRec[:,i+p] * theta * (1-frac_emitted) * 0.5
-
-            PL = intg.trapz(PL_base, dx=dx, axis=1)
-
-        PL += correct_integral(PL_base.T, l_bound, u_bound, i, j, dx)
-
-    return PL
-
 def prep_PL(radRec, i, j, need_extra_node, params):
     frac_emitted = params["Frac-Emitted"]
     alpha = 0 if params["ignore_alpha"] else params["Alpha"]
@@ -435,7 +355,7 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
     uncorrected_u_bound = toCoord(j, dx)
     lfrac1 = min(l_bound - uncorrected_l_bound, dx / 2)
 
-    # Yes, integrand[0] and not integrand[i]. Note that in propagatingPL() and integrate(), the ith node maps to integrand[0] and the jth node maps to integrand[j-i].
+    # Yes, integrand[0] and not integrand[i]. Note that in integrate(), the ith node maps to integrand[0] and the jth node maps to integrand[j-i].
     l_bound_correction = integrand[0] * lfrac1
 
     if l_bound > uncorrected_l_bound + dx / 2:
