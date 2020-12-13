@@ -213,20 +213,30 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
     dChidz[0] = (init_Chi[1] - init_Chi[0]) / dx
     dChidz[m] = (init_Chi[m] - init_Chi[m-1]) / dx
 
+
+    ## Do n time steps
+    tSteps = np.linspace(0, n*dt, n+1)
+    data, error_data = intg.odeint(odefuncs.dydt, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
+        tfirst=True, full_output=True)
+        
+    if (data[1:, 0:2*m] < 0).any():
+        h = np.geomspace(2**2, 2**-6, 9)
+        for hmax in h:   
+            print("Simulation is not converging well, retrying with hmax={}".format(hmax))
+            data, error_data = intg.odeint(odefuncs.dydt, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
+                                           tfirst=True, full_output=True, hmax=hmax)
+                
+            if not (data[1:, 0:2*m] < 0).any():
+                break
+            
     if write_output:
         ## Prep output files
-
         with tables.open_file(data_path_name + "-N.h5", mode='a') as ofstream_N, \
             tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P, \
             tables.open_file(data_path_name + "-E_field.h5", mode='a') as ofstream_E_field:
             array_N = ofstream_N.root.data
             array_P = ofstream_P.root.data
             array_E_field = ofstream_E_field.root.data
-
-            ## Do n time steps
-            tSteps = np.linspace(0, n*dt, n+1)
-            data, error_data = intg.odeint(odefuncs.dydt, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
-                tfirst=True, full_output=True, hmax=1.0)
             array_N.append(data[1:,0:m])
             array_P.append(data[1:,m:2*(m)])
             array_E_field.append(data[1:,2*(m):])
@@ -234,11 +244,6 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
         return error_data
 
     else:
-        ## Do n time steps without writing to output files
-        tSteps = np.linspace(0, n*dt, n+1)
-        data, error_data = intg.odeint(odefuncs.dydt, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
-            tfirst=True, full_output=True, hmax=1.0)
-
         array_N = data[:,0:m]
         array_P = data[:,m:2*(m)]
 
