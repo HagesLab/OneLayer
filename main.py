@@ -2524,19 +2524,10 @@ class Notebook:
 
         return
 
-    def read_data(self, data_filename, plot_ID, do_overlay):
+    def read_data(self, data_filename, plot_ID, datatype):
         # Create a dataset object and prepare to plot on analysis tab
         # Select data type of incoming dataset from existing datasets
         active_plot = self.analysis_plots[plot_ID]
-        if do_overlay: # If we already know what type of data is being plotted
-            datatype = active_plot.datagroup.type
-        else:
-            try:
-                datatype = self.data_var.get()
-                if (datatype == ""): raise ValueError("Select a data type from the drop-down menu")
-            except ValueError as oops:
-                self.write(self.analysis_status, oops)
-                return
 
         try:
             param_values_dict = self.fetch_metadata(data_filename)
@@ -2550,28 +2541,21 @@ class Notebook:
             self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
             return
 
-        active_datagroup = active_plot.datagroup
-        if not do_overlay: 
-            active_plot.time_index = 0
-            active_datagroup.clear()
-
-        active_show_index = active_plot.time_index
-
 		# Now that we have the parameters from metadata, fetch the data itself
         sim_data = {}
         for sim_datatype in self.nanowire.simulation_outputs_dict:
             path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, sim_datatype)
-            sim_data[sim_datatype] = u_read(path_name, t0=active_show_index, single_tstep=True)
+            sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, single_tstep=True)
         
         try:
-            new_data = self.nanowire.create_dataset(datatype, sim_data, param_values_dict, data_node_x, data_edge_x, data_filename, active_show_index)
+            new_data = self.nanowire.create_dataset(datatype, sim_data, param_values_dict, data_node_x, data_edge_x, data_filename, active_plot.time_index)
             
         except:
             self.write(self.analysis_status, "Error: Unable to calculate {}".format(datatype))
             return
 
         try:
-            active_datagroup.add(new_data, new_data.tag())
+            active_plot.datagroup.add(new_data, new_data.tag())
 
         except ValueError:
             self.write(self.analysis_status, "Error: dt or total t mismatch")
@@ -2587,21 +2571,26 @@ class Notebook:
         active_plot = self.analysis_plots[plot_ID]
         if (active_plot.data_filenames.__len__() == 0): return
 
-        data_filename = active_plot.data_filenames[0]
-        short_filename = data_filename[data_filename.rfind('/') + 1:]
+        try:
+            datatype = self.data_var.get()
+            if (datatype == ""): raise ValueError("Select a data type from the drop-down menu")
+        except ValueError as oops:
+            self.write(self.analysis_status, oops)
+            return
 
-        self.read_data(short_filename, plot_ID, do_overlay=False)
-
-        for i in range(1, active_plot.data_filenames.__len__()):
+        active_plot.time_index = 0
+        active_plot.datagroup.clear()
+        
+        for i in range(0, active_plot.data_filenames.__len__()):
             data_filename = active_plot.data_filenames[i]
             short_filename = data_filename[data_filename.rfind('/') + 1:]
-            self.read_data(short_filename, plot_ID, do_overlay=True)
+            self.read_data(short_filename, plot_ID, datatype)
 
-        
+        # TODO: Better y-axis autoscaling
         active_plot.xlim = (0, active_plot.datagroup.get_max_x())
+        active_plot.xaxis_type = 'linear'
         max_val = active_plot.datagroup.get_maxval() * self.convert_out_dict[active_plot.datagroup.type]
         active_plot.ylim = (max_val * 1e-11, max_val * 10)
-        active_plot.xaxis_type = 'linear'
         active_plot.yaxis_type = 'log'
         self.plot_analyze(plot_ID, clear_plot=True)
         
