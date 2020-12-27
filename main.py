@@ -94,9 +94,8 @@ class Output(Characteristic):
 
 
 class Nanowire:
-    # A Nanowire object contains all information regarding the initial state of a nanowire
-    # All such state classes must uniquely define a param_dict, flags_dict, simulation_outputs_dict,
-    # convert_in_dict, and calc_inits()
+    # A Nanowire object stores all information regarding the initial state being edited in the IC tab
+    # And functions for managing other previously simulated nanowire data as they are loaded in
     def __init__(self):
         self.system_ID = "Nanowire"
         self.total_length = -1
@@ -104,6 +103,7 @@ class Nanowire:
         self.grid_x_nodes = -1
         self.grid_x_edges = -1
         self.spacegrid_is_set = False
+        
         self.param_dict = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True), "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True), 
                             "N0":Parameter(units="[cm^-3]", is_edge=False), "P0":Parameter(units="[cm^-3]", is_edge=False), 
                             "B":Parameter(units="[cm^3 / s]", is_edge=False), "Tau_N":Parameter(units="[ns]", is_edge=False), 
@@ -306,6 +306,32 @@ class Nanowire:
             data_dict[data] *= self.convert_out_dict[data]
             
         return data_dict
+    
+    def create_dataset(self, datatype, sim_data, param_values_dict, data_node_x, data_edge_x, data_filename, active_show_index):
+        # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
+        if (datatype in self.simulation_outputs_dict):
+            data = sim_data[datatype]
+        
+        else:
+            if (datatype == "RR"):
+                data = finite.radiative_recombination(sim_data, param_values_dict)
+
+            elif (datatype == "NRR"):
+                data = finite.nonradiative_recombination(sim_data, param_values_dict)
+
+            elif (datatype == "PL"):
+    
+                rad_rec = finite.radiative_recombination(sim_data, param_values_dict)
+    
+                data = finite.prep_PL(rad_rec, 0, len(data_node_x), need_extra_node=False, params=param_values_dict).flatten()
+
+            else:
+                raise ValueError
+                
+        if self.outputs_dict[datatype].is_edge: 
+            return Raw_Data_Set(data, data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+        else:
+            return Raw_Data_Set(data, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
     
 class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
@@ -2445,11 +2471,11 @@ class Notebook:
                 print("Warning: invalid xvar {} in system class definition for output {}".format(output_info.xvar, output_name))
                 continue
             
-            if values.ndim == 2:
+            if values.ndim == 2: # time/space variant outputs
                 for i in range(len(values)):
                     self.overview_subplots[output_name].plot(grid_x, values[i], label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
                     
-            else:
+            else: # Time variant only
                 self.overview_subplots[output_name].plot(grid_x, values)
 
         for output_name in self.nanowire.simulation_outputs_dict:
@@ -2520,7 +2546,6 @@ class Notebook:
             data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
             data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
 
-
         except:
             self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
             return
@@ -2533,75 +2558,17 @@ class Notebook:
         active_show_index = active_plot.time_index
 
 		# Now that we have the parameters from metadata, fetch the data itself
-		# For N, P, E-field this is just reading the data but for others we'll calculate it in situ
-        if (datatype == "N"):
-            try:
-                # Having data_node_x twice is NOT a typo - see definition of Data_Set() class for explanation
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
-                new_data = Raw_Data_Set(u_read(path_name, t0=active_show_index, single_tstep=True), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
-
-            except:
-                self.write(self.analysis_status, "Error: The data set {} is missing -n data".format(data_filename))
-                return
-
-        elif (datatype == "P"):
-            try:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
-                new_data = Raw_Data_Set(u_read(path_name, t0=active_show_index, single_tstep=True), data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
-
-            except:
-                self.write(self.analysis_status, "Error: The data set {} is missing -p data".format(data_filename))
-                return
-
-        elif (datatype == "E_field"):
-            try:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "E_field")
-                new_data = Raw_Data_Set(u_read(path_name, t0=active_show_index, single_tstep=True), data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
-
-            except:
-                self.write(self.analysis_status, "Error: The data set {} is missing -E_field data".format(data_filename))
-                return
+        sim_data = {}
+        for sim_datatype in self.nanowire.simulation_outputs_dict:
+            path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, sim_datatype)
+            sim_data[sim_datatype] = u_read(path_name, t0=active_show_index, single_tstep=True)
         
-        elif (datatype == "RR"):
-            try:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
-                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
-                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
-                new_data = Raw_Data_Set(finite.radiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict), 
-                                    data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
-
-            except:
-                self.write(self.analysis_status, "Error: Unable to calculate Rad Rec")
-                return
-
-        elif (datatype == "NRR"):
-            try:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
-                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
-                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
-                new_data = Raw_Data_Set(finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict),  
-                                    data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
-
-            except:
-                self.write(self.analysis_status, "Error: Unable to calculate Non Rad Rec")
-                return
-
-        elif (datatype == "PL"):
-            try:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "N")
-                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, "P")
-                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
-                rad_rec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, param_values_dict)
-
-                PL_base = finite.prep_PL(rad_rec, 0, data_m, need_extra_node=False, params=param_values_dict).flatten()
-                new_data = Raw_Data_Set(PL_base, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
-
-            except OSError:
-                self.write(self.analysis_status, "Error: Unable to calculate PL")
-                return
+        try:
+            new_data = self.nanowire.create_dataset(datatype, sim_data, param_values_dict, data_node_x, data_edge_x, data_filename, active_show_index)
+            
+        except:
+            self.write(self.analysis_status, "Error: Unable to calculate {}".format(datatype))
+            return
 
         try:
             active_datagroup.add(new_data, new_data.tag())
