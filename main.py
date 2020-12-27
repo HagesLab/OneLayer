@@ -307,7 +307,7 @@ class Nanowire:
             
         return data_dict
     
-    def create_dataset(self, datatype, sim_data, param_values_dict, data_node_x, data_edge_x, data_filename, active_show_index):
+    def prep_dataset(self, datatype, sim_data, param_values_dict):
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
         if (datatype in self.simulation_outputs_dict):
             data = sim_data[datatype]
@@ -323,15 +323,12 @@ class Nanowire:
     
                 rad_rec = finite.radiative_recombination(sim_data, param_values_dict)
     
-                data = finite.prep_PL(rad_rec, 0, len(data_node_x), need_extra_node=False, params=param_values_dict).flatten()
+                data = finite.prep_PL(rad_rec, 0, len(rad_rec), need_extra_node=False, params=param_values_dict).flatten()
 
             else:
                 raise ValueError
                 
-        if self.outputs_dict[datatype].is_edge: 
-            return Raw_Data_Set(data, data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
-        else:
-            return Raw_Data_Set(data, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_show_index)
+        return data
     
 class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
@@ -2548,8 +2545,12 @@ class Notebook:
             sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, single_tstep=True)
         
         try:
-            new_data = self.nanowire.create_dataset(datatype, sim_data, param_values_dict, data_node_x, data_edge_x, data_filename, active_plot.time_index)
-            
+            values = self.nanowire.prep_dataset(datatype, sim_data, param_values_dict)
+            if self.nanowire.outputs_dict[datatype].is_edge: 
+                new_data = Raw_Data_Set(values, data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
+            else:
+                new_data = Raw_Data_Set(values, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
+    
         except:
             self.write(self.analysis_status, "Error: Unable to calculate {}".format(datatype))
             return
@@ -2613,69 +2614,18 @@ class Notebook:
             self.write(self.analysis_status, "Invalid number of time steps")
             return
 
-        active_show_index = active_plot.time_index
         active_datagroup = active_plot.datagroup
 
         # Search data files for data at new time step
-        if active_datagroup.type == "N":
-            for tag in active_datagroup.datasets:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
-                active_datagroup.datasets[tag].data = u_read(path_name, t0=active_show_index, single_tstep=True)
-                active_datagroup.datasets[tag].show_index = active_show_index
-
-        elif active_datagroup.type == "P":
-            for tag in active_datagroup.datasets:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
-                active_datagroup.datasets[tag].data = u_read(path_name, t0=active_show_index, single_tstep=True)
-                active_datagroup.datasets[tag].show_index = active_show_index
-
-        elif active_datagroup.type == "E_field":
-            for tag in active_datagroup.datasets:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "E_field")
-                active_datagroup.datasets[tag].data = u_read(path_name, t0=active_show_index, single_tstep=True)
-                active_datagroup.datasets[tag].show_index = active_show_index
-
-        elif active_datagroup.type == "RR":
-            for tag in active_datagroup.datasets:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
-                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
-                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
-                n0 = active_datagroup.datasets[tag].params_dict["N0"]
-                p0 = active_datagroup.datasets[tag].params_dict["P0"]
-                B = active_datagroup.datasets[tag].params_dict["B"]
-                active_datagroup.datasets[tag].data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                active_datagroup.datasets[tag].show_index = active_show_index
-
-        elif active_datagroup.type == "NRR":
-            for tag in active_datagroup.datasets:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
-                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
-                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
-                n0 = active_datagroup.datasets[tag].params_dict["N0"]
-                p0 = active_datagroup.datasets[tag].params_dict["P0"]
-                tauN = active_datagroup.datasets[tag].params_dict["Tau_N"]
-                tauP = active_datagroup.datasets[tag].params_dict["Tau_P"]
-                active_datagroup.datasets[tag].data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                active_datagroup.datasets[tag].show_index = active_show_index
-
-        elif active_datagroup.type == "PL":
-            for tag in active_datagroup.datasets:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "N")
-                temp_N = u_read(path_name, t0=active_show_index, single_tstep=True)
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, active_datagroup.datasets[tag].filename, active_datagroup.datasets[tag].filename, "P")
-                temp_P = u_read(path_name, t0=active_show_index, single_tstep=True)
-                rad_rec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-
-                max = active_datagroup.datasets[tag].params_dict["Total_length"]
-                dx = active_datagroup.datasets[tag].params_dict["Node_width"]
-                data_m = int(0.5 + max / dx)
-                
-                PL_base = finite.prep_PL(rad_rec, 0, data_m, need_extra_node=False, params=active_datagroup.datasets[tag].params_dict).flatten()
-                active_datagroup.datasets[tag].data = PL_base
-                active_datagroup.datasets[tag].show_index = active_show_index
-
+        for tag, dataset in active_datagroup.datasets.items():
+            sim_data = {}
+            for sim_datatype in self.nanowire.simulation_outputs_dict:
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, dataset.filename, dataset.filename, sim_datatype)
+                sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, single_tstep=True)
+        
+            dataset.data = self.nanowire.prep_dataset(active_datagroup.type, sim_data, dataset.params_dict)
+            dataset.show_index = active_plot.time_index
+            
         else:
             self.write(self.analysis_status, "Error #107: Data group has an invalid datatype")
 
