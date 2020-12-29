@@ -1880,6 +1880,9 @@ class Notebook:
                     ubound = float(self.integration_ubound_entry.get())
                     if (lbound > ubound):
                         raise KeyError("Error: upper bound too small")
+                        
+                    if (lbound < 0 and ubound < 0):
+                        raise KeyError("Error: bounds out of range")
 
                     self.integration_bounds.append([lbound, ubound])
                     
@@ -1897,7 +1900,10 @@ class Notebook:
                     if width < 0: raise KeyError("Error: width must be non-negative")
 
                     for center in centers:
-                        self.integration_bounds.append([center - width, center + width])
+                        if center < 0:
+                            raise KeyError("Error: center {} is out of range".format(center))
+                        else:
+                            self.integration_bounds.append([center - width, center + width])
 
                 else:
                     raise KeyError("Select \"Single\" or \"Multiple\"")
@@ -2940,6 +2946,8 @@ class Notebook:
 
             if self.PL_mode == "Current time step":
                 show_index = active_datagroup.datasets[tag].show_index
+            else:
+                show_index = None
 
             # Clean up any bounds that extend past the confines of the system
             # The system usually exists from x=0 to x=total_length, but can accept x=-total_length to x=total_length if symmetric
@@ -2974,71 +2982,71 @@ class Notebook:
                 
                 m = int(total_length / dx)
             
+                do_curr_t = self.PL_mode == "Current time step"
                 
                 ## TODO: Clean up these filenames
                 pathname = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename
                 if (datatype in self.nanowire.simulation_outputs_dict):
                     if include_negative:
-                        data = u_read("{}-{}.h5".format(pathname, datatype), l=0, r=i+1, need_extra_node=nen[0])
+                        data = u_read("{}-{}.h5".format(pathname, datatype), t0=show_index, l=0, r=i+1, single_tstep=do_curr_t, need_extra_node=nen[0])
                         
                         I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, nen[0])
 
-                        data = u_read("{}-{}.h5".format(pathname, datatype), l=0, r=j+1, need_extra_node=nen[1])
+                        data = u_read("{}-{}.h5".format(pathname, datatype), t0=show_index, l=0, r=j+1, single_tstep=do_curr_t, need_extra_node=nen[1])
                         
                         I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, nen[1])
 
                     else:
-                        data = u_read("{}-{}.h5".format(pathname, datatype), l=i, r=j+1, need_extra_node=nen) 
+                        data = u_read("{}-{}.h5".format(pathname, datatype), t0=show_index, l=i, r=j+1, single_tstep=do_curr_t, need_extra_node=nen) 
                         
                         I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, nen)
 
                 elif (datatype == "RR"):
                     
                     if include_negative:
-                        temp_N = u_read("{}-N.h5".format(pathname), l=0, r=i+1, need_extra_node=nen[0])
-                        temp_P = u_read("{}-P.h5".format(pathname), l=0, r=i+1, need_extra_node=nen[0])
+                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=0, r=i+1, single_tstep=do_curr_t,need_extra_node=nen[0])
+                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=0, r=i+1, single_tstep=do_curr_t,need_extra_node=nen[0])
                         data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, nen[0])
 
-                        temp_N = u_read("{}-N.h5".format(pathname), l=0, r=j+1, need_extra_node=nen[1])
-                        temp_P = u_read("{}-P.h5".format(pathname), l=0, r=j+1, need_extra_node=nen[1])
+                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=0, r=j+1, single_tstep=do_curr_t,need_extra_node=nen[1])
+                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=0, r=j+1, single_tstep=do_curr_t,need_extra_node=nen[1])
                         data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, nen[1])
 
                     else:
-                        temp_N = u_read("{}-N.h5".format(pathname), l=i, r=j+1, need_extra_node=nen) 
-                        temp_P = u_read("{}-P.h5".format(pathname), l=i, r=j+1, need_extra_node=nen) 
+                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=i, r=j+1, single_tstep=do_curr_t,need_extra_node=nen) 
+                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=i, r=j+1, single_tstep=do_curr_t,need_extra_node=nen) 
                         data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, nen)
                     
                 elif (datatype == "NRR"):
                     if include_negative:
-                        temp_N = u_read("{}-N.h5".format(pathname), l=0, r=i+1, need_extra_node=nen[0])
-                        temp_P = u_read("{}-P.h5".format(pathname), l=0, r=i+1, need_extra_node=nen[0])
+                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=0, r=i+1, single_tstep=do_curr_t,need_extra_node=nen[0])
+                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=0, r=i+1, single_tstep=do_curr_t,need_extra_node=nen[0])
                         data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, nen[0])
 
-                        temp_N = u_read("{}-N.h5".format(pathname), l=0, r=j+1, need_extra_node=nen[1])
-                        temp_P = u_read("{}-P.h5".format(pathname), l=0, r=j+1, need_extra_node=nen[1])
+                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=0, r=j+1, single_tstep=do_curr_t,need_extra_node=nen[1])
+                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=0, r=j+1, single_tstep=do_curr_t,need_extra_node=nen[1])
                         data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, nen[1])
 
                     else:
-                        temp_N = u_read("{}-N.h5".format(pathname), l=i, r=j+1, need_extra_node=nen) 
-                        temp_P = u_read("{}-P.h5".format(pathname), l=i, r=j+1, need_extra_node=nen) 
+                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=i, r=j+1, single_tstep=do_curr_t,need_extra_node=nen) 
+                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=i, r=j+1, single_tstep=do_curr_t,need_extra_node=nen) 
                         data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
                         
                         I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, nen)
 
-                    
                 else: # datatype = "PL"
-                    temp_N = u_read(pathname + "-N.h5")
-                    temp_P = u_read(pathname + "-P.h5")
+                    temp_N = u_read(pathname + "-N.h5", t0=show_index, single_tstep=do_curr_t)
+                    temp_P = u_read(pathname + "-P.h5", t0=show_index, single_tstep=do_curr_t)
                     
                     params = active_datagroup.datasets[tag].params_dict
                     radRec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, params)
@@ -3056,10 +3064,6 @@ class Notebook:
 
                             
                 if self.PL_mode == "Current time step":
-                    # FIXME: We don't need to integrate everything just to extract a single time step
-                    # Change the integration procedure above to work only with the needed data
-                    I_data = I_data[show_index]
-
                     # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
                     grid_xaxis = float(active_datagroup.datasets[tag].params_dict[self.xaxis_param] * self.convert_out_dict[self.xaxis_param])
 

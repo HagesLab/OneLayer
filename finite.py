@@ -314,7 +314,7 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     m = int(total_length / dx)
     
     if np.ndim(radRec) == 1:
-        radRec = radRec.reshape((1, len(radRec)))
+        radRec = radRec[None]
             
     if need_extra_node:
         temp_RR = radRec[:, i:j+2]
@@ -330,6 +330,9 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     return PL_base
 
 def new_integrate(base_data, l_bound, u_bound, i, j, dx, total_length, need_extra_node):
+    if base_data.ndim == 1:
+        base_data = base_data[None]
+    
     if l_bound == u_bound:
         I_base = base_data[:,0]
         if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == total_length:
