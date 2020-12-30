@@ -307,29 +307,31 @@ class Nanowire:
             
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, param_values_dict):
+    def prep_dataset(self, datatype, sim_data, params, do_plot_override=True, i=0, j=0, nen=False, extra_data = None):
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
         if (datatype in self.simulation_outputs_dict):
             data = sim_data[datatype]
         
         else:
             if (datatype == "RR"):
-                data = finite.radiative_recombination(sim_data, param_values_dict)
+                data = finite.radiative_recombination(sim_data, params)
 
             elif (datatype == "NRR"):
-                data = finite.nonradiative_recombination(sim_data, param_values_dict)
+                data = finite.nonradiative_recombination(sim_data, params)
 
             elif (datatype == "PL"):
     
-                rad_rec = finite.radiative_recombination(sim_data, param_values_dict)
-    
-                data = finite.prep_PL(rad_rec, 0, len(rad_rec), need_extra_node=False, params=param_values_dict).flatten()
-
+                if do_plot_override:
+                    rad_rec = finite.radiative_recombination(sim_data, params)
+                    data = finite.prep_PL(rad_rec, 0, len(rad_rec), need_extra_node=False, params=params).flatten()
+                else:
+                    rad_rec = finite.radiative_recombination(extra_data, params)
+                    data = finite.prep_PL(rad_rec, i, j, nen, params)
             else:
                 raise ValueError
                 
         return data
-    
+
 class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
     # but we interact with the checkbutton using the actual tk.CheckButton() element
@@ -2632,8 +2634,8 @@ class Notebook:
             dataset.data = self.nanowire.prep_dataset(active_datagroup.type, sim_data, dataset.params_dict)
             dataset.show_index = active_plot.time_index
             
-        else:
-            self.write(self.analysis_status, "Error #107: Data group has an invalid datatype")
+        # except:
+        #     self.write(self.analysis_status, "Error #107: Data group has an invalid datatype")
 
         self.plot_analyze(plot_ID, clear_plot=True)
         self.write(self.analysis_status, "")
@@ -2986,81 +2988,37 @@ class Notebook:
                 
                 ## TODO: Clean up these filenames
                 pathname = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename
-                if (datatype in self.nanowire.simulation_outputs_dict):
-                    if include_negative:
-                        data = u_read("{}-{}.h5".format(pathname, datatype), t0=show_index, l=0, r=i+1, single_tstep=do_curr_t, need_extra_node=nen[0])
-                        
-                        I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, nen[0])
-
-                        data = u_read("{}-{}.h5".format(pathname, datatype), t0=show_index, l=0, r=j+1, single_tstep=do_curr_t, need_extra_node=nen[1])
-                        
-                        I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, nen[1])
-
-                    else:
-                        data = u_read("{}-{}.h5".format(pathname, datatype), t0=show_index, l=i, r=j+1, single_tstep=do_curr_t, need_extra_node=nen) 
-                        
-                        I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, nen)
-
-                elif (datatype == "RR"):
+                
+                if include_negative:
+                    sim_data = {}
+                    extra_data = {}
+                    data_node_x = np.linspace(active_datagroup.datasets[tag].params_dict["Node_width"] / 2, active_datagroup.datasets[tag].params_dict["Total_length"] - active_datagroup.datasets[tag].params_dict["Node_width"] / 2, m)
                     
-                    if include_negative:
-                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=0, r=i+1, single_tstep=do_curr_t,need_extra_node=nen[0])
-                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=0, r=i+1, single_tstep=do_curr_t,need_extra_node=nen[0])
-                        data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                        
-                        I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, nen[0])
-
-                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=0, r=j+1, single_tstep=do_curr_t,need_extra_node=nen[1])
-                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=0, r=j+1, single_tstep=do_curr_t,need_extra_node=nen[1])
-                        data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                        
-                        I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, nen[1])
-
-                    else:
-                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=i, r=j+1, single_tstep=do_curr_t,need_extra_node=nen) 
-                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=i, r=j+1, single_tstep=do_curr_t,need_extra_node=nen) 
-                        data = finite.radiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                        
-                        I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, nen)
+                    for sim_datatype in self.nanowire.simulation_outputs_dict:
+                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=i+1, single_tstep=do_curr_t, need_extra_node=nen[0]) 
+                        extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t)
+            
+                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, 0, i, nen[0], extra_data)
+                    I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, nen[0])
+                    sim_data = {}
                     
-                elif (datatype == "NRR"):
-                    if include_negative:
-                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=0, r=i+1, single_tstep=do_curr_t,need_extra_node=nen[0])
-                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=0, r=i+1, single_tstep=do_curr_t,need_extra_node=nen[0])
-                        data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                        
-                        I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, nen[0])
-
-                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=0, r=j+1, single_tstep=do_curr_t,need_extra_node=nen[1])
-                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=0, r=j+1, single_tstep=do_curr_t,need_extra_node=nen[1])
-                        data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                        
-                        I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, nen[1])
-
-                    else:
-                        temp_N = u_read("{}-N.h5".format(pathname), t0=show_index,l=i, r=j+1, single_tstep=do_curr_t,need_extra_node=nen) 
-                        temp_P = u_read("{}-P.h5".format(pathname), t0=show_index,l=i, r=j+1, single_tstep=do_curr_t,need_extra_node=nen) 
-                        data = finite.nonradiative_recombination({"N":temp_N, "P":temp_P}, active_datagroup.datasets[tag].params_dict)
-                        
-                        I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, nen)
-
-                else: # datatype = "PL"
-                    temp_N = u_read(pathname + "-N.h5", t0=show_index, single_tstep=do_curr_t)
-                    temp_P = u_read(pathname + "-P.h5", t0=show_index, single_tstep=do_curr_t)
+                    for sim_datatype in self.nanowire.simulation_outputs_dict:
+                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=j+1, single_tstep=do_curr_t, need_extra_node=nen[1]) 
+            
+                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, 0, j, nen[1], extra_data)
+                    I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, nen[1])
                     
-                    params = active_datagroup.datasets[tag].params_dict
-                    radRec = finite.radiative_recombination({"N":temp_N, "P":temp_P}, params)
-                        
-                    if include_negative:
-                        PL_base = finite.prep_PL(radRec, 0, i, nen[0], params)
-                        I_data = finite.new_integrate(PL_base, 0, -l_bound, 0, i, dx, total_length, nen[0])
-
-                        PL_base = finite.prep_PL(radRec, 0, j, nen[1], params)
-                        I_data += finite.new_integrate(PL_base, 0, u_bound, 0, j, dx, total_length, nen[1])
-
-                    else:
-                        PL_base = finite.prep_PL(radRec, i, j, nen, params)
-                        I_data = finite.new_integrate(PL_base, l_bound, u_bound, i, j, dx, total_length, nen)
+                else:
+                    sim_data = {}
+                    extra_data = {}
+                    for sim_datatype in self.nanowire.simulation_outputs_dict:
+                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=i, r=j+1, single_tstep=do_curr_t, need_extra_node=nen) 
+                        extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t) 
+            
+                    data_node_x = np.linspace(active_datagroup.datasets[tag].params_dict["Node_width"] / 2, active_datagroup.datasets[tag].params_dict["Total_length"] - active_datagroup.datasets[tag].params_dict["Node_width"] / 2, m)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, i, j, nen, extra_data)
+                    
+                    I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, nen)
 
                             
                 if self.PL_mode == "Current time step":
