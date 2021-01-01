@@ -297,8 +297,8 @@ class Nanowire:
             temp_P = np.array(ifstream_P.root.data)
         temp_RR = finite.radiative_recombination({"N":temp_N, "P":temp_P}, params)
         PL_base = finite.prep_PL(temp_RR, 0, finite.toIndex(params["Total_length"], params["Node_width"], params["Total_length"]), False, params)
-        data_dict["PL"] = self.calculated_outputs_dict["PL"].calc_func(PL_base, 0, params["Total_length"], 0, finite.toIndex(params["Total_length"], params["Node_width"], params["Total_length"]), 
-                                                                       params["Node_width"], params["Total_length"], False)
+        data_dict["PL"] = self.calculated_outputs_dict["PL"].calc_func(PL_base, 0, params["Total_length"], params["Node_width"], params["Total_length"], 
+                                                                       False)
         
         data_dict["tau_diff"] = self.calculated_outputs_dict["tau_diff"].calc_func(data_dict["PL"], params["dt"])
         
@@ -455,7 +455,7 @@ class Integrated_Data_Group(Data_Group):
 
         # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong
         if (self.type == new_set.type):
-            self.datasets[new_set.tag] = new_set
+            self.datasets[new_set.tag()] = new_set
 
         return
 
@@ -605,7 +605,7 @@ class Notebook:
         
         # Helpers, flags, and containers for analysis plots
         self.analysis_plots = [Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State()]
-        self.integration_plots = [Integration_Plot_State(), Integration_Plot_State()]
+        self.integration_plots = [Integration_Plot_State()]
         self.data_var = tk.StringVar()
         self.fetch_PLmode = tk.StringVar()
         self.fetch_intg_mode = tk.StringVar()
@@ -823,14 +823,351 @@ class Notebook:
 
         self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", style="Grey Bar.TSeparator")
         self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
-     
-        ## Analytical Initial Condition (AIC):
+             
+        ## Parameter Toolkit:
 
-        # An empty GUI element is used to force the analytical IC elements into the correct position.
-        # Note that self.tab_analytical_init is a sub-frame attached to the overall self.tab_inputs
-        # Normally, the first element of a frame like self.tab_analytical_init would start at row=0, column=0
-        # instead of column=2. Starting at column=2 is NOT A TYPO. self.tab_analytical_init is attached to
-        # the notebook self.tab_inputs, so it inherits the first two columns of self.tab_inputs.
+        self.param_rules_frame = tk.ttk.Frame(self.tab_rules_init)
+        self.param_rules_frame.grid(row=0,column=0,padx=(370,0))
+
+        self.active_paramrule_list_title = tk.ttk.Label(self.param_rules_frame, text="Add/Edit/Remove Space-Dependent Parameters", style="Header.TLabel")
+        self.active_paramrule_list_title.grid(row=0,column=0,columnspan=3)
+
+        self.active_paramrule_listbox = tk.Listbox(self.param_rules_frame, width=86,height=8)
+        self.active_paramrule_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, padx=(32,32))
+
+        self.paramrule_var_label = tk.ttk.Label(self.param_rules_frame, text="Select parameter to edit:")
+        self.paramrule_var_label.grid(row=4,column=0)
+        
+        self.paramrule_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_var_selection, var_dropdown_list[0], *var_dropdown_list)
+        self.paramrule_var_dropdown.grid(row=4,column=1)
+
+        self.paramrule_method_label = tk.ttk.Label(self.param_rules_frame, text="Select calculation method:")
+        self.paramrule_method_label.grid(row=5,column=0)
+
+        self.paramrule_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_shape_selection, paramtoolkit_method_dropdown_list[0], *paramtoolkit_method_dropdown_list)
+        self.paramrule_method_dropdown.grid(row=5, column=1)
+
+        self.paramrule_lbound_label = tk.ttk.Label(self.param_rules_frame, text="Left bound coordinate:")
+        self.paramrule_lbound_label.grid(row=6, column=0)
+
+        self.paramrule_lbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.paramrule_lbound_entry.grid(row=6,column=1)
+
+        self.paramrule_rbound_label = tk.ttk.Label(self.param_rules_frame, text="Right bound coordinate:")
+        self.paramrule_rbound_label.grid(row=7, column=0)
+
+        self.paramrule_rbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.paramrule_rbound_entry.grid(row=7,column=1)
+
+        self.paramrule_lvalue_label = tk.ttk.Label(self.param_rules_frame, text="Left bound value:")
+        self.paramrule_lvalue_label.grid(row=8, column=0)
+
+        self.paramrule_lvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.paramrule_lvalue_entry.grid(row=8,column=1)
+
+        self.paramrule_rvalue_label = tk.ttk.Label(self.param_rules_frame, text="Right bound value:")
+        self.paramrule_rvalue_label.grid(row=9, column=0)
+
+        self.paramrule_rvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
+        self.paramrule_rvalue_entry.grid(row=9,column=1)
+
+        self.add_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Add new parameter rule", command=self.add_paramrule)
+        self.add_paramrule_button.grid(row=10,column=0,columnspan=2)
+
+        self.delete_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete highlighted rule", command=self.delete_paramrule)
+        self.delete_paramrule_button.grid(row=4,column=2)
+
+        self.deleteall_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete all rules for this parameter", command=self.deleteall_paramrule)
+        self.deleteall_paramrule_button.grid(row=5,column=2)
+
+        self.paramtoolkit_description = tk.Message(self.param_rules_frame, text="The Parameter Toolkit uses a series of rules and patterns to build a spatially dependent distribution for any parameter.", width=250)
+        self.paramtoolkit_description.grid(row=6,rowspan=3,column=2,columnspan=2)
+
+        self.paramtoolkit_description2 = tk.Message(self.param_rules_frame, text="Warning: Rules are applied from top to bottom. Order matters!", width=250)
+        self.paramtoolkit_description2.grid(row=9,rowspan=3,column=2,columnspan=2)
+        
+        # These plots were previously attached to self.tab_inputs so that it was visible on all three IC tabs,
+        # but it was hard to position them correctly.
+        # Attaching to the Parameter Toolkit makes them easier to position
+        self.custom_param_fig = Figure(figsize=(5,3.1))
+        self.custom_param_subplot = self.custom_param_fig.add_subplot(111)
+        # Prevent coordinate values from appearing in the toolbar; this would sometimes jostle GUI elements around
+        self.custom_param_subplot.format_coord = lambda x, y: ""
+        self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, master=self.param_rules_frame)
+        self.custom_param_plotwidget = self.custom_param_canvas.get_tk_widget()
+        self.custom_param_plotwidget.grid(row=12, column=0, columnspan=2)
+
+        self.custom_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
+        self.custom_param_toolbar_frame.grid(row=13,column=0,columnspan=2)
+        self.custom_param_toolbar = tkagg.NavigationToolbar2Tk(self.custom_param_canvas, self.custom_param_toolbar_frame)
+        
+        self.recent_param_fig = Figure(figsize=(5,3.1))
+        self.recent_param_subplot = self.recent_param_fig.add_subplot(111)
+        self.recent_param_subplot.format_coord = lambda x, y: ""
+        self.recent_param_canvas = tkagg.FigureCanvasTkAgg(self.recent_param_fig, master=self.param_rules_frame)
+        self.recent_param_plotwidget = self.recent_param_canvas.get_tk_widget()
+        self.recent_param_plotwidget.grid(row=12,column=2,columnspan=2)
+
+        self.recent_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
+        self.recent_param_toolbar_frame.grid(row=13,column=2,columnspan=2)
+        self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, self.recent_param_toolbar_frame)
+
+        self.moveup_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇧", command=self.moveup_paramrule)
+        self.moveup_paramrule_button.grid(row=1,column=4)
+
+        self.paramrule_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.paramtoolkit_viewer_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
+        self.paramrule_viewer_dropdown.grid(row=2,column=4)
+
+        self.paramrule_view_button = tk.ttk.Button(self.param_rules_frame, text="Change view", command=self.refresh_paramrule_listbox)
+        self.paramrule_view_button.grid(row=2,column=5)
+
+        self.movedown_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇩", command=self.movedown_paramrule)
+        self.movedown_paramrule_button.grid(row=3,column=4)
+
+        ## Param List Upload:
+
+        self.listupload_frame = tk.ttk.Frame(self.tab_explicit_init)
+        self.listupload_frame.grid(row=0,column=0,padx=(440,0))
+
+        self.listupload_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified space grid.", width=360)
+        self.listupload_description.grid(row=0,column=0)
+        
+        self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.listupload_var_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
+        self.listupload_dropdown.grid(row=1,column=0)
+
+        self.add_listupload_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_listupload)
+        self.add_listupload_button.grid(row=2,column=0)
+        
+        self.listupload_fig = Figure(figsize=(6,3.8))
+        self.listupload_subplot = self.listupload_fig.add_subplot(111)
+        self.listupload_canvas = tkagg.FigureCanvasTkAgg(self.listupload_fig, master=self.listupload_frame)
+        self.listupload_plotwidget = self.listupload_canvas.get_tk_widget()
+        self.listupload_plotwidget.grid(row=0, rowspan=3,column=1)
+        
+        self.listupload_toolbar_frame = tk.ttk.Frame(master=self.listupload_frame)
+        self.listupload_toolbar_frame.grid(row=3,column=1)
+        self.listupload_toolbar = tkagg.NavigationToolbar2Tk(self.listupload_canvas, self.listupload_toolbar_frame)
+
+
+        # Attach sub-frames to input tab and input tab to overall notebook
+        self.tab_inputs.add(self.tab_rules_init, text="Parameter Toolkit")
+        
+        ## Analytical Initial Condition (AIC): extra input mtd for specific system type
+        if self.nanowire.system_ID == "Nanowire":
+            self.create_AIC_frame()
+            self.tab_inputs.add(self.tab_analytical_init, text="Analytical Init. Cond.")
+        self.tab_inputs.add(self.tab_explicit_init, text="Parameter List Upload")
+        self.notebook.add(self.tab_inputs, text="Inputs")
+        return
+
+    def add_tab_simulate(self):
+        self.tab_simulate = tk.ttk.Frame(self.notebook)
+
+        self.choose_ICfile_title = tk.ttk.Label(self.tab_simulate, text="Select Init. Cond.", style="Header.TLabel")
+        self.choose_ICfile_title.grid(row=0,column=0,columnspan=2, padx=(9,12))
+
+        self.simtime_label = tk.ttk.Label(self.tab_simulate, text="Simulation Time [ns]")
+        self.simtime_label.grid(row=2,column=0)
+
+        self.simtime_entry = tk.ttk.Entry(self.tab_simulate, width=9)
+        self.simtime_entry.grid(row=2,column=1)
+
+        self.dt_label = tk.ttk.Label(self.tab_simulate, text="dt [ns]")
+        self.dt_label.grid(row=3,column=0)
+
+        self.dt_entry = tk.ttk.Entry(self.tab_simulate, width=9)
+        self.dt_entry.grid(row=3,column=1)
+
+        self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
+        self.do_ss_checkbutton.grid(row=5,column=0)
+
+        self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", command=self.do_Batch)
+        self.calculate_NP.grid(row=6,column=0,columnspan=2,padx=(9,12))
+
+        self.status_label = tk.ttk.Label(self.tab_simulate, text="Status")
+        self.status_label.grid(row=7, column=0, columnspan=2)
+
+        self.status = tk.Text(self.tab_simulate, width=28,height=4)
+        self.status.grid(row=8, rowspan=2, column=0, columnspan=2)
+        self.status.configure(state='disabled')
+
+        self.line3_separator = tk.ttk.Separator(self.tab_simulate, orient="vertical", style="Grey Bar.TSeparator")
+        self.line3_separator.grid(row=0,rowspan=30,column=2,sticky="ns")
+
+        self.subtitle = tk.ttk.Label(self.tab_simulate, text="1-D Carrier Sim (rk4 mtd), with photon propagation")
+        self.subtitle.grid(row=0,column=3,columnspan=3)
+        
+        self.sim_fig = Figure(figsize=(12, 8))
+        count = 1
+        cdim = np.ceil(np.sqrt(self.nanowire.simulation_outputs_count))
+        
+        rdim = np.ceil(self.nanowire.simulation_outputs_count / cdim)
+        self.sim_subplots = {}
+        for variable in self.nanowire.simulation_outputs_dict:
+            self.sim_subplots[variable] = self.sim_fig.add_subplot(rdim, cdim, count)
+            self.sim_subplots[variable].set_title(variable)
+            count += 1
+
+        self.sim_canvas = tkagg.FigureCanvasTkAgg(self.sim_fig, master=self.tab_simulate)
+        self.sim_plot_widget = self.sim_canvas.get_tk_widget()
+        self.sim_plot_widget.grid(row=1,column=3,rowspan=12,columnspan=2)
+        
+        self.simfig_toolbar_frame = tk.ttk.Frame(master=self.tab_simulate)
+        self.simfig_toolbar_frame.grid(row=13,column=3,columnspan=2)
+        self.simfig_toolbar = tkagg.NavigationToolbar2Tk(self.sim_canvas, self.simfig_toolbar_frame)
+
+        self.notebook.add(self.tab_simulate, text="Simulate")
+        return
+
+    def add_tab_analyze(self):
+        self.tab_analyze = tk.ttk.Notebook(self.notebook)
+        self.tab_overview_analysis = tk.ttk.Frame(self.tab_analyze)
+        self.tab_detailed_analysis = tk.ttk.Frame(self.tab_analyze)
+        
+        self.analyze_overview_fig = Figure(figsize=(15,8))
+        self.overview_subplots = {}
+        count = 1
+        rdim = np.floor(np.sqrt(self.nanowire.total_outputs_count))
+        cdim = np.ceil(self.nanowire.total_outputs_count / rdim)
+        for output in self.nanowire.simulation_outputs_dict:
+            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(rdim, cdim, count)
+            count += 1
+            
+        for output in self.nanowire.calculated_outputs_dict:
+            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(rdim, cdim, count)
+            count += 1
+        
+        self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.plot_overview_analysis)
+        self.analyze_overview_button.grid(row=0,column=0)
+        
+        self.analyze_overview_canvas = tkagg.FigureCanvasTkAgg(self.analyze_overview_fig, master=self.tab_overview_analysis)
+        self.analyze_overview_widget = self.analyze_overview_canvas.get_tk_widget()
+        self.analyze_overview_widget.grid(row=1,column=0)
+
+        self.overview_toolbar_frame = tk.ttk.Frame(self.tab_overview_analysis)
+        self.overview_toolbar_frame.grid(row=2,column=0)
+        self.overview_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, self.overview_toolbar_frame)
+        self.overview_toolbar.grid(row=0,column=0)
+        
+        self.analysis_title = tk.ttk.Label(self.tab_detailed_analysis, text="Plot and Integrate Saved Datasets", style="Header.TLabel")
+        self.analysis_title.grid(row=0,column=0,columnspan=8)
+        
+        self.analyze_fig = Figure(figsize=(9.8,6))
+        # add_subplot() starts counting indices with 1 instead of 0
+        self.analyze_subplot0 = self.analyze_fig.add_subplot(221)
+        self.analyze_subplot1 = self.analyze_fig.add_subplot(222)
+        self.analyze_subplot2 = self.analyze_fig.add_subplot(223)
+        self.analyze_subplot3 = self.analyze_fig.add_subplot(224)
+        self.analysis_plots[0].plot_obj = self.analyze_subplot0
+        self.analysis_plots[1].plot_obj = self.analyze_subplot1
+        self.analysis_plots[2].plot_obj = self.analyze_subplot2
+        self.analysis_plots[3].plot_obj = self.analyze_subplot3
+        
+        self.analyze_canvas = tkagg.FigureCanvasTkAgg(self.analyze_fig, master=self.tab_detailed_analysis)
+        self.analyze_widget = self.analyze_canvas.get_tk_widget()
+        self.analyze_widget.grid(row=1,column=0,rowspan=1,columnspan=4, padx=(12,0))
+
+        self.analyze_plotselector_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
+        self.analyze_plotselector_frame.grid(row=2,rowspan=2,column=0,columnspan=4)
+        
+        self.analysisplot_topleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=0)
+        self.analysisplot_topleft.grid(row=0,column=0)
+
+        self.analysisplot_topleft_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Top Left")
+        self.analysisplot_topleft_label.grid(row=0,column=1)
+        
+        self.analysisplot_topright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=1)
+        self.analysisplot_topright.grid(row=0,column=2)
+
+        self.analysisplot_topright_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Top Right")
+        self.analysisplot_topright_label.grid(row=0,column=3)
+        
+        self.analysisplot_bottomleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=2)
+        self.analysisplot_bottomleft.grid(row=1,column=0)
+
+        self.analysisplot_bottomleft_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Bottom Left")
+        self.analysisplot_bottomleft_label.grid(row=1,column=1)
+        
+        self.analysisplot_bottomright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=3)
+        self.analysisplot_bottomright.grid(row=1,column=2)
+
+        self.analysisplot_bottomright_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Bottom Right")
+        self.analysisplot_bottomright_label.grid(row=1,column=3)
+        
+        self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
+        self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=3,columnspan=4)
+        self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
+        self.analyze_toolbar.grid(row=0,column=0,columnspan=6)
+
+        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.fetch_dataset))
+        self.analyze_plot_button.grid(row=1,column=0)
+        
+        self.analyze_tstep_entry = tk.ttk.Entry(self.analyze_toolbar_frame, width=9)
+        self.analyze_tstep_entry.grid(row=1,column=1)
+
+        self.analyze_tstep_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Step >>", command=partial(self.plot_tstep))
+        self.analyze_tstep_button.grid(row=1,column=2)
+
+        self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate))
+        self.calculate_PL_button.grid(row=1,column=3)
+
+        self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=0))
+        self.analyze_axis_button.grid(row=1,column=4)
+
+        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Export", command=partial(self.export_plot, from_integration=0))
+        self.analyze_export_button.grid(row=1,column=5)
+
+        self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup))
+        self.analyze_IC_carry_button.grid(row=1,column=6)
+
+        self.integration_fig = Figure(figsize=(9,5))
+        self.integration_subplot = self.integration_fig.add_subplot(1,1,1)
+        self.integration_plots[0].plot_obj = self.integration_subplot
+
+        self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_detailed_analysis)
+        self.integration_widget = self.integration_canvas.get_tk_widget()
+        self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
+
+        self.integration_plotselector_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
+        self.integration_plotselector_frame.grid(row=2,column=5)
+        
+        self.integrationplot_left = tk.ttk.Radiobutton(self.integration_plotselector_frame, variable=self.active_integrationplot_ID, value=0)
+        self.integrationplot_left.grid(row=0,column=0)
+
+        self.integrationplot_topleft_label = tk.ttk.Label(self.integration_plotselector_frame, text="Use: Integration")
+        self.integrationplot_topleft_label.grid(row=0,column=1)
+        
+        self.integrationplot_topright = tk.ttk.Radiobutton(self.integration_plotselector_frame, variable=self.active_integrationplot_ID, value=1)
+        self.integrationplot_topright.grid(row=0,column=2)
+
+        self.integrationplot_topright_label = tk.ttk.Label(self.integration_plotselector_frame, text="Use: Tau_Diff")
+        self.integrationplot_topright_label.grid(row=0,column=3)
+
+        self.integration_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
+        self.integration_toolbar_frame.grid(row=3,column=5, rowspan=2,columnspan=1)
+        self.integration_toolbar = tkagg.NavigationToolbar2Tk(self.integration_canvas, self.integration_toolbar_frame)
+        self.integration_toolbar.grid(row=0,column=0,columnspan=5)
+
+        self.integration_axis_button = tk.ttk.Button(self.integration_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=1))
+        self.integration_axis_button.grid(row=1,column=0)
+
+        self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, text="Export", command=partial(self.export_plot, from_integration=1))
+        self.integration_export_button.grid(row=1,column=1)
+
+        self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
+        self.integration_bayesim_button.grid(row=1,column=2)
+
+        self.analysis_status = tk.Text(self.tab_detailed_analysis, width=28,height=3)
+        self.analysis_status.grid(row=5,rowspan=3,column=5,columnspan=1)
+        self.analysis_status.configure(state="disabled")
+
+        self.tab_analyze.add(self.tab_overview_analysis, text="Overview")
+        self.tab_analyze.add(self.tab_detailed_analysis, text="Detailed Analysis")
+        self.notebook.add(self.tab_analyze, text="Analyze")
+        return
+    
+    
+    def create_AIC_frame(self):
         self.AIC_frame = tk.ttk.Frame(self.tab_analytical_init)
         self.AIC_frame.grid(row=0,column=0, padx=(330,0))
 
@@ -1002,349 +1339,9 @@ class Notebook:
         self.AIC_toolbar_frame.grid(row=5,column=0,columnspan=3)
         self.AIC_toolbar = tkagg.NavigationToolbar2Tk(self.AIC_canvas, self.AIC_toolbar_frame)
         
-        ## Parameter Toolkit:
-
-        self.param_rules_frame = tk.ttk.Frame(self.tab_rules_init)
-        self.param_rules_frame.grid(row=0,column=0,padx=(370,0))
-
-        self.active_paramrule_list_title = tk.ttk.Label(self.param_rules_frame, text="Add/Edit/Remove Space-Dependent Parameters", style="Header.TLabel")
-        self.active_paramrule_list_title.grid(row=0,column=0,columnspan=3)
-
-        self.active_paramrule_listbox = tk.Listbox(self.param_rules_frame, width=86,height=8)
-        self.active_paramrule_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, padx=(32,32))
-
-        self.paramrule_var_label = tk.ttk.Label(self.param_rules_frame, text="Select parameter to edit:")
-        self.paramrule_var_label.grid(row=4,column=0)
-        
-        self.paramrule_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_var_selection, var_dropdown_list[0], *var_dropdown_list)
-        self.paramrule_var_dropdown.grid(row=4,column=1)
-
-        self.paramrule_method_label = tk.ttk.Label(self.param_rules_frame, text="Select calculation method:")
-        self.paramrule_method_label.grid(row=5,column=0)
-
-        self.paramrule_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_shape_selection, paramtoolkit_method_dropdown_list[0], *paramtoolkit_method_dropdown_list)
-        self.paramrule_method_dropdown.grid(row=5, column=1)
-
-        self.paramrule_lbound_label = tk.ttk.Label(self.param_rules_frame, text="Left bound coordinate:")
-        self.paramrule_lbound_label.grid(row=6, column=0)
-
-        self.paramrule_lbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.paramrule_lbound_entry.grid(row=6,column=1)
-
-        self.paramrule_rbound_label = tk.ttk.Label(self.param_rules_frame, text="Right bound coordinate:")
-        self.paramrule_rbound_label.grid(row=7, column=0)
-
-        self.paramrule_rbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.paramrule_rbound_entry.grid(row=7,column=1)
-
-        self.paramrule_lvalue_label = tk.ttk.Label(self.param_rules_frame, text="Left bound value:")
-        self.paramrule_lvalue_label.grid(row=8, column=0)
-
-        self.paramrule_lvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.paramrule_lvalue_entry.grid(row=8,column=1)
-
-        self.paramrule_rvalue_label = tk.ttk.Label(self.param_rules_frame, text="Right bound value:")
-        self.paramrule_rvalue_label.grid(row=9, column=0)
-
-        self.paramrule_rvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
-        self.paramrule_rvalue_entry.grid(row=9,column=1)
-
-        self.add_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Add new parameter rule", command=self.add_paramrule)
-        self.add_paramrule_button.grid(row=10,column=0,columnspan=2)
-
-        self.delete_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete highlighted rule", command=self.delete_paramrule)
-        self.delete_paramrule_button.grid(row=4,column=2)
-
-        self.deleteall_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete all rules for this parameter", command=self.deleteall_paramrule)
-        self.deleteall_paramrule_button.grid(row=5,column=2)
-
-        self.paramtoolkit_description = tk.Message(self.param_rules_frame, text="The Parameter Toolkit uses a series of rules and patterns to build a spatially dependent distribution for any parameter.", width=250)
-        self.paramtoolkit_description.grid(row=6,rowspan=3,column=2,columnspan=2)
-
-        self.paramtoolkit_description2 = tk.Message(self.param_rules_frame, text="Warning: Rules are applied from top to bottom. Order matters!", width=250)
-        self.paramtoolkit_description2.grid(row=9,rowspan=3,column=2,columnspan=2)
-        
-        # These plots were previously attached to self.tab_inputs so that it was visible on all three IC tabs,
-        # but it was hard to position them correctly.
-        # Attaching to the Parameter Toolkit makes them easier to position
-        self.custom_param_fig = Figure(figsize=(5,3.1))
-        self.custom_param_subplot = self.custom_param_fig.add_subplot(111)
-        # Prevent coordinate values from appearing in the toolbar; this would sometimes jostle GUI elements around
-        self.custom_param_subplot.format_coord = lambda x, y: ""
-        self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, master=self.param_rules_frame)
-        self.custom_param_plotwidget = self.custom_param_canvas.get_tk_widget()
-        self.custom_param_plotwidget.grid(row=12, column=0, columnspan=2)
-
-        self.custom_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
-        self.custom_param_toolbar_frame.grid(row=13,column=0,columnspan=2)
-        self.custom_param_toolbar = tkagg.NavigationToolbar2Tk(self.custom_param_canvas, self.custom_param_toolbar_frame)
-        
-        self.recent_param_fig = Figure(figsize=(5,3.1))
-        self.recent_param_subplot = self.recent_param_fig.add_subplot(111)
-        self.recent_param_subplot.format_coord = lambda x, y: ""
-        self.recent_param_canvas = tkagg.FigureCanvasTkAgg(self.recent_param_fig, master=self.param_rules_frame)
-        self.recent_param_plotwidget = self.recent_param_canvas.get_tk_widget()
-        self.recent_param_plotwidget.grid(row=12,column=2,columnspan=2)
-
-        self.recent_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
-        self.recent_param_toolbar_frame.grid(row=13,column=2,columnspan=2)
-        self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, self.recent_param_toolbar_frame)
-
-        self.moveup_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇧", command=self.moveup_paramrule)
-        self.moveup_paramrule_button.grid(row=1,column=4)
-
-        self.paramrule_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.paramtoolkit_viewer_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
-        self.paramrule_viewer_dropdown.grid(row=2,column=4)
-
-        self.paramrule_view_button = tk.ttk.Button(self.param_rules_frame, text="Change view", command=self.refresh_paramrule_listbox)
-        self.paramrule_view_button.grid(row=2,column=5)
-
-        self.movedown_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇩", command=self.movedown_paramrule)
-        self.movedown_paramrule_button.grid(row=3,column=4)
-
-        ## Param List Upload:
-
-        self.listupload_frame = tk.ttk.Frame(self.tab_explicit_init)
-        self.listupload_frame.grid(row=0,column=0,padx=(440,0))
-
-        self.listupload_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified space grid.", width=360)
-        self.listupload_description.grid(row=0,column=0)
-        
-        self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.listupload_var_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
-        self.listupload_dropdown.grid(row=1,column=0)
-
-        self.add_listupload_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_listupload)
-        self.add_listupload_button.grid(row=2,column=0)
-        
-        self.listupload_fig = Figure(figsize=(6,3.8))
-        self.listupload_subplot = self.listupload_fig.add_subplot(111)
-        self.listupload_canvas = tkagg.FigureCanvasTkAgg(self.listupload_fig, master=self.listupload_frame)
-        self.listupload_plotwidget = self.listupload_canvas.get_tk_widget()
-        self.listupload_plotwidget.grid(row=0, rowspan=3,column=1)
-        
-        self.listupload_toolbar_frame = tk.ttk.Frame(master=self.listupload_frame)
-        self.listupload_toolbar_frame.grid(row=3,column=1)
-        self.listupload_toolbar = tkagg.NavigationToolbar2Tk(self.listupload_canvas, self.listupload_toolbar_frame)
-
-        # Dictionaries of parameter entry boxes
-        
         self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "AIC_expfactor":self.AIC_expfactor_entry, "Pulse_Freq":self.pulse_freq_entry, 
                                            "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
                                            "Max_Gen":self.max_gen_entry, "Total_Gen":self.total_gen_entry}
-
-        # Attach sub-frames to input tab and input tab to overall notebook
-        self.tab_inputs.add(self.tab_rules_init, text="Parameter Toolkit")
-        self.tab_inputs.add(self.tab_analytical_init, text="Analytical Init. Cond.")
-        self.tab_inputs.add(self.tab_explicit_init, text="Parameter List Upload")
-        self.notebook.add(self.tab_inputs, text="Inputs")
-        return
-
-    def add_tab_simulate(self):
-        self.tab_simulate = tk.ttk.Frame(self.notebook)
-
-        self.choose_ICfile_title = tk.ttk.Label(self.tab_simulate, text="Select Init. Cond.", style="Header.TLabel")
-        self.choose_ICfile_title.grid(row=0,column=0,columnspan=2, padx=(9,12))
-
-        self.simtime_label = tk.ttk.Label(self.tab_simulate, text="Simulation Time [ns]")
-        self.simtime_label.grid(row=2,column=0)
-
-        self.simtime_entry = tk.ttk.Entry(self.tab_simulate, width=9)
-        self.simtime_entry.grid(row=2,column=1)
-
-        self.dt_label = tk.ttk.Label(self.tab_simulate, text="dt [ns]")
-        self.dt_label.grid(row=3,column=0)
-
-        self.dt_entry = tk.ttk.Entry(self.tab_simulate, width=9)
-        self.dt_entry.grid(row=3,column=1)
-
-        self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
-        self.do_ss_checkbutton.grid(row=5,column=0)
-
-        self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", command=self.do_Batch)
-        self.calculate_NP.grid(row=6,column=0,columnspan=2,padx=(9,12))
-
-        self.status_label = tk.ttk.Label(self.tab_simulate, text="Status")
-        self.status_label.grid(row=7, column=0, columnspan=2)
-
-        self.status = tk.Text(self.tab_simulate, width=28,height=4)
-        self.status.grid(row=8, rowspan=2, column=0, columnspan=2)
-        self.status.configure(state='disabled')
-
-        self.line3_separator = tk.ttk.Separator(self.tab_simulate, orient="vertical", style="Grey Bar.TSeparator")
-        self.line3_separator.grid(row=0,rowspan=30,column=2,sticky="ns")
-
-        self.subtitle = tk.ttk.Label(self.tab_simulate, text="1-D Carrier Sim (rk4 mtd), with photon propagation")
-        self.subtitle.grid(row=0,column=3,columnspan=3)
-        
-        self.sim_fig = Figure(figsize=(12, 8))
-        count = 1
-        cdim = np.ceil(np.sqrt(self.nanowire.simulation_outputs_count))
-        
-        rdim = np.ceil(self.nanowire.simulation_outputs_count / cdim)
-        self.sim_subplots = {}
-        for variable in self.nanowire.simulation_outputs_dict:
-            self.sim_subplots[variable] = self.sim_fig.add_subplot(rdim, cdim, count)
-            self.sim_subplots[variable].set_title(variable)
-            count += 1
-
-        self.sim_canvas = tkagg.FigureCanvasTkAgg(self.sim_fig, master=self.tab_simulate)
-        self.sim_plot_widget = self.sim_canvas.get_tk_widget()
-        self.sim_plot_widget.grid(row=1,column=3,rowspan=12,columnspan=2)
-        
-        self.simfig_toolbar_frame = tk.ttk.Frame(master=self.tab_simulate)
-        self.simfig_toolbar_frame.grid(row=13,column=3,columnspan=2)
-        self.simfig_toolbar = tkagg.NavigationToolbar2Tk(self.sim_canvas, self.simfig_toolbar_frame)
-
-        self.notebook.add(self.tab_simulate, text="Simulate")
-        return
-
-    def add_tab_analyze(self):
-        self.tab_analyze = tk.ttk.Notebook(self.notebook)
-        self.tab_overview_analysis = tk.ttk.Frame(self.tab_analyze)
-        self.tab_detailed_analysis = tk.ttk.Frame(self.tab_analyze)
-        
-        self.analyze_overview_fig = Figure(figsize=(15,8))
-        self.overview_subplots = {}
-        count = 1
-        rdim = np.floor(np.sqrt(self.nanowire.total_outputs_count))
-        cdim = np.ceil(self.nanowire.total_outputs_count / rdim)
-        for output in self.nanowire.simulation_outputs_dict:
-            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(rdim, cdim, count)
-            count += 1
-            
-        for output in self.nanowire.calculated_outputs_dict:
-            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(rdim, cdim, count)
-            count += 1
-        
-        self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.plot_overview_analysis)
-        self.analyze_overview_button.grid(row=0,column=0)
-        
-        self.analyze_overview_canvas = tkagg.FigureCanvasTkAgg(self.analyze_overview_fig, master=self.tab_overview_analysis)
-        self.analyze_overview_widget = self.analyze_overview_canvas.get_tk_widget()
-        self.analyze_overview_widget.grid(row=1,column=0)
-
-        self.overview_toolbar_frame = tk.ttk.Frame(self.tab_overview_analysis)
-        self.overview_toolbar_frame.grid(row=2,column=0)
-        self.overview_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, self.overview_toolbar_frame)
-        self.overview_toolbar.grid(row=0,column=0)
-        
-        self.analysis_title = tk.ttk.Label(self.tab_detailed_analysis, text="Plot and Integrate Saved Datasets", style="Header.TLabel")
-        self.analysis_title.grid(row=0,column=0,columnspan=8)
-        
-        self.analyze_fig = Figure(figsize=(9.8,6))
-        # add_subplot() starts counting indices with 1 instead of 0
-        self.analyze_subplot0 = self.analyze_fig.add_subplot(221)
-        self.analyze_subplot1 = self.analyze_fig.add_subplot(222)
-        self.analyze_subplot2 = self.analyze_fig.add_subplot(223)
-        self.analyze_subplot3 = self.analyze_fig.add_subplot(224)
-        self.analysis_plots[0].plot_obj = self.analyze_subplot0
-        self.analysis_plots[1].plot_obj = self.analyze_subplot1
-        self.analysis_plots[2].plot_obj = self.analyze_subplot2
-        self.analysis_plots[3].plot_obj = self.analyze_subplot3
-        
-        self.analyze_canvas = tkagg.FigureCanvasTkAgg(self.analyze_fig, master=self.tab_detailed_analysis)
-        self.analyze_widget = self.analyze_canvas.get_tk_widget()
-        self.analyze_widget.grid(row=1,column=0,rowspan=1,columnspan=4, padx=(12,0))
-
-        self.analyze_plotselector_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
-        self.analyze_plotselector_frame.grid(row=2,rowspan=2,column=0,columnspan=4)
-        
-        self.analysisplot_topleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=0)
-        self.analysisplot_topleft.grid(row=0,column=0)
-
-        self.analysisplot_topleft_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Top Left")
-        self.analysisplot_topleft_label.grid(row=0,column=1)
-        
-        self.analysisplot_topright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=1)
-        self.analysisplot_topright.grid(row=0,column=2)
-
-        self.analysisplot_topright_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Top Right")
-        self.analysisplot_topright_label.grid(row=0,column=3)
-        
-        self.analysisplot_bottomleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=2)
-        self.analysisplot_bottomleft.grid(row=1,column=0)
-
-        self.analysisplot_bottomleft_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Bottom Left")
-        self.analysisplot_bottomleft_label.grid(row=1,column=1)
-        
-        self.analysisplot_bottomright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=3)
-        self.analysisplot_bottomright.grid(row=1,column=2)
-
-        self.analysisplot_bottomright_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Bottom Right")
-        self.analysisplot_bottomright_label.grid(row=1,column=3)
-        
-        self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
-        self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=3,columnspan=4)
-        self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
-        self.analyze_toolbar.grid(row=0,column=0,columnspan=6)
-
-        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.fetch_dataset))
-        self.analyze_plot_button.grid(row=1,column=0)
-        
-        self.analyze_tstep_entry = tk.ttk.Entry(self.analyze_toolbar_frame, width=9)
-        self.analyze_tstep_entry.grid(row=1,column=1)
-
-        self.analyze_tstep_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Step >>", command=partial(self.plot_tstep))
-        self.analyze_tstep_button.grid(row=1,column=2)
-
-        self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate))
-        self.calculate_PL_button.grid(row=1,column=3)
-
-        self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=0))
-        self.analyze_axis_button.grid(row=1,column=4)
-
-        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Export", command=partial(self.export_plot, from_integration=0))
-        self.analyze_export_button.grid(row=1,column=5)
-
-        self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup))
-        self.analyze_IC_carry_button.grid(row=1,column=6)
-
-        self.integration_fig = Figure(figsize=(9,5))
-        self.integration_subplot = self.integration_fig.add_subplot(121)
-        self.taudiff_subplot = self.integration_fig.add_subplot(122)
-        self.integration_plots[0].plot_obj = self.integration_subplot
-        self.integration_plots[1].plot_obj = self.taudiff_subplot
-        
-        self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_detailed_analysis)
-        self.integration_widget = self.integration_canvas.get_tk_widget()
-        self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
-
-        self.integration_plotselector_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
-        self.integration_plotselector_frame.grid(row=2,column=5)
-        
-        self.integrationplot_left = tk.ttk.Radiobutton(self.integration_plotselector_frame, variable=self.active_integrationplot_ID, value=0)
-        self.integrationplot_left.grid(row=0,column=0)
-
-        self.integrationplot_topleft_label = tk.ttk.Label(self.integration_plotselector_frame, text="Use: Integration")
-        self.integrationplot_topleft_label.grid(row=0,column=1)
-        
-        self.integrationplot_topright = tk.ttk.Radiobutton(self.integration_plotselector_frame, variable=self.active_integrationplot_ID, value=1)
-        self.integrationplot_topright.grid(row=0,column=2)
-
-        self.integrationplot_topright_label = tk.ttk.Label(self.integration_plotselector_frame, text="Use: Tau_Diff")
-        self.integrationplot_topright_label.grid(row=0,column=3)
-
-        self.integration_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
-        self.integration_toolbar_frame.grid(row=3,column=5, rowspan=2,columnspan=1)
-        self.integration_toolbar = tkagg.NavigationToolbar2Tk(self.integration_canvas, self.integration_toolbar_frame)
-        self.integration_toolbar.grid(row=0,column=0,columnspan=5)
-
-        self.integration_axis_button = tk.ttk.Button(self.integration_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=1))
-        self.integration_axis_button.grid(row=1,column=0)
-
-        self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, text="Export", command=partial(self.export_plot, from_integration=1))
-        self.integration_export_button.grid(row=1,column=1)
-
-        self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
-        self.integration_bayesim_button.grid(row=1,column=2)
-
-        self.analysis_status = tk.Text(self.tab_detailed_analysis, width=28,height=3)
-        self.analysis_status.grid(row=5,rowspan=3,column=5,columnspan=1)
-        self.analysis_status.configure(state="disabled")
-
-        self.tab_analyze.add(self.tab_overview_analysis, text="Overview")
-        self.tab_analyze.add(self.tab_detailed_analysis, text="Detailed Analysis")
-        self.notebook.add(self.tab_analyze, text="Analyze")
         return
 
     def DEBUG(self):
@@ -2241,8 +2238,8 @@ class Notebook:
 
         return
 
-    def do_bayesim_popup(self):
-        if self.integration_plots[0].datagroup.size() == 0: return
+    def do_bayesim_popup(self, plot_ID=0):
+        if self.integration_plots[plot_ID].datagroup.size() == 0: return
 
         if not self.bayesim_popup_isopen:
 
@@ -2887,6 +2884,11 @@ class Notebook:
 
     def do_Integrate(self, bypass_inputs=False):
         plot_ID = self.active_analysisplot_ID.get()
+        
+        # Replace this with an appropriate getter function if more integration plots are added
+        ip_ID = 0
+        
+        
         self.write(self.analysis_status, "")
 
         active_plot = self.analysis_plots[plot_ID]
@@ -2911,28 +2913,28 @@ class Notebook:
                     self.write(self.analysis_status, "Integration cancelled")
                     return
                 print("Selected param {}".format(self.xaxis_param))
-                self.integration_plots[0].x_param = self.xaxis_param
+                self.integration_plots[ip_ID].x_param = self.xaxis_param
     
             else:
-                self.integration_plots[0].x_param = "Time"
+                self.integration_plots[ip_ID].x_param = "Time"
                 
         else:
             # A "default integration behavior": integrate the present data over all time and space steps
             self.PL_mode = "All time steps"
-            self.integration_plots[0].x_param = "Time"
+            self.integration_plots[ip_ID].x_param = "Time"
             self.integration_bounds = [[0,active_datagroup.get_max_x()]]
             
         # Clean up the I_plot and prepare to integrate given selections
         # A lot of the following is a data transfer between the sending active_datagroup and the receiving I_plot
-        self.integration_plots[0].datagroup.clear()
-        self.integration_plots[1].datagroup.clear()
-        self.integration_plots[0].mode = self.PL_mode
-        self.integration_plots[0].global_gridx = None
+        self.integration_plots[ip_ID].datagroup.clear()
+        self.integration_plots[ip_ID].mode = self.PL_mode
+        self.integration_plots[ip_ID].global_gridx = None
 
         
         n = active_datagroup.get_maxnumtsteps()
         
         counter = 0
+        
         # Integrate for EACH dataset in chosen datagroup
         for tag in active_datagroup.datasets:
             data_filename = active_datagroup.datasets[tag].filename
@@ -3025,36 +3027,28 @@ class Notebook:
                     xaxis_label = self.xaxis_param + " [WIP]"
 
                 elif self.PL_mode == "All time steps":
-                    self.integration_plots[0].global_gridx = np.linspace(0, total_time, n + 1)
+                    self.integration_plots[ip_ID].global_gridx = np.linspace(0, total_time, n + 1)
                     grid_xaxis = -1 # A dummy value for the I_Set constructor
                     xaxis_label = "Time [ns]"
 
-                self.integration_plots[0].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
-
-                # FIXME: Do some bonus calculations involving PL's time derivative
-                # Move this into a popup hidden under if system_ID == "Nanowire"
-                if (self.PL_mode == "All time steps" and datatype == "PL"):
-                    self.integration_plots[1].global_gridx = np.linspace(0, total_time, n + 1)
-                    tau_diff = finite.tau_diff(I_data, dt)
-                    self.integration_plots[1].datagroup.add(Integrated_Data_Set(tau_diff, grid_xaxis, active_datagroup.datasets[tag].params_dict, "tau_diff", data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
-                        
+                self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
+            
                 counter += 1
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
 
-            
-        subplot = self.integration_plots[0].plot_obj
-        datagroup = self.integration_plots[0].datagroup
+        subplot = self.integration_plots[ip_ID].plot_obj
+        datagroup = self.integration_plots[ip_ID].datagroup
         subplot.cla()
         
         #max = datagroup.get_maxval() * self.convert_out_dict[datagroup.type]
         
 
-        self.integration_plots[0].xaxis_type = 'linear'
-        self.integration_plots[0].yaxis_type = 'log'
-        #self.integration_plots[0].ylim = max * 1e-12, max * 10
+        self.integration_plots[ip_ID].xaxis_type = 'linear'
+        self.integration_plots[ip_ID].yaxis_type = 'log'
+        #self.integration_plots[ip_ID].ylim = max * 1e-12, max * 10
 
-        subplot.set_yscale(self.integration_plots[0].yaxis_type)
-        #subplot.set_ylim(self.integration_plots[0].ylim)
+        subplot.set_yscale(self.integration_plots[ip_ID].yaxis_type)
+        #subplot.set_ylim(self.integration_plots[ip_ID].ylim)
         subplot.set_xlabel(xaxis_label)
         subplot.set_ylabel(datagroup.type)
         subplot.set_title("Integrated {}".format(datagroup.type))
@@ -3065,33 +3059,48 @@ class Notebook:
                 subplot.scatter(datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag(for_matplotlib=True))
 
             elif self.PL_mode == "All time steps":
-                subplot.plot(self.integration_plots[0].global_gridx, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag(for_matplotlib=True))
+                subplot.plot(self.integration_plots[ip_ID].global_gridx, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag(for_matplotlib=True))
                 
-        self.integration_plots[0].xlim = subplot.get_xlim()
-        self.integration_plots[0].ylim = subplot.get_ylim()
+        self.integration_plots[ip_ID].xlim = subplot.get_xlim()
+        self.integration_plots[ip_ID].ylim = subplot.get_ylim()
                 
         subplot.legend().set_draggable(True)
-        
-        self.taudiff_subplot.cla()
-        if self.integration_plots[1].datagroup.size(): # If has tau_diff data to plot
-            self.taudiff_subplot.set_ylabel("tau_diff")
-            self.taudiff_subplot.set_xlabel("Time [ns]")
-            self.taudiff_subplot.set_title("-(dln(PL)/dt)^(-1)")
-            for key in self.integration_plots[1].datagroup.datasets:
-                self.taudiff_subplot.plot(self.integration_plots[1].global_gridx, self.integration_plots[1].datagroup.datasets[key].data, label=self.integration_plots[1].datagroup.datasets[key].tag(for_matplotlib=True))
-        
-            self.taudiff_subplot.legend().set_draggable(True)
-            
-            self.integration_plots[1].xaxis_type = 'linear'
-            self.integration_plots[1].yaxis_type = 'linear'
-            self.integration_plots[1].ylim = self.taudiff_subplot.get_ylim()
-            self.integration_plots[1].xlim = self.taudiff_subplot.get_xlim()
 
         self.integration_fig.tight_layout()
         self.integration_fig.canvas.draw()
         
         self.write(self.analysis_status, "Integration complete")
-
+        # FIXME: Do some bonus calculations involving PL's time derivative
+        # Move this into a popup hidden under if system_ID == "Nanowire"
+        if (self.nanowire.system_ID == "Nanowire" and self.PL_mode == "All time steps" and datatype == "PL"):
+            # Calculate tau_D
+            if self.integration_plots[ip_ID].datagroup.size(): # If has tau_diff data to plot
+                td_gridt = {}
+                td = {}
+                
+                for tag, dataset in self.integration_plots[ip_ID].datagroup.datasets.items():
+                    total_time = dataset.params_dict["Total-Time"]
+                    dt = dataset.params_dict["dt"]
+                    td_gridt[tag] = np.linspace(0, total_time, n + 1)
+                    td[tag] = finite.tau_diff(dataset.data, dt)
+                    
+                td_popup = tk.Toplevel(self.root)
+                td_fig = Figure(figsize=(6,4))
+                td_subplot = td_fig.add_subplot(1, 1, 1)
+                
+                td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=td_popup)
+                td_plotwidget = td_canvas.get_tk_widget()
+                td_plotwidget.grid(row=0,column=0)
+                
+                
+                
+                td_subplot.set_ylabel("tau_diff")
+                td_subplot.set_xlabel("Time [ns]")
+                td_subplot.set_title("-(dln(PL)/dt)^(-1)")
+                for tag in td:
+                    td_subplot.plot(td_gridt[tag], td[tag], label=tag.strip('_'))
+            
+                td_subplot.legend().set_draggable(True)
         return
 
     ## Initial Condition Managers
@@ -3980,10 +3989,10 @@ class Notebook:
         
         return
 
-    def export_for_bayesim(self):
+    def export_for_bayesim(self, ip_ID=0):
         # Note: DO NOT convert_out any of these values - bayesim models are created in TEDs units.
-        datagroup = self.integration_plots[0].datagroup
-        plot_info = self.integration_plots[0]
+        datagroup = self.integration_plots[ip_ID].datagroup
+        plot_info = self.integration_plots[ip_ID]
         if datagroup.size() == 0: return
             
         if (plot_info.mode == "All time steps"):
