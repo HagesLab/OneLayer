@@ -329,7 +329,9 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     
     return PL_base
 
-def new_integrate(base_data, l_bound, u_bound, i, j, dx, total_length, need_extra_node):
+def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node):
+    i = toIndex(l_bound, dx, total_length)
+    j = toIndex(u_bound, dx, total_length)
     if base_data.ndim == 1:
         base_data = base_data[None]
     

@@ -2986,27 +2986,25 @@ class Notebook:
             
                 do_curr_t = self.PL_mode == "Current time step"
                 
-                ## TODO: Clean up these filenames
                 pathname = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename
                 
                 if include_negative:
                     sim_data = {}
                     extra_data = {}
-                    data_node_x = np.linspace(active_datagroup.datasets[tag].params_dict["Node_width"] / 2, active_datagroup.datasets[tag].params_dict["Total_length"] - active_datagroup.datasets[tag].params_dict["Node_width"] / 2, m)
                     
                     for sim_datatype in self.nanowire.simulation_outputs_dict:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=i+1, single_tstep=do_curr_t, need_extra_node=nen[0]) 
                         extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t)
             
                     data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, 0, i, nen[0], extra_data)
-                    I_data = finite.new_integrate(data, 0, -l_bound, 0, i, dx, total_length, nen[0])
+                    I_data = finite.new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
                     sim_data = {}
                     
                     for sim_datatype in self.nanowire.simulation_outputs_dict:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=j+1, single_tstep=do_curr_t, need_extra_node=nen[1]) 
             
                     data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, 0, j, nen[1], extra_data)
-                    I_data += finite.new_integrate(data, 0, u_bound, 0, j, dx, total_length, nen[1])
+                    I_data += finite.new_integrate(data, 0, u_bound, dx, total_length, nen[1])
                     
                 else:
                     sim_data = {}
@@ -3015,10 +3013,9 @@ class Notebook:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=i, r=j+1, single_tstep=do_curr_t, need_extra_node=nen) 
                         extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t) 
             
-                    data_node_x = np.linspace(active_datagroup.datasets[tag].params_dict["Node_width"] / 2, active_datagroup.datasets[tag].params_dict["Total_length"] - active_datagroup.datasets[tag].params_dict["Node_width"] / 2, m)
                     data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, i, j, nen, extra_data)
                     
-                    I_data = finite.new_integrate(data, l_bound, u_bound, i, j, dx, total_length, nen)
+                    I_data = finite.new_integrate(data, l_bound, u_bound, dx, total_length, nen)
 
                             
                 if self.PL_mode == "Current time step":
@@ -3034,7 +3031,8 @@ class Notebook:
 
                 self.integration_plots[0].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
 
-                # Do some bonus calculations involving PL's time derivative
+                # FIXME: Do some bonus calculations involving PL's time derivative
+                # Move this into a popup hidden under if system_ID == "Nanowire"
                 if (self.PL_mode == "All time steps" and datatype == "PL"):
                     self.integration_plots[1].global_gridx = np.linspace(0, total_time, n + 1)
                     tau_diff = finite.tau_diff(I_data, dt)
