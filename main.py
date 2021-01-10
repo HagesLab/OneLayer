@@ -331,6 +331,16 @@ class Nanowire:
                 raise ValueError
                 
         return data
+    
+    def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
+        param_dict["deltaN"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(grid_x.__len__())
+                    
+        param_dict["deltaP"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(grid_x.__len__())
+        
+        param_dict["E_field"] = sim_data["E_field"] if include_flags['E_field'] else np.zeros(grid_x.__len__() + 1)
+
+        return
+    
 
 class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
@@ -599,10 +609,10 @@ class Notebook:
         self.IC_file_name = ""
         self.using_AIC = False
 
-        self.carry_include_N = tk.IntVar()
-        self.carry_include_P = tk.IntVar()
-        self.carry_include_E_field = tk.IntVar()
-        
+        self.carry_include_flags = {}
+        for var in self.nanowire.simulation_outputs_dict:
+            self.carry_include_flags[var] = tk.IntVar()
+
         # Helpers, flags, and containers for analysis plots
         self.analysis_plots = [Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State()]
         self.integration_plots = [Integration_Plot_State()]
@@ -1165,7 +1175,6 @@ class Notebook:
         self.tab_analyze.add(self.tab_detailed_analysis, text="Detailed Analysis")
         self.notebook.add(self.tab_analyze, text="Analyze")
         return
-    
     
     def create_AIC_frame(self):
         self.AIC_frame = tk.ttk.Frame(self.tab_analytical_init)
@@ -2145,15 +2154,13 @@ class Notebook:
 
             self.IC_carry_title_label = tk.ttk.Label(self.IC_carry_popup, text="Select data to include in new IC", style="Header.TLabel")
             self.IC_carry_title_label.grid(row=0,column=0,columnspan=2)
-
-            self.include_N_checkbutton = tk.Checkbutton(self.IC_carry_popup, text="N", variable=self.carry_include_N)
-            self.include_N_checkbutton.grid(row=1,column=0)
-
-            self.include_P_checkbutton = tk.Checkbutton(self.IC_carry_popup, text="P", variable=self.carry_include_P)
-            self.include_P_checkbutton.grid(row=2,column=0)
             
-            self.include_E_checkbutton = tk.Checkbutton(self.IC_carry_popup, text="E_field", variable=self.carry_include_E_field)
-            self.include_E_checkbutton.grid(row=3,column=0)
+            self.carry_checkbuttons = {}
+            rcount = 1
+            for var in self.nanowire.simulation_outputs_dict:
+                self.carry_checkbuttons[var] = tk.Checkbutton(self.IC_carry_popup, text=var, variable=self.carry_include_flags[var])
+                self.carry_checkbuttons[var].grid(row=rcount, column=0)
+                rcount += 1
 
             self.carry_IC_listbox = tk.Listbox(self.IC_carry_popup, width=30,height=10, selectmode='extended')
             self.carry_IC_listbox.grid(row=4,column=0,columnspan=2)
@@ -2166,6 +2173,7 @@ class Notebook:
             self.IC_carry_popup.protocol("WM_DELETE_WINDOW", partial(self.on_IC_carry_popup_close, continue_=False))
             self.IC_carry_popup.grab_set()
             self.IC_carry_popup_isopen = True
+            
         else:
             print("Error #510: Opened more than one PL change axis popup at a time")
         return
@@ -2175,8 +2183,13 @@ class Notebook:
             if continue_:
                 plot_ID = self.active_analysisplot_ID.get()
                 active_sets = self.analysis_plots[plot_ID].datagroup.datasets
-                pile = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
-                for key in pile:
+                datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
+                
+                include_flags = {}
+                for iflag in self.carry_include_flags:
+                    include_flags[iflag] = self.carry_include_flags[iflag].get()
+                    
+                for key in datasets:
                     new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file for {}".format(key), filetypes=[("Text files","*.txt")])
                     if new_filename == "": continue
 
@@ -2187,21 +2200,16 @@ class Notebook:
                     node_x = active_sets[key].node_x
                     
                     filename = active_sets[key].filename
-                    
-                    var = "N"
-                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
-                    param_dict_copy["deltaN"] = u_read(path_name, t0=active_sets[key].show_index, single_tstep=True) - param_dict_copy["N0"] if self.carry_include_N.get() else np.zeros(node_x.__len__())
-                    
-                    var = "P"
-                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
-                    param_dict_copy["deltaP"] = u_read(path_name, t0=active_sets[key].show_index, single_tstep=True) - param_dict_copy["P0"] if self.carry_include_P.get() else np.zeros(node_x.__len__())
-                    
-                    var = "E_field"
-                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
-                    param_dict_copy["E_field"] = u_read(path_name, t0=active_sets[key].show_index, single_tstep=True) if self.carry_include_E_field.get() else np.zeros(node_x.__len__() + 1)
+                    sim_data = {}
+                    for var in self.nanowire.simulation_outputs_dict:
+                        path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
+                        sim_data[var] = u_read(path_name, t0=active_sets[key].show_index, single_tstep=True)
+
+                    self.nanowire.get_IC_carry(sim_data, param_dict_copy, include_flags, node_x)
 
                     with open(new_filename + ".txt", "w+") as ofstream:
                         ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
+                        ofstream.write("System_class: {}\n".format(self.nanowire.system_ID))
                         ofstream.write("$ Space Grid:\n")
                         ofstream.write("Total_length: {}\n".format(active_sets[key].params_dict["Total_length"]))
                         ofstream.write("Node_width: {}\n".format(active_sets[key].params_dict["Node_width"]))
@@ -2230,11 +2238,11 @@ class Notebook:
             print("IC carry popup closed")
             self.IC_carry_popup_isopen = False
 
-        except OSError as oops:
-            self.write(self.analysis_status, "IC file not created")
+        except OSError:
+            self.write(self.analysis_status, "Error: failed to regenerate IC file")
             
-        # except:
-        #     print("Error #511: Failed to close IC carry popup.")
+        except:
+            print("Error #511: Failed to close IC carry popup.")
 
         return
 
