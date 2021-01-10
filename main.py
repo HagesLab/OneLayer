@@ -12,7 +12,6 @@ starting_backend = matplotlib.get_backend()
 matplotlib.use("TkAgg")
 import matplotlib.backends.backend_tkagg as tkagg
 from matplotlib.figure import Figure
-from scipy import integrate as intg
 
 import tkinter.filedialog
 import tkinter.scrolledtext as tkscrolledtext
@@ -24,7 +23,10 @@ import os
 import tables
 import itertools
 from functools import partial # This lets us pass params to functions called by tkinter buttons
+
 import finite
+import modules
+from utils import extract_values, u_read, check_valid_filename
 
 import pandas as pd # For bayesim compatibility
 import bayesim.hdf5io as dd
@@ -61,286 +63,6 @@ class Param_Rule:
 
     def is_edge(self):
         return (self.variable == "dEc" or self.variable == "chi")
-
-class Characteristic:
-    def __init__(self, units, is_edge):
-        self.units = units
-        self.is_edge = is_edge
-        return
-
-class Parameter(Characteristic):
-    # Helper class to store info about each of a Nanowire's parameters and initial distributions
-    def __init__(self, units, is_edge):
-        super().__init__(units, is_edge)
-        # self.value can be a number (i.e. the parameter value is constant across the length of the nanowire)
-        # or an array (i.e. the parameter value is spatially dependent)
-        self.value = 0
-        self.param_rules = []
-        return
-    
-class Output(Characteristic):
-    
-    def __init__(self, display_name, units, xlabel, xvar, is_edge, is_calculated=False, calc_func=None, is_integrated=False, yscale='log', yfactors=(1,1)):
-        super().__init__(units, is_edge)
-        self.display_name = display_name
-        self.xlabel = xlabel
-        self.xvar = xvar
-        self.is_calculated = is_calculated
-        self.is_integrated = is_integrated
-        self.yscale = yscale
-        self.yfactors = yfactors
-        self.calc_func = calc_func
-        return
-
-
-class Nanowire:
-    # A Nanowire object stores all information regarding the initial state being edited in the IC tab
-    # And functions for managing other previously simulated nanowire data as they are loaded in
-    def __init__(self):
-        self.system_ID = "Nanowire"
-        self.total_length = -1
-        self.dx = -1
-        self.grid_x_nodes = -1
-        self.grid_x_edges = -1
-        self.spacegrid_is_set = False
-        
-        self.param_dict = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True), "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True), 
-                            "N0":Parameter(units="[cm^-3]", is_edge=False), "P0":Parameter(units="[cm^-3]", is_edge=False), 
-                            "B":Parameter(units="[cm^3 / s]", is_edge=False), "Tau_N":Parameter(units="[ns]", is_edge=False), 
-                            "Tau_P":Parameter(units="[ns]", is_edge=False), "Sf":Parameter(units="[cm / s]", is_edge=False), 
-                            "Sb":Parameter(units="[cm / s]", is_edge=False), "Temperature":Parameter(units="[K]", is_edge=True), 
-                            "Rel-Permitivity":Parameter(units="", is_edge=True), "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
-                            "Theta":Parameter(units="[cm^-1]", is_edge=False), "Alpha":Parameter(units="[cm^-1]", is_edge=False), 
-                            "Delta":Parameter(units="", is_edge=False), "Frac-Emitted":Parameter(units="", is_edge=False),
-                            "deltaN":Parameter(units="[cm^-3]", is_edge=False), "deltaP":Parameter(units="[cm^-3]", is_edge=False), 
-                            "E_field":Parameter(units="[WIP]", is_edge=True), "Ec":Parameter(units="[WIP]", is_edge=True),
-                            "electron_affinity":Parameter(units="[WIP]", is_edge=True)}
-
-        self.param_count = len(self.param_dict)
-        # This tells TEDs what flags there will be and their 'layman's name' shown on the interface as,
-        # but we actually don't need to store the flag values here
-        # The reason why is that info is already stored in whether a flag appears visually selected on the interface
-
-        self.flags_dict = {"ignore_alpha":"Ignore Photon Recycle",
-                           "symmetric_system":"Symmetric System"}
-
-        # List of all variables active during the finite difference simulating        
-        # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[cm^-3]", xlabel="nm", xvar="position",is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
-                                        "E_field":Output("Electric Field", units="[WIP]", xlabel="nm", xvar="position",is_edge=True, is_calculated=False,is_integrated=False, yscale='linear')}
-        
-        # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_n, is_integrated=False),
-                                         "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_p, is_integrated=False),
-                                         "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, is_calculated=True, calc_func=finite.radiative_recombination, is_integrated=False),
-                                         "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.nonradiative_recombination, is_integrated=False),
-                                         "PL":Output("TRPL", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.new_integrate, is_integrated=True),
-                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.tau_diff, is_integrated=True)}
-        
-        self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
-        
-        self.simulation_outputs_count = len(self.simulation_outputs_dict)
-        self.calculated_outputs_count = len(self.calculated_outputs_dict)
-        self.total_outputs_count = self.simulation_outputs_count + self.calculated_outputs_count
-        ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
-        # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
-        self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
-                                "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
-                                "Thickness": 1, "dx": 1,
-                                "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
-                                "Tau_N": 1, "Tau_P": 1,                                     # [ns]
-                                "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
-                                "Temperature": 1, "Rel-Permitivity": 1, 
-                                "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
-                                "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
-                                "Delta": 1, "Frac-Emitted": 1,
-                                "deltaN": ((1e-7) ** 3), "deltaP": ((1e-7) ** 3),
-                                "Ec": 1, "electron_affinity": 1,
-                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
-                                "E_field": 1, 
-                                "tau_diff": 1}
-        
-        # FIXME: Check these
-        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
-        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["Tau_N"]
-        self.convert_in_dict["PL"] = self.convert_in_dict["RR"] * self.convert_in_dict["Theta"]
-        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
-        self.convert_out_dict = {}
-        for param in self.convert_in_dict:
-            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
-
-        return
-
-    def add_param_rule(self, param_name, new_rule):
-        self.param_dict[param_name].param_rules.append(new_rule)
-        self.update_param_toarray(param_name)
-        return
-
-    def swap_param_rules(self, param_name, i):
-        self.param_dict[param_name].param_rules[i], self.param_dict[param_name].param_rules[i-1] = self.param_dict[param_name].param_rules[i-1], self.param_dict[param_name].param_rules[i]
-        self.update_param_toarray(param_name)
-        return
-
-    def remove_param_rule(self, param_name, i):
-        self.param_dict[param_name].param_rules.pop(i)
-        self.update_param_toarray(param_name)
-        return
-    
-    def removeall_param_rules(self, param_name):
-        self.param_dict[param_name].param_rules = []
-        self.param_dict[param_name].value = 0
-        return
-    
-    def update_param_toarray(self, param_name):
-        # Recalculate a Parameter from its Param_Rules
-        # This should be done every time the Param_Rules are changed
-        param = self.param_dict[param_name]
-
-        if param.is_edge:
-            new_param_value = np.zeros(self.grid_x_edges.__len__())
-        else:
-            new_param_value = np.zeros(self.grid_x_nodes.__len__())
-
-        for condition in param.param_rules:
-            i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
-            
-            # If the left bound coordinate exceeds the width of the node toIndex() (which always rounds down) 
-            # assigned, it should actually be mapped to the next node
-            if (condition.l_bound - finite.toCoord(i, self.dx, param.is_edge) >= self.dx / 2): i += 1
-
-            if (condition.type == "POINT"):
-                new_param_value[i] = condition.l_boundval
-
-            elif (condition.type == "FILL"):
-                j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
-                new_param_value[i:j+1] = condition.l_boundval
-
-            elif (condition.type == "LINE"):
-                slope = (condition.r_boundval - condition.l_boundval) / (condition.r_bound - condition.l_bound)
-                j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
-
-                ndx = np.linspace(0, self.dx * (j - i), j - i + 1)
-                new_param_value[i:j+1] = condition.l_boundval + ndx * slope
-
-            elif (condition.type == "EXP"):
-                j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
-
-                ndx = np.linspace(0, j - i, j - i + 1)
-                try:
-                    new_param_value[i:j+1] = condition.l_boundval * np.power(condition.r_boundval / condition.l_boundval, ndx / (j - i))
-                except FloatingPointError:
-                    print("Warning: Step size too large to resolve initial condition accurately")
-
-        param.value = new_param_value
-        return
-
-    def DEBUG_print(self):
-        #print("Behold the One Nanowire in its infinite glory:")
-        mssg = ""
-        if self.spacegrid_is_set:
-            mssg += ("Space Grid is set\n")
-            mssg += ("Nodes: {}\n".format(self.grid_x_nodes))
-            mssg += ("Edges: {}\n".format(self.grid_x_edges))
-        else:
-            mssg += ("Grid is not set\n")
-
-        for param in self.param_dict:
-            mssg += ("{} {}: {}\n".format(param, self.param_dict[param].units, self.param_dict[param].value))
-
-        return mssg
-    
-    def calc_inits(self):
-        # The three true initial conditions for our three coupled ODEs
-        # N = N0 + delta_N
-        init_N = (self.param_dict["N0"].value + self.param_dict["deltaN"].value) * self.convert_in_dict["N"]
-        init_P = (self.param_dict["P0"].value + self.param_dict["deltaP"].value) * self.convert_in_dict["P"]
-        init_E_field = self.param_dict["E_field"].value * self.convert_in_dict["E_field"]
-        # "Typecast" single values to uniform arrays
-        if not isinstance(init_N, np.ndarray):
-            init_N = np.ones(self.grid_x_nodes.__len__()) * init_N
-            
-        if not isinstance(init_P, np.ndarray):
-            init_P = np.ones(self.grid_x_nodes.__len__()) * init_P
-            
-        if not isinstance(init_E_field, np.ndarray):
-            init_E_field = np.ones(self.grid_x_edges.__len__()) * init_E_field
-        
-        return {"N":init_N, "P":init_P, "E_field":init_E_field}
-    
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, init_conditions, write_output):
-        # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from finite.py with the correct args
-        return finite.ode_nanowire(data_path, m, n, self.dx, dt, params,
-                                    not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), do_ss, write_output,
-                                    init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
-    
-    def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
-        # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
-        data_dict = {}
-        
-        for raw_output_name in self.simulation_outputs_dict:
-            data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, raw_output_name)
-            data = []
-            for tstep in tsteps:
-                data.append(u_read(data_filename, t0=tstep, single_tstep=True))
-            
-            data_dict[raw_output_name] = np.array(data)
-            
-        for calculated_output_name, output_obj in self.calculated_outputs_dict.items():
-            if not output_obj.is_integrated:
-                data_dict[calculated_output_name] = output_obj.calc_func(data_dict, params)
-                
-                
-        with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
-            tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
-            temp_N = np.array(ifstream_N.root.data)
-            temp_P = np.array(ifstream_P.root.data)
-        temp_RR = finite.radiative_recombination({"N":temp_N, "P":temp_P}, params)
-        PL_base = finite.prep_PL(temp_RR, 0, finite.toIndex(params["Total_length"], params["Node_width"], params["Total_length"]), False, params)
-        data_dict["PL"] = self.calculated_outputs_dict["PL"].calc_func(PL_base, 0, params["Total_length"], params["Node_width"], params["Total_length"], 
-                                                                       False)
-        
-        data_dict["tau_diff"] = self.calculated_outputs_dict["tau_diff"].calc_func(data_dict["PL"], params["dt"])
-        
-        for data in data_dict:
-            data_dict[data] *= self.convert_out_dict[data]
-            
-        return data_dict
-    
-    def prep_dataset(self, datatype, sim_data, params, do_plot_override=True, i=0, j=0, nen=False, extra_data = None):
-        # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
-        if (datatype in self.simulation_outputs_dict):
-            data = sim_data[datatype]
-        
-        else:
-            if (datatype == "RR"):
-                data = finite.radiative_recombination(sim_data, params)
-
-            elif (datatype == "NRR"):
-                data = finite.nonradiative_recombination(sim_data, params)
-
-            elif (datatype == "PL"):
-    
-                if do_plot_override:
-                    rad_rec = finite.radiative_recombination(sim_data, params)
-                    data = finite.prep_PL(rad_rec, 0, len(rad_rec), need_extra_node=False, params=params).flatten()
-                else:
-                    rad_rec = finite.radiative_recombination(extra_data, params)
-                    data = finite.prep_PL(rad_rec, i, j, nen, params)
-            else:
-                raise ValueError
-                
-        return data
-    
-    def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
-        param_dict["deltaN"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(grid_x.__len__())
-                    
-        param_dict["deltaP"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(grid_x.__len__())
-        
-        param_dict["E_field"] = sim_data["E_field"] if include_flags['E_field'] else np.zeros(grid_x.__len__() + 1)
-
-        return
-    
 
 class Flag:
     # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
@@ -515,42 +237,6 @@ class Analysis_Plot_State(Scalable_Plot_State):
             self.time_index = self.datagroup.get_maxnumtsteps()
         return
 
-def extract_values(string, delimiter):
-    # Converts a string with deliimiters into a list of float values
-	# E.g. "100,200,300" with "," delimiter becomes [100,200,300]
-    values = []
-    substring = string
-    
-    while (not substring.find(delimiter) == -1):
-        next_delimiter = substring.find(delimiter)
-        values.append(float(substring[0:next_delimiter]))
-        substring = substring[next_delimiter + 1:]
-
-    values.append(float(substring))
-
-    return values
-
-def check_valid_filename(file_name):
-    prohibited_characters = [".","<",">","/","\\","*","?",":","\"","|"]
-	# return !any(char in file_name for char in prohibited_characters)
-    if any(char in file_name for char in prohibited_characters):
-        return False
-
-    return True
-        
-def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, need_extra_node=False):
-    if not (t0 is None) and single_tstep:
-        t1 = t0 + 1
-        
-    if need_extra_node:
-        r = r + 1
-        
-    with tables.open_file(filename, mode='r') as ifstream:
-        data = np.array(ifstream.root.data[t0:t1, l:r])
-        
-        if np.ndim(data) == 2 and len(data) == 1:
-            data = data.flatten()
-        return data
         
 class Notebook:
 	# This is somewhat Java-like: everything about the GUI exists inside a class
@@ -591,15 +277,8 @@ class Notebook:
         self.listupload_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
-        self.check_bay_params = {"Mu_N":tk.IntVar(), "Mu_P":tk.IntVar(), "N0":tk.IntVar(), "P0":tk.IntVar(),
-                        "B":tk.IntVar(), "Tau_N":tk.IntVar(), "Tau_P":tk.IntVar(), "Sf":tk.IntVar(), \
-                        "Sb":tk.IntVar(), "Temperature":tk.IntVar(), "Rel-Permitivity":tk.IntVar(), \
-                        "Theta":tk.IntVar(), "Alpha":tk.IntVar(), "Delta":tk.IntVar(), "Frac-Emitted":tk.IntVar()}
-        
-        self.bay_mode = tk.StringVar(value="model")
-
         # Flags and containers for IC arrays
-        self.nanowire = Nanowire()
+        self.nanowire = modules.Nanowire()
         self.convert_in_dict = self.nanowire.convert_in_dict
         self.convert_out_dict = self.nanowire.convert_out_dict
 
@@ -612,6 +291,12 @@ class Notebook:
         self.carry_include_flags = {}
         for var in self.nanowire.simulation_outputs_dict:
             self.carry_include_flags[var] = tk.IntVar()
+            
+        self.check_bay_params = {}
+        for param in self.nanowire.param_dict:
+            self.check_bay_params[param] = tk.IntVar()
+            
+        self.bay_mode = tk.StringVar(value="model")
 
         # Helpers, flags, and containers for analysis plots
         self.analysis_plots = [Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State()]
@@ -1105,7 +790,7 @@ class Notebook:
         self.analysisplot_bottomright_label.grid(row=1,column=3)
         
         self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
-        self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=3,columnspan=4)
+        self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=4,columnspan=4)
         self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
         self.analyze_toolbar.grid(row=0,column=0,columnspan=6)
 
@@ -3078,8 +2763,7 @@ class Notebook:
         self.integration_fig.canvas.draw()
         
         self.write(self.analysis_status, "Integration complete")
-        # FIXME: Do some bonus calculations involving PL's time derivative
-        # Move this into a popup hidden under if system_ID == "Nanowire"
+
         if (self.nanowire.system_ID == "Nanowire" and self.PL_mode == "All time steps" and datatype == "PL"):
             # Calculate tau_D
             if self.integration_plots[ip_ID].datagroup.size(): # If has tau_diff data to plot
@@ -4001,7 +3685,9 @@ class Notebook:
         # Note: DO NOT convert_out any of these values - bayesim models are created in TEDs units.
         datagroup = self.integration_plots[ip_ID].datagroup
         plot_info = self.integration_plots[ip_ID]
-        if datagroup.size() == 0: return
+        if datagroup.size() == 0: 
+            self.write(self.analysis_status, "No datasets loaded for bayesim")
+            return
             
         if (plot_info.mode == "All time steps"):
             if self.bay_mode.get() == "obs":
@@ -4026,10 +3712,16 @@ class Notebook:
                     grid_x = plot_info.global_gridx
                     paired_data = np.vstack((grid_x, raw_data))
 
-                    for param in active_bay_params:
-                        param_column = np.ones((1,raw_data.__len__())) * datagroup.datasets[key].params_dict[param] * self.convert_out_dict[param]
-                        paired_data = np.concatenate((param_column, paired_data), axis=0)
-
+                    try:
+                        for param in active_bay_params:
+                            if not isinstance(datagroup.datasets[key].params_dict[param], (int, float)):
+                                raise ValueError
+                            param_column = np.ones((1,raw_data.__len__())) * datagroup.datasets[key].params_dict[param] * self.convert_out_dict[param]
+                            paired_data = np.concatenate((param_column, paired_data), axis=0)
+                    except ValueError:
+                        self.write(self.analysis_status, "WIP: Bayesim with space-dependent params not yet supported")
+                        return
+                    
                     paired_data = paired_data.T
 
                     if is_first:
@@ -4049,7 +3741,9 @@ class Notebook:
                 full_data = pd.DataFrame.from_records(data=full_data, columns=panda_columns)
                 
                 new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
-                if new_filename == "": return
+                if new_filename == "": 
+                    self.write(self.analysis_status, "Bayesim export cancelled")
+                    return
 
                 if not new_filename.endswith(".h5"): new_filename += ".h5"
 
