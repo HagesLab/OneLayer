@@ -408,3 +408,62 @@ def CalcInt(input_array,spacing):
     for i in range(length):
         output_array[i]=intg.trapz(input_array[:,i],dx=spacing,axis=-1)
     return output_array
+
+####################
+
+def ode_heatplate(data_path_name, m, n, dx, dt, params, write_output=True):
+    atom = tables.Float64Atom()
+
+    ## Unpack params; typecast non-array params to arrays if needed
+    q0 = params["Left_flux"]
+    qL = params["Right_flux"]
+    init_T = toArray(params["init_T"], m, False)
+
+    k = toArray(params["k"], m, False)
+    Cp = toArray(params["Cp"], m, False)
+    rho = toArray(params["density"], m, False)
+    
+    init_T[0] = init_T[1] + q0*dx/k[0]
+    init_T[-1] = init_T[-2] - qL*dx/k[-1]
+    
+    tSteps = np.linspace(0, n*dt, n+1)
+    data, error_data = intg.odeint(odefuncs.heat_constflux, init_T, tSteps, args=(m, dx, k, rho, Cp, q0, qL),\
+        tfirst=True, full_output=True)
+            
+    if write_output:
+        ## Prep output files
+        with tables.open_file(data_path_name + "-T.h5", mode='a') as ofstream_T:
+            array_T = ofstream_T.root.data
+
+            array_T.append(data[1:])
+
+        return error_data
+
+    else:
+        array_T = data
+
+        return array_T, error_data
+    return
+
+def heatflux(sim_data, params):
+    T = sim_data['T']
+    k = toArray(params['k'], len(T), False)
+    k_avg = np.zeros(len(T) - 1)
+    for i in range(0, len(T) - 1):
+        k_avg[i] = (k[i] + k[i+1]) / 2
+        
+    if T.ndim == 1:
+        q = np.zeros(len(T) + 1)
+        q[0] = params["Left_flux"]
+        q[-1] = params["Right_flux"]
+        for i in range(1, len(q) - 1):
+            q[i] = -k_avg[i-1] * (T[i] - T[i-1]) / params["Node_width"]
+            
+    elif T.ndim == 2:
+        q = np.zeros((len(T), len(T[0]) + 1))
+        q[:,0] += params["Left_flux"]
+        q[:,-1] += params["Right_flux"]
+        for i in range(1, len(q) - 1):
+            q[:,i] = -k_avg[i-1] * (T[:,i] - T[:,i-1]) / params["Node_width"]
+        
+    return q

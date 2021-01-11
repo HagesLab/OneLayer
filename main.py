@@ -243,6 +243,10 @@ class Notebook:
     # A goal is to achieve total separation between this class (i.e. the GUI) and all mathematical operations, which makes this GUI reusable for different problems
 
     def __init__(self, title):
+        self.nanowire = modules.Nanowire()
+        #self.nanowire = modules.HeatPlate()
+        self.nanowire.verify()
+        
         ## Set up GUI, special variables needed to interact with certain tkinter objects, other "global" variables
         # Create the main Tkinter object
         self.root = tk.Tk()
@@ -278,7 +282,7 @@ class Notebook:
         self.display_selection = tk.StringVar()
 
         # Flags and containers for IC arrays
-        self.nanowire = modules.Nanowire()
+        
         self.convert_in_dict = self.nanowire.convert_in_dict
         self.convert_out_dict = self.nanowire.convert_out_dict
 
@@ -286,6 +290,8 @@ class Notebook:
         self.paramtoolkit_currentparam = ""
         self.IC_file_list = None
         self.IC_file_name = ""
+        
+        # FIXME: Deal with this flag and anything that involves self.analytical_entryboxes_dict
         self.using_AIC = False
 
         self.carry_include_flags = {}
@@ -471,13 +477,13 @@ class Notebook:
         self.steps_head = tk.ttk.Label(self.spacegrid_frame, text="Space Grid - Start Here", style="Header.TLabel")
         self.steps_head.grid(row=0,column=0,columnspan=2)
 
-        self.thickness_label = tk.ttk.Label(self.spacegrid_frame, text="Thickness [nm]")
+        self.thickness_label = tk.ttk.Label(self.spacegrid_frame, text="Thickness " + self.nanowire.length_unit)
         self.thickness_label.grid(row=1,column=0)
 
         self.thickness_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
         self.thickness_entry.grid(row=1,column=1)
 
-        self.dx_label = tk.ttk.Label(self.spacegrid_frame, text="Node width [nm]")
+        self.dx_label = tk.ttk.Label(self.spacegrid_frame, text="Node width " + self.nanowire.length_unit)
         self.dx_label.grid(row=2,column=0)
 
         self.dx_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
@@ -1397,7 +1403,7 @@ class Notebook:
             self.plotter_title_label = tk.ttk.Label(self.plotter_popup, text="Select a data type", style="Header.TLabel")
             self.plotter_title_label.grid(row=0,column=0,columnspan=2)
 
-            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, "N", "P", "E_field", "RR", "NRR", "PL")
+            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, *self.nanowire.outputs_dict)
             self.var_select_menu.grid(row=1,column=0)
 
             self.autointegrate_checkbutton = tk.Checkbutton(self.plotter_popup, text="Auto integrate all space and time steps?", variable=self.check_autointegrate, onvalue=1, offvalue=0)
@@ -1508,7 +1514,7 @@ class Notebook:
             self.single_intg_label = tk.ttk.Label(self.integration_getbounds_popup, text="Single integral", style="Header.TLabel")
             self.single_intg_label.grid(row=0,column=1, rowspan=3, padx=(0,20))
 
-            self.integration_getbounds_title_label = tk.Label(self.integration_getbounds_popup, text="Enter bounds of integration [nm]")
+            self.integration_getbounds_title_label = tk.Label(self.integration_getbounds_popup, text="Enter bounds of integration " + self.nanowire.length_unit)
             self.integration_getbounds_title_label.grid(row=0,column=2,columnspan=4)
 
             self.lower = tk.Label(self.integration_getbounds_popup, text="Lower bound: x=")
@@ -1532,13 +1538,13 @@ class Notebook:
             self.multi_intg_label = tk.ttk.Label(self.integration_getbounds_popup, text="Multiple integrals", style="Header.TLabel")
             self.multi_intg_label.grid(row=4,column=1, rowspan=3, padx=(0,20))
 
-            self.integration_center_label = tk.Label(self.integration_getbounds_popup, text="Enter space-separated e.g. (100 200 300...) Centers [nm]: ")
+            self.integration_center_label = tk.Label(self.integration_getbounds_popup, text="Enter space-separated e.g. (100 200 300...) Centers {}: ".format(self.nanowire.length_unit))
             self.integration_center_label.grid(row=5,column=2)
 
             self.integration_center_entry = tk.Entry(self.integration_getbounds_popup, width=30)
             self.integration_center_entry.grid(row=5,column=3,columnspan=3)
 
-            self.integration_width_label = tk.Label(self.integration_getbounds_popup, text="Width [nm]: +/- ")
+            self.integration_width_label = tk.Label(self.integration_getbounds_popup, text="Width {}: +/- ".format(self.nanowire.length_unit))
             self.integration_width_label.grid(row=6,column=2)
 
             self.integration_width_entry = tk.Entry(self.integration_getbounds_popup, width=9)
@@ -2077,7 +2083,7 @@ class Notebook:
             grid_x = self.nanowire.grid_x_nodes if not output_obj.is_edge else self.nanowire.grid_x_edges
             plot.plot(grid_x, self.sim_data[variable] * self.convert_out_dict[variable])
 
-            plot.set_xlabel("x [nm]")
+            plot.set_xlabel("x {}".format(self.nanowire.length_unit))
             plot.set_ylabel("{} {}".format(variable, output_obj.units))
 
             plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
@@ -2203,7 +2209,7 @@ class Notebook:
                 label = dataset.tag(for_matplotlib=True) + "*" if dataset.params_dict["symmetric_system"] else dataset.tag(for_matplotlib=True)
                 subplot.plot(dataset.grid_x, dataset.data * self.convert_out_dict[active_datagroup.type], label=label)
 
-            subplot.set_xlabel("x [nm]")
+            subplot.set_xlabel("x {}".format(self.nanowire.length_unit))
             subplot.set_ylabel(active_datagroup.type)
             subplot.legend().set_draggable(True)
             subplot.set_title("Time: " + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) + " / " + str(active_datagroup.get_maxtime()) + "ns")
@@ -2527,7 +2533,11 @@ class Notebook:
             print("Error: an unusual value occurred while simulating {}".format(data_file_name))
             self.error_states.append(data_file_name)
             return
-        
+        except:
+            print("An unknown error occurred while simulating {}".format(data_file_name))
+            self.error_states.append(data_file_name)
+            return
+            
         grid_t = np.linspace(self.dt, self.simtime, self.n)
 
         try:
@@ -3340,7 +3350,7 @@ class Notebook:
         else:
             plot.plot(grid_x, val_array, label=param_name)
 
-        plot.set_xlabel("x [nm]")
+        plot.set_xlabel("x {}".format(self.nanowire.length_unit))
         plot.set_ylabel("{} {}".format(param_name, param_obj.units))
         
         if plot_ID=="recent": 
@@ -3412,7 +3422,7 @@ class Notebook:
             for param in batch_set:
                 filename += str("__{}_{:.4e}".format(param, batch_set[param]))
                 
-                if param in self.analytical_entryboxes_dict:
+                if self.nanowire.system_ID == "Nanowire" and (param in self.analytical_entryboxes_dict):
                     self.enter(self.analytical_entryboxes_dict[param], str(batch_set[param]))
                     
                 else:
@@ -3577,8 +3587,9 @@ class Notebook:
             return
         
         # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and any other values that may exist on the GUI
-        for key in self.analytical_entryboxes_dict:
-            self.enter(self.analytical_entryboxes_dict[key], "")
+        if self.nanowire.system_ID == "Nanowire":
+            for key in self.analytical_entryboxes_dict:
+                self.enter(self.analytical_entryboxes_dict[key], "")
             
         for param in self.nanowire.param_dict:
             self.paramtoolkit_currentparam = param
@@ -3666,7 +3677,7 @@ class Notebook:
             paired_data = self.analysis_plots[plot_ID].datagroup.build(self.convert_out_dict)
             # We need some fancy footwork using itertools to transpose a non-rectangular array
             paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
-            header = "".join(["x [nm]," + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
+            header = "".join(["x {},".format(self.nanowire.length_unit) + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
         export_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save data", filetypes=[("csv (comma-separated-values)","*.csv")])
         

@@ -181,3 +181,19 @@ def dydt_twolayer(t, y, m, f, dm, df, Cn, Cp, tauN, tauP, tauT, tauS, tauD, tauD
 # Package
     dydt = np.concatenate([dNdt, dPdt, dEdt,dTdt,dSdt,dDdt], axis=None)
     return dydt
+
+#@njit(cache=True)
+def heat_constflux(t, y, m, dx, k, rho, Cp, q0, qL):
+    alpha = k * rho / Cp
+    G = alpha / (dx**2)
+    T = y
+    
+    dydt = np.zeros(m)
+    for i in range(1, len(T) - 1):
+        dydt[i] = G[i+1]*T[i+1] - 2*G[i]*T[i] + G[i-1]*T[i-1]
+    
+    # Bounds
+    dydt[0] = dydt[1]
+    dydt[-1] = dydt[-2]
+    
+    return dydt
