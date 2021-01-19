@@ -18,18 +18,23 @@ class Parameter(Characteristic):
         # self.value can be a number (i.e. the parameter value is constant across the length of the nanowire)
         # or an array (i.e. the parameter value is spatially dependent)
         self.value = 0
+        
+        # TODO: Implement value verification using this
+        self.valid_range = (None, None) # Min, max
+        
         self.param_rules = []
         return
     
 class Output(Characteristic):
     
-    def __init__(self, display_name, units, xlabel, xvar, is_edge, is_calculated=False, calc_func=None, is_integrated=False, yscale='log', yfactors=(1,1)):
+    def __init__(self, display_name, units, xlabel, xvar, is_edge, is_calculated=False, calc_func=None, is_integrated=False, analysis_plotable=True, yscale='log', yfactors=(1,1)):
         super().__init__(units, is_edge)
         self.display_name = display_name
         self.xlabel = xlabel
         self.xvar = xvar
         self.is_calculated = is_calculated
         self.is_integrated = is_integrated
+        self.analysis_plotable = analysis_plotable # Whether this Output can be selected from analysis tab's plot feature
         self.yscale = yscale
         self.yfactors = yfactors
         self.calc_func = calc_func

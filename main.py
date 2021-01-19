@@ -26,7 +26,7 @@ from functools import partial # This lets us pass params to functions called by 
 
 import finite
 import modules
-from utils import extract_values, u_read, check_valid_filename
+from utils import extract_values, u_read, check_valid_filename, autoscale
 
 import pandas as pd # For bayesim compatibility
 import bayesim.hdf5io as dd
@@ -291,8 +291,9 @@ class Notebook:
         self.IC_file_list = None
         self.IC_file_name = ""
         
-        # FIXME: Deal with this flag and anything that involves self.analytical_entryboxes_dict
-        self.using_AIC = False
+        # FIXME: This is a somewhat clumsy way to introduce a Nanowire module-specific functionality
+        if self.nanowire.system_ID == "Nanowire":
+            self.using_AIC = False
 
         self.carry_include_flags = {}
         for var in self.nanowire.simulation_outputs_dict:
@@ -1055,10 +1056,11 @@ class Notebook:
         if self.sys_plotsummary_popup_isopen:
             for param_name in self.nanowire.param_dict:
                 param = self.nanowire.param_dict[param_name]
-                val = param.value if isinstance(param.value, np.ndarray) else finite.toArray(param.value, len(self.nanowire.grid_x_nodes), param.is_edge)
+                val = finite.toArray(param.value, len(self.nanowire.grid_x_nodes), param.is_edge)
                 grid_x = self.nanowire.grid_x_nodes if not param.is_edge else self.nanowire.grid_x_edges
                 self.sys_param_summaryplots[param_name].plot(grid_x, val)
-            
+                self.sys_param_summaryplots[param_name].set_yscale(autoscale(val))
+                
             self.plotsummary_fig.tight_layout()
             self.plotsummary_fig.canvas.draw()
 
@@ -1258,12 +1260,12 @@ class Notebook:
 
             # Contextually-dependent options for batchable params
             self.batchables_array = []
-            batchable_params = [param for param in self.nanowire.param_dict if not (self.using_AIC and (param == "deltaN" or param == "deltaP"))]
+            batchable_params = [param for param in self.nanowire.param_dict if not (self.nanowire.system_ID == "Nanowire" and self.using_AIC and (param == "deltaN" or param == "deltaP"))]
             
-            if self.using_AIC:
+            if self.nanowire.system_ID == "Nanowire" and self.using_AIC:
                 
                 self.AIC_instruction1 = tk.Message(self.batch_popup, text="Additional options for generating deltaN and deltaP batches " +
-                                                  "are available when using the Analytical Initial Condition tool", width=300)
+                                                  "are available when using the Analytical Initial Condition tool.", width=300)
                 self.AIC_instruction1.grid(row=4,column=0)
                 
                 self.AIC_instruction2 = tk.Message(self.batch_popup, text="Please note that TEDs will use the values and settings on the A.I.C. tool's tab " +
@@ -1283,7 +1285,7 @@ class Notebook:
 
             for i in range(max_batchable_params):
                 batch_param_name = tk.StringVar()
-                if self.using_AIC:
+                if self.nanowire.system_ID == "Nanowire" and self.using_AIC:
                     optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params, *AIC_params)
                 else:
                     optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params)
@@ -1403,7 +1405,7 @@ class Notebook:
             self.plotter_title_label = tk.ttk.Label(self.plotter_popup, text="Select a data type", style="Header.TLabel")
             self.plotter_title_label.grid(row=0,column=0,columnspan=2)
 
-            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, *self.nanowire.outputs_dict)
+            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, *(output for output in self.nanowire.outputs_dict if self.nanowire.outputs_dict[output].analysis_plotable))
             self.var_select_menu.grid(row=1,column=0)
 
             self.autointegrate_checkbutton = tk.Checkbutton(self.plotter_popup, text="Auto integrate all space and time steps?", variable=self.check_autointegrate, onvalue=1, offvalue=0)
@@ -3132,7 +3134,8 @@ class Notebook:
         self.paramtoolkit_viewer_selection.set(new_param_name)
         self.update_paramrule_listbox(new_param_name)
 
-        if new_param_name == "deltaN" or new_param_name == "deltaP": self.using_AIC = False
+        if self.nanowire.system_ID == "Nanowire":
+            if new_param_name == "deltaN" or new_param_name == "deltaP": self.using_AIC = False
         self.update_IC_plot(plot_ID="recent")
         return
 
@@ -3306,7 +3309,8 @@ class Notebook:
                     temp_IC_values[j] = 0
                     warning_flag = True
                 
-        if var == "deltaN" or var == "deltaP": self.using_AIC = False
+        if self.nanowire.system_ID == "Nanowire":
+            if var == "deltaN" or var == "deltaP": self.using_AIC = False
         
         self.paramtoolkit_currentparam = var
         self.deleteall_paramrule()
@@ -3324,22 +3328,18 @@ class Notebook:
         elif plot_ID=="AIC": plot = self.AIC_subplot
         elif plot_ID=="listupload": plot = self.listupload_subplot
         plot.cla()
-        plot.set_yscale('log')
 
         if plot_ID=="AIC": param_name="deltaN"
         else: param_name = self.paramtoolkit_currentparam
         
         param_obj = self.nanowire.param_dict[param_name]
         grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
-        val_array = param_obj.value
         # Support for constant value shortcut: temporarily create distribution
         # simulating filling across nanowire with that value
-        if not isinstance(val_array, np.ndarray):
-            val_array = np.ones(grid_x.__len__()) * val_array
-        max_val = np.amax(param_obj.value)
-        
+        val_array = finite.toArray(param_obj.value, len(self.nanowire.grid_x_nodes), param_obj.is_edge)
 
-        plot.set_ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
+        plot.set_yscale(autoscale(val_array))
+        #plot.set_ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
 
 
         if self.sys_flag_dict['symmetric_system'].value():
@@ -3429,7 +3429,7 @@ class Notebook:
                     self.nanowire.param_dict[param].value = batch_set[param]
 
                 
-            if self.using_AIC: self.add_AIC()
+            if self.nanowire.system_ID == "Nanowire" and self.using_AIC: self.add_AIC()
                 
             try:
                 self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], batch_dir_name, filename))
@@ -3641,7 +3641,7 @@ class Notebook:
                 print("Warning: could not apply value for param: {}".format(param))
                 warning_flag += 1
                 
-        self.using_AIC = False
+        if self.nanowire.system_ID == "Nanowire": self.using_AIC = False
         
         if not warning_flag: self.write(self.ICtab_status, "IC file loaded successfully")
         else: self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
@@ -3660,8 +3660,7 @@ class Notebook:
             if plot_info.mode == "Current time step": 
                 paired_data = [[datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type]] for key in datagroup.datasets]
 
-                # TODO: Write both of these values with their units
-                header = "{}, {}".format(plot_info.x_param, datagroup.type)
+                header = "{} {}, {}".format(plot_info.x_param, self.nanowire.param_dict[plot_info.x_param].units, datagroup.type)
 
             else: # if self.I_plot.mode == "All time steps"
                 raw_data = np.array([datagroup.datasets[key].data * self.convert_out_dict[datagroup.type] for key in datagroup.datasets])
@@ -3676,7 +3675,7 @@ class Notebook:
             if self.analysis_plots[plot_ID].datagroup.size() == 0: return
             paired_data = self.analysis_plots[plot_ID].datagroup.build(self.convert_out_dict)
             # We need some fancy footwork using itertools to transpose a non-rectangular array
-            paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
+            paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))), dtype='object')
             header = "".join(["x {},".format(self.nanowire.length_unit) + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
         export_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save data", filetypes=[("csv (comma-separated-values)","*.csv")])

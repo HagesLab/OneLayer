@@ -204,7 +204,7 @@ class Nanowire(OneD_Model):
                                          "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, is_calculated=True, calc_func=finite.radiative_recombination, is_integrated=False),
                                          "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.nonradiative_recombination, is_integrated=False),
                                          "PL":Output("TRPL", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.new_integrate, is_integrated=True),
-                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.tau_diff, is_integrated=True)}
+                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.tau_diff, is_integrated=True, analysis_plotable=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         

@@ -42,3 +42,16 @@ def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, need_
         if np.ndim(data) == 2 and len(data) == 1:
             data = data.flatten()
         return data
+    
+def autoscale(val_array):
+    # Help a matplotlib plot determine whether a log or linear scale should be used
+    # when plotting val_array
+    max_val = np.amax(val_array)
+    min_val = np.amin(val_array)
+        
+    if not (min_val == 0) and np.abs(max_val / min_val) > 1e1:
+        return 'symlog'
+    elif (min_val < 0) and np.abs(min_val / max_val) > 1e1:
+        return 'symlog'
+    else:
+        return 'linear'
