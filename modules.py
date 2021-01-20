@@ -162,6 +162,7 @@ class OneD_Model:
         return
     
     def verify(self):
+        print("Verifying selected module...")
         assert (set(self.param_dict.keys()).union(set(self.outputs_dict.keys())).issubset(set(self.convert_in_dict.keys()))), "Error: param_dict and conversion_dict are not same size"
         return
 
@@ -192,13 +193,11 @@ class Nanowire(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[cm^-3]", xlabel="nm", xvar="position",is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1)), 
+        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
+                                        "P":Output("P", units="[cm^-3]", xlabel="nm", xvar="position",is_edge=False, is_calculated=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
                                         "E_field":Output("Electric Field", units="[WIP]", xlabel="nm", xvar="position",is_edge=True, is_calculated=False,is_integrated=False, yscale='linear')}
         
         # List of all variables calculated from those in simulation_outputs_dict
-        # FIXME: Find way to exclude tau_diff from Plotter
-        # e.g. Plottable flag
         self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_n, is_integrated=False),
                                          "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_p, is_integrated=False),
                                          "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, is_calculated=True, calc_func=finite.radiative_recombination, is_integrated=False),

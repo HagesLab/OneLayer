@@ -680,7 +680,7 @@ class Notebook:
         self.dt_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.dt_entry.grid(row=3,column=1)
 
-        self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Steady State External Stimulation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
+        self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Inject init. conds. as generation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
         self.do_ss_checkbutton.grid(row=5,column=0)
 
         self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", command=self.do_Batch)
@@ -696,7 +696,7 @@ class Notebook:
         self.line3_separator = tk.ttk.Separator(self.tab_simulate, orient="vertical", style="Grey Bar.TSeparator")
         self.line3_separator.grid(row=0,rowspan=30,column=2,sticky="ns")
 
-        self.subtitle = tk.ttk.Label(self.tab_simulate, text="1-D Carrier Sim (rk4 mtd), with photon propagation")
+        self.subtitle = tk.ttk.Label(self.tab_simulate, text="Simulation - {}".format(self.nanowire.system_ID))
         self.subtitle.grid(row=0,column=3,columnspan=3)
         
         self.sim_fig = Figure(figsize=(12, 8))
@@ -1762,8 +1762,8 @@ class Notebook:
 
             self.enter(self.xlbound, active_plot.xlim[0])
             self.enter(self.xubound, active_plot.xlim[1])
-            self.enter(self.ylbound, active_plot.ylim[0])
-            self.enter(self.yubound, active_plot.ylim[1])
+            self.enter(self.ylbound, "{:.2e}".format(active_plot.ylim[0]))
+            self.enter(self.yubound, "{:.2e}".format(active_plot.ylim[1]))
             self.xaxis_type.set(active_plot.xaxis_type)
             self.yaxis_type.set(active_plot.yaxis_type)
             self.check_display_legend.set(active_plot.display_legend)
@@ -1772,7 +1772,7 @@ class Notebook:
             self.change_axis_popup.grab_set()
             self.change_axis_popup_isopen = True
         else:
-            print("Error #440: Opened more than one PL change axis popup at a time")
+            print("Error #440: Opened more than one change axis popup at a time")
         return
 
     def on_change_axis_popup_close(self, from_integration, continue_=False):
@@ -1826,14 +1826,14 @@ class Notebook:
                     self.integration_plots[plot_ID].display_legend = self.check_display_legend.get()
 
             self.change_axis_popup.destroy()
-            print("PL change axis popup closed")
+
             self.change_axis_popup_isopen = False
 
         except ValueError as oops:
             self.write(self.change_axis_status, oops)
             return
         except:
-            print("Error #441: Failed to close PL xaxis popup.")
+            print("Error #441: Failed to close change axis popup.")
 
         return
 
@@ -1868,7 +1868,7 @@ class Notebook:
             self.IC_carry_popup_isopen = True
             
         else:
-            print("Error #510: Opened more than one PL change axis popup at a time")
+            print("Error #510: Opened more than one IC carryover popup at a time")
         return
 
     def on_IC_carry_popup_close(self, continue_=False):
@@ -1928,7 +1928,7 @@ class Notebook:
                 self.write(self.analysis_status, "IC file generated")
 
             self.IC_carry_popup.destroy()
-            print("IC carry popup closed")
+
             self.IC_carry_popup_isopen = False
 
         except OSError:
@@ -2051,7 +2051,6 @@ class Notebook:
                 self.export_for_bayesim()
 
             self.bay_popup.destroy()
-            print("Bayesim popup closed")
             self.bayesim_popup_isopen = False
 
         except FloatingPointError:
@@ -2069,15 +2068,8 @@ class Notebook:
             if do_clear_plots: 
                 plot.cla()
 
-                if output_obj.yscale == 'log':
-                    # Why + 1e-30?
-                    # We want a log-scaled plot, and adding a tiny number to the y limits avoids the edge case of every value being zero.
-                    ymin = np.amin(self.sim_data[variable] + 1e-30) * output_obj.yfactors[0]
-                    ymax = np.amax(self.sim_data[variable] + 1e-30) * output_obj.yfactors[1]
-                    
-                else:
-                    ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
-                    ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
+                ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
+                ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
                 plot.set_ylim(ymin * self.convert_out_dict[variable], ymax * self.convert_out_dict[variable])
 
             plot.set_yscale(output_obj.yscale)
@@ -2535,8 +2527,8 @@ class Notebook:
             print("Error: an unusual value occurred while simulating {}".format(data_file_name))
             self.error_states.append(data_file_name)
             return
-        except:
-            print("An unknown error occurred while simulating {}".format(data_file_name))
+        except Exception as oops:
+            print("Error \"{}\" occurred while simulating {}".format(oops, data_file_name))
             self.error_states.append(data_file_name)
             return
             
@@ -2547,7 +2539,7 @@ class Notebook:
                 error_dict['tolsf'], error_dict['tsw'], error_dict['nst'], error_dict['nfe'], error_dict['nje'], error_dict['nqu'],\
                 error_dict['mused'])).transpose(), fmt='%.4e', delimiter=',', header="t, hu, tcur, tolsf, tsw, nst, nfe, nje, nqu, mused")
         except PermissionError:
-            print(self.status, "Error: unable to access convergence data export destination")
+            print("Error: unable to access convergence data export destination")
         
         self.write(self.status, "Finalizing...")
 
@@ -3339,8 +3331,6 @@ class Notebook:
         val_array = finite.toArray(param_obj.value, len(self.nanowire.grid_x_nodes), param_obj.is_edge)
 
         plot.set_yscale(autoscale(val_array))
-        #plot.set_ylim((max_val + 1e-30) * 1e-12, (max_val + 1e-30) * 1e4)
-
 
         if self.sys_flag_dict['symmetric_system'].value():
             plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(val_array), val_array), axis=0), label=param_name)
@@ -3675,7 +3665,7 @@ class Notebook:
             if self.analysis_plots[plot_ID].datagroup.size() == 0: return
             paired_data = self.analysis_plots[plot_ID].datagroup.build(self.convert_out_dict)
             # We need some fancy footwork using itertools to transpose a non-rectangular array
-            paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))), dtype='object')
+            paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
             header = "".join(["x {},".format(self.nanowire.length_unit) + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
         export_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save data", filetypes=[("csv (comma-separated-values)","*.csv")])

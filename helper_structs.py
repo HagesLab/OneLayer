@@ -27,7 +27,7 @@ class Parameter(Characteristic):
     
 class Output(Characteristic):
     
-    def __init__(self, display_name, units, xlabel, xvar, is_edge, is_calculated=False, calc_func=None, is_integrated=False, analysis_plotable=True, yscale='log', yfactors=(1,1)):
+    def __init__(self, display_name, units, xlabel, xvar, is_edge, is_calculated=False, calc_func=None, is_integrated=False, analysis_plotable=True, yscale='symlog', yfactors=(1,1)):
         super().__init__(units, is_edge)
         self.display_name = display_name
         self.xlabel = xlabel
