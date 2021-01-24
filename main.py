@@ -2390,7 +2390,8 @@ class Notebook:
         if (IC_files.__len__() == 0): return
 
         batch_num = 0
-        self.error_states = []
+        self.sim_warning_msg = ""
+        
         for IC in IC_files:
             batch_num += 1
             self.IC_file_name = IC
@@ -2398,11 +2399,12 @@ class Notebook:
             self.write(self.status, "Now calculating {} : ({} of {})".format(self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")], str(batch_num), str(IC_files.__len__())))
             self.do_Calculate()
             
-        if not len(self.error_states):
-            self.write(self.status, "Simulations complete")
-        else:
-            self.write(self.status, "Warning: fatal errors logged in console for {} simulations".format(len(self.error_states)))
+        self.write(self.status, "Simulations complete")
 
+        if not self.sim_warning_msg == "":
+            sim_warning_popup = tk.Toplevel(self.root)
+            sim_warning_textbox = tk.ttk.Label(sim_warning_popup, text=self.sim_warning_msg)
+            sim_warning_textbox.grid(row=0,column=0)
         return
 
 	# The big function that does all the simulating
@@ -2432,26 +2434,24 @@ class Notebook:
                     raise KeyError
             
         except ValueError:
-            print("Error: Invalid parameters for {}".format(data_file_name))
-            self.error_states.append(data_file_name)
+            self.sim_warning_msg += "Error: Invalid parameters for {}\n".format(data_file_name)
+
             return
         
         except KeyError:
-            print("Error: Nanowire() calc_inits() did not return values for all simulation output variables")
-            self.error_states.append(data_file_name)
+            self.sim_warning_msg += "Error: Module calc_inits() did not return values for all simulation output variables\n"
             return
 
         except Exception as oops:
-            print("{} for {}".format(oops, data_file_name))
-            self.error_states.append(data_file_name)
+            self.sim_warning_msg += "Error: \"{}\" reported while setting up {}\n".format(oops, data_file_name)
             return
     
         try:
             print("Attempting to create {} data folder".format(data_file_name))
-
             full_path_name = "{}\\{}\\{}".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
+            
             if os.path.isdir(full_path_name):
                 print("{} folder already exists; trying alternate name".format(data_file_name))
                 append = 1
@@ -2460,17 +2460,15 @@ class Notebook:
 
                 full_path_name = "{}({})".format(full_path_name, append)
                 
-                overwrite_warning_popup = tk.Toplevel(self.root)
-                overwrite_warning_text = tk.ttk.Label(overwrite_warning_popup, text="Overwrite warning - {} already exists in Data directory\nSaving as {} instead".format(data_file_name, full_path_name))
-                overwrite_warning_text.grid(row=0,column=0)
-
+                
+                self.sim_warning_msg += "Overwrite warning - {} already exists in Data directory\nSaving as {} instead\n".format(data_file_name, full_path_name)
+                
                 data_file_name = "{}({})".format(data_file_name, append)
                 
             os.mkdir("{}".format(full_path_name))
 
-        except FileExistsError:
-            print("Error: unable to create directory for results of simulation {}".format(shortened_IC_name))
-            self.error_states.append(data_file_name)
+        except:
+            self.sim_warning_msg += "Error: unable to create directory for results of simulation {}\n".format(shortened_IC_name)
             return
 
 
@@ -2524,12 +2522,10 @@ class Notebook:
                                                 temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), init_conditions, write_output)
             
         except FloatingPointError:
-            print("Error: an unusual value occurred while simulating {}".format(data_file_name))
-            self.error_states.append(data_file_name)
+            self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}\n".format(data_file_name))
             return
         except Exception as oops:
-            print("Error \"{}\" occurred while simulating {}".format(oops, data_file_name))
-            self.error_states.append(data_file_name)
+            self.sim_warning_msg += ("Error \"{}\" occurred while simulating {}\n".format(oops, data_file_name))
             return
             
         grid_t = np.linspace(self.dt, self.simtime, self.n)

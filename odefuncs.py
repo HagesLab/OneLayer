@@ -7,7 +7,7 @@ import numpy as np
 from scipy import integrate as intg
 from numba import njit
 
-@njit(cache=True)
+@njit
 def dydt(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_N=0, init_P=0):
 
     Jn = np.zeros((m+1))

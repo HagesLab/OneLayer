@@ -195,7 +195,7 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
     if recycle_photons:
         combined_weight = gen_weight_distribution(m, dx, alphaCof, thetaCof, delta_frac, fracEmitted, symmetric)
     else:
-        combined_weight = 0
+        combined_weight = np.zeros((m, m))
 
     ## Generate space derivative of Ec and Chi
     # Note that for these two quantities the derivatives at node edges are being calculated by values at node edges
