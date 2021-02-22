@@ -7,7 +7,7 @@ Created on Sun Jan 10 15:47:55 2021
 import numpy as np
 import finite
 from helper_structs import Parameter, Output
-from utils import u_read
+from utils import u_read, to_index, to_array, to_pos
 import tables
 
 class OneD_Model:
@@ -86,28 +86,28 @@ class OneD_Model:
             new_param_value = np.zeros(self.grid_x_nodes.__len__())
 
         for condition in param.param_rules:
-            i = finite.toIndex(condition.l_bound, self.dx, self.total_length, param.is_edge)
+            i = to_index(condition.l_bound, self.dx, self.total_length, param.is_edge)
             
             # If the left bound coordinate exceeds the width of the node toIndex() (which always rounds down) 
             # assigned, it should actually be mapped to the next node
-            if (condition.l_bound - finite.toCoord(i, self.dx, param.is_edge) >= self.dx / 2): i += 1
+            if (condition.l_bound - to_pos(i, self.dx, param.is_edge) >= self.dx / 2): i += 1
 
             if (condition.type == "POINT"):
                 new_param_value[i] = condition.l_boundval
 
             elif (condition.type == "FILL"):
-                j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                j = to_index(condition.r_bound, self.dx, self.total_length, param.is_edge)
                 new_param_value[i:j+1] = condition.l_boundval
 
             elif (condition.type == "LINE"):
                 slope = (condition.r_boundval - condition.l_boundval) / (condition.r_bound - condition.l_bound)
-                j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                j = to_index(condition.r_bound, self.dx, self.total_length, param.is_edge)
 
                 ndx = np.linspace(0, self.dx * (j - i), j - i + 1)
                 new_param_value[i:j+1] = condition.l_boundval + ndx * slope
 
             elif (condition.type == "EXP"):
-                j = finite.toIndex(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                j = to_index(condition.r_bound, self.dx, self.total_length, param.is_edge)
 
                 ndx = np.linspace(0, j - i, j - i + 1)
                 try:
@@ -285,7 +285,7 @@ class Nanowire(OneD_Model):
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
         temp_RR = finite.radiative_recombination({"N":temp_N, "P":temp_P}, params)
-        PL_base = finite.prep_PL(temp_RR, 0, finite.toIndex(params["Total_length"], params["Node_width"], params["Total_length"]), False, params)
+        PL_base = finite.prep_PL(temp_RR, 0, to_index(params["Total_length"], params["Node_width"], params["Total_length"]), False, params)
         data_dict["PL"] = self.calculated_outputs_dict["PL"].calc_func(PL_base, 0, params["Total_length"], params["Node_width"], params["Total_length"], 
                                                                        False)
         
@@ -302,7 +302,13 @@ class Nanowire(OneD_Model):
             data = sim_data[datatype]
         
         else:
-            if (datatype == "RR"):
+            if (datatype == "deltaN"):
+                data = finite.delta_n(sim_data, params)
+                
+            elif (datatype == "deltaP"):
+                data = finite.delta_p(sim_data, params)
+                
+            elif (datatype == "RR"):
                 data = finite.radiative_recombination(sim_data, params)
 
             elif (datatype == "NRR"):
@@ -371,7 +377,7 @@ class HeatPlate(OneD_Model):
     
     def calc_inits(self):
         init_T = self.param_dict['init_T'].value * self.convert_in_dict["T"]
-        init_T = finite.toArray(init_T, len(self.grid_x_nodes), False)
+        init_T = to_array(init_T, len(self.grid_x_nodes), False)
         return {"T":init_T}
     
     def simulate(self, data_path, m, n, dt, params, flags, do_ss, init_conditions, write_output):

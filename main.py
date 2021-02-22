@@ -26,217 +26,13 @@ from functools import partial # This lets us pass params to functions called by 
 
 import finite
 import modules
-from utils import extract_values, u_read, check_valid_filename, autoscale
+from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, Integrated_Data_Set, Analysis_Plot_State, Integration_Plot_State
+from utils import to_index, to_pos, to_array, get_all_combinations, extract_values, u_read, check_valid_filename, autoscale
 
 import pandas as pd # For bayesim compatibility
 import bayesim.hdf5io as dd
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
-class Param_Rule:
-    # The Parameter Toolkit uses these to build Parameter()'s values
-    def __init__(self, variable, type, l_bound, r_bound=-1, l_boundval=-1, r_boundval=-1):
-        self.variable = variable # e.g. N, P, E-Field
-        self.type = type
-        self.l_bound = l_bound
-        self.r_bound = r_bound
-        self.l_boundval = l_boundval
-        self.r_boundval = r_boundval
-        return
-
-    def get(self):
-        if (self.type == "POINT"):
-            return((self.variable + ": " + self.type + " at x=" + '{:.4e}'.format(self.l_bound) + " with value: " + '{:.4e}'.format(self.l_boundval)))
-
-        elif (self.type == "FILL"):
-            return((self.variable + ": " + self.type + " from x=" + '{:.4e}'.format(self.l_bound) + " to " + '{:.4e}'.format(self.r_bound) + " with value: " + '{:.4e}'.format(self.l_boundval)))
-
-        elif (self.type == "LINE"):
-            return((self.variable + ": " + self.type + " from x=" + '{:.4e}'.format(self.l_bound) + " to " + '{:.4e}'.format(self.r_bound) + 
-                    " with left value: " + '{:.4e}'.format(self.l_boundval) + " and right value: " + '{:.4e}'.format(self.r_boundval)))
-
-        elif (self.type == "EXP"):
-            return((self.variable + ": " + self.type + " from x=" + '{:.4e}'.format(self.l_bound) + " to " + '{:.4e}'.format(self.r_bound) + 
-                    " with left value: " + '{:.4e}'.format(self.l_boundval) + " and right value: " + '{:.4e}'.format(self.r_boundval)))
-
-        else:
-            return("Error #101: Invalid initial condition")
-
-    def is_edge(self):
-        return (self.variable == "dEc" or self.variable == "chi")
-
-class Flag:
-    # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
-    # but we interact with the checkbutton using the actual tk.CheckButton() element
-    # So wrap both of those together in a single object and call it a day
-    def __init__(self, master, display_name):
-        self.tk_var = tk.IntVar()
-        self.tk_element = tk.ttk.Checkbutton(master=master, text=display_name, variable=self.tk_var, onvalue=1, offvalue=0)
-        return
-    
-    def value(self):
-        return self.tk_var.get()
-
-class Batchable:
-    # Much like the flag class, the Batchable() serves to collect together various tk elements and values for the batch IC tool.
-    def __init__(self, tk_optionmenu, tk_entrybox, param_name):
-        self.tk_optionmenu = tk_optionmenu
-        self.tk_entrybox = tk_entrybox
-        self.param_name = param_name
-        return
-
-class Data_Set:
-    def __init__(self, data, grid_x, params_dict, type, filename):
-        self.data = data
-        self.grid_x = grid_x
-        self.params_dict = dict(params_dict)
-        self.type = type
-        self.filename = filename
-        return
-    
-    def tag(self, for_matplotlib=False):
-        # For some reason, Matplotlib legends don't like leading underscores
-        if not for_matplotlib:
-            return self.filename + "_" + self.type
-        else:
-            return (self.filename + "_" + self.type).strip('_')
-        
-class Raw_Data_Set(Data_Set):
-    # Object containing all the metadata required to plot and integrate saved data sets
-    def __init__(self, data, grid_x, node_x, params_dict, type, filename, show_index):
-        super().__init__(data, grid_x, params_dict, type, filename)
-        self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
-
-        # node_x and grid_x will usually be identical, unless the data is a type (like E-field) that exists on edges
-        # There's a little optimization that can be made here because grid_x will either be identical to node_x or not, but that makes the code harder to follow
-
-        self.show_index = show_index # Time step number data belongs to
-
-        self.num_tsteps = int(0.5 + self.params_dict["Total-Time"] / self.params_dict["dt"])
-        return
-
-    def build(self):
-        return np.vstack((self.grid_x, self.data))
-    
-class Integrated_Data_Set(Data_Set):
-    def __init__(self, data, grid_x, params_dict, type, filename):
-        super().__init__(data, grid_x, params_dict, type, filename)
-        return
-
-class Data_Group:
-    def __init__(self):
-        self.type = "None"
-        self.datasets = {}
-        return
-    
-    def get_maxval(self):
-        return np.amax([np.amax(self.datasets[tag].data) for tag in self.datasets])
-    
-    def size(self):
-        return len(self.datasets)
-    
-    def clear(self):
-        self.datasets.clear()
-        return
-
-class Raw_Data_Group(Data_Group):
-    def __init__(self):
-        super().__init__()
-        self.dt = -1
-        self.total_t = -1
-        return
-
-    def add(self, data, tag):
-        if (len(self.datasets) == 0): # Allow the first set in to set the dt and t restrictions
-           self.dt = data.params_dict["dt"]
-           self.total_t = data.params_dict["Total-Time"]
-           self.type = data.type
-
-        # Only allow datasets with identical time step size and total time
-        if (self.dt == data.params_dict["dt"] and self.total_t == data.params_dict["Total-Time"] and self.type == data.type):
-            self.datasets[tag] = data
-
-        else:
-            print("Cannot plot selected data sets: dt or total t mismatch")
-
-        return
-
-    def build(self, convert_out_dict):
-        result = []
-        for key in self.datasets:
-            result.append(self.datasets[key].grid_x)
-            result.append(self.datasets[key].data * convert_out_dict[self.type])
-        return result
-
-    def get_max_x(self):
-        return np.amax([self.datasets[tag].params_dict["Total_length"] for tag in self.datasets])
-
-    def get_maxtime(self):
-        return np.amax([self.datasets[tag].params_dict["Total-Time"] for tag in self.datasets])
-
-    def get_maxnumtsteps(self):
-        return np.amax([self.datasets[tag].num_tsteps for tag in self.datasets])
-
-class Integrated_Data_Group(Data_Group):
-    def __init__(self):
-        super().__init__()
-        return
-    
-    def add(self, new_set):
-        if (len(self.datasets) == 0): # Allow the first set in to set the type restriction
-           self.type = new_set.type
-
-        # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong
-        if (self.type == new_set.type):
-            self.datasets[new_set.tag()] = new_set
-
-        return
-
-class Scalable_Plot_State:
-    def __init__(self, plot_obj=None):
-        self.plot_obj = plot_obj
-        self.xaxis_type = 'linear'
-        self.yaxis_type = 'log'
-        self.xlim = (-1,-1)
-        self.ylim = (-1,-1)
-        self.display_legend = 1
-        return
-
-class Integration_Plot_State(Scalable_Plot_State):
-    def __init__(self):
-        super().__init__()
-        self.mode = ""
-        self.x_param = "None"   # This is usually "Time"
-        self.global_gridx = None    # In some modes of operation every I_Set will have the same grid_x
-        self.datagroup = Integrated_Data_Group()
-        return
-
-class Analysis_Plot_State(Scalable_Plot_State):
-    # Object containing variables needed for each small plot on analysis tab
-	# This is really a wrapper that enhances interactions between the Data_Group object and the embedded plot
-    # There are currently four of these
-    def __init__(self):
-        super().__init__()
-        self.time_index = 0
-        self.data_filenames = []
-        self.datagroup = Raw_Data_Group()
-        return
-
-    # def remove_duplicate_filenames(self):
-    #     # Sets, unlike arrays, contain at most one copy of each item. Forcing an array into a set like this
-    #     # is a fast way to scrub duplicate entries, which is needed because we don't want to waste time
-    #     # plotting the same data set multiple times.
-    #     # Unfortunately, sets are not indexable, so we convert back into arrays to regain index access ability.
-            
-    #     self.data_filenames = list(set(self.data_filenames))
-    #     return
-
-    def add_time_index(self, offset):
-        self.time_index += offset
-        if self.time_index < 0: self.time_index = 0
-        if self.time_index > self.datagroup.get_maxnumtsteps(): 
-            self.time_index = self.datagroup.get_maxnumtsteps()
-        return
-
         
 class Notebook:
 	# This is somewhat Java-like: everything about the GUI exists inside a class
@@ -1056,7 +852,7 @@ class Notebook:
         if self.sys_plotsummary_popup_isopen:
             for param_name in self.nanowire.param_dict:
                 param = self.nanowire.param_dict[param_name]
-                val = finite.toArray(param.value, len(self.nanowire.grid_x_nodes), param.is_edge)
+                val = to_array(param.value, len(self.nanowire.grid_x_nodes), param.is_edge)
                 grid_x = self.nanowire.grid_x_nodes if not param.is_edge else self.nanowire.grid_x_edges
                 self.sys_param_summaryplots[param_name].plot(grid_x, val)
                 self.sys_param_summaryplots[param_name].set_yscale(autoscale(val))
@@ -1591,8 +1387,8 @@ class Notebook:
                 elif self.fetch_intg_mode.get() == "multiple":
                     print("Multiple integrals")
                     if self.integration_center_entry.get() == "Aboma":
-                        centers = [0,2200,3400,5200,6400,7200,8600,10000]
-
+                        centers = [0,1600,3600,5000,6400,8000,14200]
+                        #centers = [0,2200,3400,5200,6400,7200,8600,10000]
                     else:
                         centers = list(set(extract_values(self.integration_center_entry.get(), ' ')))
 
@@ -2668,14 +2464,14 @@ class Notebook:
 
                 print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
-                j = finite.toIndex(u_bound, dx, total_length)
+                j = to_index(u_bound, dx, total_length)
                 if include_negative:
-                    i = finite.toIndex(-l_bound, dx, total_length)
-                    nen = [-l_bound > finite.toCoord(i, dx) + dx / 2,
-                                       u_bound > finite.toCoord(j, dx) + dx / 2]
+                    i = to_index(-l_bound, dx, total_length)
+                    nen = [-l_bound > to_pos(i, dx) + dx / 2,
+                                       u_bound > to_pos(j, dx) + dx / 2]
                 else:
-                    i = finite.toIndex(l_bound, dx, total_length)
-                    nen = u_bound > finite.toCoord(j, dx) + dx / 2 or l_bound == u_bound
+                    i = to_index(l_bound, dx, total_length)
+                    nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
                 
                 m = int(total_length / dx)
             
@@ -2869,7 +2665,7 @@ class Notebook:
 
         if (thickness <= 0 or dx <= 0): raise ValueError
 
-        if not finite.check_valid_dx(thickness, dx):
+        if dx > thickness:
             raise Exception("Error: space step size larger than thickness")
 
         # Upper limit on number of space steps
@@ -3279,17 +3075,17 @@ class Notebook:
                 warning_flag = True
 
             # Linear interpolate from provided param list to specified grid points
-            lindex = finite.toIndex(first_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
-            rindex = finite.toIndex(second_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
+            lindex = to_index(first_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
+            rindex = to_index(second_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
             
-            if (first_valueset[0] - finite.toCoord(lindex, self.nanowire.dx, is_edge) >= self.nanowire.dx / 2): lindex += 1
+            if (first_valueset[0] - to_pos(lindex, self.nanowire.dx, is_edge) >= self.nanowire.dx / 2): lindex += 1
 
             intermediate_x_indices = np.arange(lindex, rindex + 1, 1)
 
             for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
                 try:
                     if (second_valueset[0] > self.nanowire.total_length): raise IndexError
-                    temp_IC_values[j] = first_valueset[1] + (finite.toCoord(j, self.nanowire.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
+                    temp_IC_values[j] = first_valueset[1] + (to_pos(j, self.nanowire.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
                 except IndexError:
                     self.write(self.ICtab_status, "Warning: some points out of bounds")
                     warning_flag = True
@@ -3324,7 +3120,7 @@ class Notebook:
         grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
         # Support for constant value shortcut: temporarily create distribution
         # simulating filling across nanowire with that value
-        val_array = finite.toArray(param_obj.value, len(self.nanowire.grid_x_nodes), param_obj.is_edge)
+        val_array = to_array(param_obj.value, len(self.nanowire.grid_x_nodes), param_obj.is_edge)
 
         plot.set_yscale(autoscale(val_array))
 
@@ -3400,7 +3196,7 @@ class Notebook:
             original_param_values[param] = self.nanowire.param_dict[param].value
                 
         # This algorithm was shamelessly stolen from our bay.py script...                
-        batch_combinations = finite.get_all_combinations(batch_values)        
+        batch_combinations = get_all_combinations(batch_values)        
                 
         # Apply each combination to Nanowire, going through AIC if necessary
         for batch_set in batch_combinations:

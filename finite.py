@@ -9,80 +9,7 @@ import tables
 import numpy as np
 from scipy import integrate as intg
 import odefuncs
-
-def check_valid_dx(length, dx):
-    return (dx <= length)
-
-def toIndex(x,dx, absUpperBound, is_edge=False):
-    # Warning: this and toCoord() always round x down to the nearest node (or edge if is_edge=True)!
-    absLowerBound = dx / 2 if not is_edge else 0
-    if (x < absLowerBound):
-        return 0
-
-    if (x > absUpperBound):
-        return int(absUpperBound / dx)
-
-    return int((x - absLowerBound) / dx)
-
-
-def toCoord(i,dx, is_edge=False):
-    absLowerBound = dx / 2 if not is_edge else 0
-    return (absLowerBound + i * dx)
-
-def toArray(value, m, is_edge):
-    if not isinstance(value, np.ndarray):
-        if is_edge:
-            return np.ones(m+1) * value
-        else:
-            return np.ones(m) * value
-        
-    else:
-        return value
-
-def get_all_combinations(value_dict):
-    combinations = []
-    param_names = list(value_dict.keys())
-        
-    iterable_param_indexes = {}
-    iterable_param_lengths = {}
-    for param in param_names:
-        iterable_param_indexes[param] = 0
-        iterable_param_lengths[param] = value_dict[param].__len__()
-    
-    pivot_index = param_names.__len__() - 1
-
-    current_params = dict(value_dict)
-    # Create a list of all combinations of parameter values
-    while(pivot_index >= 0):
-
-        # Generate the next parameter set using lists of indices stored in the helper structures
-        for iterable_param in param_names:
-            current_params[iterable_param] = value_dict[iterable_param][iterable_param_indexes[iterable_param]]
-
-        combinations.append(dict(current_params))
-
-        # Determine the next iterable parameter using a "reverse search" amd update indices from right to left
-        # For example, given Param_A = [1,2,3], Param_B = [4,5,6], Param_C = [7,8]:
-        # The order {A, B, C} this algorithm will run is: 
-        # {1,4,7}, 
-        # {1,4,8}, 
-        # {1,5,7}, 
-        # {1,5,8}, 
-        # {1,6,7}, 
-        # {1,6,8},
-        # ...
-        # {3,6,7},
-        # {3,6,8}
-        pivot_index = param_names.__len__() - 1
-        while (pivot_index >= 0 and iterable_param_indexes[param_names[pivot_index]] == iterable_param_lengths[param_names[pivot_index]] - 1):
-            pivot_index -= 1
-
-        iterable_param_indexes[param_names[pivot_index]] += 1
-
-        for i in range(pivot_index + 1, param_names.__len__()):
-            iterable_param_indexes[param_names[i]] = 0
-            
-    return combinations
+from utils import to_index, to_pos, to_array
 
 def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
     # h and c are Planck's const and speed of light, respectively. These default to common units [J*s] and [m/s] but
@@ -157,22 +84,22 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
     ## Unpack params; typecast non-array params to arrays if needed
     Sf = params["Sf"]
     Sb = params["Sb"]
-    mu_n = toArray(params["Mu_N"], m, True)
-    mu_p = toArray(params["Mu_P"], m, True)
-    T = toArray(params["Temperature"], m, True)
-    n0 = toArray(params["N0"], m, False)
-    p0 = toArray(params["P0"], m, False)
-    tauN = toArray(params["Tau_N"], m, False)
-    tauP = toArray(params["Tau_P"], m, False)
-    B = toArray(params["B"], m, False)
-    eps = toArray(params["Rel-Permitivity"], m, True)
-    E_field_ext = toArray(params["Ext_E-Field"], m, True)
-    alphaCof = toArray(params["Alpha"], m, False) if recycle_photons else np.zeros(m)
-    thetaCof = toArray(params["Theta"], m, False)
-    delta_frac = toArray(params["Delta"], m, False)
-    fracEmitted = toArray(params["Frac-Emitted"], m, False)
-    init_Ec = toArray(params["Ec"], m, True)
-    init_Chi = toArray(params["electron_affinity"], m, True)
+    mu_n = to_array(params["Mu_N"], m, True)
+    mu_p = to_array(params["Mu_P"], m, True)
+    T = to_array(params["Temperature"], m, True)
+    n0 = to_array(params["N0"], m, False)
+    p0 = to_array(params["P0"], m, False)
+    tauN = to_array(params["Tau_N"], m, False)
+    tauP = to_array(params["Tau_P"], m, False)
+    B = to_array(params["B"], m, False)
+    eps = to_array(params["Rel-Permitivity"], m, True)
+    E_field_ext = to_array(params["Ext_E-Field"], m, True)
+    alphaCof = to_array(params["Alpha"], m, False) if recycle_photons else np.zeros(m)
+    thetaCof = to_array(params["Theta"], m, False)
+    delta_frac = to_array(params["Delta"], m, False)
+    fracEmitted = to_array(params["Frac-Emitted"], m, False)
+    init_Ec = to_array(params["Ec"], m, True)
+    init_Chi = to_array(params["electron_affinity"], m, True)
            
     ## Define constants
     eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
@@ -215,15 +142,16 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
 
 
     ## Do n time steps
+    # FIXME: hmax as a simulation parameter
     tSteps = np.linspace(0, n*dt, n+1)
-    data, error_data = intg.odeint(odefuncs.dydt, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
+    data, error_data = intg.odeint(odefuncs.dydt2, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
         tfirst=True, full_output=True)
         
     if (data[1:, 0:2*m] < 0).any():
         h = np.geomspace(2**2, 2**-6, 9)
-        for hmax in h:   
+        for hmax in h:
             print("Simulation is not converging well, retrying with hmax={}".format(hmax))
-            data, error_data = intg.odeint(odefuncs.dydt, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
+            data, error_data = intg.odeint(odefuncs.dydt2, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
                                            tfirst=True, full_output=True, hmax=hmax)
                 
             if not (data[1:, 0:2*m] < 0).any():
@@ -248,61 +176,6 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
         array_P = data[:,m:2*(m)]
 
         return array_N, array_P, error_data
-
-def ode_twolayer(m, f, dm, df, thickness_Layer1, thickness_Layer2, z0, dt, total_time, Cn, Cp, tauN, tauP, tauT, tauS, tauD, tauD_FRET, mu_n, mu_p, mu_S, mu_T, n0, p0, Sf, Sb, B, k_fusion, kstar_tgen, Theta_Tgenb, kB, T, T0, q, q_C, eps, eps0, do_Fret, init_N, init_P):
-    # FIXME: NEEDS TESTING WITH bay.py
-    init_E = np.zeros(m+1)
-    init_T = np.zeros(f)
-    init_S = np.zeros(f)
-    init_D = np.zeros(f)
-
-    init_m = np.linspace(0+dm/2,thickness_Layer1-dm/2,m)
-    init_f = np.linspace(0+df/2,thickness_Layer2-df/2,f)
-    Face_Space_m = np.linspace(0,thickness_Layer1,m+1)
-    Face_Space_f = np.linspace(0,thickness_Layer2,f+1)
-
-    if do_Fret:
-        # A small optimization: the weight arrays for DFret never change once the sim has started,
-        # So we calculate once and pass into dydt instead of recalculating many times within dydt
-        weight_array1 = np.array([1 / (1 + (thickness_Layer1 - i + init_f) ** 3 /z0) for i in init_m])
-        weight_array2 = np.array([1 / (1 + (thickness_Layer1 - init_m + i) ** 3 /z0) for i in init_f])
-
-        integrated_weight_array2 = intg.trapz(weight_array2, dx=dm, axis=1)
-
-    else:
-        weight_array1 = 0
-        integrated_weight_array2 = 0
-
-    init_condition = np.concatenate([init_N, init_P, init_E,init_T,init_S,init_D], axis=None)
-
-    # Do n time steps
-    tSteps = np.linspace(0, total_time, total_time/dt+1)
-
-    data, error = intg.odeint(dydt_twolayer, init_condition, tSteps, args=(m, f, dm, df, Cn, Cp, tauN, tauP, tauT, tauS, tauD, tauD_FRET, mu_n, mu_p, mu_S, mu_T, n0, p0, Sf, Sb, B, k_fusion, kstar_tgen, Theta_Tgenb, kB, T, T0, q, q_C, eps, eps0, weight_array1, integrated_weight_array2, do_Fret), tfirst=True, full_output=True)
-
-    #Organize output data into arrays
-    array_deltaN = data[:,0:m]
-    array_deltaP = data[:,m:2*(m)]
-    array_E = data[:,2*(m):3*(m)+1]
-    array_deltaT =data[:,3*(m)+1:3*(m)+1+f]
-    array_deltaS = data[:,3*(m)+1+f:3*(m)+1+2*(f)]
-    array_deltaD = data[:,3*(m)+1+2*(f):]
-
-
-    #Calcualte integral values from outputs
-    Rad_MAPI_array = B*((array_deltaN+n0)*(array_deltaP+p0)-n0*p0)
-    PL_Layer1_array = CalcInt(Rad_MAPI_array,dm)
-    PL_Layer2_array = CalcInt(array_deltaD / tauD, df)
-    TTA_Rate = CalcInt(k_fusion*(array_deltaT+T0)**2,df)
-    surface_v_bulk = 9
-    TTA_Rate_Surface = CalcInt(k_fusion*(array_deltaT[:surface_v_bulk]+T0)**2,df)
-    TTA_Rate_Bulk = CalcInt(k_fusion*(array_deltaT[surface_v_bulk:]+T0)**2,df)
-
-    if (do_ss):
-        integrated_init_N = intg.trapz(init_N, dx=dm, axis=0)
-        eta_MAPI= PL_Layer1_array / integrated_init_N*100  #[%]
-        eta_UC= PL_Layer2_array / integrated_init_N*100    #[%]
-    return
 
 def prep_PL(radRec, i, j, need_extra_node, params):
     frac_emitted = params["Frac-Emitted"]
@@ -330,20 +203,20 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     return PL_base
 
 def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node):
-    i = toIndex(l_bound, dx, total_length)
-    j = toIndex(u_bound, dx, total_length)
+    i = to_index(l_bound, dx, total_length)
+    j = to_index(u_bound, dx, total_length)
     if base_data.ndim == 1:
         base_data = base_data[None]
     
     if l_bound == u_bound:
         I_base = base_data[:,0]
-        if l_bound >= toCoord(i, dx) + dx / 2 and not l_bound == total_length:
+        if l_bound >= to_pos(i, dx) + dx / 2 and not l_bound == total_length:
             I_plus_one = base_data[:,1]
 
-        if l_bound == toCoord(i, dx) + dx / 2 and not l_bound == total_length:
+        if l_bound == to_pos(i, dx) + dx / 2 and not l_bound == total_length:
             I_data = (I_base + I_plus_one) / 2
 
-        elif l_bound > toCoord(i, dx) + dx / 2:
+        elif l_bound > to_pos(i, dx) + dx / 2:
             I_data = I_plus_one
 
         else:
@@ -361,8 +234,8 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
     return I_data
 
 def correct_integral(integrand, l_bound, u_bound, i, j, dx):
-    uncorrected_l_bound = toCoord(i, dx)
-    uncorrected_u_bound = toCoord(j, dx)
+    uncorrected_l_bound = to_pos(i, dx)
+    uncorrected_u_bound = to_pos(j, dx)
     lfrac1 = min(l_bound - uncorrected_l_bound, dx / 2)
 
     # Yes, integrand[0] and not integrand[i]. Note that in integrate(), the ith node maps to integrand[0] and the jth node maps to integrand[j-i].
@@ -401,14 +274,6 @@ def radiative_recombination(sim_outputs, params):
 def nonradiative_recombination(sim_outputs, params):
     return (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"]) / ((params["Tau_N"] * sim_outputs["P"]) + (params["Tau_P"] * sim_outputs["N"]))
 
-def CalcInt(input_array,spacing):
-    # FIXME: NEEDS TESTING WITH bay.py
-    length=np.shape(input_array)[1]
-    output_array=np.zeros(length)
-    for i in range(length):
-        output_array[i]=intg.trapz(input_array[:,i],dx=spacing,axis=-1)
-    return output_array
-
 ####################
 
 def ode_heatplate(data_path_name, m, n, dx, dt, params, write_output=True):
@@ -417,11 +282,11 @@ def ode_heatplate(data_path_name, m, n, dx, dt, params, write_output=True):
     ## Unpack params; typecast non-array params to arrays if needed
     q0 = params["Left_flux"]
     qL = params["Right_flux"]
-    init_T = toArray(params["init_T"], m, False)
+    init_T = to_array(params["init_T"], m, False)
 
-    k = toArray(params["k"], m, False)
-    Cp = toArray(params["Cp"], m, False)
-    rho = toArray(params["density"], m, False)
+    k = to_array(params["k"], m, False)
+    Cp = to_array(params["Cp"], m, False)
+    rho = to_array(params["density"], m, False)
     
     init_T[0] = init_T[1] + q0*dx/k[0]
     init_T[-1] = init_T[-2] - qL*dx/k[-1]
@@ -447,7 +312,7 @@ def ode_heatplate(data_path_name, m, n, dx, dt, params, write_output=True):
 
 def heatflux(sim_data, params):
     T = sim_data['T']
-    k = toArray(params['k'], len(T), False)
+    k = to_array(params['k'], len(T), False)
     k_avg = np.zeros(len(T) - 1)
     for i in range(0, len(T) - 1):
         k_avg[i] = (k[i] + k[i+1]) / 2
