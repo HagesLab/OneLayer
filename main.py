@@ -63,7 +63,8 @@ class Notebook:
         self.check_reset_params = tk.IntVar()
         self.check_reset_inits = tk.IntVar()
         self.check_display_legend = tk.IntVar()
-        self.check_autointegrate = tk.IntVar(value=1)
+        self.check_freeze_axes = tk.IntVar()
+        self.check_autointegrate = tk.IntVar(value=0)
 
         self.check_calculate_init_material_expfactor = tk.IntVar()
         self.AIC_stim_mode = tk.StringVar()
@@ -595,7 +596,7 @@ class Notebook:
         self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
         self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=4,columnspan=4)
         self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
-        self.analyze_toolbar.grid(row=0,column=0,columnspan=6)
+        self.analyze_toolbar.grid(row=0,column=0,columnspan=7)
 
         self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.fetch_dataset))
         self.analyze_plot_button.grid(row=1,column=0)
@@ -625,21 +626,6 @@ class Notebook:
         self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_detailed_analysis)
         self.integration_widget = self.integration_canvas.get_tk_widget()
         self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
-
-        self.integration_plotselector_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
-        self.integration_plotselector_frame.grid(row=2,column=5)
-        
-        self.integrationplot_left = tk.ttk.Radiobutton(self.integration_plotselector_frame, variable=self.active_integrationplot_ID, value=0)
-        self.integrationplot_left.grid(row=0,column=0)
-
-        self.integrationplot_topleft_label = tk.ttk.Label(self.integration_plotselector_frame, text="Use: Integration")
-        self.integrationplot_topleft_label.grid(row=0,column=1)
-        
-        self.integrationplot_topright = tk.ttk.Radiobutton(self.integration_plotselector_frame, variable=self.active_integrationplot_ID, value=1)
-        self.integrationplot_topright.grid(row=0,column=2)
-
-        self.integrationplot_topright_label = tk.ttk.Label(self.integration_plotselector_frame, text="Use: Tau_Diff")
-        self.integrationplot_topright_label.grid(row=0,column=3)
 
         self.integration_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
         self.integration_toolbar_frame.grid(row=3,column=5, rowspan=2,columnspan=1)
@@ -855,7 +841,7 @@ class Notebook:
                 val = to_array(param.value, len(self.nanowire.grid_x_nodes), param.is_edge)
                 grid_x = self.nanowire.grid_x_nodes if not param.is_edge else self.nanowire.grid_x_edges
                 self.sys_param_summaryplots[param_name].plot(grid_x, val)
-                self.sys_param_summaryplots[param_name].set_yscale(autoscale(val))
+                self.sys_param_summaryplots[param_name].set_yscale(autoscale(val_array=val))
                 
             self.plotsummary_fig.tight_layout()
             self.plotsummary_fig.canvas.draw()
@@ -1491,7 +1477,7 @@ class Notebook:
             self.xlin_label = tk.Label(self.xframe, text="Linear")
             self.xlin_label.grid(row=1,column=1)
 
-            self.xlog = tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, value='log')
+            self.xlog = tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, value='symlog')
             self.xlog.grid(row=2,column=0)
 
             self.xlog_label = tk.Label(self.xframe, text="Log")
@@ -1521,7 +1507,7 @@ class Notebook:
             self.ylin_label = tk.Label(self.yframe, text="Linear")
             self.ylin_label.grid(row=1,column=1)
 
-            self.ylog = tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, value='log')
+            self.ylog = tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, value='symlog')
             self.ylog.grid(row=2,column=0)
 
             self.ylog_label = tk.Label(self.yframe, text="Log")
@@ -1541,12 +1527,15 @@ class Notebook:
 
             self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Display legend?", variable=self.check_display_legend, onvalue=1, offvalue=0)
             self.toggle_legend_checkbutton.grid(row=2,column=0,columnspan=2)
+            
+            self.toggle_axis_freeze_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Freeze axes?", variable=self.check_freeze_axes, onvalue=1, offvalue=0)
+            self.toggle_axis_freeze_checkbutton.grid(row=3,column=0,columnspan=2)
 
             self.change_axis_continue_button = tk.Button(self.change_axis_popup, text="Continue", command=partial(self.on_change_axis_popup_close, from_integration, continue_=True))
-            self.change_axis_continue_button.grid(row=3,column=0,columnspan=2)
+            self.change_axis_continue_button.grid(row=4, column=0,columnspan=2)
 
             self.change_axis_status = tk.Text(self.change_axis_popup, width=24,height=2)
-            self.change_axis_status.grid(row=4,rowspan=2,column=0,columnspan=2)
+            self.change_axis_status.grid(row=5,rowspan=2,column=0,columnspan=2)
             self.change_axis_status.configure(state="disabled")
 
             # Set the default values in the entry boxes to be the current options of the plot (in case the user only wants to make a few changes)
@@ -1563,6 +1552,7 @@ class Notebook:
             self.xaxis_type.set(active_plot.xaxis_type)
             self.yaxis_type.set(active_plot.yaxis_type)
             self.check_display_legend.set(active_plot.display_legend)
+            self.check_freeze_axes.set(active_plot.do_freeze_axes)
 
             self.change_axis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_change_axis_popup_close, from_integration, continue_=False))
             self.change_axis_popup.grab_set()
@@ -1614,6 +1604,7 @@ class Notebook:
                     self.analysis_plots[plot_ID].ylim = (bounds[2], bounds[3])
                     self.analysis_plots[plot_ID].xlim = (bounds[0], bounds[1])
                     self.analysis_plots[plot_ID].display_legend = self.check_display_legend.get()
+                    self.analysis_plots[plot_ID].do_freeze_axes = self.check_freeze_axes.get()
                 else:
                     self.integration_plots[plot_ID].yaxis_type = self.yaxis_type.get()
                     self.integration_plots[plot_ID].xaxis_type = self.xaxis_type.get()
@@ -1979,17 +1970,26 @@ class Notebook:
 
     ## Funcs for detailed analyze tab
 
-    def plot_analyze(self, plot_ID, clear_plot=True):
+    def plot_analyze(self, plot_ID, force_axis_update=False):
         # Draw on analysis tab
         try:
             active_plot_data = self.analysis_plots[plot_ID]
+            active_datagroup = active_plot_data.datagroup
             subplot = active_plot_data.plot_obj
             
-            if clear_plot: subplot.cla()
+            subplot.cla()
 
+            if force_axis_update or not active_plot_data.do_freeze_axes:
+                active_plot_data.xlim = (0, active_plot_data.datagroup.get_max_x())
+                active_plot_data.xaxis_type = 'linear'
+                max_val = active_datagroup.get_maxval() * self.convert_out_dict[active_datagroup.type]
+                min_val = active_datagroup.get_minval() * self.convert_out_dict[active_datagroup.type]
+                active_plot_data.ylim = (min_val * 0.9, max_val * 1.1)
+                active_plot_data.yaxis_type = autoscale(min_val=min_val, max_val=max_val)
+
+            
             subplot.set_yscale(active_plot_data.yaxis_type)
             subplot.set_xscale(active_plot_data.xaxis_type)
-            active_datagroup = active_plot_data.datagroup
 
             subplot.set_ylim(*active_plot_data.ylim)
             subplot.set_xlim(*active_plot_data.xlim)
@@ -2001,7 +2001,8 @@ class Notebook:
 
             subplot.set_xlabel("x {}".format(self.nanowire.length_unit))
             subplot.set_ylabel(active_datagroup.type)
-            subplot.legend().set_draggable(True)
+            if active_plot_data.display_legend:
+                subplot.legend().set_draggable(True)
             subplot.set_title("Time: " + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) + " / " + str(active_datagroup.get_maxtime()) + "ns")
             self.analyze_fig.tight_layout()
             self.analyze_fig.canvas.draw()
@@ -2081,13 +2082,8 @@ class Notebook:
             short_filename = data_filename[data_filename.rfind('/') + 1:]
             self.read_data(short_filename, plot_ID, datatype)
 
-        # TODO: Better y-axis autoscaling
-        active_plot.xlim = (0, active_plot.datagroup.get_max_x())
-        active_plot.xaxis_type = 'linear'
-        max_val = active_plot.datagroup.get_maxval() * self.convert_out_dict[active_plot.datagroup.type]
-        active_plot.ylim = (max_val * 1e-11, max_val * 10)
-        active_plot.yaxis_type = 'log'
-        self.plot_analyze(plot_ID, clear_plot=True)
+        
+        self.plot_analyze(plot_ID, force_axis_update=True)
         
         if self.check_autointegrate.get():
             self.write(self.analysis_status, "Data read success; integrating...")
@@ -2123,7 +2119,7 @@ class Notebook:
         # except:
         #     self.write(self.analysis_status, "Error #107: Data group has an invalid datatype")
 
-        self.plot_analyze(plot_ID, clear_plot=True)
+        self.plot_analyze(plot_ID, force_axis_update=False)
         self.write(self.analysis_status, "")
         return
 
@@ -3122,7 +3118,7 @@ class Notebook:
         # simulating filling across nanowire with that value
         val_array = to_array(param_obj.value, len(self.nanowire.grid_x_nodes), param_obj.is_edge)
 
-        plot.set_yscale(autoscale(val_array))
+        plot.set_yscale(autoscale(val_array=val_array))
 
         if self.sys_flag_dict['symmetric_system'].value():
             plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(val_array), val_array), axis=0), label=param_name)

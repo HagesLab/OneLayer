@@ -104,6 +104,9 @@ class Data_Group:
     def get_maxval(self):
         return np.amax([np.amax(self.datasets[tag].data) for tag in self.datasets])
     
+    def get_minval(self):
+        return np.amin([np.amin(self.datasets[tag].data) for tag in self.datasets])
+    
     def size(self):
         return len(self.datasets)
     
@@ -172,6 +175,7 @@ class Scalable_Plot_State:
         self.xlim = (-1,-1)
         self.ylim = (-1,-1)
         self.display_legend = 1
+        self.do_freeze_axes = 0
         return
 
 class Integration_Plot_State(Scalable_Plot_State):

@@ -114,12 +114,18 @@ def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, need_
             data = data.flatten()
         return data
     
-def autoscale(val_array):
+def autoscale(val_array=None, min_val=None, max_val=None):
     # Help a matplotlib plot determine whether a log or linear scale should be used
     # when plotting val_array
-    max_val = np.amax(val_array)
-    min_val = np.amin(val_array)
+    if max_val is not None and min_val is not None:
+        pass
+    elif val_array is not None:
+        max_val = np.amax(val_array)
+        min_val = np.amin(val_array)
         
+    else:
+        return 'linear'
+    
     if not (min_val == 0) and np.abs(max_val / min_val) > 1e1:
         return 'symlog'
     elif (min_val < 0) and np.abs(min_val / max_val) > 1e1:
