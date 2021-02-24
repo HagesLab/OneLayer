@@ -47,7 +47,10 @@ class Notebook:
         self.do_module_popup()
         self.root.wait_window(self.select_module_popup)
         if self.nanowire is None: return
+        self.prep_notebook()
+        return
         
+    def prep_notebook(self):
         self.notebook = tk.ttk.Notebook(self.root)
         self.default_dirs = {"Initial":"Initial", "Data":"Data", "PL":"Analysis"}
 
@@ -112,7 +115,8 @@ class Notebook:
         self.file_menu.add_command(label="Manage Initial Condition Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete IC files", initialdir=self.default_dirs["Initial"]))
         self.file_menu.add_command(label="Manage Data Files", command=partial(tk.filedialog.askdirectory, title="This window does not open anything - Use this window to move or delete data files",initialdir=self.default_dirs["Data"]))
         self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
-        self.file_menu.add_command(label="Exit", command=self.root.quit)
+        self.file_menu.add_command(label="Change Module", command=self.change_module)
+        self.file_menu.add_command(label="Exit", command=self.root.destroy)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
@@ -202,7 +206,19 @@ class Notebook:
         self.root.attributes('-fullscreen', not self.root.attributes('-fullscreen'))
         return
 
-
+    def change_module(self):
+        self.do_confirmation_popup("Warning: This will close the current instance of TEDs (and all unsaved data). Are you sure you want to select a new module?")
+        self.root.wait_window(self.confirmation_popup)
+        if not self.confirmed: return
+        
+        self.notebook.destroy()
+        self.do_module_popup()
+        self.root.wait_window(self.select_module_popup)
+        if self.nanowire is None: return
+        self.prep_notebook()
+        self.notebook.pack(expand=1, fill="both")
+        
+        return
     ## Create GUI elements for each tab
 	# Tkinter works a bit like a bulletin board - we declare an overall frame and pin things to it at specified locations
 	# This includes other frames, which is evident in how the tab_inputs has three sub-tabs pinned to itself.
@@ -480,7 +496,7 @@ class Notebook:
         rdim = np.ceil(self.nanowire.simulation_outputs_count / cdim)
         self.sim_subplots = {}
         for variable in self.nanowire.simulation_outputs_dict:
-            self.sim_subplots[variable] = self.sim_fig.add_subplot(int(rdim*100 + cdim*10 + count))
+            self.sim_subplots[variable] = self.sim_fig.add_subplot(int(rdim), int(cdim), int(count))
             self.sim_subplots[variable].set_title(variable)
             count += 1
 
@@ -506,11 +522,11 @@ class Notebook:
         rdim = np.floor(np.sqrt(self.nanowire.total_outputs_count))
         cdim = np.ceil(self.nanowire.total_outputs_count / rdim)
         for output in self.nanowire.simulation_outputs_dict:
-            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim*100 + cdim*10 + count))
+            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
             count += 1
             
         for output in self.nanowire.calculated_outputs_dict:
-            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim*100 + cdim*10 + count))
+            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
             count += 1
         
         self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.plot_overview_analysis)
@@ -829,7 +845,7 @@ class Notebook:
     def do_module_popup(self):
 
         self.select_module_popup = tk.Toplevel(self.root)
-        self.select_module_label = tk.Label(self.select_module_popup, text="The following modules were found; select one to continue: ")
+        self.select_module_label = tk.Label(self.select_module_popup, text="The following TEDs modules were found; select one to continue: ")
         self.select_module_label.grid(row=0,column=0)
         
         self.modules_list = modules.mod_list()
@@ -843,6 +859,9 @@ class Notebook:
         self.module_continue_button.grid(row=2,column=0)
         
         self.select_module_popup.protocol("WM_DELETE_WINDOW", partial(self.on_select_module_popup_close, continue_=False))
+        self.select_module_popup.attributes("-topmost", True)
+        self.select_module_popup.after_idle(self.select_module_popup.attributes,'-topmost',False)
+        
         self.select_module_popup.grab_set()
         
         return
@@ -862,7 +881,27 @@ class Notebook:
             print(str(oops))
         return
         
-            
+    def do_confirmation_popup(self, text):
+        self.confirmation_popup = tk.Toplevel(self.root)
+        
+        self.confirmation_text = tk.Label(self.confirmation_popup, text=text)
+        self.confirmation_text.grid(row=0,column=0, columnspan=2)
+        
+        self.confirmation_cancel_button = tk.Button(self.confirmation_popup, text="Cancel", command=partial(self.on_confirmation_popup_close, continue_=False))
+        self.confirmation_cancel_button.grid(row=1,column=0)
+        
+        self.confirmation_continue_btn = tk.Button(self.confirmation_popup, text='Continue', command=partial(self.on_confirmation_popup_close, continue_=True))
+        self.confirmation_continue_btn.grid(row=1,column=1)
+        
+        self.confirmation_popup.protocol("WM_DELETE_WINDOW", self.on_confirmation_popup_close)
+        self.confirmation_popup.grab_set()        
+        return
+    
+    def on_confirmation_popup_close(self, continue_=False):
+        self.confirmed = continue_
+        self.confirmation_popup.destroy()
+        return
+    
     
     def do_sys_printsummary_popup(self):
         if not self.sys_printsummary_popup_isopen: # Don't open more than one of this window at a time
@@ -905,7 +944,7 @@ class Notebook:
             self.sys_param_summaryplots = {}
             for param_name in self.nanowire.param_dict:
                 
-                self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim*100 + cdim*10 + count))
+                self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
                 self.sys_param_summaryplots[param_name].set_title(param_name)
                 count += 1
             
