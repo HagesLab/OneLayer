@@ -23,6 +23,7 @@ import os
 import tables
 import itertools
 from functools import partial # This lets us pass params to functions called by tkinter buttons
+from copy import deepcopy
 
 import finite
 import modules
@@ -35,8 +36,6 @@ import bayesim.hdf5io as dd
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
 class Notebook:
-	# This is somewhat Java-like: everything about the GUI exists inside a class
-    # A goal is to achieve total separation between this class (i.e. the GUI) and all mathematical operations, which makes this GUI reusable for different problems
 
     def __init__(self, title):
         self.nanowire = modules.Nanowire()
@@ -476,6 +475,12 @@ class Notebook:
 
         self.dt_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.dt_entry.grid(row=3,column=1)
+        
+        self.hmax_label = tk.ttk.Label(self.tab_simulate, text="Max solver stepsize")
+        self.hmax_label.grid(row=4,column=0)
+        
+        self.hmax_entry = tk.ttk.Entry(self.tab_simulate, width=9)
+        self.hmax_entry.grid(row=4,column=1)
 
         self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Inject init. conds. as generation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
         self.do_ss_checkbutton.grid(row=5,column=0)
@@ -503,7 +508,7 @@ class Notebook:
         rdim = np.ceil(self.nanowire.simulation_outputs_count / cdim)
         self.sim_subplots = {}
         for variable in self.nanowire.simulation_outputs_dict:
-            self.sim_subplots[variable] = self.sim_fig.add_subplot(rdim, cdim, count)
+            self.sim_subplots[variable] = self.sim_fig.add_subplot(int(rdim*100 + cdim*10 + count))
             self.sim_subplots[variable].set_title(variable)
             count += 1
 
@@ -529,11 +534,11 @@ class Notebook:
         rdim = np.floor(np.sqrt(self.nanowire.total_outputs_count))
         cdim = np.ceil(self.nanowire.total_outputs_count / rdim)
         for output in self.nanowire.simulation_outputs_dict:
-            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(rdim, cdim, count)
+            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim*100 + cdim*10 + count))
             count += 1
             
         for output in self.nanowire.calculated_outputs_dict:
-            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(rdim, cdim, count)
+            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim*100 + cdim*10 + count))
             count += 1
         
         self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.plot_overview_analysis)
@@ -598,7 +603,7 @@ class Notebook:
         self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
         self.analyze_toolbar.grid(row=0,column=0,columnspan=7)
 
-        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.fetch_dataset))
+        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.load_datasets))
         self.analyze_plot_button.grid(row=1,column=0)
         
         self.analyze_tstep_entry = tk.ttk.Entry(self.analyze_toolbar_frame, width=9)
@@ -620,7 +625,7 @@ class Notebook:
         self.analyze_IC_carry_button.grid(row=1,column=6)
 
         self.integration_fig = Figure(figsize=(9,5))
-        self.integration_subplot = self.integration_fig.add_subplot(1,1,1)
+        self.integration_subplot = self.integration_fig.add_subplot(111)
         self.integration_plots[0].plot_obj = self.integration_subplot
 
         self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_detailed_analysis)
@@ -890,7 +895,7 @@ class Notebook:
             self.sys_param_summaryplots = {}
             for param_name in self.nanowire.param_dict:
                 
-                self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(rdim, cdim, count)
+                self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim*100 + cdim*10 + count))
                 self.sys_param_summaryplots[param_name].set_title(param_name)
                 count += 1
             
@@ -1875,7 +1880,10 @@ class Notebook:
     
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
-        with open(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + "metadata.txt", "r") as ifstream:
+        path = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + "metadata.txt"
+        assert os.path.exists(path), "Error: Missing metadata"
+        
+        with open(path, "r") as ifstream:
             param_values_dict = {}
             for line in ifstream:
                 if "$" in line: continue
@@ -1978,6 +1986,8 @@ class Notebook:
             subplot = active_plot_data.plot_obj
             
             subplot.cla()
+            
+            if not active_datagroup.size(): return
 
             if force_axis_update or not active_plot_data.do_freeze_axes:
                 active_plot_data.xlim = (0, active_plot_data.datagroup.get_max_x())
@@ -2016,22 +2026,26 @@ class Notebook:
 
         return
 
-    def read_data(self, data_filename, plot_ID, datatype):
+    def make_rawdataset(self, data_filename, plot_ID, datatype):
         # Create a dataset object and prepare to plot on analysis tab
         # Select data type of incoming dataset from existing datasets
         active_plot = self.analysis_plots[plot_ID]
+        datagroup = active_plot.datagroup
 
         try:
             param_values_dict = self.fetch_metadata(data_filename)
-                    
-            data_n = int(0.5 + param_values_dict["Total-Time"] / param_values_dict["dt"])
+            if datagroup.size():
+                assert (datagroup.total_t == param_values_dict["Total-Time"]), "Error: time grid mismatch"
+                assert (datagroup.dt == param_values_dict["dt"]), "Error: time grid mismatch"
+                
             data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
             data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
             data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
 
+        except AssertionError as oops:
+            return str(oops)
         except:
-            self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
-            return
+            return "Error: missing or has unusual metadata.txt"
 
 		# Now that we have the parameters from metadata, fetch the data itself
         sim_data = {}
@@ -2042,24 +2056,17 @@ class Notebook:
         try:
             values = self.nanowire.prep_dataset(datatype, sim_data, param_values_dict)
             if self.nanowire.outputs_dict[datatype].is_edge: 
-                new_data = Raw_Data_Set(values, data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
+                return Raw_Data_Set(values, data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
             else:
-                new_data = Raw_Data_Set(values, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
+                return Raw_Data_Set(values, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
     
         except:
-            self.write(self.analysis_status, "Error: Unable to calculate {}".format(datatype))
-            return
+            return "Error: Unable to calculate {}".format(datatype)
 
-        try:
-            active_plot.datagroup.add(new_data, new_data.tag())
 
-        except ValueError:
-            self.write(self.analysis_status, "Error: dt or total t mismatch")
-        return
-
-    def fetch_dataset(self):
-        # Wrapper to apply read_data() on multiple selected datasets
+    def load_datasets(self):
         # THe Plot button on the Analyze tab calls this function
+        
         plot_ID = self.active_analysisplot_ID.get()
         self.do_plotter_popup(plot_ID)
         self.root.wait_window(self.plotter_popup)
@@ -2069,28 +2076,39 @@ class Notebook:
 
         try:
             datatype = self.data_var.get()
-            if (datatype == ""): raise ValueError("Select a data type from the drop-down menu")
-        except ValueError as oops:
-            self.write(self.analysis_status, oops)
+            assert (datatype), "Select a data type from the drop-down menu"
+        except AssertionError as oops:
+            self.write(self.analysis_status, str(oops))
             return
 
         active_plot.time_index = 0
         active_plot.datagroup.clear()
-        
+        err_msg = ""
         for i in range(0, active_plot.data_filenames.__len__()):
             data_filename = active_plot.data_filenames[i]
             short_filename = data_filename[data_filename.rfind('/') + 1:]
-            self.read_data(short_filename, plot_ID, datatype)
+            new_data = self.make_rawdataset(short_filename, plot_ID, datatype)
 
+            if isinstance(new_data, str):
+                err_msg += "{}: {}\n".format(short_filename, new_data)
+            else:
+                active_plot.datagroup.add(new_data, new_data.tag())
+    
+        if len(err_msg):
+            read_warning_popup = tk.Toplevel(self.root)
+            read_warning_title = tk.Label(read_warning_popup, text="Error: the following data could not be plotted")
+            read_warning_title.grid(row=0,column=0)
+            read_warning_textbox = tk.Label(read_warning_popup, text=err_msg)
+            read_warning_textbox.grid(row=1,column=0)
         
         self.plot_analyze(plot_ID, force_axis_update=True)
         
         if self.check_autointegrate.get():
-            self.write(self.analysis_status, "Data read success; integrating...")
+            self.write(self.analysis_status, "Data read finished; integrating...")
             self.do_Integrate(bypass_inputs=True)
             
         else:
-            self.write(self.analysis_status, "Data read success")
+            self.write(self.analysis_status, "Data read finished")
         
         return
 
@@ -2116,9 +2134,6 @@ class Notebook:
             dataset.data = self.nanowire.prep_dataset(active_datagroup.type, sim_data, dataset.params_dict)
             dataset.show_index = active_plot.time_index
             
-        # except:
-        #     self.write(self.analysis_status, "Error #107: Data group has an invalid datatype")
-
         self.plot_analyze(plot_ID, force_axis_update=False)
         self.write(self.analysis_status, "")
         return
@@ -2161,15 +2176,20 @@ class Notebook:
 
     # Wrapper function to set up main N, P, E-field calculations
     def do_Batch(self):
-        # We test that the two following entryboxes are valid before opening any popups
-        # Imagine if you selected 37 files from the popup and TED refused to calculate because these entryboxes were empty!
+        # Test for valid entry values
         try:
             self.simtime = float(self.simtime_entry.get())      # [ns]
             self.dt = float(self.dt_entry.get())           # [ns]
-
+            self.hmax = self.hmax_entry.get()
+            
             if (self.simtime <= 0): raise Exception("Error: Invalid simulation time")
             if (self.dt <= 0 or self.dt > self.simtime): raise Exception("Error: Invalid dt")
-        
+            
+            if self.hmax == "": # Default hmax
+                self.hmax = 0
+                
+            self.hmax = float(self.hmax)
+            
         except ValueError:
             self.write(self.status, "Error: Invalid parameters")
             return
@@ -2282,36 +2302,11 @@ class Notebook:
         self.sim_data = dict(init_conditions)
         self.update_sim_plots(0)
 
-        # numTimeStepsDone = 0
-
-        # WIP: Option for staggered calculate/plot: In this mode the program calculates a block of time steps, plots intermediate (N, P, E), and calculates the next block 
-        # using the final time step from the previous block as the initial condition.
-        # This mode can be disabled by inputting numPartitions = 1.
-        #for i in range(1, self.numPartitions):
-            
-        #    #finite.simulate_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, self.max_iter, init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
-        #    finite.ode_nanowire(self.IC_file_name,self.m,int(self.n / self.numPartitions),self.dx,self.dt, *(boundaryParams), *(systemParams), False, self.alphaCof, self.thetaCof, self.fracEmitted, init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
-
-        #    numTimeStepsDone += int(self.n / self.numPartitions)
-        #    self.write(self.status, "Calculations {:.1f}% complete".format(100 * i / self.numPartitions))
-            
-
-        #    with tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-n.h5", mode='r') as ifstream_N, \
-        #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-p.h5", mode='r') as ifstream_P, \
-        #        tables.open_file("Data\\" + self.IC_file_name + "\\" + self.IC_file_name + "-E_field.h5", mode='r') as ifstream_E_field:
-        #        init_conditions["N"] = ifstream_N.root.data[-1]
-        #        init_conditions["P"] = ifstream_P.root.data[-1]
-        #        init_conditions["E_field"] = ifstream_E_field.root.data[-1]
-
-
-        #    self.update_sim_plots(int(self.n * i / self.numPartitions), self.numPartitions > 20)
-            #self.update_err_plots()
-
         write_output = True
 
         try:
             error_dict = self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), self.m, self.n, self.dt, 
-                                                temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), init_conditions, write_output)
+                                                temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), self.hmax, init_conditions, write_output)
             
         except FloatingPointError:
             self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}\n".format(data_file_name))
@@ -2372,7 +2367,6 @@ class Notebook:
         
         # Replace this with an appropriate getter function if more integration plots are added
         ip_ID = 0
-        
         
         self.write(self.analysis_status, "")
 
@@ -2529,7 +2523,8 @@ class Notebook:
         
 
         self.integration_plots[ip_ID].xaxis_type = 'linear'
-        self.integration_plots[ip_ID].yaxis_type = 'log'
+
+        self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), max_val=datagroup.get_maxval())
         #self.integration_plots[ip_ID].ylim = max * 1e-12, max * 10
 
         subplot.set_yscale(self.integration_plots[ip_ID].yaxis_type)
@@ -2570,7 +2565,7 @@ class Notebook:
                     
                 td_popup = tk.Toplevel(self.root)
                 td_fig = Figure(figsize=(6,4))
-                td_subplot = td_fig.add_subplot(1, 1, 1)
+                td_subplot = td_fig.add_subplot(111)
                 
                 td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=td_popup)
                 td_plotwidget = td_canvas.get_tk_widget()

@@ -71,7 +71,7 @@ def PL_weight_distribution(m, dx, total_length, i, j, alpha, theta, delta, frac_
         
     return (1 - frac_emitted) * 0.5 * theta * (delta * weight + (1 - delta) * weight2)
 
-def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, symmetric=True, do_ss=False, write_output=True, init_N=0, init_P=0, init_E_field=0):
+def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, symmetric=True, do_ss=False, hmax_=0, write_output=True, init_N=0, init_P=0, init_E_field=0):
     ## Problem statement:
     # Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
     # Space step size is dx, time step is dt
@@ -142,10 +142,9 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
 
 
     ## Do n time steps
-    # FIXME: hmax as a simulation parameter
     tSteps = np.linspace(0, n*dt, n+1)
     data, error_data = intg.odeint(odefuncs.dydt2, init_condition, tSteps, args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons, do_ss, alphaCof, thetaCof, delta_frac, fracEmitted, combined_weight, E_field_ext, dEcdz, dChidz, init_N_copy, init_P_copy),\
-        tfirst=True, full_output=True)
+        tfirst=True, full_output=True, hmax=hmax_)
         
     if (data[1:, 0:2*m] < 0).any():
         h = np.geomspace(2**2, 2**-6, 9)

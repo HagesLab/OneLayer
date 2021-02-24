@@ -137,7 +137,7 @@ class OneD_Model:
         # Do stuff here
         return {}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, init_conditions, write_output):
+    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions, write_output):
         # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from finite.py with the correct args
         return None
     
@@ -257,10 +257,10 @@ class Nanowire(OneD_Model):
         
         return {"N":init_N, "P":init_P, "E_field":init_E_field}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, init_conditions, write_output):
+    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions, write_output):
         # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from finite.py with the correct args
         return finite.ode_nanowire(data_path, m, n, self.dx, dt, params,
-                                    not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), do_ss, write_output,
+                                    not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), do_ss, hmax_, write_output,
                                     init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
     
     def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
@@ -380,7 +380,7 @@ class HeatPlate(OneD_Model):
         init_T = to_array(init_T, len(self.grid_x_nodes), False)
         return {"T":init_T}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, init_conditions, write_output):
+    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions, write_output):
         # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from finite.py with the correct args
         return finite.ode_heatplate(data_path, m, n, self.dx, dt, params,
                                     write_output)
