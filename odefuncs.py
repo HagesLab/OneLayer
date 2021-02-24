@@ -5,77 +5,64 @@
 ################################################# 
 import numpy as np
 from scipy import integrate as intg
+from numba import njit
 
+@njit
 def dydt(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_N=0, init_P=0):
-    ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
-    # These are calculated at node edges, of which there are m + 1
-    # dn/dx and dp/dx are also node edge values
+
     Jn = np.zeros((m+1))
     Jp = np.zeros((m+1))
-
-    # These are calculated at node centers, of which there are m
-    # dE/dt, dn/dt, and dp/dt are also node center values
-    dJz = np.zeros((m))
-    rad_rec = np.zeros((m))
-    non_rad_rec = np.zeros((m))
-    G_array = np.zeros((m))
+    dydt = np.zeros(3*m+1)
 
     N = y[0:m]
     P = y[m:2*(m)]
     E_field = y[2*(m):]
-    N_edges = (N[:-1] + np.roll(N, -1)[:-1]) / 2 # Excluding the boundaries; see the following FIXME
-    P_edges = (P[:-1] + np.roll(P, -1)[:-1]) / 2
-    
-    ## Do boundary conditions of Jn, Jp
-    # FIXME: Calculate N, P at boundaries?
-    Sft = (N[0] * P[0] - n0[0] * p0[0]) / ((N[0] / Sf) + (P[0] / Sf))
-    Sbt = (N[m-1] * P[m-1] - n0[m-1] * p0[m-1]) / ((N[m-1] / Sb) + (P[m-1] / Sb))
-    Jn[0] = Sft
-    Jn[m] = -Sbt
-    Jp[0] = -Sft
-    Jp[m] = Sbt
+    NP = N * P - n0 * p0
 
-    ## Calculate Jn, Jp [nm^-2 ns^-1] over the space dimension, 
-    # Jn(t) ~ N(t) * E_field(t) + (dN/dt)
-    # np.roll(y,m) shifts the values of array y by m places, allowing for quick approximation of dy/dx ~ (y[m+1] - y[m-1] / 2*dx) over entire array y
-    Jn[1:-1] = (-mu_n[1:-1] * (N_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1]) + 
-                (mu_n[1:-1]*kB*T[1:-1]) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dx)))
-
-    ## Changed sign
-    Jp[1:-1] = (-mu_p[1:-1] * (P_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEcdz[1:-1]) -
-                (mu_p[1:-1]*kB*T[1:-1]) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dx)))
-
+    Sft = Sf * (NP[0]) / (N[0] + P[0])
+    Sbt = Sb * (NP[m-1]) / (N[m-1] + P[m-1])
+    Jn[0] = -Sft
+    Jn[m] = Sbt
+    Jp[0] = Sft
+    Jp[m] = -Sbt
+        
+    for i in range(1, len(Jn) - 1):
+        Jn[i] = (-mu_n[i] * 0.5 * (N[i-1] + N[i]) * (q * (E_field[i] + E_field_ext[i]) + dChidz[i]) - 
+                  (mu_n[i]*kB*T[i]) * (N[i] - N[i-1]) / dx)
+        
+        Jp[i] = (-mu_p[i] * 0.5 * (P[i-1] + P[i]) * (q * (E_field[i] + E_field_ext[i]) + dChidz[i] + dEcdz[i]) + 
+                  (mu_p[i]*kB*T[i]) * (P[i] - P[i-1]) / dx)
         
     # [V nm^-1 ns^-1]
-    dEdt = (Jn + Jp) * ((q_C) / (eps * eps0))
+    for i in range(len(Jn)):
+        dydt[2*m+i] = (Jn[i] + Jp[i]) * ((q_C) / (eps[i] * eps0))
     
-    ## Calculate recombination (consumption) terms
-    rad_rec = B * (N * P - n0 * p0)
-    non_rad_rec = (N * P - n0 * p0) / ((tauN * P) + (tauP * N))
-        
+    ## RR
+    sink = B * NP
+
     ## Calculate generation term from photon recycling, if photon recycling is being considered
     if recycle_photons:
-        G_array = intg.trapz(rad_rec * combined_weight, dx=dx, axis=1) + (1 - fracEmitted) * 0.5 * alphaCof * delta_frac * rad_rec
-    else:
-        G_array = 0
-    ## Calculate dJn/dx
-    dJz = (np.roll(Jn, -1)[:-1] - Jn[:-1]) / (dx)
+        G_array = 0.5 * sink[0] * combined_weight[:,0]
+        for i in range(1, len(sink) - 1):
+            G_array += sink[i] * combined_weight[:,i]
+        G_array += 0.5 * sink[-1] * combined_weight[:,-1]
+        G_array *= dx
 
-    ## N(t) = N(t-1) + dt * (dN/dt)
-    #N_new = np.maximum(N_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
-    dNdt = ((1/q) * dJz - rad_rec - non_rad_rec + G_array)
-    if do_ss: dNdt += init_N
+        G_array += (1 - fracEmitted) * 0.5 * alphaCof * delta_frac * sink
 
-    ## Calculate dJp/dx
-    dJz = (np.roll(Jp, -1)[:-1] - Jp[:-1]) / (dx)
+        sink -= G_array
+        
+    # NRR
+    sink += NP / ((tauN * P) + (tauP * N))
 
-    ## P(t) = P(t-1) + dt * (dP/dt)
-    #P_new = np.maximum(P_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
-    dPdt = ((1/q) * -dJz - rad_rec - non_rad_rec + G_array)
-    if do_ss: dPdt += init_P
-
-    ## Package results
-    dydt = np.concatenate([dNdt, dPdt, dEdt], axis=None)
+    for i in range(len(Jn) - 1):
+        dydt[i] = (-Jn[i+1] + Jn[i]) / dx - sink[i]
+        dydt[m+i] = (Jp[i+1] - Jp[i]) / dx - sink[i]
+        
+    if do_ss:
+        dydt[:m] += init_N
+        dydt[m:2*m] += init_P
+        
     return dydt
 
 def dydt_twolayer(t, y, m, f, dm, df, Cn, Cp, tauN, tauP, tauT, tauS, tauD, tauD_FRET, mu_n, mu_p, mu_S, mu_T, n0, p0, Sf, Sb, B, k_fusion, kstar_tgen, Theta_Tgenb, kB, T, T0, q, q_C, eps, eps0, weight_array1, integrated_weight_array2, do_Fret, init_N, init_P):
@@ -193,4 +180,20 @@ def dydt_twolayer(t, y, m, f, dm, df, Cn, Cp, tauN, tauP, tauT, tauS, tauD, tauD
     dDdt = S_Fret - D_Fret2 - D_Rec
 # Package
     dydt = np.concatenate([dNdt, dPdt, dEdt,dTdt,dSdt,dDdt], axis=None)
+    return dydt
+
+#@njit(cache=True)
+def heat_constflux(t, y, m, dx, k, rho, Cp, q0, qL):
+    alpha = k * rho / Cp
+    G = alpha / (dx**2)
+    T = y
+    
+    dydt = np.zeros(m)
+    for i in range(1, len(T) - 1):
+        dydt[i] = G[i+1]*T[i+1] - 2*G[i]*T[i] + G[i-1]*T[i-1]
+    
+    # Bounds
+    dydt[0] = dydt[1]
+    dydt[-1] = dydt[-2]
+    
     return dydt
