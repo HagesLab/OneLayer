@@ -981,11 +981,15 @@ class Notebook:
         if not self.sys_param_shortcut_popup_isopen:
             try:
                 self.set_init_x()
+                assert self.nanowire.spacegrid_is_set
     
             except ValueError:
                 self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
                 return
     
+            except AssertionError:
+                return
+            
             except Exception as oops:
                 self.write(self.ICtab_status, oops)
                 return
@@ -1072,6 +1076,11 @@ class Notebook:
     def do_batch_popup(self):
         try:
             self.set_init_x()
+            assert self.nanowire.spacegrid_is_set
+        
+        except AssertionError:
+            return
+        
         except:
             self.write(self.ICtab_status, "Error: missing space grid")
             return
@@ -2707,12 +2716,17 @@ class Notebook:
 
         if (thickness <= 0 or dx <= 0): raise ValueError
 
-        if dx > thickness:
-            raise Exception("Error: space step size larger than thickness")
+        if dx > thickness / 2:
+            raise Exception("Error: space step size too large")
 
         # Upper limit on number of space steps
         if (int(0.5 + thickness / dx) > 1e6): 
             raise Exception("Error: too many space steps")
+
+        if dx > thickness / 10:
+            self.do_confirmation_popup("Warning: a very large space stepsize was entered. Results may be less accurate with large stepsizes. Are you sure you want to continue?")
+            self.root.wait_window(self.confirmation_popup)
+            if not self.confirmed: return
 
         self.nanowire.total_length = thickness
         self.nanowire.dx = dx
@@ -2726,11 +2740,15 @@ class Notebook:
         # Read AIC parameters and plot when relevant button pressed
         try:
             self.set_init_x()
+            assert self.nanowire.spacegrid_is_set
 
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
-
+        
+        except AssertionError:
+            return
+        
         except Exception as oops:
             self.write(self.ICtab_status, oops)
             return
@@ -2883,11 +2901,13 @@ class Notebook:
 
         try:
             self.set_init_x()
+            assert self.nanowire.spacegrid_is_set
 
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
-
+        except AssertionError:
+            return
         except Exception as oops:
             self.write(self.ICtab_status, oops)
             return
@@ -3070,11 +3090,14 @@ class Notebook:
     def add_listupload(self):
         try:
             self.set_init_x()
-
+            assert self.nanowire.spacegrid_is_set
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
 
+        except AssertionError:
+            return
+        
         except Exception as oops:
             self.write(self.ICtab_status, oops)
             return
@@ -3404,7 +3427,7 @@ class Notebook:
         try:
             total_length = float(total_length)
             dx = float(dx)
-            if (total_length <= 0) or (dx <= 0) or (total_length < dx):
+            if (total_length <= 0) or (dx <= 0) or (dx > total_length / 2):
                 raise ValueError
         except:
             self.write(self.ICtab_status, "Error: invalid space grid")
