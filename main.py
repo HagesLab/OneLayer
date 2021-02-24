@@ -116,7 +116,7 @@ class Notebook:
         self.file_menu.add_command(label="Manage Data Files", command=partial(tk.filedialog.askdirectory, title="This window does not open anything - Use this window to move or delete data files",initialdir=self.default_dirs["Data"]))
         self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
         self.file_menu.add_command(label="Change Module", command=self.change_module)
-        self.file_menu.add_command(label="Exit", command=self.root.destroy)
+        self.file_menu.add_command(label="Exit", command=self.quit)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
@@ -202,6 +202,13 @@ class Notebook:
         matplotlib.use(starting_backend)
         return
 
+    def quit(self):
+        self.do_confirmation_popup("All unsaved data will be lost. Are you sure you want to close TEDs?")
+        self.root.wait_window(self.confirmation_popup)
+        if not self.confirmed: return
+        self.root.destroy()
+        return
+    
     def toggle_fullscreen(self):
         self.root.attributes('-fullscreen', not self.root.attributes('-fullscreen'))
         return
