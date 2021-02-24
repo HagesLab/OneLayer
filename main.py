@@ -888,14 +888,15 @@ class Notebook:
             print(str(oops))
         return
         
-    def do_confirmation_popup(self, text):
+    def do_confirmation_popup(self, text, hide_cancel=False):
         self.confirmation_popup = tk.Toplevel(self.root)
         
-        self.confirmation_text = tk.Label(self.confirmation_popup, text=text)
+        self.confirmation_text = tk.Message(self.confirmation_popup, text=text, width=(float(self.root.winfo_screenwidth()) / 4))
         self.confirmation_text.grid(row=0,column=0, columnspan=2)
         
-        self.confirmation_cancel_button = tk.Button(self.confirmation_popup, text="Cancel", command=partial(self.on_confirmation_popup_close, continue_=False))
-        self.confirmation_cancel_button.grid(row=1,column=0)
+        if not hide_cancel:
+            self.confirmation_cancel_button = tk.Button(self.confirmation_popup, text="Cancel", command=partial(self.on_confirmation_popup_close, continue_=False))
+            self.confirmation_cancel_button.grid(row=1,column=0)
         
         self.confirmation_continue_btn = tk.Button(self.confirmation_popup, text='Continue', command=partial(self.on_confirmation_popup_close, continue_=True))
         self.confirmation_continue_btn.grid(row=1,column=1)
@@ -1046,7 +1047,7 @@ class Notebook:
                 changed_params = []
                 for param in self.nanowire.param_dict:
                     val = self.sys_param_entryboxes_dict[param].get()
-                    if val == "": continue
+                    if not val: continue
                     else:
                         try:
                             val = float(val)
@@ -1061,7 +1062,8 @@ class Notebook:
                     
                 if changed_params.__len__() > 0:
                     self.update_IC_plot(plot_ID="recent")
-                    self.write(self.ICtab_status, "Updated: {}".format(changed_params))
+                    self.do_confirmation_popup("Updated: {}".format(changed_params), hide_cancel=True)
+                    self.root.wait_window(self.confirmation_popup)
                     
                 else:
                     self.write(self.ICtab_status, "")
