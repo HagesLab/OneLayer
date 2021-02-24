@@ -1224,7 +1224,7 @@ class Notebook:
 			# There are two ways for a popup to close: by the user pressing "Continue" or the user cancelling or pressing "X"
 			# We only interpret the input on the popup if the user wants to continue
             if continue_:
-                if self.data_var.get() == "": raise ValueError
+                assert (self.data_var.get()), "Select a data type from the drop-down menu"
                 self.analysis_plots[plot_ID].data_filenames = []
                 # This year for Christmas, I want Santa to implement tk.filedialog.askdirectories() so we can select multiple directories like we can do with files
                 dir_names = [self.data_list[i] for i in self.data_listbox.curselection()]
@@ -1232,13 +1232,15 @@ class Notebook:
                     self.analysis_plots[plot_ID].data_filenames.append(next_dir)
 
                 #self.analysis_plots[plot_ID].remove_duplicate_filenames()
+                
+                assert len(self.analysis_plots[plot_ID].data_filenames), "Select data files"
 
             self.plotter_popup.destroy()
             print("Plotter popup closed")
             self.plotter_popup_isopen = False
 
-        except ValueError:
-            self.write(self.plotter_status, "Select a variable from the menu")
+        except AssertionError as oops:
+            self.write(self.plotter_status, str(oops))
         except:
             print("Error #502: Failed to close plotter popup.")
 
@@ -2072,14 +2074,7 @@ class Notebook:
         self.root.wait_window(self.plotter_popup)
         
         active_plot = self.analysis_plots[plot_ID]
-        if (active_plot.data_filenames.__len__() == 0): return
-
-        try:
-            datatype = self.data_var.get()
-            assert (datatype), "Select a data type from the drop-down menu"
-        except AssertionError as oops:
-            self.write(self.analysis_status, str(oops))
-            return
+        datatype = self.data_var.get()
 
         active_plot.time_index = 0
         active_plot.datagroup.clear()
