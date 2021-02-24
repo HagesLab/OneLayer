@@ -10,6 +10,9 @@ from helper_structs import Parameter, Output
 from utils import u_read, to_index, to_array, to_pos
 import tables
 
+def mod_list():
+    return {"Nanowire":Nanowire, "Neumann Bound Heatplate":HeatPlate}
+
 class OneD_Model:
     
     def __init__(self):
@@ -163,7 +166,9 @@ class OneD_Model:
     
     def verify(self):
         print("Verifying selected module...")
-        assert (set(self.param_dict.keys()).union(set(self.outputs_dict.keys())).issubset(set(self.convert_in_dict.keys()))), "Error: param_dict and conversion_dict are not same size"
+        params = set(self.param_dict.keys()).union(set(self.outputs_dict.keys()))
+        params_in_cdict = set(self.convert_in_dict.keys())
+        assert (params.issubset(params_in_cdict)), "Error: conversion_dict is missing entries {}".format(params.difference(params_in_cdict))
         return
 
 class Nanowire(OneD_Model):

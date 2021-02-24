@@ -23,7 +23,6 @@ import os
 import tables
 import itertools
 from functools import partial # This lets us pass params to functions called by tkinter buttons
-from copy import deepcopy
 
 import finite
 import modules
@@ -38,22 +37,19 @@ np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
 class Notebook:
 
     def __init__(self, title):
-        self.nanowire = modules.Nanowire()
-        #self.nanowire = modules.HeatPlate()
-        self.nanowire.verify()
-        
+        self.nanowire = None
         ## Set up GUI, special variables needed to interact with certain tkinter objects, other "global" variables
         # Create the main Tkinter object
         self.root = tk.Tk()
         self.root.attributes('-fullscreen', False)
         self.root.title(title)
+        
+        self.do_module_popup()
+        self.root.wait_window(self.select_module_popup)
+        if self.nanowire is None: return
+        
         self.notebook = tk.ttk.Notebook(self.root)
-
-        # Attempt to create a default config.txt file, if no config.txt can be found
-        self.gen_default_config_file()
-
-        # List of default directories for most I/O operations
-        self.get_default_dirs()
+        self.default_dirs = {"Initial":"Initial", "Data":"Data", "PL":"Analysis"}
 
         # Tkinter checkboxes and radiobuttons require special variables to extract user input
         # IntVars or BooleanVars are sufficient for binary choices e.g. whether a checkbox is checked
@@ -188,10 +184,15 @@ class Notebook:
         return
 
     def run(self):
+        if self.nanowire is None: 
+            self.root.destroy()
+            return
         self.notebook.pack(expand=1, fill="both")
         width, height = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
 
         self.root.geometry('%dx%d+0+0' % (width,height))
+        self.root.attributes("-topmost", True)
+        self.root.after_idle(self.root.attributes,'-topmost',False)
         self.root.mainloop()
         print("Closed TEDs")
         matplotlib.use(starting_backend)
@@ -201,35 +202,6 @@ class Notebook:
         self.root.attributes('-fullscreen', not self.root.attributes('-fullscreen'))
         return
 
-    def gen_default_config_file(self):
-        if not os.path.isfile("config.txt"):
-            print("Could not find config.txt; generating default...")
-            with open("config.txt", 'w+') as ofstream:
-                ofstream.write("# Directories\n")
-                ofstream.write("Initial: \"Initial\"\n")
-                ofstream.write("Data: \"Data\"\n")
-                ofstream.write("Analysis: \"Analysis\"\n")
-
-        return
-    
-    def get_default_dirs(self):
-        with open("config.txt", 'r') as ifstream:
-            for line in ifstream:
-                if (line == "" or '#' in line): continue
-
-                elif (line[0:line.find(':')] == "Initial"):
-                    default_initial = line[(line.find('\"')+1):].strip().strip('\"\n')
-
-                elif (line[0:line.find(':')] == "Data"):
-                    default_simdata = line[line.find('\"')+1:].strip().strip('\"\n')
-
-                elif (line[0:line.find(':')] == "Analysis"):
-                    default_analysis = line[line.find('\"')+1:].strip().strip('\"\n')
-
-                else: continue
-
-            self.default_dirs = {"Initial":default_initial, "Data":default_simdata, "PL":default_analysis}
-        return
 
     ## Create GUI elements for each tab
 	# Tkinter works a bit like a bulletin board - we declare an overall frame and pin things to it at specified locations
@@ -852,7 +824,45 @@ class Notebook:
             self.plotsummary_fig.canvas.draw()
 
         return
+    
     ## Functions to create popups and manage
+    def do_module_popup(self):
+
+        self.select_module_popup = tk.Toplevel(self.root)
+        self.select_module_label = tk.Label(self.select_module_popup, text="The following modules were found; select one to continue: ")
+        self.select_module_label.grid(row=0,column=0)
+        
+        self.modules_list = modules.mod_list()
+        self.module_names = list(self.modules_list.keys())
+        self.module_listbox = tk.Listbox(self.select_module_popup, width=40, height=10)
+        self.module_listbox.grid(row=1,column=0)
+        self.module_listbox.delete(0,tk.END)
+        self.module_listbox.insert(0,*(self.module_names))
+        
+        self.module_continue_button = tk.Button(self.select_module_popup, text="Continue", command=partial(self.on_select_module_popup_close, True))
+        self.module_continue_button.grid(row=2,column=0)
+        
+        self.select_module_popup.protocol("WM_DELETE_WINDOW", partial(self.on_select_module_popup_close, continue_=False))
+        self.select_module_popup.grab_set()
+        
+        return
+    
+    def on_select_module_popup_close(self, continue_=False):
+        try:
+            if continue_:
+                self.nanowire = self.modules_list[self.module_names[self.module_listbox.curselection()[0]]]()
+                self.nanowire.verify()
+                
+            self.select_module_popup.destroy()
+
+        except IndexError:
+            print("No module selected: Select a module from the list")
+        except AssertionError as oops:
+            print("Error: could not verify selected module")
+            print(str(oops))
+        return
+        
+            
     
     def do_sys_printsummary_popup(self):
         if not self.sys_printsummary_popup_isopen: # Don't open more than one of this window at a time
@@ -3532,5 +3542,6 @@ class Notebook:
         self.write(self.analysis_status, "Bayesim export complete")
         return
 
-nb = Notebook("ted")
-nb.run()
+if __name__ == "__main__":
+    nb = Notebook("ted")
+    nb.run()
