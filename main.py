@@ -1065,9 +1065,8 @@ class Notebook:
                     self.do_confirmation_popup("Updated: {}".format(changed_params), hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
                     
-                else:
-                    self.write(self.ICtab_status, "")
                     
+            self.write(self.ICtab_status, "")
             self.sys_param_shortcut_popup.destroy()
             self.sys_param_shortcut_popup_isopen = False
         except:
@@ -2780,17 +2779,19 @@ class Notebook:
 
         if (AIC_options["long_expfactor"]):
             try: A0 = float(self.A0_entry.get())         # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid A0")
                 return
 
             try: Eg = float(self.Eg_entry.get())                  # [eV]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid Eg")
                 return
 
-            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
-            except ValueError:
+            try: 
+                wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+                assert wavelength > 0
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
@@ -2807,7 +2808,8 @@ class Notebook:
         else:
             try: 
                 alpha = float(self.AIC_expfactor_entry.get()) # [cm^-1]
-            except ValueError:
+                
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid α")
                 return
 
@@ -2817,12 +2819,15 @@ class Notebook:
             try: 
                 power = float(self.power_entry.get()) * 1e-6  # [uJ/s] to [J/s]
                 spotsize = float(self.spotsize_entry.get()) * ((1e7) ** 2)     # [cm^2] to [nm^2]
-            except ValueError:
+                assert spotsize > 0
+            except:
                 self.write(self.ICtab_status, "Error: missing power or spot size")
                 return
 
-            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
-            except ValueError:
+            try: 
+                wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+                assert wavelength > 0
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
@@ -2831,8 +2836,8 @@ class Notebook:
             else:
                 try:
                     freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
-
-                except ValueError:
+                    assert freq > 0
+                except:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
@@ -2841,12 +2846,14 @@ class Notebook:
         
         elif (AIC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing power density")
                 return
 
-            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
-            except ValueError:
+            try: 
+                wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+                assert wavelength > 0
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
             if (self.pulse_freq_entry.get() == "cw"):
@@ -2854,8 +2861,8 @@ class Notebook:
             else:
                 try:
                     freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
-
-                except ValueError:
+                    assert freq > 0
+                except:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
@@ -2863,7 +2870,7 @@ class Notebook:
         
         elif (AIC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
@@ -2872,7 +2879,7 @@ class Notebook:
 
         elif (AIC_options["power_mode"] == "total-gen"):
             try: total_gen = float(self.total_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
