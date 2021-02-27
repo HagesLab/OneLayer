@@ -2925,63 +2925,44 @@ class Notebook:
             new_param_name = self.init_var_selection.get()
             if "[" in new_param_name: new_param_name = new_param_name[:new_param_name.find("[")]
 
+            assert (float(self.paramrule_lbound_entry.get()) >= 0),  "Error: left bound coordinate too low"
+            
             if (self.init_shape_selection.get() == "POINT"):
-
-                if (float(self.paramrule_lbound_entry.get()) < 0):
-                    raise Exception("Error: Bound coordinates exceed system thickness specifications")
-
-                if (float(self.paramrule_lbound_entry.get()) < 0):
-                	self.write(self.ICtab_status, "Warning: negative initial condition value")
-
+                assert (float(self.paramrule_lbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                
                 new_param_rule = Param_Rule(new_param_name, "POINT", float(self.paramrule_lbound_entry.get()), -1, float(self.paramrule_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
-                	raise Exception("Error: Bound coordinates exceed system thickness specifications")
-
-                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
-                	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
-
-                if (float(self.paramrule_lbound_entry.get()) < 0):
-                	self.write(self.ICtab_status, "Warning: negative initial condition value")
+                assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
                 new_param_rule = Param_Rule(new_param_name, "FILL", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), float(self.paramrule_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
-                	raise Exception("Error: Bound coordinates exceed system thickness specifications")
-
-                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
-                	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
-
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) < 0):
-                	self.write(self.ICtab_status, "Warning: negative initial condition value")
+                assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
                 new_param_rule = Param_Rule(new_param_name, "LINE", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
                                             float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
 
             elif (self.init_shape_selection.get() == "EXP"):
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
-                    raise Exception("Error: Bound coordinates exceed system thickness specifications")
-
-                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
-                	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
-
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) < 0):
-                	self.write(self.ICtab_status, "Warning: negative initial condition value")
-
+                assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
+                assert (float(self.paramrule_lvalue_entry.get()) != 0), "Error: left value cannot be 0"
+                assert (float(self.paramrule_rvalue_entry.get()) != 0), "Error: right value cannot be 0"
+                assert (float(self.paramrule_lvalue_entry.get()) * float(self.paramrule_rvalue_entry.get()) > 0), "Error: values must have same sign"
                 new_param_rule = Param_Rule(new_param_name, "EXP", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
                                             float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
 
             else:
-                raise Exception("Error: No init. type selected")
+                raise ValueError
 
         except ValueError:
             self.write(self.ICtab_status, "Error: Missing Parameters")
             return
 
-        except Exception as oops:
-            self.write(self.ICtab_status, oops)
+        except AssertionError as oops:
+            self.write(self.ICtab_status, str(oops))
             return
 
         self.nanowire.add_param_rule(new_param_name, new_param_rule)
@@ -2996,8 +2977,9 @@ class Notebook:
 
     def refresh_paramrule_listbox(self):
         # The View button has two jobs: change the listbox to the new param and display a snapshot of it
-        self.update_paramrule_listbox(self.paramtoolkit_viewer_selection.get())
-        self.update_IC_plot(plot_ID="custom")
+        if self.nanowire.spacegrid_is_set:
+            self.update_paramrule_listbox(self.paramtoolkit_viewer_selection.get())
+            self.update_IC_plot(plot_ID="custom")
         return
     
     def update_paramrule_listbox(self, param_name):
