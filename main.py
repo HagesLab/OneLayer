@@ -3352,6 +3352,7 @@ class Notebook:
 
     def load_ICfile(self, cycle_through_IC_plots=True):
         warning_flag = False
+        warning_mssg = ""
 
         try:
             print("Poked file: {}".format(self.IC_file_name))
@@ -3448,9 +3449,12 @@ class Notebook:
             self.enter(self.thickness_entry, total_length)
             self.enter(self.dx_entry, dx)
             self.set_init_x()
-            
+            assert self.nanowire.spacegrid_is_set
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
+            return
+        
+        except AssertionError:
             return
 
         except Exception as oops:
@@ -3462,13 +3466,13 @@ class Notebook:
             try:
                 self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
             except:
-                print("Warning: could not apply value for flag: {}".format(flag))
-                print("Flags must have integer value 1 or 0")
+                warning_mssg += "\nWarning: could not apply value for flag: {}".format(flag)
+                warning_mssg += "\nFlags must have integer value 1 or 0"
                 warning_flag += 1
             
         for param in self.nanowire.param_dict:
-            new_value = init_param_values_dict[param]
             try:
+                new_value = init_param_values_dict[param]
                 if '\t' in new_value:
                     self.nanowire.param_dict[param].value = np.array(extract_values(new_value, '\t'))
                 else: self.nanowire.param_dict[param].value = float(new_value)
@@ -3476,13 +3480,16 @@ class Notebook:
                 self.paramtoolkit_currentparam = param
                 if cycle_through_IC_plots: self.update_IC_plot(plot_ID="recent")
             except:
-                print("Warning: could not apply value for param: {}".format(param))
+                warning_mssg += ("\nWarning: could not apply value for param: {}".format(param))
                 warning_flag += 1
                 
         if self.nanowire.system_ID == "Nanowire": self.using_AIC = False
         
         if not warning_flag: self.write(self.ICtab_status, "IC file loaded successfully")
-        else: self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
+        else: 
+            self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
+            self.do_confirmation_popup(warning_mssg, hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
         return
 
     # Data I/O
