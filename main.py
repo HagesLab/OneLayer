@@ -2242,6 +2242,9 @@ class Notebook:
             self.simtime = float(self.simtime_entry.get())      # [ns]
             self.dt = float(self.dt_entry.get())           # [ns]
             self.hmax = self.hmax_entry.get()
+            self.n = int(0.5 + self.simtime / self.dt)           # Number of time steps
+
+            # Upper limit on number of time steps
             
             if (self.simtime <= 0): raise Exception("Error: Invalid simulation time")
             if (self.dt <= 0 or self.dt > self.simtime): raise Exception("Error: Invalid dt")
@@ -2250,6 +2253,23 @@ class Notebook:
                 self.hmax = 0
                 
             self.hmax = float(self.hmax)
+            
+            if (self.hmax < 0): raise Exception("Error: Invalid solver stepsize")
+            
+            if self.dt > self.simtime / 10:
+                self.do_confirmation_popup("Warning: a very large time stepsize was entered. Results may be less accurate with large stepsizes. Are you sure you want to continue?")
+                self.root.wait_window(self.confirmation_popup)
+                if not self.confirmed: return
+                
+            if self.hmax and self.hmax < 1e-3:
+                self.do_confirmation_popup("Warning: a very small solver stepsize was entered. Results may be slow with small solver stepsizes. Are you sure you want to continue?")
+                self.root.wait_window(self.confirmation_popup)
+                if not self.confirmed: return
+                
+            if (self.n > 1e5):
+                self.do_confirmation_popup("Warning: a very small time stepsize was entered. Results may be slow with small time stepsizes. Are you sure you want to continue?")
+                self.root.wait_window(self.confirmation_popup)
+                if not self.confirmed: return
             
         except ValueError:
             self.write(self.status, "Error: Invalid parameters")
@@ -2289,10 +2309,7 @@ class Notebook:
             data_file_name = shortened_IC_name
             
             self.m = int(0.5 + self.nanowire.total_length / self.nanowire.dx)         # Number of space steps
-            self.n = int(0.5 + self.simtime / self.dt)           # Number of time steps
-
-            # Upper limit on number of time steps
-            if (self.n > 2.5e5): raise Exception("Error: too many time steps")
+            
 
             temp_sim_dict = {}
 
@@ -2324,7 +2341,8 @@ class Notebook:
             full_path_name = "{}\\{}\\{}".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
-            
+            assert "Data" in full_path_name
+            assert self.nanowire.system_ID in full_path_name
             if os.path.isdir(full_path_name):
                 print("{} folder already exists; trying alternate name".format(data_file_name))
                 append = 1
@@ -2366,25 +2384,27 @@ class Notebook:
         write_output = True
 
         try:
-            error_dict = self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), self.m, self.n, self.dt, 
-                                                temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), self.hmax, init_conditions, write_output)
+            self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), self.m, self.n, self.dt, 
+                                   temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), self.hmax, init_conditions, write_output)
             
         except FloatingPointError:
-            self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}\n".format(data_file_name))
+            self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}. This file may have invalid parameters.\n".format(data_file_name))
+            for file in os.listdir(full_path_name):
+                tpath = full_path_name + "\\" + file
+                os.remove(tpath)
+                
+            os.rmdir(full_path_name)
             return
         except Exception as oops:
             self.sim_warning_msg += ("Error \"{}\" occurred while simulating {}\n".format(oops, data_file_name))
-            return
+            for file in os.listdir(full_path_name):
+                tpath = full_path_name + "\\" + file
+                os.remove(tpath)
+                
+            os.rmdir(full_path_name)
             
-        grid_t = np.linspace(self.dt, self.simtime, self.n)
+            return
 
-        try:
-            np.savetxt(full_path_name + "\\convergence.csv", np.vstack((grid_t, error_dict['hu'], error_dict['tcur'],\
-                error_dict['tolsf'], error_dict['tsw'], error_dict['nst'], error_dict['nfe'], error_dict['nje'], error_dict['nqu'],\
-                error_dict['mused'])).transpose(), fmt='%.4e', delimiter=',', header="t, hu, tcur, tolsf, tsw, nst, nfe, nje, nqu, mused")
-        except PermissionError:
-            print("Error: unable to access convergence data export destination")
-        
         self.write(self.status, "Finalizing...")
 
         for i in range(1,6):
@@ -2524,8 +2544,7 @@ class Notebook:
                     i = to_index(l_bound, dx, total_length)
                     nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
                 
-                m = int(total_length / dx)
-            
+
                 do_curr_t = self.PL_mode == "Current time step"
                 
                 pathname = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename
@@ -2890,7 +2909,6 @@ class Notebook:
             return
         
         
-        ## TODO: Make AIC deposit in common units, so this patch isn't required
         self.nanowire.param_dict["deltaN"].value *= self.convert_out_dict["deltaN"]
         ## Assuming that the initial distributions of holes and electrons are identical
         self.nanowire.param_dict["deltaP"].value = self.nanowire.param_dict["deltaN"].value
@@ -3288,7 +3306,7 @@ class Notebook:
 	# Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked
     def save_ICfile(self):
         try:
-
+            assert self.nanowire.spacegrid_is_set, "Error: set a space grid first"
             new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file", filetypes=[("Text files","*.txt")])
             
             if new_filename == "": return
@@ -3296,6 +3314,9 @@ class Notebook:
             if new_filename.endswith(".txt"): new_filename = new_filename[:-4]
             self.write_init_file(new_filename + ".txt")
 
+        except AssertionError as oops:
+            self.write(self.ICtab_status, str(oops))
+            
         except ValueError as uh_Oh:
             print(uh_Oh)
             
