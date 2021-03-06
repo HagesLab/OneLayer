@@ -1289,6 +1289,7 @@ class Notebook:
         try:
 			# There are two ways for a popup to close: by the user pressing "Continue" or the user cancelling or pressing "X"
 			# We only interpret the input on the popup if the user wants to continue
+            self.confirmed = continue_
             if continue_:
                 assert (self.data_var.get()), "Select a data type from the drop-down menu"
                 self.analysis_plots[plot_ID].data_filenames = []
@@ -2152,7 +2153,7 @@ class Notebook:
         plot_ID = self.active_analysisplot_ID.get()
         self.do_plotter_popup(plot_ID)
         self.root.wait_window(self.plotter_popup)
-        
+        if not self.confirmed: return
         active_plot = self.analysis_plots[plot_ID]
         datatype = self.data_var.get()
 
@@ -2170,11 +2171,8 @@ class Notebook:
                 active_plot.datagroup.add(new_data, new_data.tag())
     
         if len(err_msg):
-            read_warning_popup = tk.Toplevel(self.root)
-            read_warning_title = tk.Label(read_warning_popup, text="Error: the following data could not be plotted")
-            read_warning_title.grid(row=0,column=0)
-            read_warning_textbox = tk.Label(read_warning_popup, text=err_msg)
-            read_warning_textbox.grid(row=1,column=0)
+            self.do_confirmation_popup("Error: the following data could not be plotted\n" + err_msg, hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
         
         self.plot_analyze(plot_ID, force_axis_update=True)
         

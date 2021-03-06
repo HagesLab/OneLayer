@@ -125,10 +125,12 @@ def autoscale(val_array=None, min_val=None, max_val=None):
         
     else:
         return 'linear'
-    
-    if not (min_val == 0) and np.abs(max_val / min_val) > 1e1:
-        return 'symlog'
-    elif (min_val < 0) and np.abs(min_val / max_val) > 1e1:
-        return 'symlog'
-    else:
+    try:
+        if not (min_val == 0) and np.abs(max_val / min_val) > 1e1:
+            return 'symlog'
+        elif (min_val < 0) and np.abs(min_val / max_val) > 1e1:
+            return 'symlog'
+        else:
+            return 'linear'
+    except:
         return 'linear'

@@ -327,7 +327,7 @@ def heatflux(sim_data, params):
         q = np.zeros((len(T), len(T[0]) + 1))
         q[:,0] += params["Left_flux"]
         q[:,-1] += params["Right_flux"]
-        for i in range(1, len(q) - 1):
+        for i in range(1, len(q[0]) - 1):
             q[:,i] = -k_avg[i-1] * (T[:,i] - T[:,i-1]) / params["Node_width"]
         
     return q
