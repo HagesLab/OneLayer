@@ -1949,7 +1949,7 @@ class Notebook:
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
         path = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + "metadata.txt"
-        assert os.path.exists(path), "Error: Missing metadata"
+        assert os.path.exists(path), "Error: Missing metadata for {}".format(self.nanowire.system_ID)
         
         with open(path, "r") as ifstream:
             param_values_dict = {}
@@ -1960,8 +1960,7 @@ class Notebook:
             
                 elif "System_class" in line:
                     system_class = line[line.find(' ') + 1:].strip('\n')
-                    if not (self.nanowire.system_ID == system_class):
-                        raise ValueError
+                    assert self.nanowire.system_ID == system_class, "Error: File is not a {}".format(self.nanowire.system_ID)
 
                 else:
                     param = line[0:line.find(':')]
@@ -1975,7 +1974,8 @@ class Notebook:
         for param in param_values_dict:
             if param in self.convert_in_dict:
                 param_values_dict[param] *= self.convert_in_dict[param]
-                    
+            
+        assert set(self.nanowire.param_dict.keys()).issubset(set(param_values_dict.keys())), "Error: metadata is missing params"
         return param_values_dict
     
     def plot_overview_analysis(self):
@@ -1995,8 +1995,14 @@ class Notebook:
             data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
             data_node_t = np.linspace(0, param_values_dict["Total-Time"], data_n + 1)
             tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
-        except:
-            self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
+        except AssertionError as oops:
+            self.do_confirmation_popup(str(oops), hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
+            return
+        
+        except ValueError:
+            self.do_confirmation_popup("Error: {} is missing or has unusual metadata.txt".format(data_filename), hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
             return
         
         for subplot in self.overview_subplots:
@@ -2010,13 +2016,18 @@ class Notebook:
             
         data_dict = self.nanowire.get_overview_analysis(param_values_dict, tstep_list, data_dirname, data_filename)
         
+        warning_msg = ""
         for output_name, output_info in self.nanowire.outputs_dict.items():
             try:
                 values = data_dict[output_name]
                 
                 if not isinstance(values, np.ndarray): raise KeyError
             except KeyError:
-                print("Warning: {}'s get_overview_analysis() did not return data for {}".format(self.nanowire.system_ID, output_name))
+                warning_msg += "Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.nanowire.system_ID, output_name)
+                continue
+            
+            except:
+                warning_msg += "Error: could not calculate {}".format(output_name)
                 continue
 
             if output_info.xvar == "time":
@@ -2026,7 +2037,7 @@ class Notebook:
                 grid_x = data_node_x if not output_info.is_edge else data_edge_x
                 
             else:
-                print("Warning: invalid xvar {} in system class definition for output {}".format(output_info.xvar, output_name))
+                warning_msg += "Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name)
                 continue
             
             if values.ndim == 2: # time/space variant outputs
@@ -2039,7 +2050,10 @@ class Notebook:
         for output_name in self.nanowire.simulation_outputs_dict:
             self.overview_subplots[output_name].legend().set_draggable(True)
             break
-        
+        if warning_msg:
+            self.do_confirmation_popup(warning_msg, hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
+            
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
         return
