@@ -1429,6 +1429,7 @@ class Notebook:
         # Read in the pairs of integration bounds as-is
         # Checking if they make sense is do_Integrate()'s job
         try:
+            self.confirmed = continue_
             if continue_:
                 self.integration_bounds = []
                 if self.fetch_intg_mode.get() == "single":
@@ -1738,11 +1739,13 @@ class Notebook:
                 plot_ID = self.active_analysisplot_ID.get()
                 active_sets = self.analysis_plots[plot_ID].datagroup.datasets
                 datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
+                if not len(datasets): return
                 
                 include_flags = {}
                 for iflag in self.carry_include_flags:
                     include_flags[iflag] = self.carry_include_flags[iflag].get()
                     
+                status_msg = "Files generated:\n"
                 for key in datasets:
                     new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file for {}".format(key), filetypes=[("Text files","*.txt")])
                     if new_filename == "": continue
@@ -1786,7 +1789,12 @@ class Notebook:
                             if param in self.nanowire.flags_dict: 
                                 ofstream.write("{}: {}\n".format(param, int(param_dict_copy[param])))
 
-                self.write(self.analysis_status, "IC file generated")
+                    status_msg += "{}-->{}\n".format(filename, new_filename)
+                    
+                # If NO new files saved
+                if status_msg == "Files generated:\n": status_msg += "(none)"
+                self.do_confirmation_popup(status_msg, hide_cancel=True)
+                self.root.wait_window(self.confirmation_popup)
 
             self.IC_carry_popup.destroy()
 
@@ -1843,51 +1851,20 @@ class Notebook:
 
             self.bay_title_label3 = tk.ttk.Label(self.bay_popup, text="Model Params", style="Header.TLabel")
             self.bay_title_label3.grid(row=4,column=2,columnspan=4)
-
-            self.bay_mun_check = tk.Checkbutton(self.bay_popup, text="Mu_N", variable=self.check_bay_params["Mu_N"], onvalue=1, offvalue=0)
-            self.bay_mun_check.grid(row=5,column=2, padx=(19,0))
-
-            self.bay_mup_check = tk.Checkbutton(self.bay_popup, text="Mu_P", variable=self.check_bay_params["Mu_P"], onvalue=1, offvalue=0)
-            self.bay_mup_check.grid(row=6,column=2, padx=(17,0))
-
-            self.bay_n0_check = tk.Checkbutton(self.bay_popup, text="N0", variable=self.check_bay_params["N0"], onvalue=1, offvalue=0)
-            self.bay_n0_check.grid(row=7,column=2, padx=(3,0))
-
-            self.bay_p0_check = tk.Checkbutton(self.bay_popup, text="P0", variable=self.check_bay_params["P0"], onvalue=1, offvalue=0)
-            self.bay_p0_check.grid(row=8,column=2)
-
-            self.bay_B_check = tk.Checkbutton(self.bay_popup, text="B", variable=self.check_bay_params["B"], onvalue=1, offvalue=0)
-            self.bay_B_check.grid(row=5,column=3, padx=(0,2))
-
-            self.bay_taun_check = tk.Checkbutton(self.bay_popup, text="Tau_N", variable=self.check_bay_params["Tau_N"], onvalue=1, offvalue=0)
-            self.bay_taun_check.grid(row=6,column=3, padx=(24,0))
-
-            self.bay_taup_check = tk.Checkbutton(self.bay_popup, text="Tau_P", variable=self.check_bay_params["Tau_P"], onvalue=1, offvalue=0)
-            self.bay_taup_check.grid(row=7,column=3, padx=(23,0))
-
-            self.bay_sf_check = tk.Checkbutton(self.bay_popup, text="Sf", variable=self.check_bay_params["Sf"], onvalue=1, offvalue=0)
-            self.bay_sf_check.grid(row=8,column=3, padx=(1,0))
-
-            self.bay_sb_check = tk.Checkbutton(self.bay_popup, text="Sb", variable=self.check_bay_params["Sb"], onvalue=1, offvalue=0)
-            self.bay_sb_check.grid(row=5,column=4, padx=(0,40))
-
-            self.bay_temperature_check = tk.Checkbutton(self.bay_popup, text="Temperature", variable=self.check_bay_params["Temperature"], onvalue=1, offvalue=0)
-            self.bay_temperature_check.grid(row=6,column=4, padx=(14,0))
-
-            self.bay_relperm_check = tk.Checkbutton(self.bay_popup, text="Rel-Permitivity", variable=self.check_bay_params["Rel-Permitivity"], onvalue=1, offvalue=0)
-            self.bay_relperm_check.grid(row=7,column=4, padx=(24,0))
-
-            self.bay_theta_check = tk.Checkbutton(self.bay_popup, text="Theta", variable=self.check_bay_params["Theta"], onvalue=1, offvalue=0)
-            self.bay_theta_check.grid(row=8,column=4, padx=(0,25))
-
-            self.bay_alpha_check = tk.Checkbutton(self.bay_popup, text="Alpha", variable=self.check_bay_params["Alpha"], onvalue=1, offvalue=0)
-            self.bay_alpha_check.grid(row=5,column=5, padx=(0,26))
-
-            self.bay_delta_check = tk.Checkbutton(self.bay_popup, text="Delta", variable=self.check_bay_params["Delta"], onvalue=1, offvalue=0)
-            self.bay_delta_check.grid(row=6,column=5, padx=(0,30))
-
-            self.bay_fm_check = tk.Checkbutton(self.bay_popup, text="Frac-Emitted", variable=self.check_bay_params["Frac-Emitted"], onvalue=1, offvalue=0)
-            self.bay_fm_check.grid(row=7,column=5, padx=(10,0))
+            
+            self.check_frame = tk.ttk.Frame(self.bay_popup)
+            self.check_frame.grid(row=5,column=2,columnspan=4)
+            self.bay_checks = {}
+            rdim = 4
+            rcount = 0
+            ccount = 0
+            for param in self.nanowire.param_dict:
+                self.bay_checks[param] = tk.ttk.Checkbutton(self.check_frame, text=param, variable=self.check_bay_params[param], onvalue=1,offvalue=0)
+                self.bay_checks[param].grid(row=rcount, column=ccount)
+                rcount += 1
+                if rcount == rdim:
+                    rcount = 0
+                    ccount += 1
 
             self.bay_continue_button = tk.Button(self.bay_popup, text="Continue", command=partial(self.on_bayesim_popup_close, continue_=True))
             self.bay_continue_button.grid(row=20,column=3)
@@ -2477,7 +2454,9 @@ class Notebook:
     
             self.do_integration_getbounds_popup()
             self.root.wait_window(self.integration_getbounds_popup)
-    
+            if not self.confirmed:
+                return
+            
             if self.PL_mode == "Current time step":
                 self.do_PL_xaxis_popup()
                 self.root.wait_window(self.PL_xaxis_popup)
@@ -2534,6 +2513,9 @@ class Notebook:
                
                 if (u_bound > total_length):
                     u_bound = total_length
+                    
+                if (l_bound > total_length):
+                    l_bound = total_length
 
                 if symmetric_flag:
 
@@ -3586,9 +3568,6 @@ class Notebook:
                     full_data = np.vstack((grid_x, raw_data, unc)).T
                     full_data = pd.DataFrame.from_records(data=full_data,columns=['time', datagroup.type, 'uncertainty'])
                     
-                    filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
-                    dd.save("{}.h5".format(filename.strip('.h5')), full_data)
-
             elif self.bay_mode.get() == "model":
                 active_bay_params = []
                 for param in self.check_bay_params:
@@ -3628,18 +3607,26 @@ class Notebook:
 
                 full_data = pd.DataFrame.from_records(data=full_data, columns=panda_columns)
                 
-                new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
-                if new_filename == "": 
-                    self.write(self.analysis_status, "Bayesim export cancelled")
-                    return
+            filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
+            if not filename: 
+                self.write(self.analysis_status, "Bayesim export cancelled")
+                return
 
-                if not new_filename.endswith(".h5"): new_filename += ".h5"
-
-                dd.save(new_filename, full_data)
+            if not filename.endswith(".h5"): filename += ".h5"
+            print(filename)
+            try:
+                dd.save(filename, full_data)
+            except Exception as oops:
+                self.do_confirmation_popup("Error: {} occured while saving bayesim file".format(str(oops)), hide_cancel=True)
+                self.root.wait_window(self.confirmation_popup)
+                os.remove(filename)
+                return
+                
         else:
             print("WIP =(")
 
-        self.write(self.analysis_status, "Bayesim export complete")
+        self.do_confirmation_popup("Bayesim export complete", hide_cancel=True)
+        self.root.wait_window(self.confirmation_popup)
         return
 
 if __name__ == "__main__":
