@@ -2370,11 +2370,9 @@ class Notebook:
         self.sim_data = dict(init_conditions)
         self.update_sim_plots(0)
 
-        write_output = True
-
         try:
             self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), self.m, self.n, self.dt, 
-                                   temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), self.hmax, init_conditions, write_output)
+                                   temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), self.hmax, init_conditions)
             
         except FloatingPointError:
             self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}. This file may have invalid parameters.\n".format(data_file_name))

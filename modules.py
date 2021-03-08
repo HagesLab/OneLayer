@@ -9,14 +9,42 @@ import finite
 from helper_structs import Parameter, Output
 from utils import u_read, to_index, to_array, to_pos
 import tables
-
+# FIXME: DOCSTRINGS FOR ONED_MODEL, Parameter, Output
 def mod_list():
+    """
+    Tells TEDs what modules are available.
+
+    Returns
+    -------
+    dict
+        {"Display name of module": OneD_Model derived module object}.
+
+    """
+    
     return {"Nanowire":Nanowire, "Neumann Bound Heatplate":HeatPlate}
 
 class OneD_Model:
+    """
+    Template class for modules.
+    
+    Stores information regarding a module's parameters, outputs, and flags.
+    
+    Also stores information used to build the initial state of a model system,
+    such as space grid and parameter rules/distributions.
+    
+    All child classes must popupate __init__'s dicts and implement:
+        calc_inits()
+        simulate()
+        get_overview_analysis()
+        prep_dataset()
+        get_IC_carry()
+    """
     
     def __init__(self):
+        # Unique identifier for module.
         self.system_ID = "INSERT MODEL NAME HERE"
+        
+        # Space grid information.
         self.total_length = -1
         self.dx = -1
         self.length_unit = "INSERT LENGTH UNIT HERE"
@@ -24,19 +52,18 @@ class OneD_Model:
         self.grid_x_edges = -1
         self.spacegrid_is_set = False
         
+        # Parameter list.
         self.param_dict = {}
         self.param_count = len(self.param_dict)
         
-        # This tells TEDs what flags there will be and their 'layman's name' shown on the interface as,
-        # but we actually don't need to store the flag values here
-        # The reason why is that info is already stored in whether a flag appears visually selected on the interface
+        # dict {"Flag's internal name":"Flag's display name"}
         self.flags_dict = {"Flag1":"Flag1's name"}
         
-        # List of all variables active during the finite difference simulating        
+        # dict {"Variable name":Output()} of all dependent variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
         self.simulation_outputs_dict = {"Output1":Output("y", units="[hamburgers/football field]", xlabel="a.u.", xvar="position", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1))}
         
-        # List of all variables calculated from those in simulation_outputs_dict
+        # dict {"Variable name":Output()} of all secondary variables calculated from those in simulation_outputs_dict
         self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_n, is_integrated=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
@@ -44,8 +71,10 @@ class OneD_Model:
         self.simulation_outputs_count = len(self.simulation_outputs_dict)
         self.calculated_outputs_count = len(self.calculated_outputs_dict)
         self.total_outputs_count = self.simulation_outputs_count + self.calculated_outputs_count
+        
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
+        # Each item in param_dict and outputs_dict must have an entry here, even if the conversion factor is one
         self.convert_in_dict = {"Output1": ((1e-2) / (1e2)),               # [hamburgers/football field] to [centihamburgers/yard]
                                 "deltaN": ((1e-7) ** 3)                    # [cm^-3] to [nm^-3]
                                 }
@@ -57,23 +86,77 @@ class OneD_Model:
 
         return
     
-    
     def add_param_rule(self, param_name, new_rule):
+        """
+
+        Parameters
+        ----------
+        param_name : str
+            Name of a parameter from self.param_dict.
+        new_rule : helper_structs.Parameter()
+            New Parameter() instance created from TEDs.add_paramrule()
+
+        Returns
+        -------
+        None.
+
+        """
         self.param_dict[param_name].param_rules.append(new_rule)
         self.update_param_toarray(param_name)
         return
 
     def swap_param_rules(self, param_name, i):
+        """
+
+        Parameters
+        ----------
+        param_name : str
+            Name of a parameter from self.param_dict
+        i : int
+            Index of parameter rule to be swapped with i-1
+
+        Returns
+        -------
+        None.
+
+        """
         self.param_dict[param_name].param_rules[i], self.param_dict[param_name].param_rules[i-1] = self.param_dict[param_name].param_rules[i-1], self.param_dict[param_name].param_rules[i]
         self.update_param_toarray(param_name)
         return
 
     def remove_param_rule(self, param_name, i):
+        """
+
+        Parameters
+        ----------
+        param_name : str
+            Name of parameter from self.param_dict
+        i : int
+            Index of parameter rule to be deleted
+
+        Returns
+        -------
+        None.
+
+        """
         self.param_dict[param_name].param_rules.pop(i)
         self.update_param_toarray(param_name)
         return
     
     def removeall_param_rules(self, param_name):
+        """
+        Deletes all parameter rules and resets stored distribution for a given parameter
+
+        Parameters
+        ----------
+        param_name : str
+            Name of parameter from self.param_dict
+
+        Returns
+        -------
+        None.
+
+        """
         self.param_dict[param_name].param_rules = []
         self.param_dict[param_name].value = 0
         return
@@ -81,6 +164,7 @@ class OneD_Model:
     def update_param_toarray(self, param_name):
         # Recalculate a Parameter from its Param_Rules
         # This should be done every time the Param_Rules are changed
+        # All params are stored as array, even if the param is space invariant
         param = self.param_dict[param_name]
 
         if param.is_edge:
@@ -122,7 +206,18 @@ class OneD_Model:
         return
     
     def DEBUG_print(self):
-        #print("Behold the One Nanowire in its infinite glory:")
+        """
+        Prepares a summary of the current state of all parameters.
+        
+        For TEDs state summary button/popup.
+
+        Returns
+        -------
+        mssg : str
+            Message displayed in popup.
+
+        """
+        
         mssg = ""
         if self.spacegrid_is_set:
             mssg += ("Space Grid is set\n")
@@ -137,20 +232,83 @@ class OneD_Model:
         return mssg
     
     def calc_inits(self):
-        # Do stuff here
+        """
+        Uses the self.param_dict to calculate initial conditions for ODEINT.
+        
+        In many cases this is just returning the appropriate parameter from self.param_dict.
+
+        Returns
+        -------
+        dict {"param name":1D numpy array}
+            Collection of initial condition arrays.
+
+        """
+        
         return {}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions, write_output):
-        # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from finite.py with the correct args
-        return None
+    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions):
+        """
+        Uses the provided args to call a numerical solver and write results to .h5 files.
+        
+        No strict rules on how simulate() needs to look or if all parameters must be utilised - 
+        nor is finite.py or even ODEINT() required (although these are recommended) - 
+        as long as this function simulates and writes output files.
+        
+        Parameters
+        ----------
+        data_path : str
+            Absolute path to target directory files are written in.
+        m : int
+            Number of space grid nodes.
+        n : int
+            Number of time steps.
+        dt : float
+            Time step size.
+        params : dict {"param name": 1D numpy array} or dict {"param name": float}
+            Collection of parameter values.
+        flags : dict {"Flag internal name": Flag()}
+            Collection of flag instances.
+        do_ss : bool
+            Special steady state injection flag.
+        hmax_ : float
+            Maximum time stepsize to be taken by ODEINT().
+        init_conditions : dict {"param name": 1D numpy array}
+            Collection of initial conditions.
+
+        Returns
+        -------
+        None.
+
+        """
+
+        return
     
     def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
-        # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
+        """
+        Perform and package all calculations to be displayed on TEDs OVerview Analysis tab.
+
+        Parameters
+        ----------
+        params : dict {"param name": 1D numpy array or float}
+            Paramteres used in simulation and stored in metadata.
+        tsteps : list, 1D numpy array
+            Time step indices overview should sample over
+        data_dirname : str
+            Name of output data directory e.g. .../Data/sim1.
+        file_name_base : str
+            Name of simulation file e.g. mydata.
+            Used with data_dirname to locate file - files are written in format
+            data_dirname/file_name_base-output_name.h5
+            e.g. .../Data/mysimulation1-y.h5
+
+        Returns
+        -------
+        data_dict : dict {"output name": 1D or 2D numpy array}
+            Collection of output data. 1D array if calculated once (e.g. an integral over space) and 2D if calculated at multiple times
+            Must return one entry per output in self.output_dict
+        """
         data_dict = {}
-        
-        # Insert calculations and stuff here
-        
-        
+
         return data_dict
     
     def prep_dataset(self, datatype, sim_data, params, do_plot_override=True, i=0, j=0, nen=False, extra_data = None):
@@ -233,7 +391,6 @@ class Nanowire(OneD_Model):
                                 "E_field": 1, 
                                 "tau_diff": 1}
         
-        # FIXME: Check these
         self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
         self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["Tau_N"]
         self.convert_in_dict["PL"] = self.convert_in_dict["RR"] * self.convert_in_dict["Theta"]
@@ -262,11 +419,11 @@ class Nanowire(OneD_Model):
         
         return {"N":init_N, "P":init_P, "E_field":init_E_field}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions, write_output):
+    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions):
         # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from finite.py with the correct args
-        return finite.ode_nanowire(data_path, m, n, self.dx, dt, params,
-                                    not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), do_ss, hmax_, write_output,
-                                    init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
+        finite.ode_nanowire(data_path, m, n, self.dx, dt, params,
+                            not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), do_ss, hmax_, True,
+                            init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
     
     def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
@@ -293,7 +450,6 @@ class Nanowire(OneD_Model):
         PL_base = finite.prep_PL(temp_RR, 0, to_index(params["Total_length"], params["Node_width"], params["Total_length"]), False, params)
         data_dict["PL"] = self.calculated_outputs_dict["PL"].calc_func(PL_base, 0, params["Total_length"], params["Node_width"], params["Total_length"], 
                                                                        False)
-        
         data_dict["tau_diff"] = self.calculated_outputs_dict["tau_diff"].calc_func(data_dict["PL"], params["dt"])
         
         for data in data_dict:
@@ -385,10 +541,9 @@ class HeatPlate(OneD_Model):
         init_T = to_array(init_T, len(self.grid_x_nodes), False)
         return {"T":init_T}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions, write_output):
+    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions):
         # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from finite.py with the correct args
-        return finite.ode_heatplate(data_path, m, n, self.dx, dt, params,
-                                    write_output)
+        return finite.ode_heatplate(data_path, m, n, self.dx, dt, params)
     
     def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
