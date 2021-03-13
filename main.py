@@ -47,6 +47,7 @@ class Notebook:
         self.do_module_popup()
         self.root.wait_window(self.select_module_popup)
         if self.nanowire is None: return
+        if not self.verified: return
         self.prep_notebook()
         return
         
@@ -876,8 +877,10 @@ class Notebook:
     def on_select_module_popup_close(self, continue_=False):
         try:
             if continue_:
+                self.verified=False
                 self.nanowire = self.modules_list[self.module_names[self.module_listbox.curselection()[0]]]()
                 self.nanowire.verify()
+                self.verified=True
                 
             self.select_module_popup.destroy()
 
@@ -886,6 +889,7 @@ class Notebook:
         except AssertionError as oops:
             print("Error: could not verify selected module")
             print(str(oops))
+            
         return
         
     def do_confirmation_popup(self, text, hide_cancel=False):
@@ -2549,14 +2553,14 @@ class Notebook:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=i+1, single_tstep=do_curr_t, need_extra_node=nen[0]) 
                         extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t)
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, 0, i, nen[0], extra_data)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, 0, i, nen[0], extra_data)
                     I_data = finite.new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
                     sim_data = {}
                     
                     for sim_datatype in self.nanowire.simulation_outputs_dict:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=j+1, single_tstep=do_curr_t, need_extra_node=nen[1]) 
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, 0, j, nen[1], extra_data)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, 0, j, nen[1], extra_data)
                     I_data += finite.new_integrate(data, 0, u_bound, dx, total_length, nen[1])
                     
                 else:
@@ -2566,7 +2570,7 @@ class Notebook:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=i, r=j+1, single_tstep=do_curr_t, need_extra_node=nen) 
                         extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t) 
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, i, j, nen, extra_data)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, i, j, nen, extra_data)
                     
                     I_data = finite.new_integrate(data, l_bound, u_bound, dx, total_length, nen)
 

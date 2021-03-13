@@ -9,7 +9,6 @@ import finite
 from helper_structs import Parameter, Output
 from utils import u_read, to_index, to_array, to_pos
 import tables
-# FIXME: DOCSTRINGS FOR ONED_MODEL, Parameter, Output
 def mod_list():
     """
     Tells TEDs what modules are available.
@@ -17,7 +16,7 @@ def mod_list():
     Returns
     -------
     dict
-        {"Display name of module": OneD_Model derived module object}.
+        {"Display name of module": OneD_Model derived module class}.
 
     """
     
@@ -32,7 +31,7 @@ class OneD_Model:
     Also stores information used to build the initial state of a model system,
     such as space grid and parameter rules/distributions.
     
-    All child classes must popupate __init__'s dicts and implement:
+    All child classes must populate __init__'s dicts and implement:
         calc_inits()
         simulate()
         get_overview_analysis()
@@ -61,10 +60,10 @@ class OneD_Model:
         
         # dict {"Variable name":Output()} of all dependent variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"Output1":Output("y", units="[hamburgers/football field]", xlabel="a.u.", xvar="position", is_edge=False, is_calculated=False,is_integrated=False, yscale='log', yfactors=(1e-4,1e1))}
+        self.simulation_outputs_dict = {"Output1":Output("y", units="[hamburgers/football field]", xlabel="a.u.", xvar="position", is_edge=False, is_integrated=False, yscale='log', yfactors=(1e-4,1e1))}
         
         # dict {"Variable name":Output()} of all secondary variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_n, is_integrated=False)}
+        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, calc_func=finite.delta_n, is_integrated=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         
@@ -305,13 +304,49 @@ class OneD_Model:
         -------
         data_dict : dict {"output name": 1D or 2D numpy array}
             Collection of output data. 1D array if calculated once (e.g. an integral over space) and 2D if calculated at multiple times
+            First dimension is time, second dimension is space
             Must return one entry per output in self.output_dict
         """
         data_dict = {}
 
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, do_plot_override=True, i=0, j=0, nen=False, extra_data = None):
+    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
+        """
+        Use the raw data in sim_data to calculate quantities in self.outputs_dict.
+        If datatype is in self.simulated_outputs dict this just needs to return the correct item from sim_data
+
+        Parameters
+        ----------
+        datatype : str
+            The item we need to calculate.
+        sim_data : dict {"datatype": 1D or 2D numpy array}
+            Collection of raw data read from .h5 files. 1D if single time step or 2D if time and space range.
+        params : dict {"param name": 1D numpy array}
+            Collection of param values from metadata.txt.
+        for_integrate : bool, optional
+            Whether this function is being called by do_Integrate. Used for integration-specific procedures.
+            All other optional arguments are needed only if for_integrate is True.
+            The default is False.
+        i : int, optional
+            Left bound index for integral. The default is 0.
+        j : int, optional
+            Right bound index for integral. The default is 0.
+        nen : bool, optional
+            Short for "need extra node". Whether an extra (the 'j+1'th) node should be counted.
+            This is determined by a correction between the node values and the actual bounds of the integration.
+            See finite.prep_PL and GUI's do_integrate for an example of this.
+            The default is False.
+        extra_data : dict {"datatype": 2D numpy array}, optional
+            A copy of the full set of raw data over all time and space. Some integrals like the weighted PL need this.
+            The default is None.
+
+        Returns
+        -------
+        data : 1D or 2D numpy array
+            Finalized data set. 2D if for_integrate and 1D otherwise.
+
+        """
         data = None
         
         # data = (your calcs here)
@@ -319,11 +354,41 @@ class OneD_Model:
         return data
     
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
+        """
+        Overwrites param_dict with values from the current data analysis in preparation for generating
+        a new initial state file.
+
+        Parameters
+        ----------
+        sim_data : dict {"data type": 1D numpy array}
+            Collection of raw data from the currently loaded timestep of the currently loaded dataset.
+        param_dict : dict {"param name": 1D numpy array}
+            Collection of params from the currently loaded dataset.
+        include_flags : dict {"data type": bool}
+            Whether to include a data type from self.simulated_outputs_dict in the new initial file.
+            One per output in self.simulated_outputs_dict
+        grid_x : 1D numpy array
+            Space node grid for currently loaded dataset.
+
+        Returns
+        -------
+        None.
+
+        """
         param_dict["Output1"] = None
         return
     
     def verify(self):
+        # Performs basic syntactical checks on module's attributes.
         print("Verifying selected module...")
+        for param in self.param_dict:
+            assert isinstance(param, str), "Error: invalid name {} in param dict. Param names must be strings".format(param)
+            assert isinstance(self.param_dict[param], Parameter), "Error: param dict {} is not a Parameter() object".format(param)
+
+        for output in self.outputs_dict:
+            assert isinstance(output, str), "Error: invalid name {} in outputs dict. Output names must be strings".format(output)
+            assert isinstance(self.outputs_dict[output], Output), "Error: output dict {} is not an Output() object".format(output)
+        
         params = set(self.param_dict.keys()).union(set(self.outputs_dict.keys()))
         params_in_cdict = set(self.convert_in_dict.keys())
         assert (params.issubset(params_in_cdict)), "Error: conversion_dict is missing entries {}".format(params.difference(params_in_cdict))
@@ -356,17 +421,17 @@ class Nanowire(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[cm^-3]", xlabel="nm", xvar="position",is_edge=False, is_calculated=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
-                                        "E_field":Output("Electric Field", units="[WIP]", xlabel="nm", xvar="position",is_edge=True, is_calculated=False,is_integrated=False, yscale='linear')}
+        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
+                                        "P":Output("P", units="[cm^-3]", xlabel="nm", xvar="position",is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
+                                        "E_field":Output("Electric Field", units="[WIP]", xlabel="nm", xvar="position",is_edge=True, is_integrated=False, yscale='linear')}
         
         # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_n, is_integrated=False),
-                                         "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.delta_p, is_integrated=False),
-                                         "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, is_calculated=True, calc_func=finite.radiative_recombination, is_integrated=False),
-                                         "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, is_calculated=True, calc_func=finite.nonradiative_recombination, is_integrated=False),
-                                         "PL":Output("TRPL", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.new_integrate, is_integrated=True),
-                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, is_calculated=True, calc_func=finite.tau_diff, is_integrated=True, analysis_plotable=False)}
+        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, calc_func=finite.delta_n, is_integrated=False),
+                                         "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, calc_func=finite.delta_p, is_integrated=False),
+                                         "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, calc_func=finite.radiative_recombination, is_integrated=False),
+                                         "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, calc_func=finite.nonradiative_recombination, is_integrated=False),
+                                         "PL":Output("TRPL", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, calc_func=finite.new_integrate, is_integrated=True),
+                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, calc_func=finite.tau_diff, is_integrated=True, analysis_plotable=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         
@@ -457,7 +522,7 @@ class Nanowire(OneD_Model):
             
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, do_plot_override=True, i=0, j=0, nen=False, extra_data = None):
+    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
         if (datatype in self.simulation_outputs_dict):
             data = sim_data[datatype]
@@ -477,12 +542,12 @@ class Nanowire(OneD_Model):
 
             elif (datatype == "PL"):
     
-                if do_plot_override:
-                    rad_rec = finite.radiative_recombination(sim_data, params)
-                    data = finite.prep_PL(rad_rec, 0, len(rad_rec), need_extra_node=False, params=params).flatten()
-                else:
+                if for_integrate:
                     rad_rec = finite.radiative_recombination(extra_data, params)
                     data = finite.prep_PL(rad_rec, i, j, nen, params)
+                else:
+                    rad_rec = finite.radiative_recombination(sim_data, params)
+                    data = finite.prep_PL(rad_rec, 0, len(rad_rec), need_extra_node=False, params=params).flatten()
             else:
                 raise ValueError
                 
@@ -508,17 +573,16 @@ class HeatPlate(OneD_Model):
                             "density":Parameter(units="[kg m^-3]", is_edge=False), "init_T":Parameter(units="[K]", is_edge=False),
                             "Left_flux":Parameter(units="[W m^-2]", is_edge=False), "Right_flux":Parameter(units="[W m^-2]", is_edge=False)}
         
-
         self.param_count = len(self.param_dict)
         
         self.flags_dict = {"symmetric_system":"Symmetric System"}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"T":Output("Temperature", units="[K]", xlabel="m", xvar="position", is_edge=False, is_calculated=False,is_integrated=False, yscale='linear')}
+        self.simulation_outputs_dict = {"T":Output("Temperature", units="[K]", xlabel="m", xvar="position", is_edge=False, is_integrated=False, yscale='linear')}
         
         # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"q":Output("Heat Flux", units="[W/m^2]", xlabel="m", xvar="position", is_edge=True, is_calculated=True, calc_func=finite.heatflux, is_integrated=False)}
+        self.calculated_outputs_dict = {"q":Output("Heat Flux", units="[W/m^2]", xlabel="m", xvar="position", is_edge=True, calc_func=finite.heatflux, is_integrated=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         
@@ -567,7 +631,7 @@ class HeatPlate(OneD_Model):
             
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, do_plot_override=True, i=0, j=0, nen=False, extra_data = None):
+    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
         if (datatype in self.simulation_outputs_dict):
             data = sim_data[datatype]
