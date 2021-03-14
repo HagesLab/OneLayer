@@ -2130,7 +2130,6 @@ class Notebook:
                 return Raw_Data_Set(values, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
     
         except:
-            self.plot_analyze(plot_ID,force_axis_update=True) # Clear plot
             return "Error: Unable to calculate {} using prep_dataset\n".format(datatype)
 
 
