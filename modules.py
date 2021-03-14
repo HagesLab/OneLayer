@@ -519,11 +519,12 @@ class Nanowire(OneD_Model):
         
         for data in data_dict:
             data_dict[data] *= self.convert_out_dict[data]
-            
+        
         return data_dict
     
     def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
+        data = None
         if (datatype in self.simulation_outputs_dict):
             data = sim_data[datatype]
         

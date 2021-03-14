@@ -2051,7 +2051,10 @@ class Notebook:
             
             subplot.cla()
             
-            if not active_datagroup.size(): return
+            if not active_datagroup.size(): 
+                self.analyze_fig.tight_layout()
+                self.analyze_fig.canvas.draw()
+                return
 
             if force_axis_update or not active_plot_data.do_freeze_axes:
                 active_plot_data.xlim = (0, active_plot_data.datagroup.get_max_x())
@@ -2099,8 +2102,8 @@ class Notebook:
         try:
             param_values_dict = self.fetch_metadata(data_filename)
             if datagroup.size():
-                assert (datagroup.total_t == param_values_dict["Total-Time"]), "Error: time grid mismatch"
-                assert (datagroup.dt == param_values_dict["dt"]), "Error: time grid mismatch"
+                assert (datagroup.total_t == param_values_dict["Total-Time"]), "Error: time grid mismatch\n"
+                assert (datagroup.dt == param_values_dict["dt"]), "Error: time grid mismatch\n"
                 
             data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
             data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
@@ -2109,7 +2112,7 @@ class Notebook:
         except AssertionError as oops:
             return str(oops)
         except:
-            return "Error: missing or has unusual metadata.txt"
+            return "Error: missing or has unusual metadata.txt\n"
 
 		# Now that we have the parameters from metadata, fetch the data itself
         sim_data = {}
@@ -2119,13 +2122,16 @@ class Notebook:
         
         try:
             values = self.nanowire.prep_dataset(datatype, sim_data, param_values_dict)
+            assert isinstance(values, np.ndarray)
+            assert values.ndim == 1
             if self.nanowire.outputs_dict[datatype].is_edge: 
                 return Raw_Data_Set(values, data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
             else:
                 return Raw_Data_Set(values, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
     
         except:
-            return "Error: Unable to calculate {}".format(datatype)
+            self.plot_analyze(plot_ID,force_axis_update=True) # Clear plot
+            return "Error: Unable to calculate {} using prep_dataset\n".format(datatype)
 
 
     def load_datasets(self):
@@ -2399,12 +2405,15 @@ class Notebook:
 
         self.write(self.status, "Finalizing...")
 
-        for i in range(1,6):
-            for var in self.sim_data:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name, data_file_name, var)
-                self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), single_tstep=True)
-            self.update_sim_plots(self.n, do_clear_plots=False)
-
+        try:
+            for i in range(1,6):
+                for var in self.sim_data:
+                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name, data_file_name, var)
+                    self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), single_tstep=True)
+                self.update_sim_plots(self.n, do_clear_plots=False)
+        except:
+            self.sim_warning_msg += "Warning: unable to plot {}. Output data may not have been saved correctly.\n".format(data_file_name)
+        
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
 
