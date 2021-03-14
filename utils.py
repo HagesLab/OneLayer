@@ -8,7 +8,8 @@ import numpy as np
 import tables
 
 def to_index(x,dx, absUpperBound, is_edge=False):
-    # Warning: this and toCoord() always round x down to the nearest node (or edge if is_edge=True)!
+    # Returns largest node index less than or equal to position x
+    # Warning: this always rounds x down to the nearest node (or edge if is_edge=True)!
     absLowerBound = dx / 2 if not is_edge else 0
     if (x < absLowerBound):
         return 0
@@ -19,10 +20,12 @@ def to_index(x,dx, absUpperBound, is_edge=False):
     return int((x - absLowerBound) / dx)
 
 def to_pos(i,dx, is_edge=False):
+    # Returns position x corresponding to node index i
     absLowerBound = dx / 2 if not is_edge else 0
     return (absLowerBound + i * dx)
 
 def to_array(value, m, is_edge):
+    # Casts value to uniform 1D ndarray if necessary
     if not isinstance(value, np.ndarray):
         if is_edge:
             return np.ones(m+1) * value
@@ -101,6 +104,7 @@ def check_valid_filename(file_name):
     return True
         
 def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, need_extra_node=False):
+    # Read a subset of a 2D array stored in an .h5 file
     if not (t0 is None) and single_tstep:
         t1 = t0 + 1
         
