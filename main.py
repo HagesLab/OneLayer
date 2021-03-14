@@ -2311,18 +2311,19 @@ class Notebook:
                 temp_sim_dict[param] = self.nanowire.param_dict[param].value * self.convert_in_dict[param]
 
             init_conditions = self.nanowire.calc_inits()
+            assert isinstance(init_conditions, dict), "Error: module calc_inits() did not return a dict of initial conditions\n"
             
             for variable in self.nanowire.simulation_outputs_dict:
-                if not variable in init_conditions:
-                    raise KeyError
-            
+                assert variable in init_conditions, "Error: Module calc_inits() did not return value for simulation output variable {}\n".format(variable)
+                assert isinstance(init_conditions[variable], np.ndarray), "Error: module calc_inits() returned an invalid value (values must be numpy arrays) for output {}\n".format(variable)
+                assert init_conditions[variable].ndim == 1, "Error: module calc_inits() did not return a 1D numpy array for output {}\n".format(variable)
+        
         except ValueError:
             self.sim_warning_msg += "Error: Invalid parameters for {}\n".format(data_file_name)
-
             return
         
-        except KeyError:
-            self.sim_warning_msg += "Error: Module calc_inits() did not return values for all simulation output variables\n"
+        except AssertionError as oops:
+            self.sim_warning_msg += str(oops)
             return
 
         except Exception as oops:
