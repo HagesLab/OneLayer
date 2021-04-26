@@ -47,6 +47,7 @@ class Notebook:
         self.do_module_popup()
         self.root.wait_window(self.select_module_popup)
         if self.nanowire is None: return
+        if not self.verified: return
         self.prep_notebook()
         return
         
@@ -876,8 +877,10 @@ class Notebook:
     def on_select_module_popup_close(self, continue_=False):
         try:
             if continue_:
+                self.verified=False
                 self.nanowire = self.modules_list[self.module_names[self.module_listbox.curselection()[0]]]()
                 self.nanowire.verify()
+                self.verified=True
                 
             self.select_module_popup.destroy()
 
@@ -886,6 +889,7 @@ class Notebook:
         except AssertionError as oops:
             print("Error: could not verify selected module")
             print(str(oops))
+            
         return
         
     def do_confirmation_popup(self, text, hide_cancel=False):
@@ -1289,6 +1293,7 @@ class Notebook:
         try:
 			# There are two ways for a popup to close: by the user pressing "Continue" or the user cancelling or pressing "X"
 			# We only interpret the input on the popup if the user wants to continue
+            self.confirmed = continue_
             if continue_:
                 assert (self.data_var.get()), "Select a data type from the drop-down menu"
                 self.analysis_plots[plot_ID].data_filenames = []
@@ -1428,6 +1433,7 @@ class Notebook:
         # Read in the pairs of integration bounds as-is
         # Checking if they make sense is do_Integrate()'s job
         try:
+            self.confirmed = continue_
             if continue_:
                 self.integration_bounds = []
                 if self.fetch_intg_mode.get() == "single":
@@ -1737,11 +1743,13 @@ class Notebook:
                 plot_ID = self.active_analysisplot_ID.get()
                 active_sets = self.analysis_plots[plot_ID].datagroup.datasets
                 datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
+                if not len(datasets): return
                 
                 include_flags = {}
                 for iflag in self.carry_include_flags:
                     include_flags[iflag] = self.carry_include_flags[iflag].get()
                     
+                status_msg = "Files generated:\n"
                 for key in datasets:
                     new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file for {}".format(key), filetypes=[("Text files","*.txt")])
                     if new_filename == "": continue
@@ -1785,7 +1793,12 @@ class Notebook:
                             if param in self.nanowire.flags_dict: 
                                 ofstream.write("{}: {}\n".format(param, int(param_dict_copy[param])))
 
-                self.write(self.analysis_status, "IC file generated")
+                    status_msg += "{}-->{}\n".format(filename, new_filename)
+                    
+                # If NO new files saved
+                if status_msg == "Files generated:\n": status_msg += "(none)"
+                self.do_confirmation_popup(status_msg, hide_cancel=True)
+                self.root.wait_window(self.confirmation_popup)
 
             self.IC_carry_popup.destroy()
 
@@ -1842,51 +1855,20 @@ class Notebook:
 
             self.bay_title_label3 = tk.ttk.Label(self.bay_popup, text="Model Params", style="Header.TLabel")
             self.bay_title_label3.grid(row=4,column=2,columnspan=4)
-
-            self.bay_mun_check = tk.Checkbutton(self.bay_popup, text="Mu_N", variable=self.check_bay_params["Mu_N"], onvalue=1, offvalue=0)
-            self.bay_mun_check.grid(row=5,column=2, padx=(19,0))
-
-            self.bay_mup_check = tk.Checkbutton(self.bay_popup, text="Mu_P", variable=self.check_bay_params["Mu_P"], onvalue=1, offvalue=0)
-            self.bay_mup_check.grid(row=6,column=2, padx=(17,0))
-
-            self.bay_n0_check = tk.Checkbutton(self.bay_popup, text="N0", variable=self.check_bay_params["N0"], onvalue=1, offvalue=0)
-            self.bay_n0_check.grid(row=7,column=2, padx=(3,0))
-
-            self.bay_p0_check = tk.Checkbutton(self.bay_popup, text="P0", variable=self.check_bay_params["P0"], onvalue=1, offvalue=0)
-            self.bay_p0_check.grid(row=8,column=2)
-
-            self.bay_B_check = tk.Checkbutton(self.bay_popup, text="B", variable=self.check_bay_params["B"], onvalue=1, offvalue=0)
-            self.bay_B_check.grid(row=5,column=3, padx=(0,2))
-
-            self.bay_taun_check = tk.Checkbutton(self.bay_popup, text="Tau_N", variable=self.check_bay_params["Tau_N"], onvalue=1, offvalue=0)
-            self.bay_taun_check.grid(row=6,column=3, padx=(24,0))
-
-            self.bay_taup_check = tk.Checkbutton(self.bay_popup, text="Tau_P", variable=self.check_bay_params["Tau_P"], onvalue=1, offvalue=0)
-            self.bay_taup_check.grid(row=7,column=3, padx=(23,0))
-
-            self.bay_sf_check = tk.Checkbutton(self.bay_popup, text="Sf", variable=self.check_bay_params["Sf"], onvalue=1, offvalue=0)
-            self.bay_sf_check.grid(row=8,column=3, padx=(1,0))
-
-            self.bay_sb_check = tk.Checkbutton(self.bay_popup, text="Sb", variable=self.check_bay_params["Sb"], onvalue=1, offvalue=0)
-            self.bay_sb_check.grid(row=5,column=4, padx=(0,40))
-
-            self.bay_temperature_check = tk.Checkbutton(self.bay_popup, text="Temperature", variable=self.check_bay_params["Temperature"], onvalue=1, offvalue=0)
-            self.bay_temperature_check.grid(row=6,column=4, padx=(14,0))
-
-            self.bay_relperm_check = tk.Checkbutton(self.bay_popup, text="Rel-Permitivity", variable=self.check_bay_params["Rel-Permitivity"], onvalue=1, offvalue=0)
-            self.bay_relperm_check.grid(row=7,column=4, padx=(24,0))
-
-            self.bay_theta_check = tk.Checkbutton(self.bay_popup, text="Theta", variable=self.check_bay_params["Theta"], onvalue=1, offvalue=0)
-            self.bay_theta_check.grid(row=8,column=4, padx=(0,25))
-
-            self.bay_alpha_check = tk.Checkbutton(self.bay_popup, text="Alpha", variable=self.check_bay_params["Alpha"], onvalue=1, offvalue=0)
-            self.bay_alpha_check.grid(row=5,column=5, padx=(0,26))
-
-            self.bay_delta_check = tk.Checkbutton(self.bay_popup, text="Delta", variable=self.check_bay_params["Delta"], onvalue=1, offvalue=0)
-            self.bay_delta_check.grid(row=6,column=5, padx=(0,30))
-
-            self.bay_fm_check = tk.Checkbutton(self.bay_popup, text="Frac-Emitted", variable=self.check_bay_params["Frac-Emitted"], onvalue=1, offvalue=0)
-            self.bay_fm_check.grid(row=7,column=5, padx=(10,0))
+            
+            self.check_frame = tk.ttk.Frame(self.bay_popup)
+            self.check_frame.grid(row=5,column=2,columnspan=4)
+            self.bay_checks = {}
+            rdim = 4
+            rcount = 0
+            ccount = 0
+            for param in self.nanowire.param_dict:
+                self.bay_checks[param] = tk.ttk.Checkbutton(self.check_frame, text=param, variable=self.check_bay_params[param], onvalue=1,offvalue=0)
+                self.bay_checks[param].grid(row=rcount, column=ccount)
+                rcount += 1
+                if rcount == rdim:
+                    rcount = 0
+                    ccount += 1
 
             self.bay_continue_button = tk.Button(self.bay_popup, text="Continue", command=partial(self.on_bayesim_popup_close, continue_=True))
             self.bay_continue_button.grid(row=20,column=3)
@@ -1949,7 +1931,7 @@ class Notebook:
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
         path = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + "metadata.txt"
-        assert os.path.exists(path), "Error: Missing metadata"
+        assert os.path.exists(path), "Error: Missing metadata for {}".format(self.nanowire.system_ID)
         
         with open(path, "r") as ifstream:
             param_values_dict = {}
@@ -1960,8 +1942,7 @@ class Notebook:
             
                 elif "System_class" in line:
                     system_class = line[line.find(' ') + 1:].strip('\n')
-                    if not (self.nanowire.system_ID == system_class):
-                        raise ValueError
+                    assert self.nanowire.system_ID == system_class, "Error: File is not a {}".format(self.nanowire.system_ID)
 
                 else:
                     param = line[0:line.find(':')]
@@ -1975,7 +1956,8 @@ class Notebook:
         for param in param_values_dict:
             if param in self.convert_in_dict:
                 param_values_dict[param] *= self.convert_in_dict[param]
-                    
+            
+        assert set(self.nanowire.param_dict.keys()).issubset(set(param_values_dict.keys())), "Error: metadata is missing params"
         return param_values_dict
     
     def plot_overview_analysis(self):
@@ -1995,8 +1977,14 @@ class Notebook:
             data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
             data_node_t = np.linspace(0, param_values_dict["Total-Time"], data_n + 1)
             tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
-        except:
-            self.write(self.analysis_status, "Error: {} is missing or has unusual metadata.txt".format(data_filename))
+        except AssertionError as oops:
+            self.do_confirmation_popup(str(oops), hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
+            return
+        
+        except ValueError:
+            self.do_confirmation_popup("Error: {} is missing or has unusual metadata.txt".format(data_filename), hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
             return
         
         for subplot in self.overview_subplots:
@@ -2010,13 +1998,18 @@ class Notebook:
             
         data_dict = self.nanowire.get_overview_analysis(param_values_dict, tstep_list, data_dirname, data_filename)
         
+        warning_msg = ""
         for output_name, output_info in self.nanowire.outputs_dict.items():
             try:
                 values = data_dict[output_name]
                 
                 if not isinstance(values, np.ndarray): raise KeyError
             except KeyError:
-                print("Warning: {}'s get_overview_analysis() did not return data for {}".format(self.nanowire.system_ID, output_name))
+                warning_msg += "Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.nanowire.system_ID, output_name)
+                continue
+            
+            except:
+                warning_msg += "Error: could not calculate {}".format(output_name)
                 continue
 
             if output_info.xvar == "time":
@@ -2026,7 +2019,7 @@ class Notebook:
                 grid_x = data_node_x if not output_info.is_edge else data_edge_x
                 
             else:
-                print("Warning: invalid xvar {} in system class definition for output {}".format(output_info.xvar, output_name))
+                warning_msg += "Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name)
                 continue
             
             if values.ndim == 2: # time/space variant outputs
@@ -2039,7 +2032,10 @@ class Notebook:
         for output_name in self.nanowire.simulation_outputs_dict:
             self.overview_subplots[output_name].legend().set_draggable(True)
             break
-        
+        if warning_msg:
+            self.do_confirmation_popup(warning_msg, hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
+            
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
         return
@@ -2055,7 +2051,10 @@ class Notebook:
             
             subplot.cla()
             
-            if not active_datagroup.size(): return
+            if not active_datagroup.size(): 
+                self.analyze_fig.tight_layout()
+                self.analyze_fig.canvas.draw()
+                return
 
             if force_axis_update or not active_plot_data.do_freeze_axes:
                 active_plot_data.xlim = (0, active_plot_data.datagroup.get_max_x())
@@ -2103,8 +2102,8 @@ class Notebook:
         try:
             param_values_dict = self.fetch_metadata(data_filename)
             if datagroup.size():
-                assert (datagroup.total_t == param_values_dict["Total-Time"]), "Error: time grid mismatch"
-                assert (datagroup.dt == param_values_dict["dt"]), "Error: time grid mismatch"
+                assert (datagroup.total_t == param_values_dict["Total-Time"]), "Error: time grid mismatch\n"
+                assert (datagroup.dt == param_values_dict["dt"]), "Error: time grid mismatch\n"
                 
             data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
             data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
@@ -2113,7 +2112,7 @@ class Notebook:
         except AssertionError as oops:
             return str(oops)
         except:
-            return "Error: missing or has unusual metadata.txt"
+            return "Error: missing or has unusual metadata.txt\n"
 
 		# Now that we have the parameters from metadata, fetch the data itself
         sim_data = {}
@@ -2123,13 +2122,15 @@ class Notebook:
         
         try:
             values = self.nanowire.prep_dataset(datatype, sim_data, param_values_dict)
+            assert isinstance(values, np.ndarray)
+            assert values.ndim == 1
             if self.nanowire.outputs_dict[datatype].is_edge: 
                 return Raw_Data_Set(values, data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
             else:
                 return Raw_Data_Set(values, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
     
         except:
-            return "Error: Unable to calculate {}".format(datatype)
+            return "Error: Unable to calculate {} using prep_dataset\n".format(datatype)
 
 
     def load_datasets(self):
@@ -2138,7 +2139,7 @@ class Notebook:
         plot_ID = self.active_analysisplot_ID.get()
         self.do_plotter_popup(plot_ID)
         self.root.wait_window(self.plotter_popup)
-        
+        if not self.confirmed: return
         active_plot = self.analysis_plots[plot_ID]
         datatype = self.data_var.get()
 
@@ -2156,11 +2157,8 @@ class Notebook:
                 active_plot.datagroup.add(new_data, new_data.tag())
     
         if len(err_msg):
-            read_warning_popup = tk.Toplevel(self.root)
-            read_warning_title = tk.Label(read_warning_popup, text="Error: the following data could not be plotted")
-            read_warning_title.grid(row=0,column=0)
-            read_warning_textbox = tk.Label(read_warning_popup, text=err_msg)
-            read_warning_textbox.grid(row=1,column=0)
+            self.do_confirmation_popup("Error: the following data could not be plotted\n" + err_msg, hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
         
         self.plot_analyze(plot_ID, force_axis_update=True)
         
@@ -2242,6 +2240,9 @@ class Notebook:
             self.simtime = float(self.simtime_entry.get())      # [ns]
             self.dt = float(self.dt_entry.get())           # [ns]
             self.hmax = self.hmax_entry.get()
+            self.n = int(0.5 + self.simtime / self.dt)           # Number of time steps
+
+            # Upper limit on number of time steps
             
             if (self.simtime <= 0): raise Exception("Error: Invalid simulation time")
             if (self.dt <= 0 or self.dt > self.simtime): raise Exception("Error: Invalid dt")
@@ -2250,6 +2251,23 @@ class Notebook:
                 self.hmax = 0
                 
             self.hmax = float(self.hmax)
+            
+            if (self.hmax < 0): raise Exception("Error: Invalid solver stepsize")
+            
+            if self.dt > self.simtime / 10:
+                self.do_confirmation_popup("Warning: a very large time stepsize was entered. Results may be less accurate with large stepsizes. Are you sure you want to continue?")
+                self.root.wait_window(self.confirmation_popup)
+                if not self.confirmed: return
+                
+            if self.hmax and self.hmax < 1e-3:
+                self.do_confirmation_popup("Warning: a very small solver stepsize was entered. Results may be slow with small solver stepsizes. Are you sure you want to continue?")
+                self.root.wait_window(self.confirmation_popup)
+                if not self.confirmed: return
+                
+            if (self.n > 1e5):
+                self.do_confirmation_popup("Warning: a very small time stepsize was entered. Results may be slow with small time stepsizes. Are you sure you want to continue?")
+                self.root.wait_window(self.confirmation_popup)
+                if not self.confirmed: return
             
         except ValueError:
             self.write(self.status, "Error: Invalid parameters")
@@ -2289,10 +2307,7 @@ class Notebook:
             data_file_name = shortened_IC_name
             
             self.m = int(0.5 + self.nanowire.total_length / self.nanowire.dx)         # Number of space steps
-            self.n = int(0.5 + self.simtime / self.dt)           # Number of time steps
-
-            # Upper limit on number of time steps
-            if (self.n > 2.5e5): raise Exception("Error: too many time steps")
+            
 
             temp_sim_dict = {}
 
@@ -2301,18 +2316,19 @@ class Notebook:
                 temp_sim_dict[param] = self.nanowire.param_dict[param].value * self.convert_in_dict[param]
 
             init_conditions = self.nanowire.calc_inits()
+            assert isinstance(init_conditions, dict), "Error: module calc_inits() did not return a dict of initial conditions\n"
             
             for variable in self.nanowire.simulation_outputs_dict:
-                if not variable in init_conditions:
-                    raise KeyError
-            
+                assert variable in init_conditions, "Error: Module calc_inits() did not return value for simulation output variable {}\n".format(variable)
+                assert isinstance(init_conditions[variable], np.ndarray), "Error: module calc_inits() returned an invalid value (values must be numpy arrays) for output {}\n".format(variable)
+                assert init_conditions[variable].ndim == 1, "Error: module calc_inits() did not return a 1D numpy array for output {}\n".format(variable)
+        
         except ValueError:
             self.sim_warning_msg += "Error: Invalid parameters for {}\n".format(data_file_name)
-
             return
         
-        except KeyError:
-            self.sim_warning_msg += "Error: Module calc_inits() did not return values for all simulation output variables\n"
+        except AssertionError as oops:
+            self.sim_warning_msg += str(oops)
             return
 
         except Exception as oops:
@@ -2324,7 +2340,8 @@ class Notebook:
             full_path_name = "{}\\{}\\{}".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
-            
+            assert "Data" in full_path_name
+            assert self.nanowire.system_ID in full_path_name
             if os.path.isdir(full_path_name):
                 print("{} folder already exists; trying alternate name".format(data_file_name))
                 append = 1
@@ -2363,36 +2380,39 @@ class Notebook:
         self.sim_data = dict(init_conditions)
         self.update_sim_plots(0)
 
-        write_output = True
-
         try:
-            error_dict = self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), self.m, self.n, self.dt, 
-                                                temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), self.hmax, init_conditions, write_output)
+            self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), self.m, self.n, self.dt, 
+                                   temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), self.hmax, init_conditions)
             
         except FloatingPointError:
-            self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}\n".format(data_file_name))
+            self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}. This file may have invalid parameters.\n".format(data_file_name))
+            for file in os.listdir(full_path_name):
+                tpath = full_path_name + "\\" + file
+                os.remove(tpath)
+                
+            os.rmdir(full_path_name)
             return
         except Exception as oops:
             self.sim_warning_msg += ("Error \"{}\" occurred while simulating {}\n".format(oops, data_file_name))
-            return
+            for file in os.listdir(full_path_name):
+                tpath = full_path_name + "\\" + file
+                os.remove(tpath)
+                
+            os.rmdir(full_path_name)
             
-        grid_t = np.linspace(self.dt, self.simtime, self.n)
+            return
 
-        try:
-            np.savetxt(full_path_name + "\\convergence.csv", np.vstack((grid_t, error_dict['hu'], error_dict['tcur'],\
-                error_dict['tolsf'], error_dict['tsw'], error_dict['nst'], error_dict['nfe'], error_dict['nje'], error_dict['nqu'],\
-                error_dict['mused'])).transpose(), fmt='%.4e', delimiter=',', header="t, hu, tcur, tolsf, tsw, nst, nfe, nje, nqu, mused")
-        except PermissionError:
-            print("Error: unable to access convergence data export destination")
-        
         self.write(self.status, "Finalizing...")
 
-        for i in range(1,6):
-            for var in self.sim_data:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name, data_file_name, var)
-                self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), single_tstep=True)
-            self.update_sim_plots(self.n, do_clear_plots=False)
-
+        try:
+            for i in range(1,6):
+                for var in self.sim_data:
+                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name, data_file_name, var)
+                    self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), single_tstep=True)
+                self.update_sim_plots(self.n, do_clear_plots=False)
+        except:
+            self.sim_warning_msg += "Warning: unable to plot {}. Output data may not have been saved correctly.\n".format(data_file_name)
+        
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
 
@@ -2445,7 +2465,9 @@ class Notebook:
     
             self.do_integration_getbounds_popup()
             self.root.wait_window(self.integration_getbounds_popup)
-    
+            if not self.confirmed:
+                return
+            
             if self.PL_mode == "Current time step":
                 self.do_PL_xaxis_popup()
                 self.root.wait_window(self.PL_xaxis_popup)
@@ -2502,6 +2524,9 @@ class Notebook:
                
                 if (u_bound > total_length):
                     u_bound = total_length
+                    
+                if (l_bound > total_length):
+                    l_bound = total_length
 
                 if symmetric_flag:
 
@@ -2524,8 +2549,7 @@ class Notebook:
                     i = to_index(l_bound, dx, total_length)
                     nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
                 
-                m = int(total_length / dx)
-            
+
                 do_curr_t = self.PL_mode == "Current time step"
                 
                 pathname = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename
@@ -2538,14 +2562,14 @@ class Notebook:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=i+1, single_tstep=do_curr_t, need_extra_node=nen[0]) 
                         extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t)
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, 0, i, nen[0], extra_data)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, 0, i, nen[0], extra_data)
                     I_data = finite.new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
                     sim_data = {}
                     
                     for sim_datatype in self.nanowire.simulation_outputs_dict:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=j+1, single_tstep=do_curr_t, need_extra_node=nen[1]) 
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, 0, j, nen[1], extra_data)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, 0, j, nen[1], extra_data)
                     I_data += finite.new_integrate(data, 0, u_bound, dx, total_length, nen[1])
                     
                 else:
@@ -2555,7 +2579,7 @@ class Notebook:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=i, r=j+1, single_tstep=do_curr_t, need_extra_node=nen) 
                         extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t) 
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, False, i, j, nen, extra_data)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, i, j, nen, extra_data)
                     
                     I_data = finite.new_integrate(data, l_bound, u_bound, dx, total_length, nen)
 
@@ -2779,17 +2803,19 @@ class Notebook:
 
         if (AIC_options["long_expfactor"]):
             try: A0 = float(self.A0_entry.get())         # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid A0")
                 return
 
             try: Eg = float(self.Eg_entry.get())                  # [eV]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid Eg")
                 return
 
-            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
-            except ValueError:
+            try: 
+                wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+                assert wavelength > 0
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
@@ -2806,7 +2832,8 @@ class Notebook:
         else:
             try: 
                 alpha = float(self.AIC_expfactor_entry.get()) # [cm^-1]
-            except ValueError:
+                
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid α")
                 return
 
@@ -2816,12 +2843,15 @@ class Notebook:
             try: 
                 power = float(self.power_entry.get()) * 1e-6  # [uJ/s] to [J/s]
                 spotsize = float(self.spotsize_entry.get()) * ((1e7) ** 2)     # [cm^2] to [nm^2]
-            except ValueError:
+                assert spotsize > 0
+            except:
                 self.write(self.ICtab_status, "Error: missing power or spot size")
                 return
 
-            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
-            except ValueError:
+            try: 
+                wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+                assert wavelength > 0
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
@@ -2830,8 +2860,8 @@ class Notebook:
             else:
                 try:
                     freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
-
-                except ValueError:
+                    assert freq > 0
+                except:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
@@ -2840,12 +2870,14 @@ class Notebook:
         
         elif (AIC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing power density")
                 return
 
-            try: wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
-            except ValueError:
+            try: 
+                wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+                assert wavelength > 0
+            except:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
             if (self.pulse_freq_entry.get() == "cw"):
@@ -2853,8 +2885,8 @@ class Notebook:
             else:
                 try:
                     freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
-
-                except ValueError:
+                    assert freq > 0
+                except:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
@@ -2862,7 +2894,7 @@ class Notebook:
         
         elif (AIC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
@@ -2871,7 +2903,7 @@ class Notebook:
 
         elif (AIC_options["power_mode"] == "total-gen"):
             try: total_gen = float(self.total_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
-            except ValueError:
+            except:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
@@ -2882,7 +2914,6 @@ class Notebook:
             return
         
         
-        ## TODO: Make AIC deposit in common units, so this patch isn't required
         self.nanowire.param_dict["deltaN"].value *= self.convert_out_dict["deltaN"]
         ## Assuming that the initial distributions of holes and electrons are identical
         self.nanowire.param_dict["deltaP"].value = self.nanowire.param_dict["deltaN"].value
@@ -2917,63 +2948,44 @@ class Notebook:
             new_param_name = self.init_var_selection.get()
             if "[" in new_param_name: new_param_name = new_param_name[:new_param_name.find("[")]
 
+            assert (float(self.paramrule_lbound_entry.get()) >= 0),  "Error: left bound coordinate too low"
+            
             if (self.init_shape_selection.get() == "POINT"):
-
-                if (float(self.paramrule_lbound_entry.get()) < 0):
-                    raise Exception("Error: Bound coordinates exceed system thickness specifications")
-
-                if (float(self.paramrule_lbound_entry.get()) < 0):
-                	self.write(self.ICtab_status, "Warning: negative initial condition value")
-
+                assert (float(self.paramrule_lbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                
                 new_param_rule = Param_Rule(new_param_name, "POINT", float(self.paramrule_lbound_entry.get()), -1, float(self.paramrule_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
-                	raise Exception("Error: Bound coordinates exceed system thickness specifications")
-
-                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
-                	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
-
-                if (float(self.paramrule_lbound_entry.get()) < 0):
-                	self.write(self.ICtab_status, "Warning: negative initial condition value")
+                assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
                 new_param_rule = Param_Rule(new_param_name, "FILL", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), float(self.paramrule_lvalue_entry.get()), -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
-                	raise Exception("Error: Bound coordinates exceed system thickness specifications")
-
-                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
-                	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
-
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) < 0):
-                	self.write(self.ICtab_status, "Warning: negative initial condition value")
+                assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
                 new_param_rule = Param_Rule(new_param_name, "LINE", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
                                             float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
 
             elif (self.init_shape_selection.get() == "EXP"):
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) > self.nanowire.total_length):
-                    raise Exception("Error: Bound coordinates exceed system thickness specifications")
-
-                if (float(self.paramrule_lbound_entry.get()) > float(self.paramrule_rbound_entry.get())):
-                	raise Exception("Error: Left bound coordinate is larger than right bound coordinate")
-
-                if (float(self.paramrule_lbound_entry.get()) < 0 or float(self.paramrule_rbound_entry.get()) < 0):
-                	self.write(self.ICtab_status, "Warning: negative initial condition value")
-
+                assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
+                assert (float(self.paramrule_lvalue_entry.get()) != 0), "Error: left value cannot be 0"
+                assert (float(self.paramrule_rvalue_entry.get()) != 0), "Error: right value cannot be 0"
+                assert (float(self.paramrule_lvalue_entry.get()) * float(self.paramrule_rvalue_entry.get()) > 0), "Error: values must have same sign"
                 new_param_rule = Param_Rule(new_param_name, "EXP", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
                                             float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
 
             else:
-                raise Exception("Error: No init. type selected")
+                raise ValueError
 
         except ValueError:
             self.write(self.ICtab_status, "Error: Missing Parameters")
             return
 
-        except Exception as oops:
-            self.write(self.ICtab_status, oops)
+        except AssertionError as oops:
+            self.write(self.ICtab_status, str(oops))
             return
 
         self.nanowire.add_param_rule(new_param_name, new_param_rule)
@@ -2988,8 +3000,9 @@ class Notebook:
 
     def refresh_paramrule_listbox(self):
         # The View button has two jobs: change the listbox to the new param and display a snapshot of it
-        self.update_paramrule_listbox(self.paramtoolkit_viewer_selection.get())
-        self.update_IC_plot(plot_ID="custom")
+        if self.nanowire.spacegrid_is_set:
+            self.update_paramrule_listbox(self.paramtoolkit_viewer_selection.get())
+            self.update_IC_plot(plot_ID="custom")
         return
     
     def update_paramrule_listbox(self, param_name):
@@ -3298,7 +3311,7 @@ class Notebook:
 	# Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked
     def save_ICfile(self):
         try:
-
+            assert self.nanowire.spacegrid_is_set, "Error: set a space grid first"
             new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file", filetypes=[("Text files","*.txt")])
             
             if new_filename == "": return
@@ -3306,6 +3319,9 @@ class Notebook:
             if new_filename.endswith(".txt"): new_filename = new_filename[:-4]
             self.write_init_file(new_filename + ".txt")
 
+        except AssertionError as oops:
+            self.write(self.ICtab_status, str(oops))
+            
         except ValueError as uh_Oh:
             print(uh_Oh)
             
@@ -3362,6 +3378,7 @@ class Notebook:
 
     def load_ICfile(self, cycle_through_IC_plots=True):
         warning_flag = False
+        warning_mssg = ""
 
         try:
             print("Poked file: {}".format(self.IC_file_name))
@@ -3458,9 +3475,12 @@ class Notebook:
             self.enter(self.thickness_entry, total_length)
             self.enter(self.dx_entry, dx)
             self.set_init_x()
-            
+            assert self.nanowire.spacegrid_is_set
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
+            return
+        
+        except AssertionError:
             return
 
         except Exception as oops:
@@ -3472,13 +3492,13 @@ class Notebook:
             try:
                 self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
             except:
-                print("Warning: could not apply value for flag: {}".format(flag))
-                print("Flags must have integer value 1 or 0")
+                warning_mssg += "\nWarning: could not apply value for flag: {}".format(flag)
+                warning_mssg += "\nFlags must have integer value 1 or 0"
                 warning_flag += 1
             
         for param in self.nanowire.param_dict:
-            new_value = init_param_values_dict[param]
             try:
+                new_value = init_param_values_dict[param]
                 if '\t' in new_value:
                     self.nanowire.param_dict[param].value = np.array(extract_values(new_value, '\t'))
                 else: self.nanowire.param_dict[param].value = float(new_value)
@@ -3486,13 +3506,16 @@ class Notebook:
                 self.paramtoolkit_currentparam = param
                 if cycle_through_IC_plots: self.update_IC_plot(plot_ID="recent")
             except:
-                print("Warning: could not apply value for param: {}".format(param))
+                warning_mssg += ("\nWarning: could not apply value for param: {}".format(param))
                 warning_flag += 1
                 
         if self.nanowire.system_ID == "Nanowire": self.using_AIC = False
         
         if not warning_flag: self.write(self.ICtab_status, "IC file loaded successfully")
-        else: self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
+        else: 
+            self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
+            self.do_confirmation_popup(warning_mssg, hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
         return
 
     # Data I/O
@@ -3556,9 +3579,6 @@ class Notebook:
                     full_data = np.vstack((grid_x, raw_data, unc)).T
                     full_data = pd.DataFrame.from_records(data=full_data,columns=['time', datagroup.type, 'uncertainty'])
                     
-                    filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
-                    dd.save("{}.h5".format(filename.strip('.h5')), full_data)
-
             elif self.bay_mode.get() == "model":
                 active_bay_params = []
                 for param in self.check_bay_params:
@@ -3598,18 +3618,26 @@ class Notebook:
 
                 full_data = pd.DataFrame.from_records(data=full_data, columns=panda_columns)
                 
-                new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
-                if new_filename == "": 
-                    self.write(self.analysis_status, "Bayesim export cancelled")
-                    return
+            filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
+            if not filename: 
+                self.write(self.analysis_status, "Bayesim export cancelled")
+                return
 
-                if not new_filename.endswith(".h5"): new_filename += ".h5"
-
-                dd.save(new_filename, full_data)
+            if not filename.endswith(".h5"): filename += ".h5"
+            print(filename)
+            try:
+                dd.save(filename, full_data)
+            except Exception as oops:
+                self.do_confirmation_popup("Error: {} occured while saving bayesim file".format(str(oops)), hide_cancel=True)
+                self.root.wait_window(self.confirmation_popup)
+                os.remove(filename)
+                return
+                
         else:
             print("WIP =(")
 
-        self.write(self.analysis_status, "Bayesim export complete")
+        self.do_confirmation_popup("Bayesim export complete", hide_cancel=True)
+        self.root.wait_window(self.confirmation_popup)
         return
 
 if __name__ == "__main__":

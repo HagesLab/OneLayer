@@ -12,25 +12,108 @@ import odefuncs
 from utils import to_index, to_pos, to_array
 
 def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
-    # h and c are Planck's const and speed of light, respectively. These default to common units [J*s] and [m/s] but
-    # they may be passed in with different units.
+    """
+    Initial excitation profile.
+    Parameters
+    ----------
+    power : float
+        Laser power.
+    spotsize : float
+        Laser beam cross section.
+    freq : float
+        Laser pulse frequency.
+    wavelength : float
+        Laser light wavelength.
+    alpha : float
+        Attenuation coefficient.
+    x_array : 1D numpy array
+        Space grid
+    hc : float, optional
+        h and c are Planck's const and speed of light, respectively. These default to common units [J*s] and [m/s] but
+        they may be passed in with different units. 
+        The default is 6.626e-34*2.997e8 [J*m].
+
+    Returns
+    -------
+    1D ndarray
+        Excited carrier profile.
+
+    """
+    
     return (power / (spotsize * freq * hc / wavelength) * alpha * np.exp(-alpha * x_array))
 
 def pulse_laser_powerdensity(power_density, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
+    """
+    Initial excitation profile.
+    Parameters
+    ----------
+    power_density : float
+        Laser power density.
+    
+    See pulse_laser_power_spotsize for more details.
+
+    """
     return (power_density / (freq * hc / wavelength) * alpha * np.exp(-alpha * x_array))
 
 def pulse_laser_maxgen(max_gen, alpha, x_array, hc=6.626e-34*2.997e8):
+    """
+    Initial excitation profile.
+    Parameters
+    ----------
+    max_gen : float
+        Maximum carrier density of excitation profile.
+    See pulse_laser_power_spotsize for more details.
+
+    """
     return (max_gen * np.exp(-alpha * x_array))
 
 def pulse_laser_totalgen(total_gen, total_length, alpha, x_array, hc=6.626e-34*2.997e8):
+    """
+    Initial excitation profile
+    Parameters
+    ----------
+    total_gen : float
+        Total excited carrier density.
+    total_length : float
+        Length of nanowire.
+    See pulse_laser_power_spotsize for more details.
+
+    """
     return ((total_gen * total_length * alpha * np.exp(alpha * total_length)) / (np.exp(alpha * total_length) - 1) * np.exp(-alpha * x_array))
 
 def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, symmetric=True):
+    """
+    Distance-dependent alpha weighting matrix for nanowire regeneration term
+
+    Parameters
+    ----------
+    m : int
+        Number of space nodes.
+    dx : float
+        Space node width.
+    alphaCof : float, optional
+        Regeneration coefficient. The default is 0.
+    thetaCof : float, optional
+        Photon propagation coefficient. The default is 0.
+    delta_frac : float, optional
+        Proportion of excitons affected by regeneration only. The default is 1.
+    fracEmitted : float, optional
+        Proportion of photons that escape the nanowire (and thus do not propogate). The default is 0.
+    symmetric : bool, optional
+        Whether contributions from symmetric half of nanowire should be considered. The default is True.
+
+    Returns
+    -------
+    2D ndarray
+        Weight matrix of size (m,m).
+
+    """
     distance = np.arange(0, m*dx, dx)
     distance_matrix = np.zeros((m, m))
     lf_distance_matrix = np.zeros((m, m)) # Account for "other half" of a symmetric system
 
     # Each row in distance_matrix represents the weight function centered around a different position
+    # Element [i,j] is the proportion of node j's value that contributes to node i
     for i in range(0,m):
         distance_matrix[i] = np.concatenate((np.flip(distance[0:i+1], 0), distance[1:m - i]))
         if symmetric: lf_distance_matrix[i] = distance + ((i+1) * dx)
@@ -41,26 +124,41 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmi
 
 
 def PL_weight_distribution(m, dx, total_length, i, j, alpha, theta, delta, frac_emitted, need_extra_node, symmetric=True):
+    """
+    Distance-dependent alpha+theta weighting for PL propagation
+    
+    Parameters
+    ----------
+    total_length : float
+        Length of nanowire.
+    i : int
+        Index of leftmost node being integrated over
+    j : int
+        Index of rightmost node being integrated over
+    need_extra_node : bool
+        Whether the 'j+1'th node should be included. 
+        This is a correction between the discrete nodes and the actual bounds of integration.
+    See gen_weight_distribution() for more details
+    Returns
+    -------
+    2D ndarray
+        Weighting matrix of size [(j-i+1),m] or [(j-i+2),m].
+
+    """
     distance = np.arange(0, total_length, dx)
 
     # Make room for the extra node if needed
-    if need_extra_node:
-        distance_matrix = np.zeros((j - i + 1 + 1, m))
-        lf_distance_matrix = np.zeros((j - i + 1 + 1, m))
+    r = j + 2 if need_extra_node else j+1
 
-        # Each row in weight will represent the weight function centered around a different position
-        # Additional lf_weight counted in if wire is symmetric
-        for n in range(i, j + 1 + 1):
-            distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
-            lf_distance_matrix[n - i] = distance + ((n+1) * dx)
+    distance_matrix = np.zeros((r - i, m))
+    lf_distance_matrix = np.zeros((r - i, m))
 
-    else: # if we don't need the extra node
-        distance_matrix = np.zeros((j - i + 1, m))
-        lf_distance_matrix = np.zeros((j - i + 1, m))
-
-        for n in range(i, j + 1):
-            distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
-            lf_distance_matrix[n - i] = distance + ((n+1) * dx)
+    # Each row in weight will represent the weight function centered around a different position
+    # Additional lf_weight counted in if wire is symmetric
+    # Element [u,v] is the proportion of node v that contributes to node u.
+    for n in range(i, r):
+        distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
+        lf_distance_matrix[n - i] = distance + ((n+1) * dx)
     
     weight = np.exp(-(alpha + theta) * distance_matrix)
     weight2 = np.exp(-(theta) * distance_matrix)
@@ -72,12 +170,51 @@ def PL_weight_distribution(m, dx, total_length, i, j, alpha, theta, delta, frac_
     return (1 - frac_emitted) * 0.5 * theta * (delta * weight + (1 - delta) * weight2)
 
 def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, symmetric=True, do_ss=False, hmax_=0, write_output=True, init_N=0, init_P=0, init_E_field=0):
-    ## Problem statement:
-    # Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
-    # Space step size is dx, time step is dt
-    # Initial conditions: init_N, init_P, init_E_field
-    # Optional photon recycle term
+    """
+    Master function for Nanowire module simulation.
+    Problem statement:
+    Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
+    Space step size is dx, time step is dt
+    Initial conditions: init_N, init_P, init_E_field
+    Optional photon recycle term
 
+    Parameters
+    ----------
+    data_path_name : str
+        Output file location.
+    m : int
+        Number of space nodes.
+    n : int
+        Number of time steps.
+    dx : float
+        Space node width.
+    dt : float
+        Time step size.
+    params : dict {"str":float or 1D array}
+        Collection of parameter values
+    recycle_photons : bool, optional
+        Whether carrier regeneration due to photons is considered. The default is True.
+    symmetric : bool, optional
+        Whether to consider the nanowire as having a symmetrical half with virtual nodes 0 to -m. The default is True.
+    do_ss : bool, optional
+        Whether to inject the initial conditions at every time step, creating a nonzero steady state situation. The default is False.
+    hmax_ : float, optional
+        Maximum internal step size to be taken by ODEINT. The default is 0.
+    write_output : bool, optional
+        Whether to write output files. TEDs always does this but other applications reusing this function might not. The default is True.
+    init_N : 1D ndarray, optional
+        Initial excited electron distribution. The default is 0.
+    init_P : 1D ndarray, optional
+        Initial hole distribution. The default is 0.
+    init_E_field : 1D ndarray, optional
+        Initial electric field. The default is 0.
+
+    Returns
+    -------
+    None
+        TEDs does not do anything with the return value. Other applications might find this useful however.
+    """
+    
     ## Set data type of array files
     atom = tables.Float64Atom()
 
@@ -107,7 +244,7 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
     q_C = 1.602e-19 # [C]
     kB = 8.61773e-5  # [eV / K]
     
-    ## Set initial condition
+    ## Package initial condition
     init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)
 
     if do_ss:
@@ -177,6 +314,29 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
         return array_N, array_P, error_data
 
 def prep_PL(radRec, i, j, need_extra_node, params):
+    """
+    Calculates PL(x,t) given radiative recombination data plus propogation contributions.
+
+    Parameters
+    ----------
+    radRec : 1D or 2D ndarray
+        Radiative Recombination(x,t) values.
+    i : int
+        Leftmost node to calculate for.
+    j : int
+        Rightmost node index to calculate for.
+    need_extra_node : bool
+        Whether the 'j+1'th node should be considered
+    params : dict {"param name":float or 1D ndarray}
+        Collection of parameters from metadata
+
+    Returns
+    -------
+    PL_base : 2D ndarray
+        PL(x,t)
+
+    """
+    
     frac_emitted = params["Frac-Emitted"]
     alpha = 0 if params["ignore_alpha"] else params["Alpha"]
     theta = params["Theta"]
@@ -202,6 +362,32 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     return PL_base
 
 def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node):
+    """
+    General purpose integration function using scipy.trapz()
+    Integrates over 2nd dimension.
+
+    Parameters
+    ----------
+    base_data : 1D or 2D ndarray
+        Values to integrate over.
+    l_bound : float
+        Lower boundary.
+    u_bound : float
+        Upper boundary.
+    dx : float
+        Space node width.
+    total_length : float
+        Length of system
+    need_extra_node : bool
+        Whether the smallest node with position larger than u_bound should be considered.
+        Correction for converting from actual boundaries to discrete nodes
+
+    Returns
+    -------
+    I_data : 1D array
+        Integrated values.
+
+    """
     i = to_index(l_bound, dx, total_length)
     j = to_index(u_bound, dx, total_length)
     if base_data.ndim == 1:
@@ -233,6 +419,31 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
     return I_data
 
 def correct_integral(integrand, l_bound, u_bound, i, j, dx):
+    """
+    Corrects new_integrate() for mismatch between nodes and actual integration bounds using linear interpolation.
+
+    Parameters
+    ----------
+    integrand : 1D ndarray
+        Raw result of new_integrate()
+    l_bound : float
+        Lower boundary.
+    u_bound : float
+        Upper boundary.
+    i : int
+        Index of lowest node integrated over.
+    j : int
+        Index of highest node integrated over.
+        Note that l_bound, u_bound do not correspond exactly with i,j hence the correction is needed
+    dx : float
+        Space node width.
+
+    Returns
+    -------
+    1D ndarray
+        Corrected integration results.
+
+    """
     uncorrected_l_bound = to_pos(i, dx)
     uncorrected_u_bound = to_pos(j, dx)
     lfrac1 = min(l_bound - uncorrected_l_bound, dx / 2)
@@ -254,6 +465,22 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
     return u_bound_correction - l_bound_correction
 
 def tau_diff(PL, dt):
+    """
+    Calculates particle lifetime from TRPL.
+
+    Parameters
+    ----------
+    PL : 1D ndarray
+        Time-resolved PL array.
+    dt : float
+        Time step size.
+
+    Returns
+    -------
+    1D ndarray
+        tau_diff.
+
+    """
     ln_PL = np.log(PL)
     dln_PLdt = np.zeros(ln_PL.__len__())
     dln_PLdt[0] = (ln_PL[1] - ln_PL[0]) / dt
@@ -276,6 +503,37 @@ def nonradiative_recombination(sim_outputs, params):
 ####################
 
 def ode_heatplate(data_path_name, m, n, dx, dt, params, write_output=True):
+    """
+    Master function for Neumann boundary heat problem module simulation.
+    Problem statement:
+    Create a discretized, time and space dependent solution (T(x,t) and P(x,t)) of a one-dimensional heated object with m space steps and n time steps
+    Space step size is dx, time step is dt
+    Initial conditions: init_T
+
+    Parameters
+    ----------
+    data_path_name : str
+        Output file location.
+    m : int
+        Number of space nodes.
+    n : int
+        Number of time steps.
+    dx : float
+        Space node width.
+    dt : float
+        Time step size.
+    params : dict {"str":float or 1D array}
+        Collection of parameter values
+    write_output : bool, optional
+        Whether to write output files. TEDs always does this but other applications reusing this function might not. The default is True.
+
+
+    Returns
+    -------
+    None
+        TEDs does not do anything with the return value. Other applications might find this useful however.
+
+    """
     atom = tables.Float64Atom()
 
     ## Unpack params; typecast non-array params to arrays if needed
@@ -327,7 +585,7 @@ def heatflux(sim_data, params):
         q = np.zeros((len(T), len(T[0]) + 1))
         q[:,0] += params["Left_flux"]
         q[:,-1] += params["Right_flux"]
-        for i in range(1, len(q) - 1):
+        for i in range(1, len(q[0]) - 1):
             q[:,i] = -k_avg[i-1] * (T[:,i] - T[:,i-1]) / params["Node_width"]
         
     return q
