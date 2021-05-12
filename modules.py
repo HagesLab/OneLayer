@@ -571,6 +571,7 @@ class HeatPlate(OneD_Model):
         super().__init__()
         self.system_ID = "HeatPlate (Const Bound Flux)"
         self.length_unit = "[m]"
+        self.time_unit = "[s]"
         
         self.param_dict = {"k":Parameter(units="[W / m k]", is_edge=False), "Cp":Parameter(units="[J / kg K]", is_edge=False), 
                             "density":Parameter(units="[kg m^-3]", is_edge=False), "init_T":Parameter(units="[K]", is_edge=False),
