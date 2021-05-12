@@ -47,6 +47,7 @@ class OneD_Model:
         self.total_length = -1
         self.dx = -1
         self.length_unit = "INSERT LENGTH UNIT HERE"
+        self.time_unit = "Insert time unit here"
         self.grid_x_nodes = -1
         self.grid_x_edges = -1
         self.spacegrid_is_set = False
@@ -401,6 +402,7 @@ class Nanowire(OneD_Model):
         super().__init__()
         self.system_ID = "Nanowire"
         self.length_unit = "[nm]"
+        self.time_unit = "[ns]"
         self.param_dict = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True), "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True), 
                             "N0":Parameter(units="[cm^-3]", is_edge=False), "P0":Parameter(units="[cm^-3]", is_edge=False), 
                             "B":Parameter(units="[cm^3 / s]", is_edge=False), "Tau_N":Parameter(units="[ns]", is_edge=False), 
@@ -431,7 +433,7 @@ class Nanowire(OneD_Model):
                                          "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, calc_func=finite.radiative_recombination, is_integrated=False),
                                          "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, calc_func=finite.nonradiative_recombination, is_integrated=False),
                                          "PL":Output("TRPL", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, calc_func=finite.new_integrate, is_integrated=True),
-                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, calc_func=finite.tau_diff, is_integrated=True, analysis_plotable=False)}
+                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[ns]", xlabel="ns", xvar="time", is_edge=False, calc_func=finite.tau_diff, is_integrated=True, analysis_plotable=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         

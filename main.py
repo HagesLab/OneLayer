@@ -2661,7 +2661,7 @@ class Notebook:
                 
                 
                 
-                td_subplot.set_ylabel("tau_diff")
+                td_subplot.set_ylabel("tau_diff [ns]")
                 td_subplot.set_xlabel("Time [ns]")
                 td_subplot.set_title("-(dln(PL)/dt)^(-1)")
                 for tag in td:
