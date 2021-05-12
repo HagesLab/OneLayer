@@ -30,7 +30,7 @@ from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, Integrated_Da
 from utils import to_index, to_pos, to_array, get_all_combinations, extract_values, u_read, check_valid_filename, autoscale
 
 import pandas as pd # For bayesim compatibility
-import bayesim.hdf5io as dd
+#import bayesim.hdf5io as dd
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
@@ -472,12 +472,15 @@ class Notebook:
         self.dt_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.dt_entry.grid(row=3,column=1)
         
-        self.hmax_label = tk.ttk.Label(self.tab_simulate, text="Max solver stepsize")
+        self.hmax_label = tk.ttk.Label(self.tab_simulate, text="Max solver stepsize [ns]")
         self.hmax_label.grid(row=4,column=0)
         
         self.hmax_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.hmax_entry.grid(row=4,column=1)
 
+        self.enter(self.dt_entry, "0.5")
+        self.enter(self.hmax_entry, "0.25")
+        
         self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Inject init. conds. as generation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
         self.do_ss_checkbutton.grid(row=5,column=0)
 
@@ -639,8 +642,8 @@ class Notebook:
         self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, text="Export", command=partial(self.export_plot, from_integration=1))
         self.integration_export_button.grid(row=1,column=1)
 
-        self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
-        self.integration_bayesim_button.grid(row=1,column=2)
+        # self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
+        # self.integration_bayesim_button.grid(row=1,column=2)
 
         self.analysis_status = tk.Text(self.tab_detailed_analysis, width=28,height=3)
         self.analysis_status.grid(row=5,rowspan=3,column=5,columnspan=1)
