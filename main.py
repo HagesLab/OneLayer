@@ -24,14 +24,25 @@ import tables
 import itertools
 from functools import partial # This lets us pass params to functions called by tkinter buttons
 
-import finite
-import modules
+import carrier_excitations
+
+from Modules.Nanowire import Nanowire
+from Modules.HeatPlate import HeatPlate
+def mod_list():
+    """
+    Tells TEDs what modules are available.
+
+    Returns
+    -------
+    dict
+        {"Display name of module": OneD_Model derived module class}.
+
+    """
+    
+    return {"Nanowire":Nanowire, "Neumann Bound Heatplate":HeatPlate}
+
 from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, Integrated_Data_Set, Analysis_Plot_State, Integration_Plot_State
-from utils import to_index, to_pos, to_array, get_all_combinations, extract_values, u_read, check_valid_filename, autoscale
-
-import pandas as pd # For bayesim compatibility
-#import bayesim.hdf5io as dd
-
+from utils import to_index, to_pos, to_array, get_all_combinations, extract_values, u_read, check_valid_filename, autoscale, new_integrate
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
 class Notebook:
@@ -859,7 +870,7 @@ class Notebook:
         self.select_module_label = tk.Label(self.select_module_popup, text="The following TEDs modules were found; select one to continue: ")
         self.select_module_label.grid(row=0,column=0)
         
-        self.modules_list = modules.mod_list()
+        self.modules_list = mod_list()
         self.module_names = list(self.modules_list.keys())
         self.module_listbox = tk.Listbox(self.select_module_popup, width=40, height=10)
         self.module_listbox.grid(row=1,column=0)
@@ -2566,14 +2577,14 @@ class Notebook:
                         extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t)
             
                     data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, 0, i, nen[0], extra_data)
-                    I_data = finite.new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
+                    I_data = new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
                     sim_data = {}
                     
                     for sim_datatype in self.nanowire.simulation_outputs_dict:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=j+1, single_tstep=do_curr_t, need_extra_node=nen[1]) 
             
                     data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, 0, j, nen[1], extra_data)
-                    I_data += finite.new_integrate(data, 0, u_bound, dx, total_length, nen[1])
+                    I_data += new_integrate(data, 0, u_bound, dx, total_length, nen[1])
                     
                 else:
                     sim_data = {}
@@ -2584,7 +2595,7 @@ class Notebook:
             
                     data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, i, j, nen, extra_data)
                     
-                    I_data = finite.new_integrate(data, l_bound, u_bound, dx, total_length, nen)
+                    I_data = new_integrate(data, l_bound, u_bound, dx, total_length, nen)
 
                             
                 if self.PL_mode == "Current time step":
@@ -2649,7 +2660,7 @@ class Notebook:
                     total_time = dataset.params_dict["Total-Time"]
                     dt = dataset.params_dict["dt"]
                     td_gridt[tag] = np.linspace(0, total_time, n + 1)
-                    td[tag] = finite.tau_diff(dataset.data, dt)
+                    td[tag] = Nanowire.tau_diff(dataset.data, dt)
                     
                 td_popup = tk.Toplevel(self.root)
                 td_fig = Figure(figsize=(6,4))
@@ -2869,7 +2880,7 @@ class Notebook:
                     return
 
             # Note: add_AIC() automatically converts into TEDs units. For consistency add_AIC should really deposit values in common units.
-            self.nanowire.param_dict["deltaN"].value = finite.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
+            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
@@ -2893,7 +2904,7 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.nanowire.param_dict["deltaN"].value = finite.pulse_laser_powerdensity(power_density, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
+            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (AIC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
@@ -2901,7 +2912,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
-            self.nanowire.param_dict["deltaN"].value = finite.pulse_laser_maxgen(max_gen, alpha_nm, self.nanowire.grid_x_nodes)
+            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, self.nanowire.grid_x_nodes)
         
 
         elif (AIC_options["power_mode"] == "total-gen"):
@@ -2910,7 +2921,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
-            self.nanowire.param_dict["deltaN"].value = finite.pulse_laser_totalgen(total_gen, self.nanowire.total_length, alpha_nm, self.nanowire.grid_x_nodes)
+            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_totalgen(total_gen, self.nanowire.total_length, alpha_nm, self.nanowire.grid_x_nodes)
         
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")

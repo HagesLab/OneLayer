@@ -5,6 +5,7 @@ Created on Sun Jan 10 15:53:38 2021
 @author: cfai2
 """
 import numpy as np
+from scipy import integrate as intg
 import tables
 
 def to_index(x,dx, absUpperBound, is_edge=False):
@@ -34,6 +35,109 @@ def to_array(value, m, is_edge):
         
     else:
         return value
+    
+def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node):
+    """
+    General purpose integration function using scipy.trapz()
+    Integrates over 2nd dimension.
+
+    Parameters
+    ----------
+    base_data : 1D or 2D ndarray
+        Values to integrate over.
+    l_bound : float
+        Lower boundary.
+    u_bound : float
+        Upper boundary.
+    dx : float
+        Space node width.
+    total_length : float
+        Length of system
+    need_extra_node : bool
+        Whether the smallest node with position larger than u_bound should be considered.
+        Correction for converting from actual boundaries to discrete nodes
+
+    Returns
+    -------
+    I_data : 1D array
+        Integrated values.
+
+    """
+    i = to_index(l_bound, dx, total_length)
+    j = to_index(u_bound, dx, total_length)
+    if base_data.ndim == 1:
+        base_data = base_data[None]
+    
+    if l_bound == u_bound:
+        I_base = base_data[:,0]
+        if l_bound >= to_pos(i, dx) + dx / 2 and not l_bound == total_length:
+            I_plus_one = base_data[:,1]
+
+        if l_bound == to_pos(i, dx) + dx / 2 and not l_bound == total_length:
+            I_data = (I_base + I_plus_one) / 2
+
+        elif l_bound > to_pos(i, dx) + dx / 2:
+            I_data = I_plus_one
+
+        else:
+            I_data = I_base
+    else:
+        if need_extra_node:
+            I_base = base_data
+            I_data = intg.trapz(I_base[:, :-1], dx=dx, axis=1)
+            
+        else:
+            I_base = base_data
+            I_data = intg.trapz(I_base, dx=dx, axis=1)
+
+        I_data += correct_integral(I_base.T, l_bound, u_bound, i, j, dx)
+    return I_data
+
+def correct_integral(integrand, l_bound, u_bound, i, j, dx):
+    """
+    Corrects new_integrate() for mismatch between nodes and actual integration bounds using linear interpolation.
+
+    Parameters
+    ----------
+    integrand : 1D ndarray
+        Raw result of new_integrate()
+    l_bound : float
+        Lower boundary.
+    u_bound : float
+        Upper boundary.
+    i : int
+        Index of lowest node integrated over.
+    j : int
+        Index of highest node integrated over.
+        Note that l_bound, u_bound do not correspond exactly with i,j hence the correction is needed
+    dx : float
+        Space node width.
+
+    Returns
+    -------
+    1D ndarray
+        Corrected integration results.
+
+    """
+    uncorrected_l_bound = to_pos(i, dx)
+    uncorrected_u_bound = to_pos(j, dx)
+    lfrac1 = min(l_bound - uncorrected_l_bound, dx / 2)
+
+    # Yes, integrand[0] and not integrand[i]. Note that in integrate(), the ith node maps to integrand[0] and the jth node maps to integrand[j-i].
+    l_bound_correction = integrand[0] * lfrac1
+
+    if l_bound > uncorrected_l_bound + dx / 2:
+        lfrac2 = (l_bound - (uncorrected_l_bound + dx / 2))
+        l_bound_correction += integrand[0+1] * lfrac2
+
+    ufrac1 = min(u_bound - uncorrected_u_bound, dx / 2)
+    u_bound_correction = integrand[j-i] * ufrac1
+
+    if u_bound > uncorrected_u_bound + dx / 2:
+        ufrac2 = (u_bound - (uncorrected_u_bound + dx / 2))
+        u_bound_correction += integrand[j-i+1] * ufrac2
+
+    return u_bound_correction - l_bound_correction
     
 def get_all_combinations(value_dict):
     combinations = []
