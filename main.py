@@ -2870,8 +2870,8 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
-            if (self.pulse_freq_entry.get() == "cw"):
-                freq = 1
+            if (self.pulse_freq_entry.get() == "cw" or self.sys_flag_dict["check_do_ss"].value()):
+                freq = 1e9 # Convert [J/s] power to [J/ns]
             else:
                 try:
                     freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
@@ -2895,8 +2895,8 @@ class Notebook:
             except:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
-            if (self.pulse_freq_entry.get() == "cw"):
-                freq = 1
+            if (self.pulse_freq_entry.get() == "cw" or self.sys_flag_dict["check_do_ss"].value()):
+                freq = 1e9 # Convert [J/s] power to [J/ns]
             else:
                 try:
                     freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
@@ -3240,7 +3240,10 @@ class Notebook:
             self.custom_param_fig.tight_layout()
             self.custom_param_fig.canvas.draw()
         elif plot_ID=="AIC": 
-            plot.set_title("Recent AIC")
+            if self.sys_flag_dict['check_do_ss'].value():
+                plot.set_title("Carriers added per ns.")
+            else:
+                plot.set_title("Initial carrier profile")
             self.AIC_fig.tight_layout()
             self.AIC_fig.canvas.draw()
         elif plot_ID=="listupload": 
