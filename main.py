@@ -25,6 +25,9 @@ import itertools
 from functools import partial # This lets us pass params to functions called by tkinter buttons
 
 import carrier_excitations
+from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, Integrated_Data_Set, Analysis_Plot_State, Integration_Plot_State
+from utils import to_index, to_pos, to_array, get_all_combinations, extract_values, u_read, check_valid_filename, autoscale, new_integrate
+
 
 from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
@@ -41,8 +44,6 @@ def mod_list():
     
     return {"Nanowire":Nanowire, "Neumann Bound Heatplate":HeatPlate}
 
-from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, Integrated_Data_Set, Analysis_Plot_State, Integration_Plot_State
-from utils import to_index, to_pos, to_array, get_all_combinations, extract_values, u_read, check_valid_filename, autoscale, new_integrate
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
 class Notebook:

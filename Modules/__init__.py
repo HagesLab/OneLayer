@@ -4,7 +4,7 @@ Created on Wed May 12 18:42:52 2021
 
 @author: cfai2
 """
-
+#https://stackoverflow.com/questions/1057431/how-to-load-all-modules-in-a-folder
 from os.path import dirname, basename, isfile, join
 import glob
 modules = glob.glob(join(dirname(__file__), "*.py"))
