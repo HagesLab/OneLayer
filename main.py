@@ -28,9 +28,11 @@ import carrier_excitations
 from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, Integrated_Data_Set, Analysis_Plot_State, Integration_Plot_State
 from utils import to_index, to_pos, to_array, get_all_combinations, extract_values, u_read, check_valid_filename, autoscale, new_integrate
 
-
+## ADD MODULES HERE
 from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
+
+## AND HERE
 def mod_list():
     """
     Tells TEDs what modules are available.
@@ -61,10 +63,37 @@ class Notebook:
         if self.nanowire is None: return
         if not self.verified: return
         self.prep_notebook()
+        
+        
         return
         
     def prep_notebook(self):
-        self.notebook = tk.ttk.Notebook(self.root)
+        #self.notebook = tk.ttk.Notebook(self.root)
+        # self.main_frame = tk.Frame(self.root)
+        # self.main_frame.grid(row=0,column=0,sticky="nwes")
+        
+        self.main_canvas = tk.Canvas(self.root)
+        #self.main_canvas.pack(expand=1,fill=tk.BOTH, anchor="nw")
+        self.main_canvas.grid(row=0,column=0, sticky='nswe')
+        
+        self.notebook = tk.ttk.Notebook(self.main_canvas)
+
+        self.main_scroll_y = tk.ttk.Scrollbar(self.root, orient="vertical", command=self.main_canvas.yview)
+        #self.main_scroll_y.pack(side=tk.RIGHT,fill=tk.Y)
+        self.main_scroll_y.grid(row=0,column=1, sticky='ns')
+        self.main_scroll_x = tk.ttk.Scrollbar(self.root, orient="horizontal", command=self.main_canvas.xview)
+        #self.main_scroll_x.pack(side=tk.BOTTOM,fill=tk.X)
+        self.main_scroll_x.grid(row=1,column=0,sticky='ew')
+        self.main_canvas.configure(yscrollcommand=self.main_scroll_y.set, xscrollcommand=self.main_scroll_x.set)
+        self.root.rowconfigure(0,weight=100)
+        self.root.rowconfigure(1,weight=1, minsize=20)
+        self.root.columnconfigure(0,weight=100)
+        self.root.columnconfigure(1,weight=1, minsize=20)
+        
+        self.main_canvas.create_window((0,0), window=self.notebook, anchor="nw")
+        self.notebook.bind('<Configure>', lambda e:self.main_canvas.configure(scrollregion=self.main_canvas.bbox('all')))
+        
+        
         self.default_dirs = {"Initial":"Initial", "Data":"Data", "PL":"Analysis"}
 
         # Tkinter checkboxes and radiobuttons require special variables to extract user input
@@ -199,14 +228,16 @@ class Notebook:
         except FileExistsError:
             print("Subdirectory detected")
 
+        
         return
 
     def run(self):
         if self.nanowire is None: 
             self.root.destroy()
             return
-        self.notebook.pack(expand=1, fill="both")
-        width, height = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        #self.notebook.pack(expand=1, fill="both")
+        #self.main_canvas.grid(row=0,column=0,sticky='nsew')
+        width, height = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
 
         self.root.geometry('%dx%d+0+0' % (width,height))
         self.root.attributes("-topmost", True)
@@ -225,6 +256,12 @@ class Notebook:
     
     def toggle_fullscreen(self):
         self.root.attributes('-fullscreen', not self.root.attributes('-fullscreen'))
+        if self.root.attributes('-fullscreen'):
+            self.main_scroll_y.grid_remove()
+            self.main_scroll_x.grid_remove()
+        else:
+            self.main_scroll_y.grid()
+            self.main_scroll_x.grid()
         return
 
     def change_module(self):
@@ -237,7 +274,7 @@ class Notebook:
         self.root.wait_window(self.select_module_popup)
         if self.nanowire is None: return
         self.prep_notebook()
-        self.notebook.pack(expand=1, fill="both")
+        #self.notebook.pack(expand=1, fill="both")
         
         return
     ## Create GUI elements for each tab
