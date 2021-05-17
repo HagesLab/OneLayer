@@ -35,7 +35,8 @@ class Nanowire(OneD_Model):
         self.param_count = len(self.param_dict)
         
         self.flags_dict = {"ignore_alpha":"Ignore Photon Recycle",
-                           "symmetric_system":"Symmetric System"}
+                           "symmetric_system":"Symmetric System",
+                           "check_do_ss":"Steady State Input"}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
@@ -102,10 +103,10 @@ class Nanowire(OneD_Model):
         
         return {"N":init_N, "P":init_P, "E_field":init_E_field}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
         # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from py with the correct args
         ode_nanowire(data_path, m, n, self.dx, dt, params,
-                            not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), do_ss, hmax_, True,
+                            not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), flags['check_do_ss'].value(), hmax_, True,
                             init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
     
     def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):

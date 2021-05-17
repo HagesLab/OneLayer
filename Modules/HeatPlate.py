@@ -55,7 +55,7 @@ class HeatPlate(OneD_Model):
         init_T = to_array(init_T, len(self.grid_x_nodes), False)
         return {"T":init_T}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
         # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from py with the correct args
         return ode_heatplate(data_path, m, n, self.dx, dt, params)
     

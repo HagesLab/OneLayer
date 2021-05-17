@@ -70,7 +70,7 @@ class Notebook:
         # Tkinter checkboxes and radiobuttons require special variables to extract user input
         # IntVars or BooleanVars are sufficient for binary choices e.g. whether a checkbox is checked
         # while StringVars are more suitable for open-ended choices e.g. selecting one mode from a list
-        self.check_do_ss = tk.IntVar()
+        #self.check_do_ss = tk.IntVar()
         self.check_reset_params = tk.IntVar()
         self.check_reset_inits = tk.IntVar()
         self.check_display_legend = tk.IntVar()
@@ -493,8 +493,8 @@ class Notebook:
         self.enter(self.dt_entry, "0.5")
         self.enter(self.hmax_entry, "0.25")
         
-        self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Inject init. conds. as generation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
-        self.do_ss_checkbutton.grid(row=5,column=0)
+        # self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Inject init. conds. as generation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
+        # self.do_ss_checkbutton.grid(row=5,column=0)
 
         self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", command=self.do_Batch)
         self.calculate_NP.grid(row=6,column=0,columnspan=2,padx=(9,12))
@@ -2397,7 +2397,7 @@ class Notebook:
 
         try:
             self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), self.m, self.n, self.dt, 
-                                   temp_sim_dict, self.sys_flag_dict, self.check_do_ss.get(), self.hmax, init_conditions)
+                                   temp_sim_dict, self.sys_flag_dict, self.hmax, init_conditions)
             
         except FloatingPointError:
             self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}. This file may have invalid parameters.\n".format(data_file_name))
@@ -2454,7 +2454,7 @@ class Notebook:
             for flag in self.sys_flag_dict:
                 ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
             
-            ofstream.write("steady_state_exc: {}\n".format(self.check_do_ss.get()))
+            #ofstream.write("steady_state_exc: {}\n".format(self.check_do_ss.get()))
 
         return
 
