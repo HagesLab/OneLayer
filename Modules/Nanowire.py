@@ -244,8 +244,8 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, 
     
     ## Do boundary conditions of Jn, Jp
     # FIXME: Calculate N, P at boundaries?
-    Sft = (N[0] * P[0] - n0[0] * p0[0]) / ((N[0] / Sf) + (P[0] / Sf))
-    Sbt = (N[m-1] * P[m-1] - n0[m-1] * p0[m-1]) / ((N[m-1] / Sb) + (P[m-1] / Sb))
+    Sft = Sf * (N[0] * P[0] - n0[0] * p0[0]) / (N[0] + P[0])
+    Sbt = Sb * (N[m-1] * P[m-1] - n0[m-1] * p0[m-1]) / (N[m-1] + P[m-1])
     Jn[0] = Sft
     Jn[m] = -Sbt
     Jp[0] = -Sft
