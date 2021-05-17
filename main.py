@@ -78,8 +78,7 @@ class Notebook:
         self.check_autointegrate = tk.IntVar(value=0)
 
         self.check_calculate_init_material_expfactor = tk.IntVar()
-        self.AIC_stim_mode = tk.StringVar()
-        self.AIC_gen_power_mode = tk.StringVar()
+        
         self.active_analysisplot_ID = tk.IntVar()
         self.active_integrationplot_ID = tk.IntVar()
 
@@ -101,7 +100,9 @@ class Notebook:
         
         # FIXME: This is a somewhat clumsy way to introduce a Nanowire module-specific functionality
         if self.nanowire.system_ID == "Nanowire":
-            self.using_AIC = False
+            self.using_LGC = False
+            self.LGC_stim_mode = tk.StringVar()
+            self.LGC_gen_power_mode = tk.StringVar()
 
         self.carry_include_flags = {}
         for var in self.nanowire.simulation_outputs_dict:
@@ -244,7 +245,7 @@ class Notebook:
 	# This includes other frames, which is evident in how the tab_inputs has three sub-tabs pinned to itself.
     def add_tab_inputs(self):
         self.tab_inputs = tk.ttk.Notebook(self.notebook)
-        self.tab_analytical_init = tk.ttk.Frame(self.tab_inputs)
+        self.tab_generation_init = tk.ttk.Frame(self.tab_inputs)
         self.tab_rules_init = tk.ttk.Frame(self.tab_inputs)
         self.tab_explicit_init = tk.ttk.Frame(self.tab_inputs)
 
@@ -454,14 +455,14 @@ class Notebook:
         self.listupload_toolbar_frame.grid(row=3,column=1)
         self.listupload_toolbar = tkagg.NavigationToolbar2Tk(self.listupload_canvas, self.listupload_toolbar_frame)
 
-
+        
+        ## Laser Generation Condition (LGC): extra input mtds for nanowire-specific applications
+        if self.nanowire.system_ID == "Nanowire":
+            self.create_LGC_frame()
+            self.tab_inputs.add(self.tab_generation_init, text="Laser Generation Conditions")
+            
         # Attach sub-frames to input tab and input tab to overall notebook
         self.tab_inputs.add(self.tab_rules_init, text="Parameter Toolkit")
-        
-        ## Analytical Initial Condition (AIC): extra input mtd for specific system type
-        if self.nanowire.system_ID == "Nanowire":
-            self.create_AIC_frame()
-            self.tab_inputs.add(self.tab_analytical_init, text="Analytical Init. Cond.")
         self.tab_inputs.add(self.tab_explicit_init, text="Parameter List Upload")
         self.notebook.add(self.tab_inputs, text="Inputs")
         return
@@ -666,16 +667,16 @@ class Notebook:
         self.notebook.add(self.tab_analyze, text="Analyze")
         return
     
-    def create_AIC_frame(self):
-        self.AIC_frame = tk.ttk.Frame(self.tab_analytical_init)
-        self.AIC_frame.grid(row=0,column=0, padx=(330,0))
+    def create_LGC_frame(self):
+        self.LGC_frame = tk.ttk.Frame(self.tab_generation_init)
+        self.LGC_frame.grid(row=0,column=0, padx=(330,0))
 
-        self.AIC_head = tk.ttk.Label(self.AIC_frame, text="Analytical Init. Cond.", style="Header.TLabel")
-        self.AIC_head.grid(row=0,column=0,columnspan=3)
+        self.LGC_head = tk.ttk.Label(self.LGC_frame, text="Generation from Laser Excitation", style="Header.TLabel")
+        self.LGC_head.grid(row=0,column=0,columnspan=3)
 
         # A sub-frame attached to a sub-frame
         # With these we can group related elements into a common region
-        self.material_param_frame = tk.Frame(self.AIC_frame, highlightbackground="black", highlightthicknes=1)
+        self.material_param_frame = tk.Frame(self.LGC_frame, highlightbackground="black", highlightthicknes=1)
         self.material_param_frame.grid(row=1,column=0)
 
         self.material_param_label = tk.Label(self.material_param_frame, text="Material Params - Select One")
@@ -684,11 +685,11 @@ class Notebook:
         self.hline1_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline1_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.calc_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=1)
-        self.calc_AIC_expfactor.grid(row=2,column=0)
+        self.calc_LGC_absorption_cof = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=1)
+        self.calc_LGC_absorption_cof.grid(row=2,column=0)
 
-        self.calc_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 1")
-        self.calc_AIC_expfactor_label.grid(row=2,column=1)
+        self.calc_LGC_absorption_cof_label = tk.Label(self.material_param_frame, text="Option 1")
+        self.calc_LGC_absorption_cof_label.grid(row=2,column=1)
 
         self.A0_label = tk.Label(self.material_param_frame, text="A0 [cm^-1 eV^-γ]")
         self.A0_label.grid(row=2,column=2)
@@ -702,34 +703,34 @@ class Notebook:
         self.Eg_entry = tk.ttk.Entry(self.material_param_frame, width=9)
         self.Eg_entry.grid(row=3,column=3)
 
-        self.direct_AIC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.AIC_stim_mode, value="direct")
-        self.direct_AIC_stim.grid(row=4,column=2)
+        self.direct_LGC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.LGC_stim_mode, value="direct")
+        self.direct_LGC_stim.grid(row=4,column=2)
 
-        self.direct_AIC_stim_label = tk.Label(self.material_param_frame,text="Direct (γ=1/2)")
-        self.direct_AIC_stim_label.grid(row=4,column=3)
+        self.direct_LGC_stim_label = tk.Label(self.material_param_frame,text="Direct (γ=1/2)")
+        self.direct_LGC_stim_label.grid(row=4,column=3)
 
-        self.indirect_AIC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.AIC_stim_mode, value="indirect")
-        self.indirect_AIC_stim.grid(row=5,column=2)
+        self.indirect_LGC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.LGC_stim_mode, value="indirect")
+        self.indirect_LGC_stim.grid(row=5,column=2)
 
-        self.indirect_AIC_stim_label = tk.Label(self.material_param_frame,text="Indirect (γ=2)")
-        self.indirect_AIC_stim_label.grid(row=5,column=3)
+        self.indirect_LGC_stim_label = tk.Label(self.material_param_frame,text="Indirect (γ=2)")
+        self.indirect_LGC_stim_label.grid(row=5,column=3)
 
         self.hline2_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline2_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.enter_AIC_expfactor = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=0)
-        self.enter_AIC_expfactor.grid(row=7,column=0)
+        self.enter_LGC_absorption_cof = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=0)
+        self.enter_LGC_absorption_cof.grid(row=7,column=0)
 
-        self.enter_AIC_expfactor_label = tk.Label(self.material_param_frame, text="Option 2")
-        self.enter_AIC_expfactor_label.grid(row=7,column=1)
+        self.enter_LGC_absorption_cof_label = tk.Label(self.material_param_frame, text="Option 2")
+        self.enter_LGC_absorption_cof_label.grid(row=7,column=1)
 
-        self.AIC_expfactor_label = tk.Label(self.material_param_frame, text="α [cm^-1]")
-        self.AIC_expfactor_label.grid(row=8,column=2)
+        self.LGC_absorption_cof_label = tk.Label(self.material_param_frame, text="α [cm^-1]")
+        self.LGC_absorption_cof_label.grid(row=8,column=2)
 
-        self.AIC_expfactor_entry = tk.ttk.Entry(self.material_param_frame, width=9)
-        self.AIC_expfactor_entry.grid(row=8,column=3)
+        self.LGC_absorption_cof_entry = tk.ttk.Entry(self.material_param_frame, width=9)
+        self.LGC_absorption_cof_entry.grid(row=8,column=3)
 
-        self.pulse_laser_frame = tk.Frame(self.AIC_frame, highlightbackground="black", highlightthicknes=1)
+        self.pulse_laser_frame = tk.Frame(self.LGC_frame, highlightbackground="black", highlightthicknes=1)
         self.pulse_laser_frame.grid(row=1,column=1, padx=(20,0))
 
         self.pulse_laser_label = tk.Label(self.pulse_laser_frame, text="Pulse Laser Params")
@@ -750,7 +751,7 @@ class Notebook:
         self.pulse_wavelength_entry = tk.ttk.Entry(self.pulse_laser_frame, width=9)
         self.pulse_wavelength_entry.grid(row=3,column=3)
 
-        self.gen_power_param_frame = tk.Frame(self.AIC_frame, highlightbackground="black", highlightthicknes=1)
+        self.gen_power_param_frame = tk.Frame(self.LGC_frame, highlightbackground="black", highlightthicknes=1)
         self.gen_power_param_frame.grid(row=1,column=2, padx=(20,0))
 
         self.gen_power_param_label = tk.Label(self.gen_power_param_frame, text="Generation/Power Params - Select One")
@@ -759,7 +760,7 @@ class Notebook:
         self.hline4_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline4_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.power_spot = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.AIC_gen_power_mode, value="power-spot")
+        self.power_spot = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.LGC_gen_power_mode, value="power-spot")
         self.power_spot.grid(row=2,column=0)
 
         self.power_spot_label = tk.Label(self.gen_power_param_frame, text="Option 1")
@@ -780,7 +781,7 @@ class Notebook:
         self.hline5_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline5_separator.grid(row=4,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.power_density_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.AIC_gen_power_mode, value="density")
+        self.power_density_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.LGC_gen_power_mode, value="density")
         self.power_density_rb.grid(row=5,column=0)
 
         self.power_density_rb_label = tk.Label(self.gen_power_param_frame,text="Option 2")
@@ -795,7 +796,7 @@ class Notebook:
         self.hline6_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline6_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.max_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.AIC_gen_power_mode, value="max-gen")
+        self.max_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.LGC_gen_power_mode, value="max-gen")
         self.max_gen_rb.grid(row=7,column=0)
 
         self.max_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 3")
@@ -810,7 +811,7 @@ class Notebook:
         self.hline7_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
         self.hline7_separator.grid(row=8,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.total_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.AIC_gen_power_mode, value="total-gen")
+        self.total_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.LGC_gen_power_mode, value="total-gen")
         self.total_gen_rb.grid(row=9,column=0)
 
         self.total_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 4")
@@ -822,23 +823,23 @@ class Notebook:
         self.total_gen_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.total_gen_entry.grid(row=9,column=3)
 
-        self.load_AIC_button = tk.ttk.Button(self.AIC_frame, text="Generate Initial Condition", command=self.add_AIC)
-        self.load_AIC_button.grid(row=2,column=0,columnspan=3)
+        self.load_LGC_button = tk.ttk.Button(self.LGC_frame, text="Generate Initial Condition", command=self.add_LGC)
+        self.load_LGC_button.grid(row=2,column=0,columnspan=3)
 
-        self.AIC_description = tk.Message(self.AIC_frame, text="The Analytical Initial Condition uses the above numerical parameters to generate an initial carrier distribution based on an exponential decay equation.", width=320)
-        self.AIC_description.grid(row=3,column=0,columnspan=3)
+        self.LGC_description = tk.Message(self.LGC_frame, text="The Laser Generation Condition uses the above numerical parameters to generate an initial carrier distribution based on an applied laser excitation.", width=320)
+        self.LGC_description.grid(row=3,column=0,columnspan=3)
         
-        self.AIC_fig = Figure(figsize=(5,3.1))
-        self.AIC_subplot = self.AIC_fig.add_subplot(111)
-        self.AIC_canvas = tkagg.FigureCanvasTkAgg(self.AIC_fig, master=self.AIC_frame)
-        self.AIC_plotwidget = self.AIC_canvas.get_tk_widget()
-        self.AIC_plotwidget.grid(row=4, column=0, columnspan=3)
+        self.LGC_fig = Figure(figsize=(5,3.1))
+        self.LGC_subplot = self.LGC_fig.add_subplot(111)
+        self.LGC_canvas = tkagg.FigureCanvasTkAgg(self.LGC_fig, master=self.LGC_frame)
+        self.LGC_plotwidget = self.LGC_canvas.get_tk_widget()
+        self.LGC_plotwidget.grid(row=4, column=0, columnspan=3)
         
-        self.AIC_toolbar_frame = tk.ttk.Frame(master=self.AIC_frame)
-        self.AIC_toolbar_frame.grid(row=5,column=0,columnspan=3)
-        self.AIC_toolbar = tkagg.NavigationToolbar2Tk(self.AIC_canvas, self.AIC_toolbar_frame)
+        self.LGC_toolbar_frame = tk.ttk.Frame(master=self.LGC_frame)
+        self.LGC_toolbar_frame.grid(row=5,column=0,columnspan=3)
+        self.LGC_toolbar = tkagg.NavigationToolbar2Tk(self.LGC_canvas, self.LGC_toolbar_frame)
         
-        self.analytical_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "AIC_expfactor":self.AIC_expfactor_entry, "Pulse_Freq":self.pulse_freq_entry, 
+        self.LGC_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "LGC_absorption_cof":self.LGC_absorption_cof_entry, "Pulse_Freq":self.pulse_freq_entry, 
                                            "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
                                            "Max_Gen":self.max_gen_entry, "Total_Gen":self.total_gen_entry}
         return
@@ -1132,33 +1133,33 @@ class Notebook:
 
             # Contextually-dependent options for batchable params
             self.batchables_array = []
-            batchable_params = [param for param in self.nanowire.param_dict if not (self.nanowire.system_ID == "Nanowire" and self.using_AIC and (param == "deltaN" or param == "deltaP"))]
+            batchable_params = [param for param in self.nanowire.param_dict if not (self.nanowire.system_ID == "Nanowire" and self.using_LGC and (param == "deltaN" or param == "deltaP"))]
             
-            if self.nanowire.system_ID == "Nanowire" and self.using_AIC:
+            if self.nanowire.system_ID == "Nanowire" and self.using_LGC:
                 
-                self.AIC_instruction1 = tk.Message(self.batch_popup, text="Additional options for generating deltaN and deltaP batches " +
-                                                  "are available when using the Analytical Initial Condition tool.", width=300)
-                self.AIC_instruction1.grid(row=4,column=0)
+                self.LGC_instruction1 = tk.Message(self.batch_popup, text="Additional options for generating deltaN and deltaP batches " +
+                                                  "are available when using the Laser Generation Condition tool.", width=300)
+                self.LGC_instruction1.grid(row=4,column=0)
                 
-                self.AIC_instruction2 = tk.Message(self.batch_popup, text="Please note that TEDs will use the values and settings on the A.I.C. tool's tab " +
+                self.LGC_instruction2 = tk.Message(self.batch_popup, text="Please note that TEDs will use the values and settings on the L.G.C. tool's tab " +
                                                    "to complete the batches when one or more of these options are selected.", width=300)
-                self.AIC_instruction2.grid(row=5,column=0)
+                self.LGC_instruction2.grid(row=5,column=0)
                 
                 # Boolean logic is fun
-                # The main idea is to hide certain parameters based on which options were used to construct the AIC
-                AIC_params = [key for key in self.analytical_entryboxes_dict.keys() if not (
-                            (self.check_calculate_init_material_expfactor.get() and (key == "AIC_expfactor")) or
+                # The main idea is to hide certain parameters based on which options were used to construct the LGC
+                LGC_params = [key for key in self.LGC_entryboxes_dict.keys() if not (
+                            (self.check_calculate_init_material_expfactor.get() and (key == "LGC_absorption_cof")) or
                             (not self.check_calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
-                            (self.AIC_gen_power_mode.get() == "power-spot" and (key == "Power_Density" or key == "Max_Gen" or key == "Total_Gen")) or
-                            (self.AIC_gen_power_mode.get() == "density" and (key == "Power" or key == "Spotsize" or key == "Max_Gen" or key == "Total_Gen")) or
-                            (self.AIC_gen_power_mode.get() == "max-gen" and (key == "Power" or key == "Spotsize" or key == "Power_Density" or key == "Total_Gen")) or
-                            (self.AIC_gen_power_mode.get() == "total-gen" and (key == "Power_Density" or key == "Power" or key == "Spotsize" or key == "Max_Gen"))
+                            (self.LGC_gen_power_mode.get() == "power-spot" and (key == "Power_Density" or key == "Max_Gen" or key == "Total_Gen")) or
+                            (self.LGC_gen_power_mode.get() == "density" and (key == "Power" or key == "Spotsize" or key == "Max_Gen" or key == "Total_Gen")) or
+                            (self.LGC_gen_power_mode.get() == "max-gen" and (key == "Power" or key == "Spotsize" or key == "Power_Density" or key == "Total_Gen")) or
+                            (self.LGC_gen_power_mode.get() == "total-gen" and (key == "Power_Density" or key == "Power" or key == "Spotsize" or key == "Max_Gen"))
                             )]
 
             for i in range(max_batchable_params):
                 batch_param_name = tk.StringVar()
-                if self.nanowire.system_ID == "Nanowire" and self.using_AIC:
-                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params, *AIC_params)
+                if self.nanowire.system_ID == "Nanowire" and self.using_LGC:
+                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params, *LGC_params)
                 else:
                     optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params)
                 
@@ -2776,8 +2777,8 @@ class Notebook:
         self.set_thickness_and_dx_entryboxes(state='lock')
         return
 
-    def add_AIC(self):
-        # Read AIC parameters and plot when relevant button pressed
+    def add_LGC(self):
+        # Read LGC parameters and plot when relevant button pressed
         try:
             self.set_init_x()
             assert self.nanowire.spacegrid_is_set
@@ -2794,11 +2795,11 @@ class Notebook:
             return
 
         # Check for valid option choices
-        AIC_options = {"long_expfactor":self.check_calculate_init_material_expfactor.get(), 
-                     "incidence":self.AIC_stim_mode.get(),
-                     "power_mode":self.AIC_gen_power_mode.get()}
+        LGC_options = {"long_expfactor":self.check_calculate_init_material_expfactor.get(), 
+                     "incidence":self.LGC_stim_mode.get(),
+                     "power_mode":self.LGC_gen_power_mode.get()}
         try:
-            if AIC_options["long_expfactor"] == '' or AIC_options["power_mode"] == '':
+            if LGC_options["long_expfactor"] == '' or LGC_options["power_mode"] == '':
                 raise ValueError("Error: select material param and power generation options ")
         except ValueError as oops:
             self.write(self.ICtab_status, oops)
@@ -2816,7 +2817,7 @@ class Notebook:
         hc_evnm = h * c * 6.241e18 * 1e9    # [J*m] to [eV*nm]
         hc_nm = h * c * 1e9     # [J*m] to [J*nm] 
 
-        if (AIC_options["long_expfactor"]):
+        if (LGC_options["long_expfactor"]):
             try: A0 = float(self.A0_entry.get())         # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
             except:
                 self.write(self.ICtab_status, "Error: missing or invalid A0")
@@ -2834,10 +2835,10 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
-            if AIC_options["incidence"] == "direct":
+            if LGC_options["incidence"] == "direct":
                 alpha = A0 * (hc_evnm / wavelength - Eg) ** 0.5     # [cm^-1]
 
-            elif AIC_options["incidence"] == "indirect":
+            elif LGC_options["incidence"] == "indirect":
                 alpha = A0 * (hc_evnm / wavelength - Eg) ** 2
 
             else:
@@ -2846,7 +2847,7 @@ class Notebook:
 
         else:
             try: 
-                alpha = float(self.AIC_expfactor_entry.get()) # [cm^-1]
+                alpha = float(self.LGC_absorption_cof_entry.get()) # [cm^-1]
                 
             except:
                 self.write(self.ICtab_status, "Error: missing or invalid α")
@@ -2854,7 +2855,7 @@ class Notebook:
 
         alpha_nm = alpha * 1e-7 # [cm^-1] to [nm^-1]
 
-        if (AIC_options["power_mode"] == "power-spot"):
+        if (LGC_options["power_mode"] == "power-spot"):
             try: 
                 power = float(self.power_entry.get()) * 1e-6  # [uJ/s] to [J/s]
                 spotsize = float(self.spotsize_entry.get()) * ((1e7) ** 2)     # [cm^2] to [nm^2]
@@ -2880,10 +2881,10 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            # Note: add_AIC() automatically converts into TEDs units. For consistency add_AIC should really deposit values in common units.
+            # Note: add_LGC() automatically converts into TEDs units. For consistency add_LGC should really deposit values in common units.
             self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
-        elif (AIC_options["power_mode"] == "density"):
+        elif (LGC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
             except:
                 self.write(self.ICtab_status, "Error: missing power density")
@@ -2907,7 +2908,7 @@ class Notebook:
 
             self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
         
-        elif (AIC_options["power_mode"] == "max-gen"):
+        elif (LGC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
             except:
                 self.write(self.ICtab_status, "Error: missing max gen")
@@ -2916,7 +2917,7 @@ class Notebook:
             self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, self.nanowire.grid_x_nodes)
         
 
-        elif (AIC_options["power_mode"] == "total-gen"):
+        elif (LGC_options["power_mode"] == "total-gen"):
             try: total_gen = float(self.total_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
             except:
                 self.write(self.ICtab_status, "Error: missing total gen")
@@ -2933,12 +2934,12 @@ class Notebook:
         ## Assuming that the initial distributions of holes and electrons are identical
         self.nanowire.param_dict["deltaP"].value = self.nanowire.param_dict["deltaN"].value
 
-        self.update_IC_plot(plot_ID="AIC")
+        self.update_IC_plot(plot_ID="LGC")
         self.paramtoolkit_currentparam = "deltaN"
         self.update_IC_plot(plot_ID="custom")
         self.paramtoolkit_currentparam = "deltaP"
         self.update_IC_plot(plot_ID="recent")
-        self.using_AIC = True
+        self.using_LGC = True
         return
 
     ## Special functions for Parameter Toolkit:
@@ -3009,7 +3010,7 @@ class Notebook:
         self.update_paramrule_listbox(new_param_name)
 
         if self.nanowire.system_ID == "Nanowire":
-            if new_param_name == "deltaN" or new_param_name == "deltaP": self.using_AIC = False
+            if new_param_name == "deltaN" or new_param_name == "deltaP": self.using_LGC = False
         self.update_IC_plot(plot_ID="recent")
         return
 
@@ -3188,7 +3189,7 @@ class Notebook:
                     warning_flag = True
                 
         if self.nanowire.system_ID == "Nanowire":
-            if var == "deltaN" or var == "deltaP": self.using_AIC = False
+            if var == "deltaN" or var == "deltaP": self.using_LGC = False
         
         self.paramtoolkit_currentparam = var
         self.deleteall_paramrule()
@@ -3203,11 +3204,11 @@ class Notebook:
 
         if plot_ID=="recent": plot = self.recent_param_subplot
         elif plot_ID=="custom": plot = self.custom_param_subplot
-        elif plot_ID=="AIC": plot = self.AIC_subplot
+        elif plot_ID=="LGC": plot = self.LGC_subplot
         elif plot_ID=="listupload": plot = self.listupload_subplot
         plot.cla()
 
-        if plot_ID=="AIC": param_name="deltaN"
+        if plot_ID=="LGC": param_name="deltaN"
         else: param_name = self.paramtoolkit_currentparam
         
         param_obj = self.nanowire.param_dict[param_name]
@@ -3239,13 +3240,13 @@ class Notebook:
             plot.set_title("Snapshot: {}".format(param_name))
             self.custom_param_fig.tight_layout()
             self.custom_param_fig.canvas.draw()
-        elif plot_ID=="AIC": 
+        elif plot_ID=="LGC": 
             if self.sys_flag_dict['check_do_ss'].value():
                 plot.set_title("Carriers added per ns.")
             else:
                 plot.set_title("Initial carrier profile")
-            self.AIC_fig.tight_layout()
-            self.AIC_fig.canvas.draw()
+            self.LGC_fig.tight_layout()
+            self.LGC_fig.canvas.draw()
         elif plot_ID=="listupload": 
             plot.set_title("Recent list upload")
             self.listupload_fig.tight_layout()
@@ -3295,20 +3296,20 @@ class Notebook:
         # This algorithm was shamelessly stolen from our bay.py script...                
         batch_combinations = get_all_combinations(batch_values)        
                 
-        # Apply each combination to Nanowire, going through AIC if necessary
+        # Apply each combination to Nanowire, going through LGC if necessary
         for batch_set in batch_combinations:
             filename = ""
             for param in batch_set:
                 filename += str("__{}_{:.4e}".format(param, batch_set[param]))
                 
-                if self.nanowire.system_ID == "Nanowire" and (param in self.analytical_entryboxes_dict):
-                    self.enter(self.analytical_entryboxes_dict[param], str(batch_set[param]))
+                if self.nanowire.system_ID == "Nanowire" and (param in self.LGC_entryboxes_dict):
+                    self.enter(self.LGC_entryboxes_dict[param], str(batch_set[param]))
                     
                 else:
                     self.nanowire.param_dict[param].value = batch_set[param]
 
                 
-            if self.nanowire.system_ID == "Nanowire" and self.using_AIC: self.add_AIC()
+            if self.nanowire.system_ID == "Nanowire" and self.using_LGC: self.add_LGC()
                 
             try:
                 self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], batch_dir_name, filename))
@@ -3471,8 +3472,8 @@ class Notebook:
         
         # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and any other values that may exist on the GUI
         if self.nanowire.system_ID == "Nanowire":
-            for key in self.analytical_entryboxes_dict:
-                self.enter(self.analytical_entryboxes_dict[key], "")
+            for key in self.LGC_entryboxes_dict:
+                self.enter(self.LGC_entryboxes_dict[key], "")
             
         for param in self.nanowire.param_dict:
             self.paramtoolkit_currentparam = param
@@ -3527,7 +3528,7 @@ class Notebook:
                 warning_mssg += ("\nWarning: could not apply value for param: {}".format(param))
                 warning_flag += 1
                 
-        if self.nanowire.system_ID == "Nanowire": self.using_AIC = False
+        if self.nanowire.system_ID == "Nanowire": self.using_LGC = False
         
         if not warning_flag: self.write(self.ICtab_status, "IC file loaded successfully")
         else: 
