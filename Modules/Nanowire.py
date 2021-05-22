@@ -373,8 +373,8 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
     
     ## Package initial condition
     # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
-    init_E_field = E_field({"N":init_N, "P":init_P}, {"Rel-Permitivity":eps, "Node_width":dx})
-        
+    #init_E_field = E_field({"N":init_N, "P":init_P}, {"Rel-Permitivity":eps, "Node_width":dx})
+    init_E_field = np.zeros(m+1)
     
     init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)
 
