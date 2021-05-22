@@ -28,8 +28,7 @@ class Nanowire(OneD_Model):
                             "Theta":Parameter(units="[cm^-1]", is_edge=False), "Alpha":Parameter(units="[cm^-1]", is_edge=False), 
                             "Delta":Parameter(units="", is_edge=False), "Frac-Emitted":Parameter(units="", is_edge=False),
                             "deltaN":Parameter(units="[cm^-3]", is_edge=False), "deltaP":Parameter(units="[cm^-3]", is_edge=False), 
-                            "E_field":Parameter(units="[WIP]", is_edge=True), "Ec":Parameter(units="[WIP]", is_edge=True),
-                            "electron_affinity":Parameter(units="[WIP]", is_edge=True)}
+                            "Ec":Parameter(units="[WIP]", is_edge=True), "electron_affinity":Parameter(units="[WIP]", is_edge=True)}
         
 
         self.param_count = len(self.param_dict)
@@ -41,11 +40,12 @@ class Nanowire(OneD_Model):
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
         self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[cm^-3]", xlabel="nm", xvar="position",is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
-                                        "E_field":Output("Electric Field", units="[WIP]", xlabel="nm", xvar="position",is_edge=True, is_integrated=False, yscale='linear')}
+                                        "P":Output("P", units="[cm^-3]", xlabel="nm", xvar="position",is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)),
+                                        }
         
         # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_n, is_integrated=False),
+        self.calculated_outputs_dict = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True, calc_func=E_field, is_integrated=False),
+                                        "deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_n, is_integrated=False),
                                          "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_p, is_integrated=False),
                                          "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, calc_func=radiative_recombination, is_integrated=False),
                                          "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, calc_func=nonradiative_recombination, is_integrated=False),
@@ -90,7 +90,6 @@ class Nanowire(OneD_Model):
         # N = N0 + delta_N
         init_N = (self.param_dict["N0"].value + self.param_dict["deltaN"].value) * self.convert_in_dict["N"]
         init_P = (self.param_dict["P0"].value + self.param_dict["deltaP"].value) * self.convert_in_dict["P"]
-        init_E_field = self.param_dict["E_field"].value * self.convert_in_dict["E_field"]
         # "Typecast" single values to uniform arrays
         if not isinstance(init_N, np.ndarray):
             init_N = np.ones(self.grid_x_nodes.__len__()) * init_N
@@ -98,16 +97,14 @@ class Nanowire(OneD_Model):
         if not isinstance(init_P, np.ndarray):
             init_P = np.ones(self.grid_x_nodes.__len__()) * init_P
             
-        if not isinstance(init_E_field, np.ndarray):
-            init_E_field = np.ones(self.grid_x_edges.__len__()) * init_E_field
         
-        return {"N":init_N, "P":init_P, "E_field":init_E_field}
+        return {"N":init_N, "P":init_P}
     
     def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
         # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from py with the correct args
         ode_nanowire(data_path, m, n, self.dx, dt, params,
                             not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), flags['check_do_ss'].value(), hmax_, True,
-                            init_conditions["N"], init_conditions["P"], init_conditions["E_field"])
+                            init_conditions["N"], init_conditions["P"])
     
     def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
@@ -120,6 +117,7 @@ class Nanowire(OneD_Model):
                 data.append(u_read(data_filename, t0=tstep, single_tstep=True))
             
             data_dict[raw_output_name] = np.array(data)
+            
             
         for calculated_output_name, output_obj in self.calculated_outputs_dict.items():
             if not output_obj.is_integrated:
@@ -159,6 +157,9 @@ class Nanowire(OneD_Model):
 
             elif (datatype == "NRR"):
                 data = nonradiative_recombination(sim_data, params)
+                
+            elif (datatype == "E_field"):
+                data = E_field(sim_data, params)
 
             elif (datatype == "PL"):
     
@@ -371,6 +372,10 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
     kB = 8.61773e-5  # [eV / K]
     
     ## Package initial condition
+    # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
+    init_E_field = E_field({"N":init_N, "P":init_P}, {"Rel-Permitivity":eps, "Node_width":dx})
+        
+    
     init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)
 
     if do_ss:
@@ -422,14 +427,14 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
     if write_output:
         ## Prep output files
         with tables.open_file(data_path_name + "-N.h5", mode='a') as ofstream_N, \
-            tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P, \
-            tables.open_file(data_path_name + "-E_field.h5", mode='a') as ofstream_E_field:
+            tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P:
+            #tables.open_file(data_path_name + "-E_field.h5", mode='a') as ofstream_E_field:
             array_N = ofstream_N.root.data
             array_P = ofstream_P.root.data
-            array_E_field = ofstream_E_field.root.data
+            #array_E_field = ofstream_E_field.root.data
             array_N.append(data[1:,0:m])
             array_P.append(data[1:,m:2*(m)])
-            array_E_field.append(data[1:,2*(m):])
+            #array_E_field.append(data[1:,2*(m):])
 
         return error_data
 
@@ -438,6 +443,17 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
         array_P = data[:,m:2*(m)]
 
         return array_N, array_P, error_data
+    
+def E_field(sim_outputs, params):
+    eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
+    q_C = 1.602e-19 # [C per carrier]
+    if isinstance(params["Rel-Permitivity"], np.ndarray):
+        averaged_rel_permitivity = params["Rel-Permitivity"][:-1] + np.roll(params["Rel-Permitivity"], -1)[:-1]
+    else:
+        averaged_rel_permitivity = params["Rel-Permitivity"]
+    
+    dEdx = q_C * (sim_outputs["P"] - sim_outputs["N"]) / (eps0 * averaged_rel_permitivity)
+    return np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
     
 def delta_n(sim_outputs, params):
     return sim_outputs["N"] - params["N0"]

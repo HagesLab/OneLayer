@@ -550,7 +550,7 @@ class Notebook:
         self.subtitle = tk.ttk.Label(self.tab_simulate, text="Simulation - {}".format(self.nanowire.system_ID))
         self.subtitle.grid(row=0,column=3,columnspan=3)
         
-        self.sim_fig = Figure(figsize=(12, 8))
+        self.sim_fig = Figure(figsize=(14, 8))
         count = 1
         cdim = np.ceil(np.sqrt(self.nanowire.simulation_outputs_count))
         
