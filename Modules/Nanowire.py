@@ -373,7 +373,7 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
     
     ## Package initial condition
     # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
-    #init_E_field = E_field({"N":init_N, "P":init_P}, {"Rel-Permitivity":eps, "Node_width":dx})
+    init_E_field = E_field({"N":init_N, "P":init_P}, {"Rel-Permitivity":eps, "Node_width":dx})
     init_E_field = np.zeros(m+1)
     
     init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)
@@ -448,12 +448,14 @@ def E_field(sim_outputs, params):
     eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
     q_C = 1.602e-19 # [C per carrier]
     if isinstance(params["Rel-Permitivity"], np.ndarray):
-        averaged_rel_permitivity = params["Rel-Permitivity"][:-1] + np.roll(params["Rel-Permitivity"], -1)[:-1]
+        averaged_rel_permitivity = (params["Rel-Permitivity"][:-1] + np.roll(params["Rel-Permitivity"], -1)[:-1]) / 2
     else:
         averaged_rel_permitivity = params["Rel-Permitivity"]
     
     dEdx = q_C * (sim_outputs["P"] - sim_outputs["N"]) / (eps0 * averaged_rel_permitivity)
-    return np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
+    E_field = np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
+    E_field[-1] = 0
+    return E_field
     
 def delta_n(sim_outputs, params):
     return sim_outputs["N"] - params["N0"]
