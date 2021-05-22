@@ -178,8 +178,6 @@ class Nanowire(OneD_Model):
         param_dict["deltaN"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(grid_x.__len__())
                     
         param_dict["deltaP"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(grid_x.__len__())
-        
-        param_dict["E_field"] = sim_data["E_field"] if include_flags['E_field'] else np.zeros(grid_x.__len__() + 1)
 
         return
     
@@ -373,8 +371,8 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
     
     ## Package initial condition
     # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
-    init_E_field = E_field({"N":init_N, "P":init_P}, {"Rel-Permitivity":eps, "Node_width":dx})
-    init_E_field = np.zeros(m+1)
+    init_E_field = E_field({"N":init_N, "P":init_P}, {"Rel-Permitivity":eps, "N0":n0, "P0":p0, "Node_width":dx})
+    #init_E_field = np.zeros(m+1)
     
     init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)
 
@@ -452,7 +450,7 @@ def E_field(sim_outputs, params):
     else:
         averaged_rel_permitivity = params["Rel-Permitivity"]
     
-    dEdx = q_C * (sim_outputs["P"] - sim_outputs["N"]) / (eps0 * averaged_rel_permitivity)
+    dEdx = q_C * (delta_p(sim_outputs, params) - delta_n(sim_outputs, params)) / (eps0 * averaged_rel_permitivity)
     E_field = np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
     E_field[-1] = 0
     return E_field
