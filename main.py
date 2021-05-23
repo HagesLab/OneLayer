@@ -1076,7 +1076,11 @@ class Notebook:
                 self.sys_param_entryboxes_dict[param].grid(row=row_count, column=col_count + 1)
                 
                 if isinstance(self.nanowire.param_dict[param].value, (float, int)):
-                    self.enter(self.sys_param_entryboxes_dict[param], str(self.nanowire.param_dict[param].value))
+                    formatted_val = self.nanowire.param_dict[param].value
+                    if formatted_val > 1e4: formatted_val = "{:.3e}".format(formatted_val)
+                    else: formatted_val = str(formatted_val)
+                    
+                    self.enter(self.sys_param_entryboxes_dict[param], formatted_val)
                 
                 else:
                     self.enter(self.sys_param_entryboxes_dict[param], "[list]")
