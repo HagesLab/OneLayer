@@ -1010,7 +1010,7 @@ class Notebook:
             for param_name in self.nanowire.param_dict:
                 
                 self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
-                self.sys_param_summaryplots[param_name].set_title(param_name)
+                self.sys_param_summaryplots[param_name].set_title("{} {}".format(param_name,self.nanowire.param_dict[param_name].units))
                 count += 1
             
             self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, master=self.sys_plotsummary_popup)

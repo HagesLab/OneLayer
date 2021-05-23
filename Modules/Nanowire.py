@@ -28,7 +28,7 @@ class Nanowire(OneD_Model):
                             "Theta":Parameter(units="[cm^-1]", is_edge=False), "Alpha":Parameter(units="[cm^-1]", is_edge=False), 
                             "Delta":Parameter(units="", is_edge=False), "Frac-Emitted":Parameter(units="", is_edge=False),
                             "deltaN":Parameter(units="[cm^-3]", is_edge=False), "deltaP":Parameter(units="[cm^-3]", is_edge=False), 
-                            "Ec":Parameter(units="[WIP]", is_edge=True), "electron_affinity":Parameter(units="[WIP]", is_edge=True)}
+                            "Ec":Parameter(units="[eV]", is_edge=True), "electron_affinity":Parameter(units="[eV]", is_edge=True)}
         
 
         self.param_count = len(self.param_dict)
