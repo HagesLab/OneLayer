@@ -21,18 +21,29 @@ class Param_Rule:
     def get(self):
         """Pack values into a display string for GUI"""
         if (self.type == "POINT"):
-            return((self.variable + ": " + self.type + " at x=" + '{:.4e}'.format(self.l_bound) + " with value: " + '{:.4e}'.format(self.l_boundval)))
+            return((self.variable + ": " + self.type + " at x=" 
+                    + '{:.4e}'.format(self.l_bound) + " with value: " 
+                    + '{:.4e}'.format(self.l_boundval)))
 
         elif (self.type == "FILL"):
-            return((self.variable + ": " + self.type + " from x=" + '{:.4e}'.format(self.l_bound) + " to " + '{:.4e}'.format(self.r_bound) + " with value: " + '{:.4e}'.format(self.l_boundval)))
+            return((self.variable + ": " + self.type + " from x=" 
+                    + '{:.4e}'.format(self.l_bound) + " to " 
+                    + '{:.4e}'.format(self.r_bound) + " with value: " 
+                    + '{:.4e}'.format(self.l_boundval)))
 
         elif (self.type == "LINE"):
-            return((self.variable + ": " + self.type + " from x=" + '{:.4e}'.format(self.l_bound) + " to " + '{:.4e}'.format(self.r_bound) + 
-                    " with left value: " + '{:.4e}'.format(self.l_boundval) + " and right value: " + '{:.4e}'.format(self.r_boundval)))
+            return((self.variable + ": " + self.type + " from x=" 
+                    + '{:.4e}'.format(self.l_bound) + " to " 
+                    + '{:.4e}'.format(self.r_bound) + 
+                    " with left value: " + '{:.4e}'.format(self.l_boundval) 
+                    + " and right value: " + '{:.4e}'.format(self.r_boundval)))
 
         elif (self.type == "EXP"):
-            return((self.variable + ": " + self.type + " from x=" + '{:.4e}'.format(self.l_bound) + " to " + '{:.4e}'.format(self.r_bound) + 
-                    " with left value: " + '{:.4e}'.format(self.l_boundval) + " and right value: " + '{:.4e}'.format(self.r_boundval)))
+            return((self.variable + ": " + self.type + " from x=" 
+                    + '{:.4e}'.format(self.l_bound) + " to " 
+                    + '{:.4e}'.format(self.r_bound) + 
+                    " with left value: " + '{:.4e}'.format(self.l_boundval) 
+                    + " and right value: " + '{:.4e}'.format(self.r_boundval)))
 
         else:
             return("Error #101: Invalid initial condition")
@@ -43,7 +54,9 @@ class Flag:
        So wrap both of those together in a single object and call it a day"""
     def __init__(self, master, display_name):
         self.tk_var = tk.IntVar()
-        self.tk_element = tk.ttk.Checkbutton(master=master, text=display_name, variable=self.tk_var, onvalue=1, offvalue=0)
+        self.tk_element = tk.ttk.Checkbutton(master=master, text=display_name, 
+                                             variable=self.tk_var, 
+                                             onvalue=1, offvalue=0)
         return
     
     def value(self):
@@ -148,10 +161,12 @@ class Raw_Data_Group(Data_Group):
         return result
 
     def get_max_x(self):
-        return np.amax([self.datasets[tag].params_dict["Total_length"] for tag in self.datasets])
+        return np.amax([self.datasets[tag].params_dict["Total_length"] 
+                        for tag in self.datasets])
 
     def get_maxtime(self):
-        return np.amax([self.datasets[tag].params_dict["Total-Time"] for tag in self.datasets])
+        return np.amax([self.datasets[tag].params_dict["Total-Time"] 
+                        for tag in self.datasets])
 
     def get_maxnumtsteps(self):
         return np.amax([self.datasets[tag].num_tsteps for tag in self.datasets])

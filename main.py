@@ -16,17 +16,24 @@ from matplotlib.figure import Figure
 import tkinter.filedialog
 import tkinter.scrolledtext as tkscrolledtext
 import tkinter as tk
-from tkinter import ttk # ttk is a sort of expansion pack to Tkinter, featuring additional elements and features.
+from tkinter import ttk
 import time
 import datetime
 import os
 import tables
 import itertools
-from functools import partial # This lets us pass params to functions called by tkinter buttons
+# This lets us pass params to functions called by tkinter buttons
+from functools import partial 
+
 
 import carrier_excitations
-from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, Integrated_Data_Set, Analysis_Plot_State, Integration_Plot_State
-from utils import to_index, to_pos, to_array, get_all_combinations, extract_values, u_read, check_valid_filename, autoscale, new_integrate
+from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, \
+                        Integrated_Data_Set, Analysis_Plot_State, \
+                        Integration_Plot_State
+
+from utils import to_index, to_pos, to_array, get_all_combinations, \
+                  extract_values, u_read, check_valid_filename, \
+                  autoscale, new_integrate
 
 ## ADD MODULES HERE
 from Modules.Nanowire import Nanowire, tau_diff
@@ -75,25 +82,33 @@ class Notebook:
         self.notebook = tk.ttk.Notebook(self.main_canvas)
         
         # Allocate room for and add scrollbars to overall notebook
-        self.main_scroll_y = tk.ttk.Scrollbar(self.root, orient="vertical", command=self.main_canvas.yview)
+        self.main_scroll_y = tk.ttk.Scrollbar(self.root, orient="vertical", 
+                                              command=self.main_canvas.yview)
         self.main_scroll_y.grid(row=0,column=1, sticky='ns')
-        self.main_scroll_x = tk.ttk.Scrollbar(self.root, orient="horizontal", command=self.main_canvas.xview)
+        self.main_scroll_x = tk.ttk.Scrollbar(self.root, orient="horizontal", 
+                                              command=self.main_canvas.xview)
         self.main_scroll_x.grid(row=1,column=0,sticky='ew')
-        self.main_canvas.configure(yscrollcommand=self.main_scroll_y.set, xscrollcommand=self.main_scroll_x.set)
+        self.main_canvas.configure(yscrollcommand=self.main_scroll_y.set, 
+                                   xscrollcommand=self.main_scroll_x.set)
+        # Make area for scrollbars as narrow as possible without cutting off
         self.root.rowconfigure(0,weight=100)
-        self.root.rowconfigure(1,weight=1, minsize=20) # Make area for scrollbars as narrow as possible without cutting off scrollbars
+        self.root.rowconfigure(1,weight=1, minsize=20) 
         self.root.columnconfigure(0,weight=100)
         self.root.columnconfigure(1,weight=1, minsize=20)
         
         self.main_canvas.create_window((0,0), window=self.notebook, anchor="nw")
-        self.notebook.bind('<Configure>', lambda e:self.main_canvas.configure(scrollregion=self.main_canvas.bbox('all')))
+        self.notebook.bind('<Configure>', 
+                           lambda e:self.main_canvas.configure(scrollregion=self.main_canvas.bbox('all')))
         
         
         self.default_dirs = {"Initial":"Initial", "Data":"Data", "PL":"Analysis"}
 
-        # Tkinter checkboxes and radiobuttons require special variables to extract user input
-        # IntVars or BooleanVars are sufficient for binary choices e.g. whether a checkbox is checked
-        # while StringVars are more suitable for open-ended choices e.g. selecting one mode from a list
+        # Tkinter checkboxes and radiobuttons require special variables 
+        # to extract user input.
+        # IntVars or BooleanVars are sufficient for binary choices 
+        # e.g. whether a checkbox is checked
+        # while StringVars are more suitable for open-ended choices 
+        # e.g. selecting one mode from a list
         self.check_reset_params = tk.IntVar()
         self.check_reset_inits = tk.IntVar()
         self.check_display_legend = tk.IntVar()
@@ -138,7 +153,8 @@ class Notebook:
         self.bay_mode = tk.StringVar(value="model")
 
         # Helpers, flags, and containers for analysis plots
-        self.analysis_plots = [Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State(), Analysis_Plot_State()]
+        self.analysis_plots = [Analysis_Plot_State(), Analysis_Plot_State(), 
+                               Analysis_Plot_State(), Analysis_Plot_State()]
         self.integration_plots = [Integration_Plot_State()]
         self.data_var = tk.StringVar()
         self.fetch_PLmode = tk.StringVar()
@@ -151,19 +167,32 @@ class Notebook:
 
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         # TODO: Open file explorer instead of a file dialog
-        self.file_menu.add_command(label="Manage Initial Condition Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete IC files", initialdir=self.default_dirs["Initial"]))
-        self.file_menu.add_command(label="Manage Data Files", command=partial(tk.filedialog.askdirectory, title="This window does not open anything - Use this window to move or delete data files",initialdir=self.default_dirs["Data"]))
-        self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
-        self.file_menu.add_command(label="Change Module", command=self.change_module)
-        self.file_menu.add_command(label="Exit", command=self.quit)
+        self.file_menu.add_command(label="Manage Initial Condition Files", 
+                                   command=partial(tk.filedialog.askopenfilenames, 
+                                                   title="This window does not open anything - Use this window to move or delete IC files", 
+                                                   initialdir=self.default_dirs["Initial"]))
+        self.file_menu.add_command(label="Manage Data Files", 
+                                   command=partial(tk.filedialog.askdirectory, 
+                                                   title="This window does not open anything - Use this window to move or delete data files",
+                                                   initialdir=self.default_dirs["Data"]))
+        self.file_menu.add_command(label="Manage Export Files", 
+                                   command=partial(tk.filedialog.askopenfilenames, 
+                                                   title="This window does not open anything - Use this window to move or delete export files",
+                                                   initialdir=self.default_dirs["PL"]))
+        self.file_menu.add_command(label="Change Module", 
+                                   command=self.change_module)
+        self.file_menu.add_command(label="Exit", 
+                                   command=self.quit)
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.view_menu.add_command(label="Toggle Fullscreen", command=self.toggle_fullscreen)
+        self.view_menu.add_command(label="Toggle Fullscreen", 
+                                   command=self.toggle_fullscreen)
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
         self.tool_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.tool_menu.add_command(label="Batch Op. Tool", command=self.do_batch_popup)
+        self.tool_menu.add_command(label="Batch Op. Tool", 
+                                   command=self.do_batch_popup)
         self.menu_bar.add_cascade(label="Tools", menu=self.tool_menu)
 
         #self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
@@ -217,7 +246,8 @@ class Notebook:
         except FileExistsError:
             print("PL Directory detected")
             
-        print("Checking whether the current system class ({}) has a dedicated data subdirectory...".format(self.nanowire.system_ID))
+        print("Checking whether the current system class ({}) "
+              "has a dedicated data subdirectory...".format(self.nanowire.system_ID))
         try:
             os.mkdir(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID)
             print("No such subdirectory detected; automatically creating...")
@@ -243,7 +273,8 @@ class Notebook:
         return
 
     def quit(self):
-        self.do_confirmation_popup("All unsaved data will be lost. Are you sure you want to close TEDs?")
+        self.do_confirmation_popup("All unsaved data will be lost. "
+                                   "Are you sure you want to close TEDs?")
         self.root.wait_window(self.confirmation_popup)
         if not self.confirmed: return
         self.root.destroy()
@@ -264,7 +295,9 @@ class Notebook:
         return
 
     def change_module(self):
-        self.do_confirmation_popup("Warning: This will close the current instance of TEDs (and all unsaved data). Are you sure you want to select a new module?")
+        self.do_confirmation_popup("Warning: This will close the current instance "
+                                   "of TEDs (and all unsaved data). Are you sure "
+                                   "you want to select a new module?")
         self.root.wait_window(self.confirmation_popup)
         if not self.confirmed: return
         
@@ -285,15 +318,18 @@ class Notebook:
         self.tab_rules_init = tk.ttk.Frame(self.tab_inputs)
         self.tab_explicit_init = tk.ttk.Frame(self.tab_inputs)
 
-        var_dropdown_list = [str(param + self.nanowire.param_dict[param].units) for param in self.nanowire.param_dict]
+        var_dropdown_list = [str(param + self.nanowire.param_dict[param].units) 
+                             for param in self.nanowire.param_dict]
         paramtoolkit_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
         unitless_dropdown_list = [param for param in self.nanowire.param_dict]
         
         self.line_sep_style = tk.ttk.Style()
-        self.line_sep_style.configure("Grey Bar.TSeparator", background='#000000', padding=160)
+        self.line_sep_style.configure("Grey Bar.TSeparator", background='#000000', 
+                                      padding=160)
 
         self.header_style = tk.ttk.Style()
-        self.header_style.configure("Header.TLabel", background='#D0FFFF',highlightbackground='#000000')
+        self.header_style.configure("Header.TLabel", background='#D0FFFF',
+                                    highlightbackground='#000000')
 
 		# We use the grid location specifier for general placement and padx/pady for fine-tuning
 		# The other two options are the pack specifier, which doesn't really provide enough versatility,
@@ -301,31 +337,41 @@ class Notebook:
         self.IO_frame = tk.ttk.Frame(self.tab_inputs)
         self.IO_frame.grid(row=0,column=0,columnspan=2, pady=(25,0))
         
-        self.load_ICfile_button = tk.ttk.Button(self.IO_frame, text="Load", command=self.select_init_file)
+        self.load_ICfile_button = tk.ttk.Button(self.IO_frame, text="Load", 
+                                                command=self.select_init_file)
         self.load_ICfile_button.grid(row=0,column=0)
 
-        self.DEBUG_BUTTON = tk.ttk.Button(self.IO_frame, text="debug", command=self.DEBUG)
+        self.DEBUG_BUTTON = tk.ttk.Button(self.IO_frame, text="debug", 
+                                          command=self.DEBUG)
         self.DEBUG_BUTTON.grid(row=0,column=1)
 
-        self.save_ICfile_button = tk.ttk.Button(self.IO_frame, text="Save", command=self.save_ICfile)
+        self.save_ICfile_button = tk.ttk.Button(self.IO_frame, text="Save", 
+                                                command=self.save_ICfile)
         self.save_ICfile_button.grid(row=0,column=2)
 
-        self.reset_IC_button = tk.ttk.Button(self.IO_frame, text="Reset", command=self.reset_IC)
+        self.reset_IC_button = tk.ttk.Button(self.IO_frame, text="Reset", 
+                                             command=self.reset_IC)
         self.reset_IC_button.grid(row=0, column=3)
 
         self.spacegrid_frame = tk.ttk.Frame(self.tab_inputs)
         self.spacegrid_frame.grid(row=1,column=0,columnspan=2)
 
-        self.steps_head = tk.ttk.Label(self.spacegrid_frame, text="Space Grid - Start Here", style="Header.TLabel")
+        self.steps_head = tk.ttk.Label(self.spacegrid_frame, 
+                                       text="Space Grid - Start Here", 
+                                       style="Header.TLabel")
         self.steps_head.grid(row=0,column=0,columnspan=2)
 
-        self.thickness_label = tk.ttk.Label(self.spacegrid_frame, text="Thickness " + self.nanowire.length_unit)
+        self.thickness_label = tk.ttk.Label(self.spacegrid_frame, 
+                                            text="Thickness " 
+                                            + self.nanowire.length_unit)
         self.thickness_label.grid(row=1,column=0)
 
         self.thickness_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
         self.thickness_entry.grid(row=1,column=1)
 
-        self.dx_label = tk.ttk.Label(self.spacegrid_frame, text="Node width " + self.nanowire.length_unit)
+        self.dx_label = tk.ttk.Label(self.spacegrid_frame, 
+                                     text="Node width " 
+                                     + self.nanowire.length_unit)
         self.dx_label.grid(row=2,column=0)
 
         self.dx_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
@@ -334,23 +380,29 @@ class Notebook:
         self.params_frame = tk.ttk.Frame(self.tab_inputs)
         self.params_frame.grid(row=2,column=0,columnspan=2, rowspan=4)
 
-        self.system_params_head = tk.ttk.Label(self.params_frame, text="Constant-value Parameters",style="Header.TLabel")
+        self.system_params_head = tk.ttk.Label(self.params_frame, 
+                                               text="Constant-value Parameters",
+                                               style="Header.TLabel")
         self.system_params_head.grid(row=0, column=0,columnspan=2)
         
-        self.system_params_shortcut_button = tk.ttk.Button(self.params_frame, text="Fast Param Entry Tool", command=self.do_sys_param_shortcut_popup)
+        self.system_params_shortcut_button = tk.ttk.Button(self.params_frame, 
+                                                           text="Fast Param Entry Tool", 
+                                                           command=self.do_sys_param_shortcut_popup)
         self.system_params_shortcut_button.grid(row=1,column=0,columnspan=2)
 
         self.flags_frame = tk.ttk.Frame(self.tab_inputs)
         self.flags_frame.grid(row=6,column=0,columnspan=2)
 
-        self.flags_head = tk.ttk.Label(self.flags_frame, text="Flags", style="Header.TLabel")
+        self.flags_head = tk.ttk.Label(self.flags_frame, text="Flags", 
+                                       style="Header.TLabel")
         self.flags_head.grid(row=0,column=0,columnspan=2)
         
         # Procedurally generated elements for flags
         i = 1
         self.sys_flag_dict = {}
         for flag in self.nanowire.flags_dict:
-            self.sys_flag_dict[flag] = Flag(self.flags_frame, self.nanowire.flags_dict[flag][0])
+            self.sys_flag_dict[flag] = Flag(self.flags_frame, 
+                                            self.nanowire.flags_dict[flag][0])
             self.sys_flag_dict[flag].tk_var.set(self.nanowire.flags_dict[flag][1])
             
             if self.nanowire.flags_dict[flag][1]:
@@ -364,13 +416,18 @@ class Notebook:
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
         
-        self.system_printout_button = tk.ttk.Button(self.tab_inputs, text="Print Init. State Summary", command=self.do_sys_printsummary_popup)
+        self.system_printout_button = tk.ttk.Button(self.tab_inputs, 
+                                                    text="Print Init. State Summary", 
+                                                    command=self.do_sys_printsummary_popup)
         self.system_printout_button.grid(row=8,column=0,columnspan=2)
         
-        self.system_plotout_button = tk.ttk.Button(self.tab_inputs, text="Show Init. State Plots", command=self.do_sys_plotsummary_popup)
+        self.system_plotout_button = tk.ttk.Button(self.tab_inputs, 
+                                                   text="Show Init. State Plots", 
+                                                   command=self.do_sys_plotsummary_popup)
         self.system_plotout_button.grid(row=9,column=0,columnspan=2)
 
-        self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", style="Grey Bar.TSeparator")
+        self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", 
+                                                style="Grey Bar.TSeparator")
         self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
              
         ## Parameter Toolkit:
@@ -378,61 +435,90 @@ class Notebook:
         self.param_rules_frame = tk.ttk.Frame(self.tab_rules_init)
         self.param_rules_frame.grid(row=0,column=0,padx=(370,0))
 
-        self.active_paramrule_list_title = tk.ttk.Label(self.param_rules_frame, text="Add/Edit/Remove Space-Dependent Parameters", style="Header.TLabel")
+        self.active_paramrule_list_title = tk.ttk.Label(self.param_rules_frame, 
+                                                        text="Add/Edit/Remove Space-Dependent Parameters", 
+                                                        style="Header.TLabel")
         self.active_paramrule_list_title.grid(row=0,column=0,columnspan=3)
 
-        self.active_paramrule_listbox = tk.Listbox(self.param_rules_frame, width=86,height=8)
-        self.active_paramrule_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, padx=(32,32))
+        self.active_paramrule_listbox = tk.Listbox(self.param_rules_frame, width=86,
+                                                   height=8)
+        self.active_paramrule_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, 
+                                           padx=(32,32))
 
-        self.paramrule_var_label = tk.ttk.Label(self.param_rules_frame, text="Select parameter to edit:")
+        self.paramrule_var_label = tk.ttk.Label(self.param_rules_frame, 
+                                                text="Select parameter to edit:")
         self.paramrule_var_label.grid(row=4,column=0)
         
-        self.paramrule_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_var_selection, var_dropdown_list[0], *var_dropdown_list)
+        self.paramrule_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, 
+                                                        self.init_var_selection, 
+                                                        var_dropdown_list[0], 
+                                                        *var_dropdown_list)
         self.paramrule_var_dropdown.grid(row=4,column=1)
 
-        self.paramrule_method_label = tk.ttk.Label(self.param_rules_frame, text="Select calculation method:")
+        self.paramrule_method_label = tk.ttk.Label(self.param_rules_frame, 
+                                                   text="Select calculation method:")
         self.paramrule_method_label.grid(row=5,column=0)
 
-        self.paramrule_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.init_shape_selection, paramtoolkit_method_dropdown_list[0], *paramtoolkit_method_dropdown_list)
+        self.paramrule_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, 
+                                                           self.init_shape_selection,
+                                                           paramtoolkit_method_dropdown_list[0], 
+                                                           *paramtoolkit_method_dropdown_list)
         self.paramrule_method_dropdown.grid(row=5, column=1)
 
-        self.paramrule_lbound_label = tk.ttk.Label(self.param_rules_frame, text="Left bound coordinate:")
+        self.paramrule_lbound_label = tk.ttk.Label(self.param_rules_frame, 
+                                                   text="Left bound coordinate:")
         self.paramrule_lbound_label.grid(row=6, column=0)
 
         self.paramrule_lbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
         self.paramrule_lbound_entry.grid(row=6,column=1)
 
-        self.paramrule_rbound_label = tk.ttk.Label(self.param_rules_frame, text="Right bound coordinate:")
+        self.paramrule_rbound_label = tk.ttk.Label(self.param_rules_frame, 
+                                                   text="Right bound coordinate:")
         self.paramrule_rbound_label.grid(row=7, column=0)
 
         self.paramrule_rbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
         self.paramrule_rbound_entry.grid(row=7,column=1)
 
-        self.paramrule_lvalue_label = tk.ttk.Label(self.param_rules_frame, text="Left bound value:")
+        self.paramrule_lvalue_label = tk.ttk.Label(self.param_rules_frame, 
+                                                   text="Left bound value:")
         self.paramrule_lvalue_label.grid(row=8, column=0)
 
         self.paramrule_lvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
         self.paramrule_lvalue_entry.grid(row=8,column=1)
 
-        self.paramrule_rvalue_label = tk.ttk.Label(self.param_rules_frame, text="Right bound value:")
+        self.paramrule_rvalue_label = tk.ttk.Label(self.param_rules_frame, 
+                                                   text="Right bound value:")
         self.paramrule_rvalue_label.grid(row=9, column=0)
 
         self.paramrule_rvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
         self.paramrule_rvalue_entry.grid(row=9,column=1)
 
-        self.add_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Add new parameter rule", command=self.add_paramrule)
+        self.add_paramrule_button = tk.ttk.Button(self.param_rules_frame, 
+                                                  text="Add new parameter rule", 
+                                                  command=self.add_paramrule)
         self.add_paramrule_button.grid(row=10,column=0,columnspan=2)
 
-        self.delete_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete highlighted rule", command=self.delete_paramrule)
+        self.delete_paramrule_button = tk.ttk.Button(self.param_rules_frame, 
+                                                     text="Delete highlighted rule", 
+                                                     command=self.delete_paramrule)
         self.delete_paramrule_button.grid(row=4,column=2)
 
-        self.deleteall_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="Delete all rules for this parameter", command=self.deleteall_paramrule)
+        self.deleteall_paramrule_button = tk.ttk.Button(self.param_rules_frame, 
+                                                        text="Delete all rules for this parameter", 
+                                                        command=self.deleteall_paramrule)
         self.deleteall_paramrule_button.grid(row=5,column=2)
 
-        self.paramtoolkit_description = tk.Message(self.param_rules_frame, text="The Parameter Toolkit uses a series of rules and patterns to build a spatially dependent distribution for any parameter.", width=250)
+        self.paramtoolkit_description = tk.Message(self.param_rules_frame, 
+                                                   text="The Parameter Toolkit uses a series "
+                                                   "of rules and patterns to build a spatially "
+                                                   "dependent distribution for any parameter.", 
+                                                   width=250)
         self.paramtoolkit_description.grid(row=6,rowspan=3,column=2,columnspan=2)
 
-        self.paramtoolkit_description2 = tk.Message(self.param_rules_frame, text="Warning: Rules are applied from top to bottom. Order matters!", width=250)
+        self.paramtoolkit_description2 = tk.Message(self.param_rules_frame, 
+                                                    text="Warning: Rules are applied "
+                                                    "from top to bottom. Order matters!", 
+                                                    width=250)
         self.paramtoolkit_description2.grid(row=9,rowspan=3,column=2,columnspan=2)
         
         # These plots were previously attached to self.tab_inputs so that it was visible on all three IC tabs,
@@ -442,35 +528,46 @@ class Notebook:
         self.custom_param_subplot = self.custom_param_fig.add_subplot(111)
         # Prevent coordinate values from appearing in the toolbar; this would sometimes jostle GUI elements around
         self.custom_param_subplot.format_coord = lambda x, y: ""
-        self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, master=self.param_rules_frame)
+        self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, 
+                                                           master=self.param_rules_frame)
         self.custom_param_plotwidget = self.custom_param_canvas.get_tk_widget()
         self.custom_param_plotwidget.grid(row=12, column=0, columnspan=2)
 
         self.custom_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
         self.custom_param_toolbar_frame.grid(row=13,column=0,columnspan=2)
-        self.custom_param_toolbar = tkagg.NavigationToolbar2Tk(self.custom_param_canvas, self.custom_param_toolbar_frame)
+        self.custom_param_toolbar = tkagg.NavigationToolbar2Tk(self.custom_param_canvas, 
+                                                               self.custom_param_toolbar_frame)
         
         self.recent_param_fig = Figure(figsize=(5,3.1))
         self.recent_param_subplot = self.recent_param_fig.add_subplot(111)
         self.recent_param_subplot.format_coord = lambda x, y: ""
-        self.recent_param_canvas = tkagg.FigureCanvasTkAgg(self.recent_param_fig, master=self.param_rules_frame)
+        self.recent_param_canvas = tkagg.FigureCanvasTkAgg(self.recent_param_fig, 
+                                                           master=self.param_rules_frame)
         self.recent_param_plotwidget = self.recent_param_canvas.get_tk_widget()
         self.recent_param_plotwidget.grid(row=12,column=2,columnspan=2)
 
         self.recent_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
         self.recent_param_toolbar_frame.grid(row=13,column=2,columnspan=2)
-        self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, self.recent_param_toolbar_frame)
+        self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, 
+                                                               self.recent_param_toolbar_frame)
 
-        self.moveup_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇧", command=self.moveup_paramrule)
+        self.moveup_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇧", 
+                                                     command=self.moveup_paramrule)
         self.moveup_paramrule_button.grid(row=1,column=4)
 
-        self.paramrule_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, self.paramtoolkit_viewer_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
+        self.paramrule_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, 
+                                                           self.paramtoolkit_viewer_selection, 
+                                                           unitless_dropdown_list[0], 
+                                                           *unitless_dropdown_list)
         self.paramrule_viewer_dropdown.grid(row=2,column=4)
 
-        self.paramrule_view_button = tk.ttk.Button(self.param_rules_frame, text="Change view", command=self.refresh_paramrule_listbox)
+        self.paramrule_view_button = tk.ttk.Button(self.param_rules_frame, 
+                                                   text="Change view", 
+                                                   command=self.refresh_paramrule_listbox)
         self.paramrule_view_button.grid(row=2,column=5)
 
-        self.movedown_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇩", command=self.movedown_paramrule)
+        self.movedown_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇩", 
+                                                       command=self.movedown_paramrule)
         self.movedown_paramrule_button.grid(row=3,column=4)
 
         ## Param List Upload:
@@ -478,29 +575,42 @@ class Notebook:
         self.listupload_frame = tk.ttk.Frame(self.tab_explicit_init)
         self.listupload_frame.grid(row=0,column=0,padx=(440,0))
 
-        self.listupload_description = tk.Message(self.listupload_frame, text="This tab provides an option to directly import a list of data points, on which the TED will do linear interpolation to fit to the specified space grid.", width=360)
+        self.listupload_description = tk.Message(self.listupload_frame, 
+                                                 text="This tab provides an option "
+                                                 "to directly import a list of data points, "
+                                                 "on which the TED will do linear interpolation "
+                                                 "to fit to the specified space grid.", 
+                                                 width=360)
         self.listupload_description.grid(row=0,column=0)
         
-        self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, self.listupload_var_selection, unitless_dropdown_list[0], *unitless_dropdown_list)
+        self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, 
+                                                     self.listupload_var_selection, 
+                                                     unitless_dropdown_list[0], 
+                                                     *unitless_dropdown_list)
         self.listupload_dropdown.grid(row=1,column=0)
 
-        self.add_listupload_button = tk.ttk.Button(self.listupload_frame, text="Import", command=self.add_listupload)
+        self.add_listupload_button = tk.ttk.Button(self.listupload_frame, 
+                                                   text="Import", 
+                                                   command=self.add_listupload)
         self.add_listupload_button.grid(row=2,column=0)
         
         self.listupload_fig = Figure(figsize=(6,3.8))
         self.listupload_subplot = self.listupload_fig.add_subplot(111)
-        self.listupload_canvas = tkagg.FigureCanvasTkAgg(self.listupload_fig, master=self.listupload_frame)
+        self.listupload_canvas = tkagg.FigureCanvasTkAgg(self.listupload_fig, 
+                                                         master=self.listupload_frame)
         self.listupload_plotwidget = self.listupload_canvas.get_tk_widget()
         self.listupload_plotwidget.grid(row=0, rowspan=3,column=1)
         
         self.listupload_toolbar_frame = tk.ttk.Frame(master=self.listupload_frame)
         self.listupload_toolbar_frame.grid(row=3,column=1)
-        self.listupload_toolbar = tkagg.NavigationToolbar2Tk(self.listupload_canvas, self.listupload_toolbar_frame)
+        self.listupload_toolbar = tkagg.NavigationToolbar2Tk(self.listupload_canvas, 
+                                                             self.listupload_toolbar_frame)
 
         ## Laser Generation Condition (LGC): extra input mtds for nanowire-specific applications
         if self.nanowire.system_ID == "Nanowire":
             self.create_LGC_frame()
-            self.tab_inputs.add(self.tab_generation_init, text="Laser Generation Conditions")
+            self.tab_inputs.add(self.tab_generation_init, 
+                                text="Laser Generation Conditions")
             
         # Attach sub-frames to input tab and input tab to overall notebook
         self.tab_inputs.add(self.tab_rules_init, text="Parameter Toolkit")
@@ -511,7 +621,9 @@ class Notebook:
     def add_tab_simulate(self):
         self.tab_simulate = tk.ttk.Frame(self.notebook)
 
-        self.choose_ICfile_title = tk.ttk.Label(self.tab_simulate, text="Select Init. Cond.", style="Header.TLabel")
+        self.choose_ICfile_title = tk.ttk.Label(self.tab_simulate, 
+                                                text="Select Init. Cond.", 
+                                                style="Header.TLabel")
         self.choose_ICfile_title.grid(row=0,column=0,columnspan=2, padx=(9,12))
 
         self.simtime_label = tk.ttk.Label(self.tab_simulate, text="Simulation Time [ns]")
@@ -535,7 +647,8 @@ class Notebook:
         self.enter(self.dt_entry, "0.5")
         self.enter(self.hmax_entry, "0.25")
         
-        self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", command=self.do_Batch)
+        self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", 
+                                          command=self.do_Batch)
         self.calculate_NP.grid(row=6,column=0,columnspan=2,padx=(9,12))
 
         self.status_label = tk.ttk.Label(self.tab_simulate, text="Status")
@@ -545,10 +658,12 @@ class Notebook:
         self.status.grid(row=8, rowspan=2, column=0, columnspan=2)
         self.status.configure(state='disabled')
 
-        self.line3_separator = tk.ttk.Separator(self.tab_simulate, orient="vertical", style="Grey Bar.TSeparator")
+        self.line3_separator = tk.ttk.Separator(self.tab_simulate, orient="vertical", 
+                                                style="Grey Bar.TSeparator")
         self.line3_separator.grid(row=0,rowspan=30,column=2,sticky="ns")
 
-        self.subtitle = tk.ttk.Label(self.tab_simulate, text="Simulation - {}".format(self.nanowire.system_ID))
+        self.subtitle = tk.ttk.Label(self.tab_simulate, 
+                                     text="Simulation - {}".format(self.nanowire.system_ID))
         self.subtitle.grid(row=0,column=3,columnspan=3)
         
         self.sim_fig = Figure(figsize=(14, 8))
@@ -558,7 +673,9 @@ class Notebook:
         rdim = np.ceil(self.nanowire.simulation_outputs_count / cdim)
         self.sim_subplots = {}
         for variable in self.nanowire.simulation_outputs_dict:
-            self.sim_subplots[variable] = self.sim_fig.add_subplot(int(rdim), int(cdim), int(count))
+            self.sim_subplots[variable] = self.sim_fig.add_subplot(int(rdim), 
+                                                                   int(cdim), 
+                                                                   int(count))
             self.sim_subplots[variable].set_title(variable)
             count += 1
 
@@ -568,7 +685,8 @@ class Notebook:
         
         self.simfig_toolbar_frame = tk.ttk.Frame(master=self.tab_simulate)
         self.simfig_toolbar_frame.grid(row=13,column=3,columnspan=2)
-        self.simfig_toolbar = tkagg.NavigationToolbar2Tk(self.sim_canvas, self.simfig_toolbar_frame)
+        self.simfig_toolbar = tkagg.NavigationToolbar2Tk(self.sim_canvas, 
+                                                         self.simfig_toolbar_frame)
 
         self.notebook.add(self.tab_simulate, text="Simulate")
         return
@@ -591,19 +709,25 @@ class Notebook:
             self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
             count += 1
         
-        self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, text="Select Dataset", command=self.plot_overview_analysis)
+        self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, 
+                                                     text="Select Dataset", 
+                                                     command=self.plot_overview_analysis)
         self.analyze_overview_button.grid(row=0,column=0)
         
-        self.analyze_overview_canvas = tkagg.FigureCanvasTkAgg(self.analyze_overview_fig, master=self.tab_overview_analysis)
+        self.analyze_overview_canvas = tkagg.FigureCanvasTkAgg(self.analyze_overview_fig, 
+                                                               master=self.tab_overview_analysis)
         self.analyze_overview_widget = self.analyze_overview_canvas.get_tk_widget()
         self.analyze_overview_widget.grid(row=1,column=0)
 
         self.overview_toolbar_frame = tk.ttk.Frame(self.tab_overview_analysis)
         self.overview_toolbar_frame.grid(row=2,column=0)
-        self.overview_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, self.overview_toolbar_frame)
+        self.overview_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, 
+                                                           self.overview_toolbar_frame)
         self.overview_toolbar.grid(row=0,column=0)
         
-        self.analysis_title = tk.ttk.Label(self.tab_detailed_analysis, text="Plot and Integrate Saved Datasets", style="Header.TLabel")
+        self.analysis_title = tk.ttk.Label(self.tab_detailed_analysis, 
+                                           text="Plot and Integrate Saved Datasets", 
+                                           style="Header.TLabel")
         self.analysis_title.grid(row=0,column=0,columnspan=8)
         
         self.analyze_fig = Figure(figsize=(9.8,6))
@@ -617,80 +741,116 @@ class Notebook:
         self.analysis_plots[2].plot_obj = self.analyze_subplot2
         self.analysis_plots[3].plot_obj = self.analyze_subplot3
         
-        self.analyze_canvas = tkagg.FigureCanvasTkAgg(self.analyze_fig, master=self.tab_detailed_analysis)
+        self.analyze_canvas = tkagg.FigureCanvasTkAgg(self.analyze_fig, 
+                                                      master=self.tab_detailed_analysis)
         self.analyze_widget = self.analyze_canvas.get_tk_widget()
         self.analyze_widget.grid(row=1,column=0,rowspan=1,columnspan=4, padx=(12,0))
 
         self.analyze_plotselector_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
         self.analyze_plotselector_frame.grid(row=2,rowspan=2,column=0,columnspan=4)
         
-        self.analysisplot_topleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=0)
+        self.analysisplot_topleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
+                                                       variable=self.active_analysisplot_ID, 
+                                                       value=0)
         self.analysisplot_topleft.grid(row=0,column=0)
 
-        self.analysisplot_topleft_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Top Left")
+        self.analysisplot_topleft_label = tk.ttk.Label(self.analyze_plotselector_frame, 
+                                                       text="Use: Top Left")
         self.analysisplot_topleft_label.grid(row=0,column=1)
         
-        self.analysisplot_topright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=1)
+        self.analysisplot_topright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
+                                                        variable=self.active_analysisplot_ID, 
+                                                        value=1)
         self.analysisplot_topright.grid(row=0,column=2)
 
-        self.analysisplot_topright_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Top Right")
+        self.analysisplot_topright_label = tk.ttk.Label(self.analyze_plotselector_frame, 
+                                                        text="Use: Top Right")
         self.analysisplot_topright_label.grid(row=0,column=3)
         
-        self.analysisplot_bottomleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=2)
+        self.analysisplot_bottomleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
+                                                          variable=self.active_analysisplot_ID, 
+                                                          value=2)
         self.analysisplot_bottomleft.grid(row=1,column=0)
 
-        self.analysisplot_bottomleft_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Bottom Left")
+        self.analysisplot_bottomleft_label = tk.ttk.Label(self.analyze_plotselector_frame, 
+                                                          text="Use: Bottom Left")
         self.analysisplot_bottomleft_label.grid(row=1,column=1)
         
-        self.analysisplot_bottomright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, variable=self.active_analysisplot_ID, value=3)
+        self.analysisplot_bottomright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
+                                                           variable=self.active_analysisplot_ID, 
+                                                           value=3)
         self.analysisplot_bottomright.grid(row=1,column=2)
 
-        self.analysisplot_bottomright_label = tk.ttk.Label(self.analyze_plotselector_frame, text="Use: Bottom Right")
+        self.analysisplot_bottomright_label = tk.ttk.Label(self.analyze_plotselector_frame, 
+                                                           text="Use: Bottom Right")
         self.analysisplot_bottomright_label.grid(row=1,column=3)
         
         self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
         self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=4,columnspan=4)
-        self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame)
+        self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, 
+                                                          self.analyze_toolbar_frame)
         self.analyze_toolbar.grid(row=0,column=0,columnspan=7)
 
-        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Plot", command=partial(self.load_datasets))
+        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, 
+                                                 text="Plot", 
+                                                 command=partial(self.load_datasets))
         self.analyze_plot_button.grid(row=1,column=0)
         
         self.analyze_tstep_entry = tk.ttk.Entry(self.analyze_toolbar_frame, width=9)
         self.analyze_tstep_entry.grid(row=1,column=1)
 
-        self.analyze_tstep_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Step >>", command=partial(self.plot_tstep))
+        self.analyze_tstep_button = tk.ttk.Button(self.analyze_toolbar_frame, 
+                                                  text="Step >>", 
+                                                  command=partial(self.plot_tstep))
         self.analyze_tstep_button.grid(row=1,column=2)
 
-        self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, text=">> Integrate <<", command=partial(self.do_Integrate))
+        self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, 
+                                                 text=">> Integrate <<", 
+                                                 command=partial(self.do_Integrate))
         self.calculate_PL_button.grid(row=1,column=3)
 
-        self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=0))
+        self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, 
+                                                 text="Axis Settings", 
+                                                 command=partial(self.do_change_axis_popup, 
+                                                                 from_integration=0))
         self.analyze_axis_button.grid(row=1,column=4)
 
-        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Export", command=partial(self.export_plot, from_integration=0))
+        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, 
+                                                   text="Export", 
+                                                   command=partial(self.export_plot, 
+                                                                   from_integration=0))
         self.analyze_export_button.grid(row=1,column=5)
 
-        self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, text="Generate IC", command=partial(self.do_IC_carry_popup))
+        self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, 
+                                                     text="Generate IC", 
+                                                     command=partial(self.do_IC_carry_popup))
         self.analyze_IC_carry_button.grid(row=1,column=6)
 
         self.integration_fig = Figure(figsize=(9,5))
         self.integration_subplot = self.integration_fig.add_subplot(111)
         self.integration_plots[0].plot_obj = self.integration_subplot
 
-        self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, master=self.tab_detailed_analysis)
+        self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, 
+                                                          master=self.tab_detailed_analysis)
         self.integration_widget = self.integration_canvas.get_tk_widget()
         self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
 
         self.integration_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
         self.integration_toolbar_frame.grid(row=3,column=5, rowspan=2,columnspan=1)
-        self.integration_toolbar = tkagg.NavigationToolbar2Tk(self.integration_canvas, self.integration_toolbar_frame)
+        self.integration_toolbar = tkagg.NavigationToolbar2Tk(self.integration_canvas, 
+                                                              self.integration_toolbar_frame)
         self.integration_toolbar.grid(row=0,column=0,columnspan=5)
 
-        self.integration_axis_button = tk.ttk.Button(self.integration_toolbar_frame, text="Axis Settings", command=partial(self.do_change_axis_popup, from_integration=1))
+        self.integration_axis_button = tk.ttk.Button(self.integration_toolbar_frame, 
+                                                     text="Axis Settings", 
+                                                     command=partial(self.do_change_axis_popup, 
+                                                                     from_integration=1))
         self.integration_axis_button.grid(row=1,column=0)
 
-        self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, text="Export", command=partial(self.export_plot, from_integration=1))
+        self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, 
+                                                       text="Export", 
+                                                       command=partial(self.export_plot, 
+                                                                       from_integration=1))
         self.integration_export_button.grid(row=1,column=1)
 
         # self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
@@ -709,24 +869,34 @@ class Notebook:
         self.LGC_frame = tk.ttk.Frame(self.tab_generation_init)
         self.LGC_frame.grid(row=0,column=0, padx=(330,0))
 
-        self.LGC_head = tk.ttk.Label(self.LGC_frame, text="Generation from Laser Excitation", style="Header.TLabel")
+        self.LGC_head = tk.ttk.Label(self.LGC_frame, 
+                                     text="Generation from Laser Excitation", 
+                                     style="Header.TLabel")
         self.LGC_head.grid(row=0,column=0,columnspan=3)
 
         # A sub-frame attached to a sub-frame
         # With these we can group related elements into a common region
-        self.material_param_frame = tk.Frame(self.LGC_frame, highlightbackground="black", highlightthicknes=1)
+        self.material_param_frame = tk.Frame(self.LGC_frame, 
+                                             highlightbackground="black", 
+                                             highlightthickness=1)
         self.material_param_frame.grid(row=1,column=0)
 
-        self.material_param_label = tk.Label(self.material_param_frame, text="Material Params - Select One")
+        self.material_param_label = tk.Label(self.material_param_frame, 
+                                             text="Material Params - Select One")
         self.material_param_label.grid(row=0,column=0,columnspan=4)
 
-        self.hline1_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline1_separator = tk.ttk.Separator(self.material_param_frame, 
+                                                 orient="horizontal", 
+                                                 style="Grey Bar.TSeparator")
         self.hline1_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.calc_LGC_absorption_cof = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=1)
+        self.calc_LGC_absorption_cof = tk.ttk.Radiobutton(self.material_param_frame, 
+                                                          variable=self.check_calculate_init_material_expfactor, 
+                                                          value=1)
         self.calc_LGC_absorption_cof.grid(row=2,column=0)
 
-        self.calc_LGC_absorption_cof_label = tk.Label(self.material_param_frame, text="Option 1")
+        self.calc_LGC_absorption_cof_label = tk.Label(self.material_param_frame, 
+                                                      text="Option 1")
         self.calc_LGC_absorption_cof_label.grid(row=2,column=1)
 
         self.A0_label = tk.Label(self.material_param_frame, text="A0 [cm^-1 eV^-γ]")
@@ -741,64 +911,91 @@ class Notebook:
         self.Eg_entry = tk.ttk.Entry(self.material_param_frame, width=9)
         self.Eg_entry.grid(row=3,column=3)
 
-        self.direct_LGC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.LGC_stim_mode, value="direct")
+        self.direct_LGC_stim = tk.ttk.Radiobutton(self.material_param_frame, 
+                                                  variable=self.LGC_stim_mode, 
+                                                  value="direct")
         self.direct_LGC_stim.grid(row=4,column=2)
 
-        self.direct_LGC_stim_label = tk.Label(self.material_param_frame,text="Direct (γ=1/2)")
+        self.direct_LGC_stim_label = tk.Label(self.material_param_frame,
+                                              text="Direct (γ=1/2)")
         self.direct_LGC_stim_label.grid(row=4,column=3)
 
-        self.indirect_LGC_stim = tk.ttk.Radiobutton(self.material_param_frame, variable=self.LGC_stim_mode, value="indirect")
+        self.indirect_LGC_stim = tk.ttk.Radiobutton(self.material_param_frame, 
+                                                    variable=self.LGC_stim_mode, 
+                                                    value="indirect")
         self.indirect_LGC_stim.grid(row=5,column=2)
 
-        self.indirect_LGC_stim_label = tk.Label(self.material_param_frame,text="Indirect (γ=2)")
+        self.indirect_LGC_stim_label = tk.Label(self.material_param_frame,
+                                                text="Indirect (γ=2)")
         self.indirect_LGC_stim_label.grid(row=5,column=3)
 
-        self.hline2_separator = tk.ttk.Separator(self.material_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline2_separator = tk.ttk.Separator(self.material_param_frame, 
+                                                 orient="horizontal", 
+                                                 style="Grey Bar.TSeparator")
         self.hline2_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.enter_LGC_absorption_cof = tk.ttk.Radiobutton(self.material_param_frame, variable=self.check_calculate_init_material_expfactor, value=0)
+        self.enter_LGC_absorption_cof = tk.ttk.Radiobutton(self.material_param_frame, 
+                                                           variable=self.check_calculate_init_material_expfactor, 
+                                                           value=0)
         self.enter_LGC_absorption_cof.grid(row=7,column=0)
 
-        self.enter_LGC_absorption_cof_label = tk.Label(self.material_param_frame, text="Option 2")
+        self.enter_LGC_absorption_cof_label = tk.Label(self.material_param_frame, 
+                                                       text="Option 2")
         self.enter_LGC_absorption_cof_label.grid(row=7,column=1)
 
-        self.LGC_absorption_cof_label = tk.Label(self.material_param_frame, text="α [cm^-1]")
+        self.LGC_absorption_cof_label = tk.Label(self.material_param_frame, 
+                                                 text="α [cm^-1]")
         self.LGC_absorption_cof_label.grid(row=8,column=2)
 
-        self.LGC_absorption_cof_entry = tk.ttk.Entry(self.material_param_frame, width=9)
+        self.LGC_absorption_cof_entry = tk.ttk.Entry(self.material_param_frame, 
+                                                     width=9)
         self.LGC_absorption_cof_entry.grid(row=8,column=3)
 
-        self.pulse_laser_frame = tk.Frame(self.LGC_frame, highlightbackground="black", highlightthicknes=1)
+        self.pulse_laser_frame = tk.Frame(self.LGC_frame, 
+                                          highlightbackground="black", 
+                                          highlightthickness=1)
         self.pulse_laser_frame.grid(row=1,column=1, padx=(20,0))
 
-        self.pulse_laser_label = tk.Label(self.pulse_laser_frame, text="Pulse Laser Params")
+        self.pulse_laser_label = tk.Label(self.pulse_laser_frame, 
+                                          text="Pulse Laser Params")
         self.pulse_laser_label.grid(row=0,column=0,columnspan=4)
 
-        self.hline3_separator = tk.ttk.Separator(self.pulse_laser_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline3_separator = tk.ttk.Separator(self.pulse_laser_frame, 
+                                                 orient="horizontal", 
+                                                 style="Grey Bar.TSeparator")
         self.hline3_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.pulse_freq_label = tk.Label(self.pulse_laser_frame, text="Pulse frequency [kHz]")
+        self.pulse_freq_label = tk.Label(self.pulse_laser_frame, 
+                                         text="Pulse frequency [kHz]")
         self.pulse_freq_label.grid(row=2,column=2)
 
         self.pulse_freq_entry = tk.ttk.Entry(self.pulse_laser_frame, width=9)
         self.pulse_freq_entry.grid(row=2,column=3)
 
-        self.pulse_wavelength_label = tk.Label(self.pulse_laser_frame, text="Wavelength [nm]")
+        self.pulse_wavelength_label = tk.Label(self.pulse_laser_frame, 
+                                               text="Wavelength [nm]")
         self.pulse_wavelength_label.grid(row=3,column=2)
 
         self.pulse_wavelength_entry = tk.ttk.Entry(self.pulse_laser_frame, width=9)
         self.pulse_wavelength_entry.grid(row=3,column=3)
 
-        self.gen_power_param_frame = tk.Frame(self.LGC_frame, highlightbackground="black", highlightthicknes=1)
+        self.gen_power_param_frame = tk.Frame(self.LGC_frame, 
+                                              highlightbackground="black",
+                                              highlightthickness=1)
         self.gen_power_param_frame.grid(row=1,column=2, padx=(20,0))
 
-        self.gen_power_param_label = tk.Label(self.gen_power_param_frame, text="Generation/Power Params - Select One")
+        self.gen_power_param_label = tk.Label(self.gen_power_param_frame, 
+                                              text="Generation/Power Params - Select One")
         self.gen_power_param_label.grid(row=0,column=0,columnspan=4)
 
-        self.hline4_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline4_separator = tk.ttk.Separator(self.gen_power_param_frame, 
+                                                 orient="horizontal", 
+                                                 style="Grey Bar.TSeparator")
         self.hline4_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.power_spot = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.LGC_gen_power_mode, value="power-spot")
+        self.power_spot = tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                                             variable=self.LGC_gen_power_mode, 
+                                             value="power-spot")
         self.power_spot.grid(row=2,column=0)
 
         self.power_spot_label = tk.Label(self.gen_power_param_frame, text="Option 1")
@@ -816,55 +1013,77 @@ class Notebook:
         self.spotsize_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.spotsize_entry.grid(row=3,column=3)
 
-        self.hline5_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline5_separator = tk.ttk.Separator(self.gen_power_param_frame, 
+                                                 orient="horizontal", 
+                                                 style="Grey Bar.TSeparator")
         self.hline5_separator.grid(row=4,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.power_density_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.LGC_gen_power_mode, value="density")
+        self.power_density_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                                                   variable=self.LGC_gen_power_mode, 
+                                                   value="density")
         self.power_density_rb.grid(row=5,column=0)
 
         self.power_density_rb_label = tk.Label(self.gen_power_param_frame,text="Option 2")
         self.power_density_rb_label.grid(row=5,column=1)
 
-        self.power_density_label = tk.Label(self.gen_power_param_frame, text="Power Density [uW/cm^2]")
+        self.power_density_label = tk.Label(self.gen_power_param_frame, 
+                                            text="Power Density [uW/cm^2]")
         self.power_density_label.grid(row=5,column=2)
 
         self.power_density_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.power_density_entry.grid(row=5,column=3)
 
-        self.hline6_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline6_separator = tk.ttk.Separator(self.gen_power_param_frame, 
+                                                 orient="horizontal", 
+                                                 style="Grey Bar.TSeparator")
         self.hline6_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.max_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.LGC_gen_power_mode, value="max-gen")
+        self.max_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                                             variable=self.LGC_gen_power_mode, 
+                                             value="max-gen")
         self.max_gen_rb.grid(row=7,column=0)
 
         self.max_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 3")
         self.max_gen_rb_label.grid(row=7,column=1)
 
-        self.max_gen_label = tk.Label(self.gen_power_param_frame, text="Max Generation [carr/cm^3]")
+        self.max_gen_label = tk.Label(self.gen_power_param_frame, 
+                                      text="Max Generation [carr/cm^3]")
         self.max_gen_label.grid(row=7,column=2)
 
         self.max_gen_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.max_gen_entry.grid(row=7,column=3)
 
-        self.hline7_separator = tk.ttk.Separator(self.gen_power_param_frame, orient="horizontal", style="Grey Bar.TSeparator")
+        self.hline7_separator = tk.ttk.Separator(self.gen_power_param_frame, 
+                                                 orient="horizontal", 
+                                                 style="Grey Bar.TSeparator")
         self.hline7_separator.grid(row=8,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.total_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, variable=self.LGC_gen_power_mode, value="total-gen")
+        self.total_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                                               variable=self.LGC_gen_power_mode, 
+                                               value="total-gen")
         self.total_gen_rb.grid(row=9,column=0)
 
         self.total_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 4")
         self.total_gen_rb_label.grid(row=9,column=1)
 
-        self.total_gen_label = tk.Label(self.gen_power_param_frame, text="Total Generation [carr/cm^3]")
+        self.total_gen_label = tk.Label(self.gen_power_param_frame, 
+                                        text="Total Generation [carr/cm^3]")
         self.total_gen_label.grid(row=9,column=2)
 
         self.total_gen_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.total_gen_entry.grid(row=9,column=3)
 
-        self.load_LGC_button = tk.ttk.Button(self.LGC_frame, text="Generate Initial Condition", command=self.add_LGC)
+        self.load_LGC_button = tk.ttk.Button(self.LGC_frame, 
+                                             text="Generate Initial Condition", 
+                                             command=self.add_LGC)
         self.load_LGC_button.grid(row=2,column=0,columnspan=3)
 
-        self.LGC_description = tk.Message(self.LGC_frame, text="The Laser Generation Condition uses the above numerical parameters to generate an initial carrier distribution based on an applied laser excitation.", width=320)
+        self.LGC_description = tk.Message(self.LGC_frame, 
+                                          text="The Laser Generation Condition "
+                                          "uses the above numerical parameters "
+                                          "to generate an initial carrier "
+                                          "distribution based on an applied "
+                                          "laser excitation.", width=320)
         self.LGC_description.grid(row=3,column=0,columnspan=3)
         
         self.LGC_fig = Figure(figsize=(5,3.1))
@@ -875,28 +1094,38 @@ class Notebook:
         
         self.LGC_toolbar_frame = tk.ttk.Frame(master=self.LGC_frame)
         self.LGC_toolbar_frame.grid(row=5,column=0,columnspan=3)
-        self.LGC_toolbar = tkagg.NavigationToolbar2Tk(self.LGC_canvas, self.LGC_toolbar_frame)
+        self.LGC_toolbar = tkagg.NavigationToolbar2Tk(self.LGC_canvas, 
+                                                      self.LGC_toolbar_frame)
         
-        self.LGC_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "LGC_absorption_cof":self.LGC_absorption_cof_entry, "Pulse_Freq":self.pulse_freq_entry, 
-                                    "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
-                                    "Max_Gen":self.max_gen_entry, "Total_Gen":self.total_gen_entry}
+        self.LGC_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, 
+                                    "LGC_absorption_cof":self.LGC_absorption_cof_entry, 
+                                    "Pulse_Freq":self.pulse_freq_entry, 
+                                    "Pulse_Wavelength":self.pulse_wavelength_entry, 
+                                    "Power":self.power_entry, 
+                                    "Spotsize":self.spotsize_entry, 
+                                    "Power_Density":self.power_density_entry,
+                                    "Max_Gen":self.max_gen_entry, 
+                                    "Total_Gen":self.total_gen_entry}
         return
 
     def DEBUG(self):
-        """ Print a custom message regarding the system state; this changes often depending on what is being worked on"""
+        """ Print a custom message regarding the system state; 
+            this changes often depending on what is being worked on"""
         for flag in self.sys_flag_dict:
             print(flag + ": " + str(self.sys_flag_dict[flag].tk_var.get()))
         return
 
     def update_system_summary(self):
-        """ Transfer parameter values from the Initial Condition tab to the summary popup windows."""
+        """ Transfer parameter values from the Initial Condition tab 
+            to the summary popup windows."""
         if self.sys_printsummary_popup_isopen:
             self.write(self.printsummary_textbox, self.nanowire.DEBUG_print())
             
         if self.sys_plotsummary_popup_isopen:
             for param_name in self.nanowire.param_dict:
                 param = self.nanowire.param_dict[param_name]
-                val = to_array(param.value, len(self.nanowire.grid_x_nodes), param.is_edge)
+                val = to_array(param.value, len(self.nanowire.grid_x_nodes), 
+                               param.is_edge)
                 grid_x = self.nanowire.grid_x_nodes if not param.is_edge else self.nanowire.grid_x_edges
                 self.sys_param_summaryplots[param_name].plot(grid_x, val)
                 self.sys_param_summaryplots[param_name].set_yscale(autoscale(val_array=val))
@@ -910,7 +1139,9 @@ class Notebook:
     def do_module_popup(self):
         """ Popup for selecting the active module (e.g. Nanowire) """
         self.select_module_popup = tk.Toplevel(self.root)
-        self.select_module_label = tk.Label(self.select_module_popup, text="The following TEDs modules were found; select one to continue: ")
+        self.select_module_label = tk.Label(self.select_module_popup, 
+                                            text="The following TEDs modules were found; "
+                                            "select one to continue: ")
         self.select_module_label.grid(row=0,column=0)
         
         self.modules_list = mod_list()
@@ -920,12 +1151,18 @@ class Notebook:
         self.module_listbox.delete(0,tk.END)
         self.module_listbox.insert(0,*(self.module_names))
         
-        self.module_continue_button = tk.Button(self.select_module_popup, text="Continue", command=partial(self.on_select_module_popup_close, True))
+        self.module_continue_button = tk.Button(self.select_module_popup, 
+                                                text="Continue", 
+                                                command=partial(self.on_select_module_popup_close, 
+                                                                True))
         self.module_continue_button.grid(row=2,column=0)
         
-        self.select_module_popup.protocol("WM_DELETE_WINDOW", partial(self.on_select_module_popup_close, continue_=False))
+        self.select_module_popup.protocol("WM_DELETE_WINDOW", 
+                                          partial(self.on_select_module_popup_close, 
+                                                  continue_=False))
         self.select_module_popup.attributes("-topmost", True)
-        self.select_module_popup.after_idle(self.select_module_popup.attributes,'-topmost',False)
+        self.select_module_popup.after_idle(self.select_module_popup.attributes,
+                                            '-topmost',False)
         
         self.select_module_popup.grab_set()
         
@@ -956,22 +1193,31 @@ class Notebook:
             which should require user confirmation"""
         self.confirmation_popup = tk.Toplevel(self.root)
         
-        self.confirmation_text = tk.Message(self.confirmation_popup, text=text, width=(float(self.root.winfo_screenwidth()) / 4))
+        self.confirmation_text = tk.Message(self.confirmation_popup, text=text, 
+                                            width=(float(self.root.winfo_screenwidth()) / 4))
         self.confirmation_text.grid(row=0,column=0, columnspan=2)
         
         if not hide_cancel:
-            self.confirmation_cancel_button = tk.Button(self.confirmation_popup, text="Cancel", command=partial(self.on_confirmation_popup_close, continue_=False))
+            self.confirmation_cancel_button = tk.Button(self.confirmation_popup, 
+                                                        text="Cancel", 
+                                                        command=partial(self.on_confirmation_popup_close, 
+                                                                        continue_=False))
             self.confirmation_cancel_button.grid(row=1,column=0)
         
-        self.confirmation_continue_btn = tk.Button(self.confirmation_popup, text='Continue', command=partial(self.on_confirmation_popup_close, continue_=True))
+        self.confirmation_continue_btn = tk.Button(self.confirmation_popup, 
+                                                   text='Continue', 
+                                                   command=partial(self.on_confirmation_popup_close, 
+                                                                   continue_=True))
         self.confirmation_continue_btn.grid(row=1,column=1)
         
-        self.confirmation_popup.protocol("WM_DELETE_WINDOW", self.on_confirmation_popup_close)
+        self.confirmation_popup.protocol("WM_DELETE_WINDOW", 
+                                         self.on_confirmation_popup_close)
         self.confirmation_popup.grab_set()        
         return
     
     def on_confirmation_popup_close(self, continue_=False):
-        """ Inform caller of do_confirmation_popup of whether user confirmation was received """
+        """ Inform caller of do_confirmation_popup of whether user confirmation 
+            was received """
         self.confirmed = continue_
         self.confirmation_popup.destroy()
         return
@@ -979,18 +1225,20 @@ class Notebook:
     
     def do_sys_printsummary_popup(self):
         """ Display as text the current space grid and parameters. """
-        
-        if not self.sys_printsummary_popup_isopen: # Don't open more than one of this window at a time
+        # Don't open more than one of this window at a time
+        if not self.sys_printsummary_popup_isopen: 
             self.sys_printsummary_popup = tk.Toplevel(self.root)
             
-            self.printsummary_textbox = tkscrolledtext.ScrolledText(self.sys_printsummary_popup, width=100,height=30)
+            self.printsummary_textbox = tkscrolledtext.ScrolledText(self.sys_printsummary_popup, 
+                                                                    width=100,height=30)
             self.printsummary_textbox.grid(row=0,column=0,padx=(20,0), pady=(20,20))
             
             self.sys_printsummary_popup_isopen = True
             
             self.update_system_summary()
             
-            self.sys_printsummary_popup.protocol("WM_DELETE_WINDOW", self.on_sys_printsummary_popup_close)
+            self.sys_printsummary_popup.protocol("WM_DELETE_WINDOW", 
+                                                 self.on_sys_printsummary_popup_close)
             return
         
     def on_sys_printsummary_popup_close(self):
@@ -1014,7 +1262,9 @@ class Notebook:
             cdim = np.ceil(self.nanowire.param_count / rdim)
             
             if self.sys_flag_dict['symmetric_system'].value():
-                self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, text="Note: All distributions are symmetric about x=0")
+                self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, 
+                                                           text="Note: All distributions "
+                                                                "are symmetric about x=0")
                 self.plotsummary_symmetriclabel.grid(row=0,column=0)
 
             self.plotsummary_fig = Figure(figsize=(20,10))
@@ -1025,14 +1275,16 @@ class Notebook:
                 self.sys_param_summaryplots[param_name].set_title("{} {}".format(param_name,self.nanowire.param_dict[param_name].units))
                 count += 1
             
-            self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, master=self.sys_plotsummary_popup)
+            self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, 
+                                                              master=self.sys_plotsummary_popup)
             self.plotsummary_plotwidget = self.plotsummary_canvas.get_tk_widget()
             self.plotsummary_plotwidget.grid(row=1,column=0)
             
             self.sys_plotsummary_popup_isopen = True
             self.update_system_summary()
             
-            self.sys_plotsummary_popup.protocol("WM_DELETE_WINDOW", self.on_sys_plotsummary_popup_close)
+            self.sys_plotsummary_popup.protocol("WM_DELETE_WINDOW", 
+                                                self.on_sys_plotsummary_popup_close)
             ## Temporarily disable the main window while this popup is active
             self.sys_plotsummary_popup.grab_set()
             
@@ -1051,26 +1303,30 @@ class Notebook:
         if not self.sys_param_shortcut_popup_isopen:
             try:
                 self.set_init_x()
-                assert self.nanowire.spacegrid_is_set
+                assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
     
             except ValueError:
                 self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
                 return
     
-            except AssertionError:
-                return
-            
-            except Exception as oops:
+            except (AssertionError, Exception) as oops:
                 self.write(self.ICtab_status, oops)
                 return
         
             self.sys_param_shortcut_popup = tk.Toplevel(self.root)
             
-            self.sys_param_shortcut_title_label = tk.ttk.Label(self.sys_param_shortcut_popup, text="Parameter Short-cut Tool", style="Header.TLabel")
+            self.sys_param_shortcut_title_label = tk.ttk.Label(self.sys_param_shortcut_popup, 
+                                                               text="Parameter Short-cut Tool", 
+                                                               style="Header.TLabel")
             self.sys_param_shortcut_title_label.grid(row=0,column=0)
             
-            self.sys_param_instruction = tk.Message(self.sys_param_shortcut_popup, text="Are the values of certain parameters constant across the system? " +
-                                                    "Enter those values here and press \"Continue\" to apply them on all space grid points.", width=300)
+            self.sys_param_instruction = tk.Message(self.sys_param_shortcut_popup, 
+                                                    text="Are the values of certain parameters "
+                                                    "constant across the system? "
+                                                    "Enter those values here and "
+                                                    "press \"Continue\" to apply "
+                                                    "them on all space grid points.", 
+                                                    width=300)
             self.sys_param_instruction.grid(row=0,column=1)
             
             self.sys_param_list_frame = tk.ttk.Frame(self.sys_param_shortcut_popup)
@@ -1082,10 +1338,15 @@ class Notebook:
             col_count = 0
             max_per_col = 6
             for param in self.nanowire.param_dict:
-                self.sys_param_labels_dict[param] = tk.ttk.Label(self.sys_param_list_frame, text="{} {}".format(param, self.nanowire.param_dict[param].units))
-                self.sys_param_labels_dict[param].grid(row=row_count, column=col_count)
-                self.sys_param_entryboxes_dict[param] = tk.ttk.Entry(self.sys_param_list_frame, width=9)
-                self.sys_param_entryboxes_dict[param].grid(row=row_count, column=col_count + 1)
+                self.sys_param_labels_dict[param] = tk.ttk.Label(self.sys_param_list_frame, 
+                                                                 text="{} {}".format(param, 
+                                                                                     self.nanowire.param_dict[param].units))
+                self.sys_param_labels_dict[param].grid(row=row_count, 
+                                                       column=col_count)
+                self.sys_param_entryboxes_dict[param] = tk.ttk.Entry(self.sys_param_list_frame, 
+                                                                     width=9)
+                self.sys_param_entryboxes_dict[param].grid(row=row_count, 
+                                                           column=col_count + 1)
                 
                 if isinstance(self.nanowire.param_dict[param].value, (float, int)):
                     formatted_val = self.nanowire.param_dict[param].value
@@ -1101,10 +1362,14 @@ class Notebook:
                     row_count = 0
                     col_count += 2
                     
-            self.shortcut_continue_button = tk.Button(self.sys_param_shortcut_popup, text="Continue", command=partial(self.on_sys_param_shortcut_popup_close, True))
+            self.shortcut_continue_button = tk.Button(self.sys_param_shortcut_popup, 
+                                                      text="Continue", 
+                                                      command=partial(self.on_sys_param_shortcut_popup_close, 
+                                                                      True))
             self.shortcut_continue_button.grid(row=2,column=1)
                     
-            self.sys_param_shortcut_popup.protocol("WM_DELETE_WINDOW", self.on_sys_param_shortcut_popup_close)
+            self.sys_param_shortcut_popup.protocol("WM_DELETE_WINDOW", 
+                                                   self.on_sys_param_shortcut_popup_close)
             self.sys_param_shortcut_popup_isopen = True
             ## Temporarily disable the main window while this popup is active
             self.sys_param_shortcut_popup.grab_set()
@@ -1136,7 +1401,8 @@ class Notebook:
                     
                 if changed_params.__len__() > 0:
                     self.update_IC_plot(plot_ID="recent")
-                    self.do_confirmation_popup("Updated: {}".format(changed_params), hide_cancel=True)
+                    self.do_confirmation_popup("Updated: {}".format(changed_params), 
+                                               hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
                     
                     
@@ -1152,10 +1418,7 @@ class Notebook:
         """ Open tool for making batches of similar initial condition files. """
         try:
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set
-        
-        except AssertionError:
-            return
+            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
         
         except:
             self.write(self.ICtab_status, "Error: missing space grid")
@@ -1167,19 +1430,37 @@ class Notebook:
 
             self.batch_popup = tk.Toplevel(self.root)
             
-            self.batch_title_label = tk.ttk.Label(self.batch_popup, text="Batch IC Tool", style="Header.TLabel")
+            self.batch_title_label = tk.ttk.Label(self.batch_popup, 
+                                                  text="Batch IC Tool", 
+                                                  style="Header.TLabel")
             self.batch_title_label.grid(row=0,column=0)
             
-            self.batch_instruction1 = tk.Message(self.batch_popup, text="This Batch Tool allows you to generate many copies of the currently-loaded IC, varying up to {} parameters between all of them.".format(max_batchable_params), width=300)
+            self.batch_instruction1 = tk.Message(self.batch_popup, 
+                                                 text="This Batch Tool allows you "
+                                                      "to generate many copies of "
+                                                      "the currently-loaded IC, "
+                                                      "varying up to {} parameters "
+                                                      "between all of them.".format(max_batchable_params), 
+                                                      width=300)
             self.batch_instruction1.grid(row=1,column=0)
 
-            self.batch_instruction2 = tk.Message(self.batch_popup, text="All copies will be stored in a new folder with the name you enter into the appropriate box.", width=300)
+            self.batch_instruction2 = tk.Message(self.batch_popup, 
+                                                 text="All copies will be stored "
+                                                      "in a new folder with the name "
+                                                      "you enter into the appropriate box.", 
+                                                 width=300)
             self.batch_instruction2.grid(row=2,column=0)
 
-            self.batch_instruction3 = tk.Message(self.batch_popup, text="For best results, load a complete IC file or fill in values for all params before using this tool.", width=300)
+            self.batch_instruction3 = tk.Message(self.batch_popup, 
+                                                 text="For best results, load a "
+                                                      "complete IC file or fill "
+                                                      "in values for all params "
+                                                      "before using this tool.", 
+                                                 width=300)
             self.batch_instruction3.grid(row=3,column=0)
 
-            self.batch_param_label = tk.ttk.Label(self.batch_popup, text="Select Batch Parameter:")
+            self.batch_param_label = tk.ttk.Label(self.batch_popup, 
+                                                  text="Select Batch Parameter:")
             self.batch_param_label.grid(row=0,column=1)
             
             self.batch_entry_frame = tk.ttk.Frame(self.batch_popup)
@@ -1188,16 +1469,28 @@ class Notebook:
 
             # Contextually-dependent options for batchable params
             self.batchables_array = []
-            batchable_params = [param for param in self.nanowire.param_dict if not (self.nanowire.system_ID == "Nanowire" and self.using_LGC and (param == "deltaN" or param == "deltaP"))]
+            batchable_params = [param for param in self.nanowire.param_dict 
+                                if not (self.nanowire.system_ID == "Nanowire" 
+                                        and self.using_LGC 
+                                        and (param == "deltaN" or param == "deltaP"))]
             
             if self.nanowire.system_ID == "Nanowire" and self.using_LGC:
                 
-                self.LGC_instruction1 = tk.Message(self.batch_popup, text="Additional options for generating deltaN and deltaP batches " +
-                                                  "are available when using the Laser Generation Condition tool.", width=300)
+                self.LGC_instruction1 = tk.Message(self.batch_popup, 
+                                                   text="Additional options for generating "
+                                                        "deltaN and deltaP batches "
+                                                        "are available when using the "
+                                                        "Laser Generation Condition tool.", 
+                                                   width=300)
                 self.LGC_instruction1.grid(row=4,column=0)
                 
-                self.LGC_instruction2 = tk.Message(self.batch_popup, text="Please note that TEDs will use the values and settings on the L.G.C. tool's tab " +
-                                                   "to complete the batches when one or more of these options are selected.", width=300)
+                self.LGC_instruction2 = tk.Message(self.batch_popup, 
+                                                   text="Please note that TEDs will "
+                                                   "use the values and settings on "
+                                                   "the L.G.C. tool's tab "
+                                                   "to complete the batches when one "
+                                                   "or more of these options are selected.", 
+                                                   width=300)
                 self.LGC_instruction2.grid(row=5,column=0)
                 
                 # Boolean logic is fun
@@ -1214,17 +1507,25 @@ class Notebook:
             for i in range(max_batchable_params):
                 batch_param_name = tk.StringVar()
                 if self.nanowire.system_ID == "Nanowire" and self.using_LGC:
-                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params, *LGC_params)
+                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, 
+                                                   batch_param_name, "", "", 
+                                                   *batchable_params, *LGC_params)
                 else:
-                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, batch_param_name, "", "", *batchable_params)
+                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, 
+                                                   batch_param_name, "", "", 
+                                                   *batchable_params)
                 
                 optionmenu.grid(row=i,column=0,padx=(20,20))
                 batch_param_entry = tk.ttk.Entry(self.batch_entry_frame, width=80)
                 batch_param_entry.grid(row=i,column=1,columnspan=2)
                 
-                if i == 0: self.enter(batch_param_entry, "Enter a list of space-separated values for the selected Batch Parameter")
+                if i == 0: self.enter(batch_param_entry, 
+                                      "Enter a list of space-separated "
+                                      "values for the selected Batch Parameter")
                 
-                self.batchables_array.append(Batchable(optionmenu, batch_param_entry, batch_param_name))
+                self.batchables_array.append(Batchable(optionmenu, 
+                                                       batch_param_entry, 
+                                                       batch_param_name))
                     
             self.batch_status = tk.Text(self.batch_popup, width=30,height=3)
             self.batch_status.grid(row=6,column=0)
@@ -1234,7 +1535,9 @@ class Notebook:
             self.enter(self.batch_name_entry, "Enter name for batch folder")
             self.batch_name_entry.grid(row=6,column=1)
 
-            self.create_batch_button = tk.ttk.Button(self.batch_popup, text="Create Batch", command=self.create_batch_init)
+            self.create_batch_button = tk.ttk.Button(self.batch_popup, 
+                                                     text="Create Batch", 
+                                                     command=self.create_batch_init)
             self.create_batch_button.grid(row=6,column=2)
 
             self.batch_popup.protocol("WM_DELETE_WINDOW", self.on_batch_popup_close)
@@ -1261,13 +1564,17 @@ class Notebook:
 
             self.resetIC_popup = tk.Toplevel(self.root)
 
-            self.resetIC_title_label1 = tk.ttk.Label(self.resetIC_popup, text="Which Parameters should be cleared?", style="Header.TLabel")
+            self.resetIC_title_label1 = tk.ttk.Label(self.resetIC_popup, 
+                                                     text="Which Parameters "
+                                                     "should be cleared?", 
+                                                     style="Header.TLabel")
             self.resetIC_title_label1.grid(row=0,column=0,columnspan=2)
 
             self.resetIC_checkbutton_frame = tk.ttk.Frame(self.resetIC_popup)
             self.resetIC_checkbutton_frame.grid(row=1,column=0,columnspan=2)
 
-            # Let's try some procedurally generated checkbuttons: one created automatically per nanowire parameter
+            # Let's try some procedurally generated checkbuttons: 
+            # one created automatically per nanowire parameter
             self.resetIC_checkparams = {}
             self.resetIC_checkbuttons = {}
             cb_row = 0
@@ -1276,7 +1583,11 @@ class Notebook:
             for param in self.nanowire.param_dict:
                 self.resetIC_checkparams[param] = tk.IntVar()
 
-                self.resetIC_checkbuttons[param] = tk.ttk.Checkbutton(self.resetIC_checkbutton_frame, text=param, variable=self.resetIC_checkparams[param], onvalue=1, offvalue=0)
+                self.resetIC_checkbuttons[param] = tk.ttk.Checkbutton(self.resetIC_checkbutton_frame, 
+                                                                      text=param, 
+                                                                      variable=self.resetIC_checkparams[param], 
+                                                                      onvalue=1, 
+                                                                      offvalue=0)
 
             for cb in self.resetIC_checkbuttons:
                 self.resetIC_checkbuttons[cb].grid(row=cb_row,column=cb_col, pady=(6,6))
@@ -1286,17 +1597,27 @@ class Notebook:
                     cb_col += 1
 
             
-            self.hline10_separator = tk.ttk.Separator(self.resetIC_popup, orient="horizontal", style="Grey Bar.TSeparator")
-            self.hline10_separator.grid(row=2,column=0,columnspan=2, pady=(10,10), sticky="ew")
+            self.hline10_separator = tk.ttk.Separator(self.resetIC_popup, 
+                                                      orient="horizontal", 
+                                                      style="Grey Bar.TSeparator")
+            self.hline10_separator.grid(row=2,column=0,columnspan=2, pady=(10,10), 
+                                        sticky="ew")
 
             self.resetIC_check_clearall = tk.IntVar()
-            self.resetIC_clearall_checkbutton = tk.Checkbutton(self.resetIC_popup, text="Clear All", variable=self.resetIC_check_clearall, onvalue=1, offvalue=0)
+            self.resetIC_clearall_checkbutton = tk.Checkbutton(self.resetIC_popup, 
+                                                               text="Clear All", 
+                                                               variable=self.resetIC_check_clearall, 
+                                                               onvalue=1, offvalue=0)
             self.resetIC_clearall_checkbutton.grid(row=3,column=0)
 
-            self.resetIC_continue_button = tk.Button(self.resetIC_popup, text="Continue", command=partial(self.on_resetIC_popup_close, True))
+            self.resetIC_continue_button = tk.Button(self.resetIC_popup, 
+                                                     text="Continue", 
+                                                     command=partial(self.on_resetIC_popup_close, 
+                                                                     True))
             self.resetIC_continue_button.grid(row=3,column=1)
 
-            self.resetIC_popup.protocol("WM_DELETE_WINDOW", self.on_resetIC_popup_close)
+            self.resetIC_popup.protocol("WM_DELETE_WINDOW", 
+                                        self.on_resetIC_popup_close)
             self.resetIC_popup.grab_set()
             self.resetIC_popup_isopen = True
             return
@@ -1315,7 +1636,8 @@ class Notebook:
                 if self.resetIC_do_clearall:
                     self.resetIC_selected_params = list(self.resetIC_checkparams.keys())
                 else:
-                    self.resetIC_selected_params = [param for param in self.resetIC_checkparams if self.resetIC_checkparams[param].get()]
+                    self.resetIC_selected_params = [param for param in self.resetIC_checkparams 
+                                                    if self.resetIC_checkparams[param].get()]
 
             self.resetIC_popup.destroy()
             print("resetIC popup closed")
@@ -1331,29 +1653,43 @@ class Notebook:
 
             self.plotter_popup = tk.Toplevel(self.root)
 
-            self.plotter_title_label = tk.ttk.Label(self.plotter_popup, text="Select a data type", style="Header.TLabel")
+            self.plotter_title_label = tk.ttk.Label(self.plotter_popup, 
+                                                    text="Select a data type", 
+                                                    style="Header.TLabel")
             self.plotter_title_label.grid(row=0,column=0,columnspan=2)
 
-            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, *(output for output in self.nanowire.outputs_dict if self.nanowire.outputs_dict[output].analysis_plotable))
+            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, 
+                                                 *(output for output in self.nanowire.outputs_dict 
+                                                   if self.nanowire.outputs_dict[output].analysis_plotable))
             self.var_select_menu.grid(row=1,column=0)
 
-            self.autointegrate_checkbutton = tk.Checkbutton(self.plotter_popup, text="Auto integrate all space and time steps?", variable=self.check_autointegrate, onvalue=1, offvalue=0)
+            self.autointegrate_checkbutton = tk.Checkbutton(self.plotter_popup, 
+                                                            text="Auto integrate all space and time steps?", 
+                                                            variable=self.check_autointegrate, 
+                                                            onvalue=1, offvalue=0)
             self.autointegrate_checkbutton.grid(row=1,column=1)
             
-            self.plotter_continue_button = tk.Button(self.plotter_popup, text="Continue", command=partial(self.on_plotter_popup_close, plot_ID, continue_=True))
+            self.plotter_continue_button = tk.Button(self.plotter_popup, 
+                                                     text="Continue", 
+                                                     command=partial(self.on_plotter_popup_close, 
+                                                                     plot_ID, continue_=True))
             self.plotter_continue_button.grid(row=2,column=1)
 
-            self.data_listbox = tk.Listbox(self.plotter_popup, width=20, height=20, selectmode="extended")
+            self.data_listbox = tk.Listbox(self.plotter_popup, width=20, 
+                                           height=20, 
+                                           selectmode="extended")
             self.data_listbox.grid(row=2,rowspan=13,column=0)
             self.data_listbox.delete(0,tk.END)
-            self.data_list = [file for file in os.listdir(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID) if not file.endswith(".txt")]
+            self.data_list = [file for file in os.listdir(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID) 
+                              if not file.endswith(".txt")]
             self.data_listbox.insert(0,*(self.data_list))
 
             self.plotter_status = tk.Text(self.plotter_popup, width=24,height=2)
             self.plotter_status.grid(row=3,rowspan=2,column=1)
             self.plotter_status.configure(state="disabled")
 
-            self.plotter_popup.protocol("WM_DELETE_WINDOW", partial(self.on_plotter_popup_close, plot_ID, continue_=False))
+            self.plotter_popup.protocol("WM_DELETE_WINDOW", partial(self.on_plotter_popup_close, 
+                                                                    plot_ID, continue_=False))
             self.plotter_popup.grab_set()
             self.plotter_popup_isopen = True
 
@@ -1394,25 +1730,38 @@ class Notebook:
         if not self.integration_popup_isopen:
             self.integration_popup = tk.Toplevel(self.root)
 
-            self.integration_title_label = tk.ttk.Label(self.integration_popup, text="Select which time steps to integrate over", style="Header.TLabel")
+            self.integration_title_label = tk.ttk.Label(self.integration_popup, 
+                                                        text="Select which time steps "
+                                                             "to integrate over", 
+                                                        style="Header.TLabel")
             self.integration_title_label.grid(row=1,column=0,columnspan=3)
 
-            self.overtime = tk.ttk.Radiobutton(self.integration_popup, variable=self.fetch_PLmode, value='All time steps')
+            self.overtime = tk.ttk.Radiobutton(self.integration_popup, 
+                                               variable=self.fetch_PLmode, 
+                                               value='All time steps')
             self.overtime.grid(row=2,column=0)
 
-            self.overtime_label = tk.Label(self.integration_popup, text="All time steps")
+            self.overtime_label = tk.Label(self.integration_popup, 
+                                           text="All time steps")
             self.overtime_label.grid(row=2,column=1)
 
-            self.currentTS = tk.ttk.Radiobutton(self.integration_popup, variable=self.fetch_PLmode, value='Current time step')
+            self.currentTS = tk.ttk.Radiobutton(self.integration_popup, 
+                                                variable=self.fetch_PLmode, 
+                                                value='Current time step')
             self.currentTS.grid(row=3,column=0)
 
-            self.currentTS_label = tk.Label(self.integration_popup, text="Current time step")
+            self.currentTS_label = tk.Label(self.integration_popup, 
+                                            text="Current time step")
             self.currentTS_label.grid(row=3,column=1)
 
-            self.integration_continue_button =  tk.Button(self.integration_popup, text="Continue", command=partial(self.on_integration_popup_close, continue_=True))
+            self.integration_continue_button =  tk.Button(self.integration_popup, 
+                                                          text="Continue", 
+                                                          command=partial(self.on_integration_popup_close, 
+                                                                          continue_=True))
             self.integration_continue_button.grid(row=4,column=0,columnspan=3)
 
-            self.integration_popup.protocol("WM_DELETE_WINDOW", partial(self.on_integration_popup_close, continue_=False))
+            self.integration_popup.protocol("WM_DELETE_WINDOW", partial(self.on_integration_popup_close, 
+                                                                        continue_=False))
             self.integration_popup.grab_set()
             self.integration_popup_isopen = True
             
@@ -1440,59 +1789,91 @@ class Notebook:
         if not self.integration_getbounds_popup_isopen:
             self.integration_getbounds_popup = tk.Toplevel(self.root)
 
-            self.single_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, variable=self.fetch_intg_mode, value='single')
+            self.single_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, 
+                                                  variable=self.fetch_intg_mode, 
+                                                  value='single')
             self.single_intg.grid(row=0,column=0, rowspan=3)
 
-            self.single_intg_label = tk.ttk.Label(self.integration_getbounds_popup, text="Single integral", style="Header.TLabel")
+            self.single_intg_label = tk.ttk.Label(self.integration_getbounds_popup, 
+                                                  text="Single integral", 
+                                                  style="Header.TLabel")
             self.single_intg_label.grid(row=0,column=1, rowspan=3, padx=(0,20))
 
-            self.integration_getbounds_title_label = tk.Label(self.integration_getbounds_popup, text="Enter bounds of integration " + self.nanowire.length_unit)
+            self.integration_getbounds_title_label = tk.Label(self.integration_getbounds_popup, 
+                                                              text="Enter bounds of integration " 
+                                                              + self.nanowire.length_unit)
             self.integration_getbounds_title_label.grid(row=0,column=2,columnspan=4)
 
-            self.lower = tk.Label(self.integration_getbounds_popup, text="Lower bound: x=")
+            self.lower = tk.Label(self.integration_getbounds_popup, 
+                                  text="Lower bound: x=")
             self.lower.grid(row=1,column=2)
 
-            self.integration_lbound_entry = tk.Entry(self.integration_getbounds_popup, width=9)
+            self.integration_lbound_entry = tk.Entry(self.integration_getbounds_popup, 
+                                                     width=9)
             self.integration_lbound_entry.grid(row=2,column=2)
 
-            self.upper = tk.Label(self.integration_getbounds_popup, text="Upper bound: x=")
+            self.upper = tk.Label(self.integration_getbounds_popup, 
+                                  text="Upper bound: x=")
             self.upper.grid(row=1,column=5)
 
-            self.integration_ubound_entry = tk.Entry(self.integration_getbounds_popup, width=9)
+            self.integration_ubound_entry = tk.Entry(self.integration_getbounds_popup, 
+                                                     width=9)
             self.integration_ubound_entry.grid(row=2,column=5)
 
-            self.hline8_separator = tk.ttk.Separator(self.integration_getbounds_popup, orient="horizontal", style="Grey Bar.TSeparator")
-            self.hline8_separator.grid(row=3,column=0,columnspan=30, pady=(10,10), sticky="ew")
+            self.hline8_separator = tk.ttk.Separator(self.integration_getbounds_popup, 
+                                                     orient="horizontal", 
+                                                     style="Grey Bar.TSeparator")
+            self.hline8_separator.grid(row=3,column=0,columnspan=30, pady=(10,10), 
+                                       sticky="ew")
 
-            self.multi_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, variable=self.fetch_intg_mode, value='multiple')
+            self.multi_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, 
+                                                 variable=self.fetch_intg_mode, 
+                                                 value='multiple')
             self.multi_intg.grid(row=4,column=0, rowspan=3)
 
-            self.multi_intg_label = tk.ttk.Label(self.integration_getbounds_popup, text="Multiple integrals", style="Header.TLabel")
+            self.multi_intg_label = tk.ttk.Label(self.integration_getbounds_popup, 
+                                                 text="Multiple integrals", 
+                                                 style="Header.TLabel")
             self.multi_intg_label.grid(row=4,column=1, rowspan=3, padx=(0,20))
 
-            self.integration_center_label = tk.Label(self.integration_getbounds_popup, text="Enter space-separated e.g. (100 200 300...) Centers {}: ".format(self.nanowire.length_unit))
+            self.integration_center_label = tk.Label(self.integration_getbounds_popup, 
+                                                     text="Enter space-separated "
+                                                     "e.g. (100 200 300...) Centers "
+                                                     "{}: ".format(self.nanowire.length_unit))
             self.integration_center_label.grid(row=5,column=2)
 
-            self.integration_center_entry = tk.Entry(self.integration_getbounds_popup, width=30)
+            self.integration_center_entry = tk.Entry(self.integration_getbounds_popup, 
+                                                     width=30)
             self.integration_center_entry.grid(row=5,column=3,columnspan=3)
 
-            self.integration_width_label = tk.Label(self.integration_getbounds_popup, text="Width {}: +/- ".format(self.nanowire.length_unit))
+            self.integration_width_label = tk.Label(self.integration_getbounds_popup, 
+                                                    text="Width {}: +/- ".format(self.nanowire.length_unit))
             self.integration_width_label.grid(row=6,column=2)
 
-            self.integration_width_entry = tk.Entry(self.integration_getbounds_popup, width=9)
+            self.integration_width_entry = tk.Entry(self.integration_getbounds_popup, 
+                                                    width=9)
             self.integration_width_entry.grid(row=6,column=3)
 
-            self.hline9_separator = tk.ttk.Separator(self.integration_getbounds_popup, orient="horizontal", style="Grey Bar.TSeparator")
-            self.hline9_separator.grid(row=7,column=0,columnspan=30, pady=(10,10), sticky="ew")
+            self.hline9_separator = tk.ttk.Separator(self.integration_getbounds_popup, 
+                                                     orient="horizontal", 
+                                                     style="Grey Bar.TSeparator")
+            self.hline9_separator.grid(row=7,column=0,columnspan=30, pady=(10,10), 
+                                       sticky="ew")
 
-            self.integration_getbounds_continue_button = tk.Button(self.integration_getbounds_popup, text="Continue", command=partial(self.on_integration_getbounds_popup_close, continue_=True))
+            self.integration_getbounds_continue_button = tk.Button(self.integration_getbounds_popup, 
+                                                                   text="Continue", 
+                                                                   command=partial(self.on_integration_getbounds_popup_close, 
+                                                                                   continue_=True))
             self.integration_getbounds_continue_button.grid(row=8,column=5)
 
-            self.integration_getbounds_status = tk.Text(self.integration_getbounds_popup, width=24,height=2)
+            self.integration_getbounds_status = tk.Text(self.integration_getbounds_popup, 
+                                                        width=24,height=2)
             self.integration_getbounds_status.grid(row=8,rowspan=2,column=0,columnspan=5)
             self.integration_getbounds_status.configure(state="disabled")
 
-            self.integration_getbounds_popup.protocol("WM_DELETE_WINDOW", partial(self.on_integration_getbounds_popup_close, continue_=False))
+            self.integration_getbounds_popup.protocol("WM_DELETE_WINDOW", 
+                                                      partial(self.on_integration_getbounds_popup_close, 
+                                                              continue_=False))
             self.integration_getbounds_popup.grab_set()
             self.integration_getbounds_popup_isopen = True
         else:
@@ -1558,26 +1939,36 @@ class Notebook:
         return
 
     def do_PL_xaxis_popup(self):
-        """ If integrating over single timestep, select which parameter to plot as horizontal axis. """
+        """ If integrating over single timestep, 
+            select which parameter to plot as horizontal axis. """
         if not self.PL_xaxis_popup_isopen:
             self.xaxis_param = ""
             self.xaxis_selection = tk.StringVar()
             self.PL_xaxis_popup = tk.Toplevel(self.root)
 
-            self.PL_xaxis_title_label = tk.ttk.Label(self.PL_xaxis_popup, text="Select parameter for x axis", style="Header.TLabel")
+            self.PL_xaxis_title_label = tk.ttk.Label(self.PL_xaxis_popup, 
+                                                     text="Select parameter for x axis", 
+                                                     style="Header.TLabel")
             self.PL_xaxis_title_label.grid(row=0,column=0,columnspan=3)
 
-            self.xaxis_param_menu = tk.OptionMenu(self.PL_xaxis_popup, self.xaxis_selection, *[param for param in self.nanowire.param_dict])
+            self.xaxis_param_menu = tk.OptionMenu(self.PL_xaxis_popup, 
+                                                  self.xaxis_selection, 
+                                                  *[param for param in self.nanowire.param_dict])
             self.xaxis_param_menu.grid(row=1,column=1)
 
-            self.PL_xaxis_continue_button = tk.Button(self.PL_xaxis_popup, text="Continue", command=partial(self.on_PL_xaxis_popup_close, continue_=True))
+            self.PL_xaxis_continue_button = tk.Button(self.PL_xaxis_popup, 
+                                                      text="Continue", 
+                                                      command=partial(self.on_PL_xaxis_popup_close, 
+                                                                      continue_=True))
             self.PL_xaxis_continue_button.grid(row=1,column=2)
 
             self.PL_xaxis_status = tk.Text(self.PL_xaxis_popup, width=24,height=2)
             self.PL_xaxis_status.grid(row=2,rowspan=2,column=0,columnspan=3)
             self.PL_xaxis_status.configure(state="disabled")
 
-            self.PL_xaxis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_PL_xaxis_popup_close, continue_=False))
+            self.PL_xaxis_popup.protocol("WM_DELETE_WINDOW", 
+                                         partial(self.on_PL_xaxis_popup_close, 
+                                                 continue_=False))
             self.PL_xaxis_popup.grab_set()
             self.PL_xaxis_popup_isopen = True
         else:
@@ -1613,7 +2004,9 @@ class Notebook:
         if not self.change_axis_popup_isopen:
             self.change_axis_popup = tk.Toplevel(self.root)
 
-            self.change_axis_title_label = tk.ttk.Label(self.change_axis_popup, text="Select axis settings", style="Header.TLabel")
+            self.change_axis_title_label = tk.ttk.Label(self.change_axis_popup, 
+                                                        text="Select axis settings", 
+                                                        style="Header.TLabel")
             self.change_axis_title_label.grid(row=0,column=0,columnspan=2)
 
             self.xframe = tk.Frame(master=self.change_axis_popup)
@@ -1622,13 +2015,15 @@ class Notebook:
             self.xheader = tk.Label(self.xframe, text="X Axis")
             self.xheader.grid(row=0,column=0,columnspan=2)
 
-            self.xlin = tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, value='linear')
+            self.xlin = tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, 
+                                           value='linear')
             self.xlin.grid(row=1,column=0)
 
             self.xlin_label = tk.Label(self.xframe, text="Linear")
             self.xlin_label.grid(row=1,column=1)
 
-            self.xlog = tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, value='symlog')
+            self.xlog = tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, 
+                                           value='symlog')
             self.xlog.grid(row=2,column=0)
 
             self.xlog_label = tk.Label(self.xframe, text="Log")
@@ -1652,13 +2047,15 @@ class Notebook:
             self.yheader = tk.Label(self.yframe, text="Y Axis")
             self.yheader.grid(row=0,column=0,columnspan=2)
 
-            self.ylin = tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, value='linear')
+            self.ylin = tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, 
+                                           value='linear')
             self.ylin.grid(row=1,column=0)
 
             self.ylin_label = tk.Label(self.yframe, text="Linear")
             self.ylin_label.grid(row=1,column=1)
 
-            self.ylog = tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, value='symlog')
+            self.ylog = tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, 
+                                           value='symlog')
             self.ylog.grid(row=2,column=0)
 
             self.ylog_label = tk.Label(self.yframe, text="Log")
@@ -1676,13 +2073,23 @@ class Notebook:
             self.yubound = tk.Entry(self.yframe, width=9)
             self.yubound.grid(row=4,column=1)
 
-            self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Display legend?", variable=self.check_display_legend, onvalue=1, offvalue=0)
+            self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, 
+                                                            text="Display legend?", 
+                                                            variable=self.check_display_legend, 
+                                                            onvalue=1, offvalue=0)
             self.toggle_legend_checkbutton.grid(row=2,column=0,columnspan=2)
             
-            self.toggle_axis_freeze_checkbutton = tk.Checkbutton(self.change_axis_popup, text="Freeze axes?", variable=self.check_freeze_axes, onvalue=1, offvalue=0)
+            self.toggle_axis_freeze_checkbutton = tk.Checkbutton(self.change_axis_popup, 
+                                                                 text="Freeze axes?", 
+                                                                 variable=self.check_freeze_axes, 
+                                                                 onvalue=1, offvalue=0)
             self.toggle_axis_freeze_checkbutton.grid(row=3,column=0,columnspan=2)
 
-            self.change_axis_continue_button = tk.Button(self.change_axis_popup, text="Continue", command=partial(self.on_change_axis_popup_close, from_integration, continue_=True))
+            self.change_axis_continue_button = tk.Button(self.change_axis_popup, 
+                                                         text="Continue", 
+                                                         command=partial(self.on_change_axis_popup_close, 
+                                                                         from_integration, 
+                                                                         continue_=True))
             self.change_axis_continue_button.grid(row=4, column=0,columnspan=2)
 
             self.change_axis_status = tk.Text(self.change_axis_popup, width=24,height=2)
@@ -1705,7 +2112,9 @@ class Notebook:
             self.check_display_legend.set(active_plot.display_legend)
             self.check_freeze_axes.set(active_plot.do_freeze_axes)
 
-            self.change_axis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_change_axis_popup_close, from_integration, continue_=False))
+            self.change_axis_popup.protocol("WM_DELETE_WINDOW", partial(self.on_change_axis_popup_close, 
+                                                                        from_integration, 
+                                                                        continue_=False))
             self.change_axis_popup.grab_set()
             self.change_axis_popup_isopen = True
         else:
@@ -1715,9 +2124,13 @@ class Notebook:
     def on_change_axis_popup_close(self, from_integration, continue_=False):
         try:
             if continue_:
-                if not self.xaxis_type or not self.yaxis_type: raise ValueError("Error: invalid axis type")
-                if self.xlbound.get() == "" or self.xubound.get() == "" or self.ylbound.get() == "" or self.yubound.get() == "": raise ValueError("Error: missing bounds")
-                bounds = [float(self.xlbound.get()), float(self.xubound.get()), float(self.ylbound.get()), float(self.yubound.get())]
+                assert self.xaxis_type and self.yaxis_type, "Error: invalid axis type"
+                assert (self.xlbound.get()
+                        and self.xubound.get() 
+                        and self.ylbound.get()
+                        and self.yubound.get()), "Error: missing bounds"
+                bounds = [float(self.xlbound.get()), float(self.xubound.get()), 
+                          float(self.ylbound.get()), float(self.yubound.get())]
             
                 if not (from_integration):
                     plot_ID = self.active_analysisplot_ID.get()
@@ -1727,7 +2140,8 @@ class Notebook:
                     plot_ID = self.active_integrationplot_ID.get()
                     plot = self.integration_plots[plot_ID].plot_obj
 
-                # Set plot axis params and save in corresponding plot state object, if the selected plot has such an object
+                # Set plot axis params and save in corresponding plot state object, 
+                # if the selected plot has such an object
                 plot.set_yscale(self.yaxis_type.get())
                 plot.set_xscale(self.xaxis_type.get())
 
@@ -1767,7 +2181,7 @@ class Notebook:
 
             self.change_axis_popup_isopen = False
 
-        except ValueError as oops:
+        except (ValueError, AssertionError) as oops:
             self.write(self.change_axis_status, oops)
             return
         except:
@@ -1784,25 +2198,35 @@ class Notebook:
         if not self.IC_carry_popup_isopen:
             self.IC_carry_popup = tk.Toplevel(self.root)
 
-            self.IC_carry_title_label = tk.ttk.Label(self.IC_carry_popup, text="Select data to include in new IC", style="Header.TLabel")
+            self.IC_carry_title_label = tk.ttk.Label(self.IC_carry_popup, 
+                                                     text="Select data to include in new IC",
+                                                     style="Header.TLabel")
             self.IC_carry_title_label.grid(row=0,column=0,columnspan=2)
             
             self.carry_checkbuttons = {}
             rcount = 1
             for var in self.nanowire.simulation_outputs_dict:
-                self.carry_checkbuttons[var] = tk.Checkbutton(self.IC_carry_popup, text=var, variable=self.carryover_include_flags[var])
+                self.carry_checkbuttons[var] = tk.Checkbutton(self.IC_carry_popup, 
+                                                              text=var, 
+                                                              variable=self.carryover_include_flags[var])
                 self.carry_checkbuttons[var].grid(row=rcount, column=0)
                 rcount += 1
 
-            self.carry_IC_listbox = tk.Listbox(self.IC_carry_popup, width=30,height=10, selectmode='extended')
+            self.carry_IC_listbox = tk.Listbox(self.IC_carry_popup, width=30,height=10, 
+                                               selectmode='extended')
             self.carry_IC_listbox.grid(row=4,column=0,columnspan=2)
             for key in self.analysis_plots[plot_ID].datagroup.datasets:
                 self.carry_IC_listbox.insert(tk.END, key)
 
-            self.IC_carry_continue_button = tk.Button(self.IC_carry_popup, text="Continue", command=partial(self.on_IC_carry_popup_close, continue_=True))
+            self.IC_carry_continue_button = tk.Button(self.IC_carry_popup, 
+                                                      text="Continue", 
+                                                      command=partial(self.on_IC_carry_popup_close,
+                                                                      continue_=True))
             self.IC_carry_continue_button.grid(row=5,column=0,columnspan=2)
 
-            self.IC_carry_popup.protocol("WM_DELETE_WINDOW", partial(self.on_IC_carry_popup_close, continue_=False))
+            self.IC_carry_popup.protocol("WM_DELETE_WINDOW", 
+                                         partial(self.on_IC_carry_popup_close, 
+                                                 continue_=False))
             self.IC_carry_popup.grab_set()
             self.IC_carry_popup_isopen = True
             
@@ -1824,7 +2248,9 @@ class Notebook:
                     
                 status_msg = "Files generated:\n"
                 for key in datasets:
-                    new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file for {}".format(key), filetypes=[("Text files","*.txt")])
+                    new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], 
+                                                                   title="Save IC text file for {}".format(key), 
+                                                                   filetypes=[("Text files","*.txt")])
                     if new_filename == "": continue
 
                     if new_filename.endswith(".txt"): new_filename = new_filename[:-4]
@@ -1836,13 +2262,20 @@ class Notebook:
                     filename = active_sets[key].filename
                     sim_data = {}
                     for var in self.nanowire.simulation_outputs_dict:
-                        path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, filename, filename, var)
-                        sim_data[var] = u_read(path_name, t0=active_sets[key].show_index, single_tstep=True)
+                        path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
+                                                                  self.nanowire.system_ID, 
+                                                                  filename, filename, var)
+                        sim_data[var] = u_read(path_name, t0=active_sets[key].show_index, 
+                                               single_tstep=True)
 
-                    self.nanowire.get_IC_carry(sim_data, param_dict_copy, include_flags, node_x)
+                    self.nanowire.get_IC_carry(sim_data, param_dict_copy, 
+                                               include_flags, node_x)
 
                     with open(new_filename + ".txt", "w+") as ofstream:
-                        ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
+                        ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " 
+                                       + str(datetime.datetime.now().date()) 
+                                       + " AT " + str(datetime.datetime.now().time()) 
+                                       + "\n")
                         ofstream.write("System_class: {}\n".format(self.nanowire.system_ID))
                         ofstream.write("$ Space Grid:\n")
                         ofstream.write("Total_length: {}\n".format(active_sets[key].params_dict["Total_length"]))
@@ -1985,7 +2418,8 @@ class Notebook:
 
                 ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
                 ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
-                plot.set_ylim(ymin * self.convert_out_dict[variable], ymax * self.convert_out_dict[variable])
+                plot.set_ylim(ymin * self.convert_out_dict[variable], 
+                              ymax * self.convert_out_dict[variable])
 
             plot.set_yscale(output_obj.yscale)
             
@@ -2035,8 +2469,10 @@ class Notebook:
         return param_values_dict
     
     def plot_overview_analysis(self):
-        """ Plot dataset and calculations from OneD_Model.get_overview_analysis() on Overview tab. """
-        data_dirname = tk.filedialog.askdirectory(title="Select a dataset", initialdir=self.default_dirs["Data"])
+        """ Plot dataset and calculations from OneD_Model.get_overview_analysis() 
+            on Overview tab. """
+        data_dirname = tk.filedialog.askdirectory(title="Select a dataset", 
+                                                  initialdir=self.default_dirs["Data"])
         if not data_dirname:
             print("No data set selected :(")
             return
@@ -2071,7 +2507,9 @@ class Notebook:
             plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
             
             
-        data_dict = self.nanowire.get_overview_analysis(param_values_dict, tstep_list, data_dirname, data_filename)
+        data_dict = self.nanowire.get_overview_analysis(param_values_dict, 
+                                                        tstep_list, data_dirname, 
+                                                        data_filename)
         
         warning_msg = ""
         for output_name, output_info in self.nanowire.outputs_dict.items():
@@ -2099,7 +2537,8 @@ class Notebook:
             
             if values.ndim == 2: # time/space variant outputs
                 for i in range(len(values)):
-                    self.overview_subplots[output_name].plot(grid_x, values[i], label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
+                    self.overview_subplots[output_name].plot(grid_x, values[i], 
+                                                             label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
                     
             else: # Time variant only
                 self.overview_subplots[output_name].plot(grid_x, values)
@@ -2155,7 +2594,9 @@ class Notebook:
             subplot.set_ylabel(active_datagroup.type)
             if active_plot_data.display_legend:
                 subplot.legend().set_draggable(True)
-            subplot.set_title("Time: " + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) + " / " + str(active_datagroup.get_maxtime()) + "ns")
+            subplot.set_title("Time: " 
+                              + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) 
+                              + " / " + str(active_datagroup.get_maxtime()) + "ns")
             self.analyze_fig.tight_layout()
             self.analyze_fig.canvas.draw()
             
@@ -2192,17 +2633,25 @@ class Notebook:
 		# Now that we have the parameters from metadata, fetch the data itself
         sim_data = {}
         for sim_datatype in self.nanowire.simulation_outputs_dict:
-            path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_filename, data_filename, sim_datatype)
-            sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, single_tstep=True)
+            path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
+                                                      self.nanowire.system_ID, 
+                                                      data_filename, data_filename, 
+                                                      sim_datatype)
+            sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
+                                            single_tstep=True)
         
         try:
             values = self.nanowire.prep_dataset(datatype, sim_data, param_values_dict)
             assert isinstance(values, np.ndarray)
             assert values.ndim == 1
             if self.nanowire.outputs_dict[datatype].is_edge: 
-                return Raw_Data_Set(values, data_edge_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
+                return Raw_Data_Set(values, data_edge_x, data_node_x, 
+                                    param_values_dict, datatype, data_filename, 
+                                    active_plot.time_index)
             else:
-                return Raw_Data_Set(values, data_node_x, data_node_x, param_values_dict, datatype, data_filename, active_plot.time_index)
+                return Raw_Data_Set(values, data_node_x, data_node_x, 
+                                    param_values_dict, datatype, data_filename, 
+                                    active_plot.time_index)
     
         except:
             return "Error: Unable to calculate {} using prep_dataset\n".format(datatype)
@@ -2232,7 +2681,8 @@ class Notebook:
                 active_plot.datagroup.add(new_data, new_data.tag())
     
         if len(err_msg):
-            self.do_confirmation_popup("Error: the following data could not be plotted\n" + err_msg, hide_cancel=True)
+            self.do_confirmation_popup("Error: the following data could not be plotted\n" + err_msg, 
+                                       hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
         
         self.plot_analyze(plot_ID, force_axis_update=True)
@@ -2262,10 +2712,16 @@ class Notebook:
         for tag, dataset in active_datagroup.datasets.items():
             sim_data = {}
             for sim_datatype in self.nanowire.simulation_outputs_dict:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, dataset.filename, dataset.filename, sim_datatype)
-                sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, single_tstep=True)
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
+                                                          self.nanowire.system_ID, 
+                                                          dataset.filename, 
+                                                          dataset.filename, 
+                                                          sim_datatype)
+                sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
+                                                single_tstep=True)
         
-            dataset.data = self.nanowire.prep_dataset(active_datagroup.type, sim_data, dataset.params_dict)
+            dataset.data = self.nanowire.prep_dataset(active_datagroup.type, sim_data, 
+                                                      dataset.params_dict)
             dataset.show_index = active_plot.time_index
             
         self.plot_analyze(plot_ID, force_axis_update=False)
@@ -2307,7 +2763,8 @@ class Notebook:
         return
 
     def do_Batch(self):
-        """ Interpret values entered into simulate tab and prepare simulations for each selected IC file"""
+        """ Interpret values entered into simulate tab and prepare simulations 
+            for each selected IC file"""
         # Test for valid entry values
         try:
             self.simtime = float(self.simtime_entry.get())      # [ns]
@@ -2317,28 +2774,34 @@ class Notebook:
 
             # Upper limit on number of time steps
             
-            if (self.simtime <= 0): raise Exception("Error: Invalid simulation time")
-            if (self.dt <= 0 or self.dt > self.simtime): raise Exception("Error: Invalid dt")
+            assert (self.simtime > 0),"Error: Invalid simulation time"
+            assert (self.dt > 0 and self.dt <= self.simtime),"Error: Invalid dt"
             
             if self.hmax == "": # Default hmax
                 self.hmax = 0
                 
             self.hmax = float(self.hmax)
             
-            if (self.hmax < 0): raise Exception("Error: Invalid solver stepsize")
+            assert (self.hmax >= 0),"Error: Invalid solver stepsize"
             
             if self.dt > self.simtime / 10:
-                self.do_confirmation_popup("Warning: a very large time stepsize was entered. Results may be less accurate with large stepsizes. Are you sure you want to continue?")
+                self.do_confirmation_popup("Warning: a very large time stepsize was entered. "
+                                           "Results may be less accurate with large stepsizes. "
+                                           "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: return
                 
             if self.hmax and self.hmax < 1e-3:
-                self.do_confirmation_popup("Warning: a very small solver stepsize was entered. Results may be slow with small solver stepsizes. Are you sure you want to continue?")
+                self.do_confirmation_popup("Warning: a very small solver stepsize was entered. "
+                                           "Results may be slow with small solver stepsizes. "
+                                           "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: return
                 
             if (self.n > 1e5):
-                self.do_confirmation_popup("Warning: a very small time stepsize was entered. Results may be slow with small time stepsizes. Are you sure you want to continue?")
+                self.do_confirmation_popup("Warning: a very small time stepsize was entered. "
+                                           "Results may be slow with small time stepsizes. "
+                                           "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: return
             
@@ -2346,11 +2809,13 @@ class Notebook:
             self.write(self.status, "Error: Invalid parameters")
             return
 
-        except Exception as oops:
+        except (AssertionError, Exception) as oops:
             self.write(self.status, oops)
             return
 
-        IC_files = tk.filedialog.askopenfilenames(initialdir = self.default_dirs["Initial"], title="Select IC text file", filetypes=[("Text files","*.txt")])
+        IC_files = tk.filedialog.askopenfilenames(initialdir=self.default_dirs["Initial"], 
+                                                  title="Select IC text file", 
+                                                  filetypes=[("Text files","*.txt")])
         if (IC_files.__len__() == 0): return
 
         batch_num = 0
@@ -2360,14 +2825,17 @@ class Notebook:
             batch_num += 1
             self.IC_file_name = IC
             self.load_ICfile()
-            self.write(self.status, "Now calculating {} : ({} of {})".format(self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")], str(batch_num), str(IC_files.__len__())))
+            self.write(self.status, 
+                       "Now calculating {} : ({} of {})".format(self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")], 
+                                                                str(batch_num), str(IC_files.__len__())))
             self.do_Calculate()
             
         self.write(self.status, "Simulations complete")
 
         if not self.sim_warning_msg == "":
             sim_warning_popup = tk.Toplevel(self.root)
-            sim_warning_textbox = tk.ttk.Label(sim_warning_popup, text=self.sim_warning_msg)
+            sim_warning_textbox = tk.ttk.Label(sim_warning_popup, 
+                                               text=self.sim_warning_msg)
             sim_warning_textbox.grid(row=0,column=0)
         return
 
@@ -2412,7 +2880,9 @@ class Notebook:
     
         try:
             print("Attempting to create {} data folder".format(data_file_name))
-            full_path_name = "{}\\{}\\{}".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name)
+            full_path_name = "{}\\{}\\{}".format(self.default_dirs["Data"], 
+                                                 self.nanowire.system_ID, 
+                                                 data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
             assert "Data" in full_path_name
@@ -2426,14 +2896,16 @@ class Notebook:
                 full_path_name = "{}({})".format(full_path_name, append)
                 
                 
-                self.sim_warning_msg += "Overwrite warning - {} already exists in Data directory\nSaving as {} instead\n".format(data_file_name, full_path_name)
+                self.sim_warning_msg += "Overwrite warning - {} already exists " \
+                                        "in Data directory\nSaving as {} instead\n".format(data_file_name, full_path_name)
                 
                 data_file_name = "{}({})".format(data_file_name, append)
                 
             os.mkdir("{}".format(full_path_name))
 
         except:
-            self.sim_warning_msg += "Error: unable to create directory for results of simulation {}\n".format(shortened_IC_name)
+            self.sim_warning_msg += "Error: unable to create directory for results " \
+                                    "of simulation {}\n".format(shortened_IC_name)
             return
 
 
@@ -2456,11 +2928,13 @@ class Notebook:
         self.update_sim_plots(0)
 
         try:
-            self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), self.m, self.n, self.dt, 
-                                   temp_sim_dict, self.sys_flag_dict, self.hmax, init_conditions)
+            self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), 
+                                   self.m, self.n, self.dt, temp_sim_dict, 
+                                   self.sys_flag_dict, self.hmax, init_conditions)
             
         except FloatingPointError:
-            self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}. This file may have invalid parameters.\n".format(data_file_name))
+            self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}. "
+                                     "This file may have invalid parameters.\n".format(data_file_name))
             for file in os.listdir(full_path_name):
                 tpath = full_path_name + "\\" + file
                 os.remove(tpath)
@@ -2482,11 +2956,16 @@ class Notebook:
         try:
             for i in range(1,6):
                 for var in self.sim_data:
-                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], self.nanowire.system_ID, data_file_name, data_file_name, var)
-                    self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), single_tstep=True)
+                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
+                                                              self.nanowire.system_ID, 
+                                                              data_file_name, 
+                                                              data_file_name, var)
+                    self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
+                                                single_tstep=True)
                 self.update_sim_plots(self.n, do_clear_plots=False)
         except:
-            self.sim_warning_msg += "Warning: unable to plot {}. Output data may not have been saved correctly.\n".format(data_file_name)
+            self.sim_warning_msg += "Warning: unable to plot {}. Output data " \
+                                    "may not have been saved correctly.\n".format(data_file_name)
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
@@ -2520,7 +2999,8 @@ class Notebook:
         """ Interpret values from series of integration popups to integrate datasets. """
         plot_ID = self.active_analysisplot_ID.get()
         
-        # Replace this with an appropriate getter function if more integration plots are added
+        # Replace this with an appropriate getter function if more integration 
+        # plots are added
         ip_ID = 0
         
         self.write(self.analysis_status, "")
@@ -2561,7 +3041,8 @@ class Notebook:
             self.integration_bounds = [[0,active_datagroup.get_max_x()]]
             
         # Clean up the I_plot and prepare to integrate given selections
-        # A lot of the following is a data transfer between the sending active_datagroup and the receiving I_plot
+        # A lot of the following is a data transfer between the 
+        # sending active_datagroup and the receiving I_plot
         self.integration_plots[ip_ID].datagroup.clear()
         self.integration_plots[ip_ID].mode = self.PL_mode
         self.integration_plots[ip_ID].global_gridx = None
@@ -2590,7 +3071,8 @@ class Notebook:
                 show_index = None
 
             # Clean up any bounds that extend past the confines of the system
-            # The system usually exists from x=0 to x=total_length, but can accept x=-total_length to x=total_length if symmetric
+            # The system usually exists from x=0 to x=total_length, 
+            # but can accept x=-total_length to x=total_length if symmetric
 
             for bounds in self.integration_bounds:
                 l_bound = bounds[0]
@@ -2633,27 +3115,41 @@ class Notebook:
                     extra_data = {}
                     
                     for sim_datatype in self.nanowire.simulation_outputs_dict:
-                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=i+1, single_tstep=do_curr_t, need_extra_node=nen[0]) 
-                        extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t)
+                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                        t0=show_index, l=0, r=i+1, 
+                                                        single_tstep=do_curr_t, need_extra_node=nen[0]) 
+                        extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                          t0=show_index, single_tstep=do_curr_t)
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, 0, i, nen[0], extra_data)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, 
+                                                      active_datagroup.datasets[tag].params_dict, 
+                                                      True, 0, i, nen[0], extra_data)
                     I_data = new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
                     sim_data = {}
                     
                     for sim_datatype in self.nanowire.simulation_outputs_dict:
-                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=0, r=j+1, single_tstep=do_curr_t, need_extra_node=nen[1]) 
+                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                        t0=show_index, l=0, r=j+1, 
+                                                        single_tstep=do_curr_t, need_extra_node=nen[1]) 
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, 0, j, nen[1], extra_data)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, 
+                                                      active_datagroup.datasets[tag].params_dict, 
+                                                      True, 0, j, nen[1], extra_data)
                     I_data += new_integrate(data, 0, u_bound, dx, total_length, nen[1])
                     
                 else:
                     sim_data = {}
                     extra_data = {}
                     for sim_datatype in self.nanowire.simulation_outputs_dict:
-                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, l=i, r=j+1, single_tstep=do_curr_t, need_extra_node=nen) 
-                        extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), t0=show_index, single_tstep=do_curr_t) 
+                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                        t0=show_index, l=i, r=j+1, 
+                                                        single_tstep=do_curr_t, need_extra_node=nen) 
+                        extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                          t0=show_index, single_tstep=do_curr_t) 
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, active_datagroup.datasets[tag].params_dict, True, i, j, nen, extra_data)
+                    data = self.nanowire.prep_dataset(datatype, sim_data, 
+                                                      active_datagroup.datasets[tag].params_dict, 
+                                                      True, i, j, nen, extra_data)
                     
                     I_data = new_integrate(data, l_bound, u_bound, dx, total_length, nen)
 
@@ -2669,7 +3165,10 @@ class Notebook:
                     grid_xaxis = -1 # A dummy value for the I_Set constructor
                     xaxis_label = "Time [ns]"
 
-                self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].type, data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
+                self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, 
+                                                                                active_datagroup.datasets[tag].params_dict, 
+                                                                                active_datagroup.datasets[tag].type, 
+                                                                                data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
             
                 counter += 1
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
@@ -2683,7 +3182,8 @@ class Notebook:
 
         self.integration_plots[ip_ID].xaxis_type = 'linear'
 
-        self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), max_val=datagroup.get_maxval())
+        self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), 
+                                                             max_val=datagroup.get_maxval())
         #self.integration_plots[ip_ID].ylim = max * 1e-12, max * 10
 
         subplot.set_yscale(self.integration_plots[ip_ID].yaxis_type)
@@ -2695,10 +3195,14 @@ class Notebook:
         for key in datagroup.datasets:
 
             if self.PL_mode == "Current time step":
-                subplot.scatter(datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag(for_matplotlib=True))
+                subplot.scatter(datagroup.datasets[key].grid_x, 
+                                datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], 
+                                label=datagroup.datasets[key].tag(for_matplotlib=True))
 
             elif self.PL_mode == "All time steps":
-                subplot.plot(self.integration_plots[ip_ID].global_gridx, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], label=datagroup.datasets[key].tag(for_matplotlib=True))
+                subplot.plot(self.integration_plots[ip_ID].global_gridx, 
+                             datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], 
+                             label=datagroup.datasets[key].tag(for_matplotlib=True))
                 
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
         self.integration_plots[ip_ID].ylim = subplot.get_ylim()
@@ -2710,7 +3214,8 @@ class Notebook:
         
         self.write(self.analysis_status, "Integration complete")
 
-        if (self.nanowire.system_ID == "Nanowire" and self.PL_mode == "All time steps" and datatype == "PL"):
+        if (self.nanowire.system_ID == "Nanowire" 
+            and self.PL_mode == "All time steps" and datatype == "PL"):
             # Calculate tau_D
             if self.integration_plots[ip_ID].datagroup.size(): # If has tau_diff data to plot
                 td_gridt = {}
@@ -2761,7 +3266,8 @@ class Notebook:
             # Step 1 and 2
             self.paramtoolkit_currentparam = param
             
-            # These two lines changes the text displayed in the param_rule display box's menu and is for cosmetic purposes only
+            # These two lines changes the text displayed in the param_rule 
+            # display box's menu and is for cosmetic purposes only
             self.update_paramrule_listbox(param)
             self.paramtoolkit_viewer_selection.set(param)
             
@@ -2783,10 +3289,13 @@ class Notebook:
         self.write(self.ICtab_status, "Selected params cleared")
         return
 
-	## This is a patch of a consistency issue involving initial conditions - we require different variables of a single initial condition
-	## to fit to the same spatial mesh, which can get messed up if the user changes the mesh while editing initial conditions.
+	## This is a patch of a consistency issue involving initial conditions - 
+    ## we require different variables of a single initial condition
+	## to fit to the same spatial mesh, which can get messed up if the 
+    ## user changes the mesh while editing initial conditions.
 
-    # First, implement a way to temporarily remove the user's ability to change variables associated with the spatial mesh
+    # First, implement a way to temporarily remove the user's ability 
+    # to change variables associated with the spatial mesh
     def set_thickness_and_dx_entryboxes(self, state):
         """ Toggle ability to change spatial mesh while parameters are stored. """
         if state =='lock':
@@ -2802,24 +3311,25 @@ class Notebook:
     
     def set_init_x(self):
         """Generate and lock in new spatial mesh. 
-           A new mesh can only be generated when the previous mesh is discarded using reset_IC()."""
+           A new mesh can only be generated when the previous mesh 
+           is discarded using reset_IC()."""
         if self.nanowire.spacegrid_is_set:
             return
 
         thickness = float(self.thickness_entry.get())
         dx = float(self.dx_entry.get())
 
-        if (thickness <= 0 or dx <= 0): raise ValueError
+        assert (thickness > 0 and dx > 0), "Error: invalid thickness or dx"
 
-        if dx > thickness / 2:
-            raise Exception("Error: space step size too large")
+        assert dx <= thickness / 2, "Error: space step size too large"
 
         # Upper limit on number of space steps
-        if (int(0.5 + thickness / dx) > 1e6): 
-            raise Exception("Error: too many space steps")
+        assert (int(0.5 + thickness / dx) <= 1e6), "Error: too many space steps"
 
         if dx > thickness / 10:
-            self.do_confirmation_popup("Warning: a very large space stepsize was entered. Results may be less accurate with large stepsizes. Are you sure you want to continue?")
+            self.do_confirmation_popup("Warning: a very large space stepsize was entered. "
+                                       "Results may be less accurate with large stepsizes. "
+                                       "Are you sure you want to continue?")
             self.root.wait_window(self.confirmation_popup)
             if not self.confirmed: return
 
@@ -2835,16 +3345,13 @@ class Notebook:
         """Calculate and store laser generation profile"""
         try:
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set
+            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
 
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
         
-        except AssertionError:
-            return
-        
-        except Exception as oops:
+        except (AssertionError, Exception) as oops:
             self.write(self.ICtab_status, oops)
             return
 
@@ -2853,13 +3360,13 @@ class Notebook:
                        "incidence":self.LGC_stim_mode.get(),
                        "power_mode":self.LGC_gen_power_mode.get()}
         try:
-            if LGC_options["long_expfactor"] == '' or LGC_options["power_mode"] == '':
-                raise ValueError("Error: select material param and power generation options ")
-        except ValueError as oops:
+            assert (LGC_options["long_expfactor"] and LGC_options["power_mode"]), "Error: select material param and power generation options "
+        except AssertionError as oops:
             self.write(self.ICtab_status, oops)
             return
 
-        # Remove all param_rules for deltaN and deltaP, as we will be reassigning them shortly.
+        # Remove all param_rules for deltaN and deltaP, 
+        # as we will be reassigning them shortly.
         self.paramtoolkit_currentparam = "deltaN"
         self.deleteall_paramrule()
         self.paramtoolkit_currentparam = "deltaP"
@@ -2872,18 +3379,18 @@ class Notebook:
         hc_nm = h * c * 1e9     # [J*m] to [J*nm] 
 
         if (LGC_options["long_expfactor"]):
-            try: A0 = float(self.A0_entry.get())         # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
+            try: A0 = float(self.A0_entry.get())   # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
             except:
                 self.write(self.ICtab_status, "Error: missing or invalid A0")
                 return
 
-            try: Eg = float(self.Eg_entry.get())                  # [eV]
+            try: Eg = float(self.Eg_entry.get())   # [eV]
             except:
                 self.write(self.ICtab_status, "Error: missing or invalid Eg")
                 return
 
             try: 
-                wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
+                wavelength = float(self.pulse_wavelength_entry.get())  # [nm]
                 assert wavelength > 0
             except:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
@@ -2936,7 +3443,9 @@ class Notebook:
                     return
 
             # Note: add_LGC() automatically converts into TEDs units. For consistency add_LGC should really deposit values in common units.
-            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
+            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, 
+                                                                                                      freq, wavelength, alpha_nm, 
+                                                                                                      self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (LGC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
@@ -2960,7 +3469,9 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, wavelength, alpha_nm, self.nanowire.grid_x_nodes, hc=hc_nm)
+            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, 
+                                                                                                    wavelength, alpha_nm, 
+                                                                                                    self.nanowire.grid_x_nodes, hc=hc_nm)
         
         elif (LGC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
@@ -2968,16 +3479,17 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
-            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, self.nanowire.grid_x_nodes)
+            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, 
+                                                                                              self.nanowire.grid_x_nodes)
         
-
         elif (LGC_options["power_mode"] == "total-gen"):
             try: total_gen = float(self.total_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
             except:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
-            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_totalgen(total_gen, self.nanowire.total_length, alpha_nm, self.nanowire.grid_x_nodes)
+            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_totalgen(total_gen, self.nanowire.total_length, 
+                                                                                                alpha_nm, self.nanowire.grid_x_nodes)
         
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
@@ -3002,14 +3514,13 @@ class Notebook:
 
         try:
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set
+            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
 
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
-        except AssertionError:
-            return
-        except Exception as oops:
+
+        except (AssertionError, Exception) as oops:
             self.write(self.ICtab_status, oops)
             return
 
@@ -3022,20 +3533,31 @@ class Notebook:
             if (self.init_shape_selection.get() == "POINT"):
                 assert (float(self.paramrule_lbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
                 
-                new_param_rule = Param_Rule(new_param_name, "POINT", float(self.paramrule_lbound_entry.get()), -1, float(self.paramrule_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "POINT", 
+                                            float(self.paramrule_lbound_entry.get()), 
+                                            -1, 
+                                            float(self.paramrule_lvalue_entry.get()), 
+                                            -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
                 assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
                 assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
-                new_param_rule = Param_Rule(new_param_name, "FILL", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), float(self.paramrule_lvalue_entry.get()), -1)
+                new_param_rule = Param_Rule(new_param_name, "FILL", 
+                                            float(self.paramrule_lbound_entry.get()), 
+                                            float(self.paramrule_rbound_entry.get()), 
+                                            float(self.paramrule_lvalue_entry.get()), 
+                                            -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
                 assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
                 assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
-                new_param_rule = Param_Rule(new_param_name, "LINE", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
-                                            float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "LINE", 
+                                            float(self.paramrule_lbound_entry.get()), 
+                                            float(self.paramrule_rbound_entry.get()), 
+                                            float(self.paramrule_lvalue_entry.get()), 
+                                            float(self.paramrule_rvalue_entry.get()))
 
             elif (self.init_shape_selection.get() == "EXP"):
                 assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
@@ -3043,8 +3565,11 @@ class Notebook:
                 assert (float(self.paramrule_lvalue_entry.get()) != 0), "Error: left value cannot be 0"
                 assert (float(self.paramrule_rvalue_entry.get()) != 0), "Error: right value cannot be 0"
                 assert (float(self.paramrule_lvalue_entry.get()) * float(self.paramrule_rvalue_entry.get()) > 0), "Error: values must have same sign"
-                new_param_rule = Param_Rule(new_param_name, "EXP", float(self.paramrule_lbound_entry.get()), float(self.paramrule_rbound_entry.get()), 
-                                            float(self.paramrule_lvalue_entry.get()), float(self.paramrule_rvalue_entry.get()))
+                new_param_rule = Param_Rule(new_param_name, "EXP", 
+                                            float(self.paramrule_lbound_entry.get()), 
+                                            float(self.paramrule_rbound_entry.get()), 
+                                            float(self.paramrule_lvalue_entry.get()), 
+                                            float(self.paramrule_rvalue_entry.get()))
 
             else:
                 raise ValueError
@@ -3063,7 +3588,8 @@ class Notebook:
         self.update_paramrule_listbox(new_param_name)
 
         if self.nanowire.system_ID == "Nanowire":
-            if new_param_name == "deltaN" or new_param_name == "deltaP": self.using_LGC = False
+            if new_param_name == "deltaN" or new_param_name == "deltaP": 
+                self.using_LGC = False
         self.update_IC_plot(plot_ID="recent")
         return
 
@@ -3089,7 +3615,8 @@ class Notebook:
 
         for param_rule in current_param_rules:
             self.active_paramrule_list.append(param_rule)
-            self.active_paramrule_listbox.insert(self.active_paramrule_list.__len__() - 1, param_rule.get())
+            self.active_paramrule_listbox.insert(self.active_paramrule_list.__len__() - 1,
+                                                 param_rule.get())
 
         
         self.write(self.ICtab_status, "")
@@ -3109,11 +3636,13 @@ class Notebook:
             # 1. Change the order param rules appear in the box
             self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
             self.active_paramrule_listbox.delete(currentSelectionIndex)
-            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, self.active_paramrule_list[currentSelectionIndex - 1].get())
+            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, 
+                                                 self.active_paramrule_list[currentSelectionIndex - 1].get())
             self.active_paramrule_listbox.selection_set(currentSelectionIndex - 1)
 
             # 2. Change the order param rules are applied when calculating Parameter's values
-            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, currentSelectionIndex)
+            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, 
+                                           currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
 
@@ -3127,10 +3656,12 @@ class Notebook:
         if (currentSelectionIndex < self.active_paramrule_list.__len__()):
             self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
             self.active_paramrule_listbox.delete(currentSelectionIndex)
-            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, self.active_paramrule_list[currentSelectionIndex - 1].get())
+            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, 
+                                                 self.active_paramrule_list[currentSelectionIndex - 1].get())
             self.active_paramrule_listbox.selection_set(currentSelectionIndex)
             
-            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, currentSelectionIndex)
+            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, 
+                                           currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
 
@@ -3163,7 +3694,8 @@ class Notebook:
         """ Deletes selected rule for current param. """
         if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
             try:
-                self.nanowire.remove_param_rule(self.paramtoolkit_currentparam, self.active_paramrule_listbox.curselection()[0])
+                self.nanowire.remove_param_rule(self.paramtoolkit_currentparam, 
+                                                self.active_paramrule_listbox.curselection()[0])
                 self.hide_paramrule()
                 self.update_IC_plot(plot_ID="recent")
             except IndexError:
@@ -3176,7 +3708,7 @@ class Notebook:
         """ Generate a parameter distribution using list from .txt file"""
         try:
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set
+            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
@@ -3184,7 +3716,7 @@ class Notebook:
         except AssertionError:
             return
         
-        except Exception as oops:
+        except (AssertionError, Exception) as oops:
             self.write(self.ICtab_status, oops)
             return
         
@@ -3192,7 +3724,9 @@ class Notebook:
         var = self.listupload_var_selection.get()
         is_edge = self.nanowire.param_dict[var].is_edge
         
-        valuelist_filename = tk.filedialog.askopenfilename(initialdir="", title="Select Values from text file", filetypes=[("Text files","*.txt")])
+        valuelist_filename = tk.filedialog.askopenfilename(initialdir="", 
+                                                           title="Select Values from text file", 
+                                                           filetypes=[("Text files","*.txt")])
         if valuelist_filename == "": # If no file selected
             return
 
@@ -3226,8 +3760,10 @@ class Notebook:
                 warning_flag = True
 
             # Linear interpolate from provided param list to specified grid points
-            lindex = to_index(first_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
-            rindex = to_index(second_valueset[0], self.nanowire.dx, self.nanowire.total_length, is_edge)
+            lindex = to_index(first_valueset[0], self.nanowire.dx, 
+                              self.nanowire.total_length, is_edge)
+            rindex = to_index(second_valueset[0], self.nanowire.dx, 
+                              self.nanowire.total_length, is_edge)
             
             if (first_valueset[0] - to_pos(lindex, self.nanowire.dx, is_edge) >= self.nanowire.dx / 2): lindex += 1
 
@@ -3269,15 +3805,19 @@ class Notebook:
         grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
         # Support for constant value shortcut: temporarily create distribution
         # simulating filling across nanowire with that value
-        val_array = to_array(param_obj.value, len(self.nanowire.grid_x_nodes), param_obj.is_edge)
+        val_array = to_array(param_obj.value, len(self.nanowire.grid_x_nodes), 
+                             param_obj.is_edge)
 
         plot.set_yscale(autoscale(val_array=val_array))
 
         if self.sys_flag_dict['symmetric_system'].value():
-            plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), np.concatenate((np.flip(val_array), val_array), axis=0), label=param_name)
+            plot.plot(np.concatenate((-np.flip(grid_x), grid_x), axis=0), 
+                      np.concatenate((np.flip(val_array), val_array), axis=0), 
+                      label=param_name)
 
             ymin, ymax = plot.get_ylim()
-            plot.fill([-grid_x[-1], 0, 0, -grid_x[-1]], [ymin, ymin, ymax, ymax], 'b', alpha=0.1, edgecolor='r')
+            plot.fill([-grid_x[-1], 0, 0, -grid_x[-1]], [ymin, ymin, ymax, ymax], 
+                      'b', alpha=0.1, edgecolor='r')
         else:
             plot.plot(grid_x, val_array, label=param_name)
 
@@ -3331,16 +3871,17 @@ class Notebook:
 
         try:
             batch_dir_name = self.batch_name_entry.get()
-            if batch_dir_name == "": raise OSError("Error: Batch folder must have a name")
-            if not check_valid_filename(batch_dir_name): raise OSError("File names may not contain certain symbols such as ., <, >, /, \\, *, ?, :, \", |")
-        except Exception as e:
+            assert batch_dir_name, "Error: Batch folder must have a name"
+            assert check_valid_filename(batch_dir_name), "File names may not contain certain symbols such as ., <, >, /, \\, *, ?, :, \", |"
+        except (AssertionError, Exception) as e:
             self.write(self.batch_status, e)
             return
 
         try:
             os.mkdir("{}\\{}".format(self.default_dirs["Initial"], batch_dir_name))
         except FileExistsError:
-            self.write(self.batch_status, "Error: {} folder already exists".format(batch_dir_name))
+            self.write(self.batch_status, 
+                       "Error: {} folder already exists".format(batch_dir_name))
             return
         
         # Record the original values of the Nanowire, so we can restore them after the batch algo finishes
@@ -3367,7 +3908,8 @@ class Notebook:
             if self.nanowire.system_ID == "Nanowire" and self.using_LGC: self.add_LGC()
                 
             try:
-                self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], batch_dir_name, filename))
+                self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], 
+                                                             batch_dir_name, filename))
             except:
                 print("Error: failed to create batch file {}".format(filename))
                 warning_flag += 1
@@ -3377,9 +3919,11 @@ class Notebook:
             self.nanowire.param_dict[param].value = original_param_values[param]
         
         if not warning_flag:
-            self.write(self.batch_status, "Batch \"{}\" created successfully".format(batch_dir_name))
+            self.write(self.batch_status, 
+                       "Batch \"{}\" created successfully".format(batch_dir_name))
         else:
-            self.write(self.batch_status, "Warning: failed to create some batch files - see console")
+            self.write(self.batch_status, 
+                       "Warning: failed to create some batch files - see console")
         return
     
 
@@ -3388,7 +3932,9 @@ class Notebook:
     
         try:
             assert self.nanowire.spacegrid_is_set, "Error: set a space grid first"
-            new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file", filetypes=[("Text files","*.txt")])
+            new_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Initial"], 
+                                                           title="Save IC text file", 
+                                                           filetypes=[("Text files","*.txt")])
             
             if new_filename == "": return
 
@@ -3447,7 +3993,9 @@ class Notebook:
     
     def select_init_file(self):
         """Wrapper for load_ICfile with user selection from IC tab"""
-        self.IC_file_name = tk.filedialog.askopenfilename(initialdir = self.default_dirs["Initial"], title="Select IC text files", filetypes=[("Text files","*.txt")])
+        self.IC_file_name = tk.filedialog.askopenfilename(initialdir=self.default_dirs["Initial"], 
+                                                          title="Select IC text files", 
+                                                          filetypes=[("Text files","*.txt")])
         if self.IC_file_name == "": return # If user closes dialog box without selecting a file
 
         self.load_ICfile()
@@ -3553,15 +4101,12 @@ class Notebook:
             self.enter(self.thickness_entry, total_length)
             self.enter(self.dx_entry, dx)
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set
+            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
-        
-        except AssertionError:
-            return
 
-        except Exception as oops:
+        except (AssertionError, Exception) as oops:
             self.write(self.ICtab_status, oops)
             return
 
@@ -3607,9 +4152,12 @@ class Notebook:
             if datagroup.size() == 0: return
             
             if plot_info.mode == "Current time step": 
-                paired_data = [[datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type]] for key in datagroup.datasets]
+                paired_data = [[datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type]] 
+                               for key in datagroup.datasets]
 
-                header = "{} {}, {}".format(plot_info.x_param, self.nanowire.param_dict[plot_info.x_param].units, datagroup.type)
+                header = "{} {}, {}".format(plot_info.x_param, 
+                                            self.nanowire.param_dict[plot_info.x_param].units, 
+                                            datagroup.type)
 
             else: # if self.I_plot.mode == "All time steps"
                 raw_data = np.array([datagroup.datasets[key].data * self.convert_out_dict[datagroup.type] for key in datagroup.datasets])
@@ -3627,13 +4175,16 @@ class Notebook:
             paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
             header = "".join(["x {},".format(self.nanowire.length_unit) + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
-        export_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save data", filetypes=[("csv (comma-separated-values)","*.csv")])
+        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
+                                                          title="Save data", 
+                                                          filetypes=[("csv (comma-separated-values)","*.csv")])
         
         # Export to .csv
         if not (export_filename == ""):
             try:
                 if export_filename.endswith(".csv"): export_filename = export_filename[:-4]
-                np.savetxt("{}.csv".format(export_filename), paired_data, fmt='%.4e', delimiter=',', header=header)
+                np.savetxt("{}.csv".format(export_filename), paired_data, 
+                           fmt='%.4e', delimiter=',', header=header)
                 self.write(self.analysis_status, "Export complete")
             except PermissionError:
                 self.write(self.analysis_status, "Error: unable to access PL export destination")

@@ -66,7 +66,8 @@ class HeatPlate(OneD_Model):
         data_dict = {}
         
         for raw_output_name in self.simulation_outputs_dict:
-            data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, raw_output_name)
+            data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
+                                                 raw_output_name)
             data = []
             for tstep in tsteps:
                 data.append(u_read(data_filename, t0=tstep, single_tstep=True))
@@ -83,7 +84,8 @@ class HeatPlate(OneD_Model):
             
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
+    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0,
+                     nen=False, extra_data = None):
         """ Calculate heat flux (or read in temperature) on demand"""
         if (datatype in self.simulation_outputs_dict):
             data = sim_data[datatype]
@@ -166,8 +168,9 @@ def ode_heatplate(data_path_name, m, n, dx, dt, params, write_output=True):
     init_T[-1] = init_T[-2] - qL*dx/k[-1]
     
     tSteps = np.linspace(0, n*dt, n+1)
-    data, error_data = intg.odeint(heat_constflux, init_T, tSteps, args=(m, dx, k, rho, Cp, q0, qL),\
-        tfirst=True, full_output=True)
+    data, error_data = intg.odeint(heat_constflux, init_T, tSteps, 
+                                   args=(m, dx, k, rho, Cp, q0, qL),
+                                   tfirst=True, full_output=True)
             
     if write_output:
         ## Prep output files

@@ -7,7 +7,8 @@
 
 import numpy as np
 
-def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
+def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, 
+                               alpha, x_array, hc=6.626e-34*2.997e8):
     """
     Initial excitation profile.
     Parameters
@@ -38,7 +39,8 @@ def pulse_laser_power_spotsize(power, spotsize, freq, wavelength, alpha, x_array
     
     return (power / (spotsize * freq * hc / wavelength) * alpha * np.exp(-alpha * x_array))
 
-def pulse_laser_powerdensity(power_density, freq, wavelength, alpha, x_array, hc=6.626e-34*2.997e8):
+def pulse_laser_powerdensity(power_density, freq, wavelength, 
+                             alpha, x_array, hc=6.626e-34*2.997e8):
     """
     Initial excitation profile.
     Parameters

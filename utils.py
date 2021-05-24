@@ -208,7 +208,8 @@ def check_valid_filename(file_name):
 
     return True
         
-def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, need_extra_node=False):
+def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, 
+           need_extra_node=False):
     """Read a subset of a 2D array (from time t0 to t1 and position l to r) stored in an .h5 file"""
     if not (t0 is None) and single_tstep:
         t1 = t0 + 1
