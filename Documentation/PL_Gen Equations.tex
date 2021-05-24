@@ -1,0 +1,96 @@
+\documentclass[11pt]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{nameref}
+\usepackage{geometry}
+\usepackage{wrapfig}
+\usepackage{xcolor}
+\usepackage{scrextend}
+\usepackage{titlesec}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{placeins}
+\usepackage{subcaption}
+\usepackage{parskip}   %Removes paragraph indentions
+\usepackage{physics}
+\usepackage{amsmath}
+\usepackage[obeyspaces]{url}
+\usepackage[dotinlabels]{titletoc}
+
+\geometry{letterpaper, margin=1in}
+\graphicspath{ {Figures/} }
+\titlelabel{\thetitle.\quad}
+\captionsetup[figure]{font=small,labelsep=period}
+\captionsetup[sub]{labelformat=parens,labelsep=space}
+
+\newcommand{\enum}[2]{\stepcounter{#1} \arabic{#1}. \begin{addmargin}[2em]{0em} \vspace{-3\parskip} #2 \end{addmargin}} %Custom enumeration which works for enumeration and lists. Start a new step counter with '\newcounter{...}' then just call \enum{..countername..}{...text...}
+\newcommand{\enumletter}[2]{\stepcounter{#1} \alph{#1}. \begin{addmargin}[2em]{0em} \vspace{-3\parskip} #2 \end{addmargin}} %Custom enumeration which works for enumeration and lists. Start a new step counter with '\newcounter{...}' then just call \enum{..countername..}{...text...}
+
+%\title{}
+%\author{}
+%\date{}
+
+\begin{document}
+	%\maketitle
+	%\tableofcontents
+	%\clearpage
+	
+	\setcounter{page}{1}	
+	
+\section{1D Transport Equations}	
+\subsection{Generation Equations}
+\subsubsection*{Photon Recycling}
+\par The equation to describe the generation of photons at a given depth $ x $ due to photon re-absorption (recycling) follows:
+\begin{equation} \label{eq:Gen}
+\begin{split}
+	Gen(x) = \int_{0}^{L} \alpha \left(\frac{\delta R_{Rad}(x')}{2}\right) e^{-\alpha (x-x')} dx' + \alpha \left(\frac{\delta R_{Rad}(x)}{2}\right)\\
+	 + \int_{0}^{x} \alpha \left(1-f_{PL}\right) \left(\frac{\delta R_{Rad}(x')}{2}\right) e^{-\alpha (x+x')} dx'
+	 - \alpha \left(1-f_{PL}\right) \left(\frac{\delta R_{Rad}(x)}{2}\right)  e^{-2\alpha x}\\
+	 + \int_{x}^{L} \alpha \left(R_{Back}\right) \left(\frac{\delta R_{Rad}(x')}{2}\right) e^{-\alpha (2L-x-x')} dx'
+	 - \alpha \left(R_{Back}\right) \left(\frac{\delta R_{Rad}(x)}{2}\right)  e^{-2\alpha (L-x)}\\
+\end{split}
+\end{equation}
+\par where $ \alpha $ is the absorption coefficient, $ R_{Rad} $ is the radiative recombination rate at a given depth, $ f_{PL} $ is the fraction of carriers emitted as PL from the film surface --- i.e. not internally reflected ---, $ R_{Back} $ is the back surface reflection, and $ L $ is the film thickness. Here we use the term $ \delta $ to account for the fraction of $ R_{Rad} $ which overlaps with the absorption spectrum for the material (since we are not considering an integration over the wavelength of emitted light at this point); for similar reasons, $ \alpha $ represents the average absorption coefficient for the photons in $ \delta R_{Rad} $. Note: For this 1D simulation, $ R_{Rad} $ is considered to emit equally in the $ +x $ and $ -x $ directions, hence the factor of $ \frac{1}{2} $. The first two terms in Equation \ref{eq:Gen} consider photons originating at all points $ x' $ towards $ x $, with a correction at $ x = x' $. The second two terms in Equation \ref{eq:Gen} consider photons originating between $ 0 $ and $ x $ which are emitted away from $ x $ then internally reflected back towards $ x $, with a correction at $ x = x' $. The final two terms in Equation \ref{eq:Gen} consider photons originating between $ x $ and $ L $ which are emitted away from $ x $ then internally reflected back towards $ x $, with a correction at $ x = x' $. Here we only consider photons with a single surface reflection.
+
+\begin{figure}[h]
+	\label{fig:Gen}
+	\centering
+	\includegraphics[width=0.3\linewidth]{"Images/Gen"}
+	\caption{Graphical representation of the three photon re-absorption processes described for Equation \ref{eq:Gen} for photon emission at $ x' $ (blue) and subsequent re-absorption at $ x $.}
+	\label{fig:Gen}
+\end{figure}
+
+\par A graphical description of the various photon emission processes considered in Equation \ref{eq:Gen} is shown in Figure \ref{fig:Gen}. 
+
+\subsubsection*{No photon recycling}
+\par The equation to describe the generation of photons in the absence of photon re-absorption (recycling) follows:
+\begin{equation} \label{eq:Gen_nonrec}
+	\begin{split}
+		Gen(x) = 0
+	\end{split}
+\end{equation}
+
+\par Equation \ref{eq:Gen_nonrec} can also be recovered by setting $ \delta = 0 $ in Equation \ref{eq:Gen}.
+
+\subsection{PL Equations}
+\subsubsection*{Photon recycling}
+\par The equation to describe the PL photon flux emitted from a film surface in the presence of photon recycling follows:
+\begin{equation} \label{eq:PL}
+	\begin{split}
+		PL = \int_{0}^{L} (1-\delta)R_{Rad}(x)dx + \int_{0}^{L} \delta \left(\frac{R_{Rad}(x)}{2}\right) e^{-\alpha x} dx\\
+		+ \int_{0}^{L} \delta R_{Back} \left(\frac{R_{Rad}(x)}{2}\right) e^{-\alpha (x+L)} dx
+	\end{split}
+\end{equation}
+\par The first term in Equation \ref{eq:PL} considers all photons generated at a depth $ x $ whose energy does not overlap with the absorption spectrum of the material. The second term in Equation \ref{eq:PL} considers photons which can be reabsorbed with the absorption coefficient $ \alpha $ and are emitted towards the film surface. The third term in Equation \ref{eq:PL} considers photons which can be reabsorbed with the absorption coefficient $ \alpha $ and are emitted away from the film surface which subsequently reflect off of the back surface.
+\subsubsection*{No photon recycling}
+\par The equation to describe the PL photon flux emitted from a film surface in the absence of photon recycling follows:
+\begin{equation} \label{eq:PL_nonrec}
+\begin{split}
+	PL = \int_{0}^{L} R_{Rad}(x)dx
+\end{split}
+\end{equation}
+ \par Equation \ref{eq:PL_nonrec} can also be recovered by setting $ \delta = 0 $ in Equation \ref{eq:PL}.
+	
+\end{document}
