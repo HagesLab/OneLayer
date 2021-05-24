@@ -29,7 +29,7 @@ from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, Integrated_Da
 from utils import to_index, to_pos, to_array, get_all_combinations, extract_values, u_read, check_valid_filename, autoscale, new_integrate
 
 ## ADD MODULES HERE
-from Modules.Nanowire import Nanowire
+from Modules.Nanowire import Nanowire, tau_diff
 from Modules.HeatPlate import HeatPlate
 
 ## AND HERE
@@ -351,10 +351,15 @@ class Notebook:
         i = 1
         self.sys_flag_dict = {}
         for flag in self.nanowire.flags_dict:
-            self.sys_flag_dict[flag] = Flag(self.flags_frame, self.nanowire.flags_dict[flag])
-            self.sys_flag_dict[flag].tk_element.grid(row=i,column=0)
-            i += 1
-            
+            self.sys_flag_dict[flag] = Flag(self.flags_frame, self.nanowire.flags_dict[flag][0])
+            self.sys_flag_dict[flag].tk_var.set(self.nanowire.flags_dict[flag][1])
+            if self.nanowire.flags_dict[flag][1]:
+                continue
+            else:
+                self.sys_flag_dict[flag].tk_element.grid(row=i,column=0)
+                i += 1
+                
+        
         self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=8)
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
@@ -882,7 +887,8 @@ class Notebook:
         return
 
     def DEBUG(self):
-        print(self.nanowire.DEBUG_print())
+        for flag in self.sys_flag_dict:
+            print(flag + ": " + str(self.sys_flag_dict[flag].tk_var.get()))
         return
 
     def update_system_summary(self):
@@ -2703,7 +2709,7 @@ class Notebook:
                     total_time = dataset.params_dict["Total-Time"]
                     dt = dataset.params_dict["dt"]
                     td_gridt[tag] = np.linspace(0, total_time, n + 1)
-                    td[tag] = Nanowire.tau_diff(dataset.data, dt)
+                    td[tag] = tau_diff(dataset.data, dt)
                     
                 td_popup = tk.Toplevel(self.root)
                 td_fig = Figure(figsize=(6,4))

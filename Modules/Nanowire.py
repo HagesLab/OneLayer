@@ -33,9 +33,9 @@ class Nanowire(OneD_Model):
 
         self.param_count = len(self.param_dict)
         
-        self.flags_dict = {"ignore_alpha":"Ignore Photon Recycle",
-                           "symmetric_system":"Symmetric System",
-                           "check_do_ss":"Steady State Input"}
+        self.flags_dict = {"ignore_alpha":("Ignore Photon Recycle",0),
+                           "symmetric_system":("Symmetric System",1),
+                           "check_do_ss":("Steady State Input",0)}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
