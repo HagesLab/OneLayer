@@ -306,7 +306,8 @@ class Notebook:
         self.notebook.destroy()
         self.do_module_popup()
         self.root.wait_window(self.select_module_popup)
-        if self.nanowire is None: return
+        if self.nanowire is None: 
+            return
         self.prep_notebook()
         
         return
@@ -1252,7 +1253,7 @@ class Notebook:
         try:
             self.sys_printsummary_popup.destroy()
             self.sys_printsummary_popup_isopen = False
-        except:
+        except Exception:
             print("Error #2022: Failed to close shortcut popup.")
         return
     
@@ -1302,7 +1303,7 @@ class Notebook:
         try:
             self.sys_plotsummary_popup.destroy()
             self.sys_plotsummary_popup_isopen = False
-        except:
+        except Exception:
             print("Error #2023: Failed to close plotsummary popup.")
         return
         
@@ -1402,7 +1403,7 @@ class Notebook:
                         try:
                             val = float(val)
                             
-                        except:
+                        except Exception:
                             continue
                     
                     self.paramtoolkit_currentparam = param
@@ -1420,7 +1421,7 @@ class Notebook:
             self.write(self.ICtab_status, "")
             self.sys_param_shortcut_popup.destroy()
             self.sys_param_shortcut_popup_isopen = False
-        except:
+        except Exception:
             print("Error #2021: Failed to close shortcut popup.")
         
         return
@@ -1431,7 +1432,7 @@ class Notebook:
             self.set_init_x()
             assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
         
-        except:
+        except Exception:
             self.write(self.ICtab_status, "Error: missing space grid")
             return
 
@@ -1565,7 +1566,7 @@ class Notebook:
             self.batch_popup.destroy()
             print("Batch popup closed")
             self.batch_popup_isopen = False
-        except:
+        except Exception:
             print("Error #103: Failed to close batch popup.")
 
         return
@@ -1655,7 +1656,7 @@ class Notebook:
             print("resetIC popup closed")
             self.resetIC_popup_isopen = False
 
-        except:
+        except Exception:
             print("Error #601: Failed to close Bayesim popup")
         return
 
@@ -1732,7 +1733,7 @@ class Notebook:
 
         except AssertionError as oops:
             self.write(self.plotter_status, str(oops))
-        except:
+        except Exception:
             print("Error #502: Failed to close plotter popup.")
 
         return
@@ -1791,7 +1792,7 @@ class Notebook:
             self.integration_popup.destroy()
             print("Integration popup closed")
             self.integration_popup_isopen = False
-        except:
+        except Exception:
             print("Error #421: Failed to close PLmode popup.")
 
         return
@@ -1946,7 +1947,7 @@ class Notebook:
         except (OSError, KeyError) as uh_oh:
             self.write(self.integration_getbounds_status, uh_oh)
 
-        except:
+        except Exception:
             self.write(self.integration_getbounds_status, "Error: missing or invalid paramters")
 
         return
@@ -1999,7 +2000,7 @@ class Notebook:
             self.PL_xaxis_popup.destroy()
             print("PL xaxis popup closed")
             self.PL_xaxis_popup_isopen = False
-        except:
+        except Exception:
             print("Error #425: Failed to close PL xaxis popup.")
 
         return
@@ -2200,7 +2201,7 @@ class Notebook:
         except (ValueError, AssertionError) as oops:
             self.write(self.change_axis_status, oops)
             return
-        except:
+        except Exception:
             print("Error #441: Failed to close change axis popup.")
 
         return
@@ -2334,7 +2335,7 @@ class Notebook:
         except OSError:
             self.write(self.analysis_status, "Error: failed to regenerate IC file")
             
-        except:
+        except Exception:
             print("Error #511: Failed to close IC carry popup.")
 
         return
@@ -2547,7 +2548,7 @@ class Notebook:
                 warning_msg += "Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.nanowire.system_ID, output_name)
                 continue
             
-            except:
+            except Exception:
                 warning_msg += "Error: could not calculate {}".format(output_name)
                 continue
 
@@ -2629,7 +2630,7 @@ class Notebook:
             active_plot_data.ylim = subplot.get_ylim()
             active_plot_data.xlim = subplot.get_xlim()
 
-        except:
+        except Exception:
             self.write(self.analysis_status, "Error #106: Plot failed")
             return
 
@@ -2653,7 +2654,7 @@ class Notebook:
 
         except AssertionError as oops:
             return str(oops)
-        except:
+        except Exception:
             return "Error: missing or has unusual metadata.txt\n"
 
 		# Now that we have the parameters from metadata, fetch the data itself
@@ -2679,7 +2680,7 @@ class Notebook:
                                     param_values_dict, datatype, data_filename, 
                                     active_plot.time_index)
     
-        except:
+        except Exception:
             return "Error: Unable to calculate {} using prep_dataset\n".format(datatype)
 
 
@@ -2936,7 +2937,7 @@ class Notebook:
                 
             os.mkdir("{}".format(full_path_name))
 
-        except:
+        except Exception:
             self.sim_warning_msg += "Error: unable to create directory for results " \
                                     "of simulation {}\n".format(shortened_IC_name)
             return
@@ -2996,7 +2997,7 @@ class Notebook:
                     self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
                                                 single_tstep=True)
                 self.update_sim_plots(self.n, do_clear_plots=False)
-        except:
+        except Exception:
             self.sim_warning_msg += "Warning: unable to plot {}. Output data " \
                                     "may not have been saved correctly.\n".format(data_file_name)
         
@@ -3417,19 +3418,19 @@ class Notebook:
 
         if (LGC_options["long_expfactor"]):
             try: A0 = float(self.A0_entry.get())   # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing or invalid A0")
                 return
 
             try: Eg = float(self.Eg_entry.get())   # [eV]
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing or invalid Eg")
                 return
 
             try: 
                 wavelength = float(self.pulse_wavelength_entry.get())  # [nm]
                 assert wavelength > 0
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
@@ -3447,7 +3448,7 @@ class Notebook:
             try: 
                 alpha = float(self.LGC_absorption_cof_entry.get()) # [cm^-1]
                 
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing or invalid α")
                 return
 
@@ -3458,14 +3459,14 @@ class Notebook:
                 power = float(self.power_entry.get()) * 1e-6  # [uJ/s] to [J/s]
                 spotsize = float(self.spotsize_entry.get()) * ((1e7) ** 2)     # [cm^2] to [nm^2]
                 assert spotsize > 0
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing power or spot size")
                 return
 
             try: 
                 wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
                 assert wavelength > 0
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
@@ -3475,7 +3476,7 @@ class Notebook:
                 try:
                     freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
                     assert freq > 0
-                except:
+                except Exception:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
@@ -3486,14 +3487,14 @@ class Notebook:
         
         elif (LGC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing power density")
                 return
 
             try: 
                 wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
                 assert wavelength > 0
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
             if (self.pulse_freq_entry.get() == "cw" or self.sys_flag_dict["check_do_ss"].value()):
@@ -3502,7 +3503,7 @@ class Notebook:
                 try:
                     freq = float(self.pulse_freq_entry.get()) * 1e3    # [kHz] to [1/s]
                     assert freq > 0
-                except:
+                except Exception:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
@@ -3512,7 +3513,7 @@ class Notebook:
         
         elif (LGC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
@@ -3521,7 +3522,7 @@ class Notebook:
         
         elif (LGC_options["power_mode"] == "total-gen"):
             try: total_gen = float(self.total_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
-            except:
+            except Exception:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
@@ -3785,7 +3786,7 @@ class Notebook:
             
             if IC_values_list.__len__() < 2: # if not enough points in list
                 raise ValueError
-        except:
+        except Exception:
             self.write(self.ICtab_status, "Error: Unable to read point list")
             return
         
@@ -3818,7 +3819,7 @@ class Notebook:
                 except IndexError:
                     self.write(self.ICtab_status, "Warning: some points out of bounds")
                     warning_flag = True
-                except:
+                except Exception:
                     temp_IC_values[j] = 0
                     warning_flag = True
                 
@@ -3961,7 +3962,7 @@ class Notebook:
             try:
                 self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], 
                                                              batch_dir_name, filename))
-            except:
+            except Exception:
                 print("Error: failed to create batch file {}".format(filename))
                 warning_flag += 1
                 
@@ -4127,7 +4128,7 @@ class Notebook:
             dx = float(dx)
             if (total_length <= 0) or (dx <= 0) or (dx > total_length / 2):
                 raise ValueError
-        except:
+        except Exception:
             self.write(self.ICtab_status, "Error: invalid space grid")
             return
         
@@ -4168,7 +4169,7 @@ class Notebook:
             # All we need to do here is mark the appropriate GUI elements as selected
             try:
                 self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
-            except:
+            except Exception:
                 warning_mssg += "\nWarning: could not apply value for flag: {}".format(flag)
                 warning_mssg += "\nFlags must have integer value 1 or 0"
                 warning_flag += 1
@@ -4183,7 +4184,7 @@ class Notebook:
                 self.paramtoolkit_currentparam = param
                 if cycle_through_IC_plots: 
                     self.update_IC_plot(plot_ID="recent")
-            except:
+            except Exception:
                 warning_mssg += ("\nWarning: could not apply value for param: {}".format(param))
                 warning_flag += 1
                 

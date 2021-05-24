@@ -541,7 +541,7 @@ def tau_diff(PL, dt):
     """
     try:
         ln_PL = np.log(PL)
-    except:
+    except Exception:
         print("Error: could not calculate tau_diff from non-positive PL values")
         return np.zeros(len(PL))
     dln_PLdt = np.zeros(ln_PL.__len__())
