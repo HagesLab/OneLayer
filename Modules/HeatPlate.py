@@ -51,6 +51,7 @@ class HeatPlate(OneD_Model):
         return
     
     def calc_inits(self):
+        """ Package initial temperature distribution"""
         init_T = self.param_dict['init_T'].value * self.convert_in_dict["T"]
         init_T = to_array(init_T, len(self.grid_x_nodes), False)
         return {"T":init_T}
@@ -60,6 +61,7 @@ class HeatPlate(OneD_Model):
         return ode_heatplate(data_path, m, n, self.dx, dt, params)
     
     def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
+        """Calculate temperature and heat flux at various sample times"""
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
         data_dict = {}
         
@@ -82,7 +84,7 @@ class HeatPlate(OneD_Model):
         return data_dict
     
     def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
-        # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
+        """ Calculate heat flux (or read in temperature) on demand"""
         if (datatype in self.simulation_outputs_dict):
             data = sim_data[datatype]
         
@@ -96,11 +98,13 @@ class HeatPlate(OneD_Model):
         return data
     
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
+        """ Set temperature distribution of outgoing IC file"""
         param_dict["T"] = sim_data["T"] if include_flags['T'] else np.zeros(grid_x.__len__())
 
         return
     
 def heat_constflux(t, y, m, dx, k, rho, Cp, q0, qL):
+    """ derivative function for heat diffusion model"""
     alpha = k * rho / Cp
     G = alpha / (dx**2)
     T = y
@@ -181,6 +185,7 @@ def ode_heatplate(data_path_name, m, n, dx, dt, params, write_output=True):
     return
 
 def heatflux(sim_data, params):
+    """Calculate heat flux from temperature distribution using Newton's law"""
     T = sim_data['T']
     k = to_array(params['k'], len(T), False)
     k_avg = np.zeros(len(T) - 1)

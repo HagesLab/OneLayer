@@ -86,8 +86,7 @@ class Nanowire(OneD_Model):
         return
     
     def calc_inits(self):
-        # The three true initial conditions for our three coupled ODEs
-        # N = N0 + delta_N
+        """Calculate initial electron and hole density distribution"""
         init_N = (self.param_dict["N0"].value + self.param_dict["deltaN"].value) * self.convert_in_dict["N"]
         init_P = (self.param_dict["P0"].value + self.param_dict["deltaP"].value) * self.convert_in_dict["P"]
         # "Typecast" single values to uniform arrays
@@ -101,12 +100,19 @@ class Nanowire(OneD_Model):
         return {"N":init_N, "P":init_P}
     
     def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
-        # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from py with the correct args
+        """Calls ODEINT solver."""
         ode_nanowire(data_path, m, n, self.dx, dt, params,
                             not flags['ignore_alpha'].value(), flags['symmetric_system'].value(), flags['check_do_ss'].value(), hmax_, True,
                             init_conditions["N"], init_conditions["P"])
     
     def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
+        """Calculates at a selection of sample times: N, P, (total carrier densities)
+           deltaN, deltaP, (above-equilibrium carrier densities)
+           internal electric field due to differences in N, P,
+           radiative recombination,
+           non-radiative (SRH model) recombination,
+           
+           Integrates over nanowire length: PL due to radiative recombination, waveguiding, and carrier regeneration"""
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
         data_dict = {}
         
@@ -140,6 +146,7 @@ class Nanowire(OneD_Model):
         return data_dict
     
     def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
+        """ Provides deltaN, deltaP, electric field, recombination, and spatial PL values on demand."""
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
         data = None
         if (datatype in self.simulation_outputs_dict):
@@ -175,6 +182,7 @@ class Nanowire(OneD_Model):
         return data
     
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
+        """ Set deltaN and deltaP of outgoing regenerated IC file."""
         param_dict["deltaN"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(grid_x.__len__())
                     
         param_dict["deltaP"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(grid_x.__len__())
@@ -223,6 +231,7 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, fracEmi
     return alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * weight
 
 def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, eps, eps0, q, q_C, kB, recycle_photons=True, do_ss=False, alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_N=0, init_P=0):
+    """Derivative function for drift-diffusion-decay carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
     # These are calculated at node edges, of which there are m + 1
     # dn/dx and dp/dx are also node edge values
@@ -443,6 +452,7 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, sym
         return array_N, array_P, error_data
     
 def E_field(sim_outputs, params):
+    """Calculate electric field from N, P"""
     eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
     q_C = 1.602e-19 # [C per carrier]
     if isinstance(params["Rel-Permitivity"], np.ndarray):
@@ -460,15 +470,20 @@ def E_field(sim_outputs, params):
     return E_field
     
 def delta_n(sim_outputs, params):
+    """Calculate above-equilibrium electron density from N, n0"""
     return sim_outputs["N"] - params["N0"]
 
 def delta_p(sim_outputs, params):
+    """Calculate above-equilibrium hole density from P, p0"""
     return sim_outputs["P"] - params["P0"]
 
 def radiative_recombination(sim_outputs, params):
+    """Calculate radiative recombination"""
     return params["B"] * (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"])
 
 def nonradiative_recombination(sim_outputs, params):
+    """Calculate nonradiative recombination using SRH model
+       Assumes quasi steady state trap level occupation"""
     return (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"]) / ((params["Tau_N"] * sim_outputs["P"]) + (params["Tau_P"] * sim_outputs["N"]))
 
 def tau_diff(PL, dt):

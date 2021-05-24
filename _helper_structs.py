@@ -23,7 +23,7 @@ class Characteristic:
         return
 
 class Parameter(Characteristic):
-    # Helper class to store info about each of a Nanowire's parameters and initial distributions
+    """Helper class to store info about each of a Module's parameters and initial distributions"""
     def __init__(self, units, is_edge):
         super().__init__(units, is_edge)
 

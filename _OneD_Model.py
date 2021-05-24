@@ -149,7 +149,7 @@ class OneD_Model:
         return
     
     def update_param_toarray(self, param_name):
-        # Recalculate a Parameter from its Param_Rules
+        """ Recalculate a Parameter from its Param_Rules"""
         # This should be done every time the Param_Rules are changed
         # All params are stored as array, even if the param is space invariant
         param = self.param_dict[param_name]
@@ -367,7 +367,7 @@ class OneD_Model:
         return
     
     def verify(self):
-        # Performs basic syntactical checks on module's attributes.
+        """Performs basic syntactical checks on module's attributes."""
         print("Verifying selected module...")
         for param in self.param_dict:
             assert isinstance(param, str), "Error: invalid name {} in param dict. Param names must be strings".format(param)

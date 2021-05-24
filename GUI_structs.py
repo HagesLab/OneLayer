@@ -8,7 +8,7 @@ import tkinter as tk
 import numpy as np
 
 class Param_Rule:
-    # The Parameter Toolkit uses these to build Parameter()'s values
+    """The Parameter Toolkit uses these to build Parameter()'s values"""
     def __init__(self, variable, type, l_bound, r_bound=-1, l_boundval=-1, r_boundval=-1):
         self.variable = variable # e.g. N, P, E-Field
         self.type = type
@@ -19,6 +19,7 @@ class Param_Rule:
         return
 
     def get(self):
+        """Pack values into a display string for GUI"""
         if (self.type == "POINT"):
             return((self.variable + ": " + self.type + " at x=" + '{:.4e}'.format(self.l_bound) + " with value: " + '{:.4e}'.format(self.l_boundval)))
 
@@ -37,9 +38,9 @@ class Param_Rule:
             return("Error #101: Invalid initial condition")
         
 class Flag:
-    # This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
-    # but we interact with the checkbutton using the actual tk.CheckButton() element
-    # So wrap both of those together in a single object and call it a day
+    """This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
+       but we interact with the checkbutton using the actual tk.CheckButton() element
+       So wrap both of those together in a single object and call it a day"""
     def __init__(self, master, display_name):
         self.tk_var = tk.IntVar()
         self.tk_element = tk.ttk.Checkbutton(master=master, text=display_name, variable=self.tk_var, onvalue=1, offvalue=0)
@@ -49,7 +50,7 @@ class Flag:
         return self.tk_var.get()
 
 class Batchable:
-    # Much like the flag class, the Batchable() serves to collect together various tk elements and values for the batch IC tool.
+    """Much like the flag class, the Batchable() serves to collect together various tk elements and values for the batch IC tool."""
     def __init__(self, tk_optionmenu, tk_entrybox, param_name):
         self.tk_optionmenu = tk_optionmenu
         self.tk_entrybox = tk_entrybox
@@ -66,6 +67,7 @@ class Data_Set:
         return
     
     def tag(self, for_matplotlib=False):
+        """Return an identifier for a dataset using its originating filename and data type"""
         # For some reason, Matplotlib legends don't like leading underscores
         if not for_matplotlib:
             return self.filename + "_" + self.type
@@ -73,7 +75,7 @@ class Data_Set:
             return (self.filename + "_" + self.type).strip('_')
         
 class Raw_Data_Set(Data_Set):
-    # Object containing all the metadata required to plot and integrate saved data sets
+    """Object containing all the metadata required to plot and integrate saved data sets"""
     def __init__(self, data, grid_x, node_x, params_dict, type, filename, show_index):
         super().__init__(data, grid_x, params_dict, type, filename)
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
@@ -87,6 +89,7 @@ class Raw_Data_Set(Data_Set):
         return
 
     def build(self):
+        """Concatenate (x,y) pairs for export"""
         return np.vstack((self.grid_x, self.data))
     
 class Integrated_Data_Set(Data_Set):
@@ -122,6 +125,7 @@ class Raw_Data_Group(Data_Group):
         return
 
     def add(self, data, tag):
+        
         if (len(self.datasets) == 0): # Allow the first set in to set the dt and t restrictions
            self.dt = data.params_dict["dt"]
            self.total_t = data.params_dict["Total-Time"]

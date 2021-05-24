@@ -9,8 +9,8 @@ from scipy import integrate as intg
 import tables
 
 def to_index(x,dx, absUpperBound, is_edge=False):
-    # Returns largest node index less than or equal to position x
-    # Warning: this always rounds x down to the nearest node (or edge if is_edge=True)!
+    """Returns largest node index less than or equal to position x
+    # Warning: this always rounds x down to the nearest node (or edge if is_edge=True)!"""
     absLowerBound = dx / 2 if not is_edge else 0
     if (x < absLowerBound):
         return 0
@@ -21,12 +21,12 @@ def to_index(x,dx, absUpperBound, is_edge=False):
     return int((x - absLowerBound) / dx)
 
 def to_pos(i,dx, is_edge=False):
-    # Returns position x corresponding to node index i
+    """ Returns position x corresponding to node index i"""
     absLowerBound = dx / 2 if not is_edge else 0
     return (absLowerBound + i * dx)
 
 def to_array(value, m, is_edge):
-    # Casts value to uniform 1D ndarray if necessary
+    """Casts value to uniform 1D ndarray if necessary"""
     if not isinstance(value, np.ndarray):
         if is_edge:
             return np.ones(m+1) * value
@@ -185,7 +185,7 @@ def get_all_combinations(value_dict):
     return combinations
     
 def extract_values(string, delimiter):
-    # Converts a string with deliimiters into a list of float values
+    """Converts a string with deliimiters into a list of float values"""
 	# E.g. "100,200,300" with "," delimiter becomes [100,200,300]
     values = []
     substring = string
@@ -200,6 +200,7 @@ def extract_values(string, delimiter):
     return values
 
 def check_valid_filename(file_name):
+    """Screens file_name for prohibited characters"""
     prohibited_characters = [".","<",">","/","\\","*","?",":","\"","|"]
 	# return !any(char in file_name for char in prohibited_characters)
     if any(char in file_name for char in prohibited_characters):
@@ -208,7 +209,7 @@ def check_valid_filename(file_name):
     return True
         
 def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, need_extra_node=False):
-    # Read a subset of a 2D array stored in an .h5 file
+    """Read a subset of a 2D array (from time t0 to t1 and position l to r) stored in an .h5 file"""
     if not (t0 is None) and single_tstep:
         t1 = t0 + 1
         
@@ -223,8 +224,8 @@ def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, need_
         return data
     
 def autoscale(val_array=None, min_val=None, max_val=None):
-    # Help a matplotlib plot determine whether a log or linear scale should be used
-    # when plotting val_array
+    """Help a matplotlib plot determine whether a log or linear scale should be used
+       when plotting val_array"""
     if max_val is not None and min_val is not None:
         pass
     elif val_array is not None:

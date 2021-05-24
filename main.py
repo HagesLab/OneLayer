@@ -51,9 +51,8 @@ np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
 class Notebook:
 
     def __init__(self, title):
+        """ Create main tkinter object and select module. """
         self.nanowire = None
-        ## Set up GUI, special variables needed to interact with certain tkinter objects, other "global" variables
-        # Create the main Tkinter object
         self.root = tk.Tk()
         self.root.attributes('-fullscreen', False)
         self.root.title(title)
@@ -68,25 +67,21 @@ class Notebook:
         return
         
     def prep_notebook(self):
-        #self.notebook = tk.ttk.Notebook(self.root)
-        # self.main_frame = tk.Frame(self.root)
-        # self.main_frame.grid(row=0,column=0,sticky="nwes")
+        """ Attach elements to notebook based on selected module. """
         
         self.main_canvas = tk.Canvas(self.root)
-        #self.main_canvas.pack(expand=1,fill=tk.BOTH, anchor="nw")
         self.main_canvas.grid(row=0,column=0, sticky='nswe')
         
         self.notebook = tk.ttk.Notebook(self.main_canvas)
-
+        
+        # Allocate room for and add scrollbars to overall notebook
         self.main_scroll_y = tk.ttk.Scrollbar(self.root, orient="vertical", command=self.main_canvas.yview)
-        #self.main_scroll_y.pack(side=tk.RIGHT,fill=tk.Y)
         self.main_scroll_y.grid(row=0,column=1, sticky='ns')
         self.main_scroll_x = tk.ttk.Scrollbar(self.root, orient="horizontal", command=self.main_canvas.xview)
-        #self.main_scroll_x.pack(side=tk.BOTTOM,fill=tk.X)
         self.main_scroll_x.grid(row=1,column=0,sticky='ew')
         self.main_canvas.configure(yscrollcommand=self.main_scroll_y.set, xscrollcommand=self.main_scroll_x.set)
         self.root.rowconfigure(0,weight=100)
-        self.root.rowconfigure(1,weight=1, minsize=20)
+        self.root.rowconfigure(1,weight=1, minsize=20) # Make area for scrollbars as narrow as possible without cutting off scrollbars
         self.root.columnconfigure(0,weight=100)
         self.root.columnconfigure(1,weight=1, minsize=20)
         
@@ -99,7 +94,6 @@ class Notebook:
         # Tkinter checkboxes and radiobuttons require special variables to extract user input
         # IntVars or BooleanVars are sufficient for binary choices e.g. whether a checkbox is checked
         # while StringVars are more suitable for open-ended choices e.g. selecting one mode from a list
-        #self.check_do_ss = tk.IntVar()
         self.check_reset_params = tk.IntVar()
         self.check_reset_inits = tk.IntVar()
         self.check_display_legend = tk.IntVar()
@@ -127,15 +121,15 @@ class Notebook:
         self.IC_file_list = None
         self.IC_file_name = ""
         
-        # FIXME: This is a somewhat clumsy way to introduce a Nanowire module-specific functionality
+        # Add (e.g. for Nanowire) module-specific functionality
         if self.nanowire.system_ID == "Nanowire":
             self.using_LGC = False
             self.LGC_stim_mode = tk.StringVar()
             self.LGC_gen_power_mode = tk.StringVar()
 
-        self.carry_include_flags = {}
+        self.carryover_include_flags = {}
         for var in self.nanowire.simulation_outputs_dict:
-            self.carry_include_flags[var] = tk.IntVar()
+            self.carryover_include_flags[var] = tk.IntVar()
             
         self.check_bay_params = {}
         for param in self.nanowire.param_dict:
@@ -152,9 +146,11 @@ class Notebook:
         self.yaxis_type = tk.StringVar()
         self.xaxis_type = tk.StringVar()
 
+        # Add menu bars
         self.menu_bar = tk.Menu(self.notebook)
 
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
+        # TODO: Open file explorer instead of a file dialog
         self.file_menu.add_command(label="Manage Initial Condition Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete IC files", initialdir=self.default_dirs["Initial"]))
         self.file_menu.add_command(label="Manage Data Files", command=partial(tk.filedialog.askdirectory, title="This window does not open anything - Use this window to move or delete data files",initialdir=self.default_dirs["Data"]))
         self.file_menu.add_command(label="Manage Export Files", command=partial(tk.filedialog.askopenfilenames, title="This window does not open anything - Use this window to move or delete export files",initialdir=self.default_dirs["PL"]))
@@ -174,7 +170,7 @@ class Notebook:
         #self.help_menu.add_command(label="About", command=self.do_about_popup)
         #self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
 
-        # Check when popup menus open and close
+        # Record when popup menus open and close
         self.sys_printsummary_popup_isopen = False
         self.sys_plotsummary_popup_isopen = False
         self.sys_param_shortcut_popup_isopen = False
@@ -191,9 +187,9 @@ class Notebook:
 
         self.root.config(menu=self.menu_bar)
 
+        # Set a tkinter graphical theme
         s = ttk.Style()
         s.theme_use('classic')
-
 
         self.add_tab_inputs()
         self.add_tab_simulate()
@@ -235,8 +231,7 @@ class Notebook:
         if self.nanowire is None: 
             self.root.destroy()
             return
-        #self.notebook.pack(expand=1, fill="both")
-        #self.main_canvas.grid(row=0,column=0,sticky='nsew')
+
         width, height = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
 
         self.root.geometry('%dx%d+0+0' % (width,height))
@@ -252,14 +247,18 @@ class Notebook:
         self.root.wait_window(self.confirmation_popup)
         if not self.confirmed: return
         self.root.destroy()
+        print("Closed TEDs")
+        matplotlib.use(starting_backend)
         return
     
     def toggle_fullscreen(self):
         self.root.attributes('-fullscreen', not self.root.attributes('-fullscreen'))
         if self.root.attributes('-fullscreen'):
+            # Hide scrollbars
             self.main_scroll_y.grid_remove()
             self.main_scroll_x.grid_remove()
         else:
+            # Reveal scrollbars
             self.main_scroll_y.grid()
             self.main_scroll_x.grid()
         return
@@ -274,9 +273,9 @@ class Notebook:
         self.root.wait_window(self.select_module_popup)
         if self.nanowire is None: return
         self.prep_notebook()
-        #self.notebook.pack(expand=1, fill="both")
         
         return
+    
     ## Create GUI elements for each tab
 	# Tkinter works a bit like a bulletin board - we declare an overall frame and pin things to it at specified locations
 	# This includes other frames, which is evident in how the tab_inputs has three sub-tabs pinned to itself.
@@ -353,6 +352,7 @@ class Notebook:
         for flag in self.nanowire.flags_dict:
             self.sys_flag_dict[flag] = Flag(self.flags_frame, self.nanowire.flags_dict[flag][0])
             self.sys_flag_dict[flag].tk_var.set(self.nanowire.flags_dict[flag][1])
+            
             if self.nanowire.flags_dict[flag][1]:
                 continue
             else:
@@ -497,7 +497,6 @@ class Notebook:
         self.listupload_toolbar_frame.grid(row=3,column=1)
         self.listupload_toolbar = tkagg.NavigationToolbar2Tk(self.listupload_canvas, self.listupload_toolbar_frame)
 
-        
         ## Laser Generation Condition (LGC): extra input mtds for nanowire-specific applications
         if self.nanowire.system_ID == "Nanowire":
             self.create_LGC_frame()
@@ -536,9 +535,6 @@ class Notebook:
         self.enter(self.dt_entry, "0.5")
         self.enter(self.hmax_entry, "0.25")
         
-        # self.do_ss_checkbutton = tk.ttk.Checkbutton(self.tab_simulate, text="Inject init. conds. as generation?", variable=self.check_do_ss, onvalue=1, offvalue=0)
-        # self.do_ss_checkbutton.grid(row=5,column=0)
-
         self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", command=self.do_Batch)
         self.calculate_NP.grid(row=6,column=0,columnspan=2,padx=(9,12))
 
@@ -882,16 +878,18 @@ class Notebook:
         self.LGC_toolbar = tkagg.NavigationToolbar2Tk(self.LGC_canvas, self.LGC_toolbar_frame)
         
         self.LGC_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, "LGC_absorption_cof":self.LGC_absorption_cof_entry, "Pulse_Freq":self.pulse_freq_entry, 
-                                           "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
-                                           "Max_Gen":self.max_gen_entry, "Total_Gen":self.total_gen_entry}
+                                    "Pulse_Wavelength":self.pulse_wavelength_entry, "Power":self.power_entry, "Spotsize":self.spotsize_entry, "Power_Density":self.power_density_entry,
+                                    "Max_Gen":self.max_gen_entry, "Total_Gen":self.total_gen_entry}
         return
 
     def DEBUG(self):
+        """ Print a custom message regarding the system state; this changes often depending on what is being worked on"""
         for flag in self.sys_flag_dict:
             print(flag + ": " + str(self.sys_flag_dict[flag].tk_var.get()))
         return
 
     def update_system_summary(self):
+        """ Transfer parameter values from the Initial Condition tab to the summary popup windows."""
         if self.sys_printsummary_popup_isopen:
             self.write(self.printsummary_textbox, self.nanowire.DEBUG_print())
             
@@ -910,7 +908,7 @@ class Notebook:
     
     ## Functions to create popups and manage
     def do_module_popup(self):
-
+        """ Popup for selecting the active module (e.g. Nanowire) """
         self.select_module_popup = tk.Toplevel(self.root)
         self.select_module_label = tk.Label(self.select_module_popup, text="The following TEDs modules were found; select one to continue: ")
         self.select_module_label.grid(row=0,column=0)
@@ -934,6 +932,8 @@ class Notebook:
         return
     
     def on_select_module_popup_close(self, continue_=False):
+        """ Do basic verification checks defined by OneD_Model.verify() 
+            and inform tkinter of selected module """
         try:
             if continue_:
                 self.verified=False
@@ -952,6 +952,8 @@ class Notebook:
         return
         
     def do_confirmation_popup(self, text, hide_cancel=False):
+        """ General purpose popup for important operations (e.g. deleting something)
+            which should require user confirmation"""
         self.confirmation_popup = tk.Toplevel(self.root)
         
         self.confirmation_text = tk.Message(self.confirmation_popup, text=text, width=(float(self.root.winfo_screenwidth()) / 4))
@@ -969,12 +971,15 @@ class Notebook:
         return
     
     def on_confirmation_popup_close(self, continue_=False):
+        """ Inform caller of do_confirmation_popup of whether user confirmation was received """
         self.confirmed = continue_
         self.confirmation_popup.destroy()
         return
     
     
     def do_sys_printsummary_popup(self):
+        """ Display as text the current space grid and parameters. """
+        
         if not self.sys_printsummary_popup_isopen: # Don't open more than one of this window at a time
             self.sys_printsummary_popup = tk.Toplevel(self.root)
             
@@ -997,6 +1002,7 @@ class Notebook:
         return
     
     def do_sys_plotsummary_popup(self):
+        """ Display as series of plots the current parameter distributions. """
         if not self.nanowire.spacegrid_is_set: return
         
         if not self.sys_plotsummary_popup_isopen:
@@ -1041,7 +1047,7 @@ class Notebook:
         return
         
     def do_sys_param_shortcut_popup(self):
-        # V2: An overhaul of the old method for inputting (spatially constant) parameters
+        """ Open a box for inputting (spatially constant) parameters. """ 
         if not self.sys_param_shortcut_popup_isopen:
             try:
                 self.set_init_x()
@@ -1064,7 +1070,7 @@ class Notebook:
             self.sys_param_shortcut_title_label.grid(row=0,column=0)
             
             self.sys_param_instruction = tk.Message(self.sys_param_shortcut_popup, text="Are the values of certain parameters constant across the system? " +
-                                                 "Enter those values here and press \"Continue\" to apply them on all space grid points.", width=300)
+                                                    "Enter those values here and press \"Continue\" to apply them on all space grid points.", width=300)
             self.sys_param_instruction.grid(row=0,column=1)
             
             self.sys_param_list_frame = tk.ttk.Frame(self.sys_param_shortcut_popup)
@@ -1109,6 +1115,7 @@ class Notebook:
             print("Error #2020: Opened more than one sys param shortcut popup at a time")
             
     def on_sys_param_shortcut_popup_close(self, continue_=False):
+        """ Transfer and store collected parameters. """ 
         try:
             if continue_:
                 changed_params = []
@@ -1142,6 +1149,7 @@ class Notebook:
         return
 
     def do_batch_popup(self):
+        """ Open tool for making batches of similar initial condition files. """
         try:
             self.set_init_x()
             assert self.nanowire.spacegrid_is_set
@@ -1248,7 +1256,7 @@ class Notebook:
         return
 
     def do_resetIC_popup(self):
-
+        """ Clear stored parameter values. """
         if not self.resetIC_popup_isopen:
 
             self.resetIC_popup = tk.Toplevel(self.root)
@@ -1318,6 +1326,7 @@ class Notebook:
         return
 
     def do_plotter_popup(self, plot_ID):
+        """ Select datasets for plotting on Analyze tab. """
         if not self.plotter_popup_isopen:
 
             self.plotter_popup = tk.Toplevel(self.root)
@@ -1380,7 +1389,8 @@ class Notebook:
 
         return
 
-    def do_integration_popup(self):
+    def do_integration_timemode_popup(self):
+        """ Select which timesteps to integrate through. """
         if not self.integration_popup_isopen:
             self.integration_popup = tk.Toplevel(self.root)
 
@@ -1426,11 +1436,8 @@ class Notebook:
         return
 
     def do_integration_getbounds_popup(self):
+        """ Select spatial region to integrate through. """
         if not self.integration_getbounds_popup_isopen:
-            # Reset integration bounds
-            # self.integration_lbound = ""
-            # self.integration_ubound = ""
-
             self.integration_getbounds_popup = tk.Toplevel(self.root)
 
             self.single_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, variable=self.fetch_intg_mode, value='single')
@@ -1493,7 +1500,7 @@ class Notebook:
         return
 
     def on_integration_getbounds_popup_close(self, continue_=False):
-        # Read in the pairs of integration bounds as-is
+        """ Read in the pairs of integration bounds as-is. """
         # Checking if they make sense is do_Integrate()'s job
         try:
             self.confirmed = continue_
@@ -1551,6 +1558,7 @@ class Notebook:
         return
 
     def do_PL_xaxis_popup(self):
+        """ If integrating over single timestep, select which parameter to plot as horizontal axis. """
         if not self.PL_xaxis_popup_isopen:
             self.xaxis_param = ""
             self.xaxis_selection = tk.StringVar()
@@ -1592,6 +1600,7 @@ class Notebook:
         return
     
     def do_change_axis_popup(self, from_integration):
+        """ Select new axis parameters for analysis plots. """
         # Don't open if no data plotted
         if from_integration:
             plot_ID = self.active_integrationplot_ID.get()
@@ -1767,6 +1776,7 @@ class Notebook:
         return
 
     def do_IC_carry_popup(self):
+        """ Open a tool to regenerate IC files based on current state of analysis plots. """
         plot_ID = self.active_analysisplot_ID.get()
         # Don't open if no data plotted
         if self.analysis_plots[plot_ID].datagroup.size() == 0: return
@@ -1780,7 +1790,7 @@ class Notebook:
             self.carry_checkbuttons = {}
             rcount = 1
             for var in self.nanowire.simulation_outputs_dict:
-                self.carry_checkbuttons[var] = tk.Checkbutton(self.IC_carry_popup, text=var, variable=self.carry_include_flags[var])
+                self.carry_checkbuttons[var] = tk.Checkbutton(self.IC_carry_popup, text=var, variable=self.carryover_include_flags[var])
                 self.carry_checkbuttons[var].grid(row=rcount, column=0)
                 rcount += 1
 
@@ -1809,8 +1819,8 @@ class Notebook:
                 if not len(datasets): return
                 
                 include_flags = {}
-                for iflag in self.carry_include_flags:
-                    include_flags[iflag] = self.carry_include_flags[iflag].get()
+                for iflag in self.carryover_include_flags:
+                    include_flags[iflag] = self.carryover_include_flags[iflag].get()
                     
                 status_msg = "Files generated:\n"
                 for key in datasets:
@@ -1964,7 +1974,7 @@ class Notebook:
 
     ## Plotter for simulation tab    
     def update_sim_plots(self, index, do_clear_plots=True):
-        ## V2: Update plots on Simulate tab
+        """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
         
         for variable, output_obj in self.nanowire.simulation_outputs_dict.items():
             
@@ -1993,6 +2003,7 @@ class Notebook:
     
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
+        """ Read and store parameters from a metadata.txt file """
         path = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + "metadata.txt"
         assert os.path.exists(path), "Error: Missing metadata for {}".format(self.nanowire.system_ID)
         
@@ -2024,6 +2035,7 @@ class Notebook:
         return param_values_dict
     
     def plot_overview_analysis(self):
+        """ Plot dataset and calculations from OneD_Model.get_overview_analysis() on Overview tab. """
         data_dirname = tk.filedialog.askdirectory(title="Select a dataset", initialdir=self.default_dirs["Data"])
         if not data_dirname:
             print("No data set selected :(")
@@ -2106,7 +2118,7 @@ class Notebook:
     ## Funcs for detailed analyze tab
 
     def plot_analyze(self, plot_ID, force_axis_update=False):
-        # Draw on analysis tab
+        """ Plot dataset object from make_rawdataset() on analysis tab. """
         try:
             active_plot_data = self.analysis_plots[plot_ID]
             active_datagroup = active_plot_data.datagroup
@@ -2157,7 +2169,7 @@ class Notebook:
         return
 
     def make_rawdataset(self, data_filename, plot_ID, datatype):
-        # Create a dataset object and prepare to plot on analysis tab
+        """Create a dataset object and prepare to plot on analysis tab."""
         # Select data type of incoming dataset from existing datasets
         active_plot = self.analysis_plots[plot_ID]
         datagroup = active_plot.datagroup
@@ -2197,7 +2209,7 @@ class Notebook:
 
 
     def load_datasets(self):
-        # THe Plot button on the Analyze tab calls this function
+        """ Interpret selection from do_plotter_popup()."""
         
         plot_ID = self.active_analysisplot_ID.get()
         self.do_plotter_popup(plot_ID)
@@ -2235,7 +2247,7 @@ class Notebook:
         return
 
     def plot_tstep(self):
-        # Step already plotted data forward (or backward) in time
+        """ Step already plotted data forward (or backward) in time"""
         plot_ID = self.active_analysisplot_ID.get()
         active_plot = self.analysis_plots[plot_ID]
         try:
@@ -2261,18 +2273,16 @@ class Notebook:
         return
 
     ## Status box update helpers
-    # Edit the text in status boxes
-	# The user is NOT meant to write into these
     def write(self, textBox, text):
+        """ Edit the text in status display boxes."""
         textBox.configure(state='normal')
         textBox.delete(1.0, tk.END)
         textBox.insert(tk.END, text)
         textBox.configure(state='disabled') # Prevents user from altering the status box
         return
 
-	# Fill in entry boxes with parameters
-	# The user IS meant to write into these
     def enter(self, entryBox, text):
+        """ Fill user entry boxes with text. """
         entryBox.delete(0,tk.END)
         entryBox.insert(0,text)
         return
@@ -2296,8 +2306,8 @@ class Notebook:
 
         return
 
-    # Wrapper function to set up main N, P, E-field calculations
     def do_Batch(self):
+        """ Interpret values entered into simulate tab and prepare simulations for each selected IC file"""
         # Test for valid entry values
         try:
             self.simtime = float(self.simtime_entry.get())      # [ns]
@@ -2361,8 +2371,10 @@ class Notebook:
             sim_warning_textbox.grid(row=0,column=0)
         return
 
-	# The big function that does all the simulating
     def do_Calculate(self):
+        """ Setup initial condition using IC file and OneD_Model.calc_inits(), 
+            simulate using OneD_Model.simulate(),
+            and prepare output directory for results."""
         ## Setup parameters
         try:
             # Construct the data folder's name from the corresponding IC file's name
@@ -2502,11 +2514,10 @@ class Notebook:
             for flag in self.sys_flag_dict:
                 ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
             
-            #ofstream.write("steady_state_exc: {}\n".format(self.check_do_ss.get()))
-
         return
 
     def do_Integrate(self, bypass_inputs=False):
+        """ Interpret values from series of integration popups to integrate datasets. """
         plot_ID = self.active_analysisplot_ID.get()
         
         # Replace this with an appropriate getter function if more integration plots are added
@@ -2520,7 +2531,7 @@ class Notebook:
 
         # Collect instructions from user using a series of popup windows
         if not bypass_inputs:
-            self.do_integration_popup()
+            self.do_integration_timemode_popup()
             self.root.wait_window(self.integration_popup) # Pause here until popup is closed
             if self.PL_mode == "":
                 self.write(self.analysis_status, "Integration cancelled")
@@ -2733,11 +2744,11 @@ class Notebook:
     ## Initial Condition Managers
 
     def reset_IC(self, force=False):
-        # V2 Update: On IC tab:
-        # 1. Remove all param_rules from all selected Parameters in the listbox
-        # 2. Remove all param_rules from all selected Parameters stored in Nanowire()
-        # 3. Remove values stored in Nanowire()
-        # + any visual changes to appeal to the user
+        """ On IC tab:
+            # 1. Remove all param_rules from all selected Parameters in the listbox
+            # 2. Remove all param_rules from all selected Parameters stored in Module
+            # 3. Remove values stored in Module
+            # + any visual changes to appeal to the user"""
 
         self.do_resetIC_popup()
         self.root.wait_window(self.resetIC_popup)
@@ -2759,11 +2770,6 @@ class Notebook:
             # Step 3
             self.nanowire.param_dict[param].value = 0
             self.update_IC_plot(plot_ID="recent")
-        #if self.check_reset_params.get() or force:
-        #    for key in self.sys_param_entryboxes_dict:
-        #        self.enter(self.sys_param_entryboxes_dict[key], "")
-
-        #    cleared_items += " Params,"
 
         if self.resetIC_do_clearall:
             self.set_thickness_and_dx_entryboxes(state='unlock')
@@ -2782,6 +2788,7 @@ class Notebook:
 
     # First, implement a way to temporarily remove the user's ability to change variables associated with the spatial mesh
     def set_thickness_and_dx_entryboxes(self, state):
+        """ Toggle ability to change spatial mesh while parameters are stored. """
         if state =='lock':
             self.thickness_entry.configure(state='disabled')
             self.dx_entry.configure(state='disabled')
@@ -2792,10 +2799,10 @@ class Notebook:
 
         return
 
-    # Second, create a function that generates and locks in new spatial meshes. A new mesh can only be generated when the previous mesh is discarded using reset_IC().
+    
     def set_init_x(self):
-        # Changed for V2
-
+        """Generate and lock in new spatial mesh. 
+           A new mesh can only be generated when the previous mesh is discarded using reset_IC()."""
         if self.nanowire.spacegrid_is_set:
             return
 
@@ -2825,7 +2832,7 @@ class Notebook:
         return
 
     def add_LGC(self):
-        # Read LGC parameters and plot when relevant button pressed
+        """Calculate and store laser generation profile"""
         try:
             self.set_init_x()
             assert self.nanowire.spacegrid_is_set
@@ -2843,8 +2850,8 @@ class Notebook:
 
         # Check for valid option choices
         LGC_options = {"long_expfactor":self.check_calculate_init_material_expfactor.get(), 
-                     "incidence":self.LGC_stim_mode.get(),
-                     "power_mode":self.LGC_gen_power_mode.get()}
+                       "incidence":self.LGC_stim_mode.get(),
+                       "power_mode":self.LGC_gen_power_mode.get()}
         try:
             if LGC_options["long_expfactor"] == '' or LGC_options["power_mode"] == '':
                 raise ValueError("Error: select material param and power generation options ")
@@ -2991,8 +2998,7 @@ class Notebook:
 
     ## Special functions for Parameter Toolkit:
     def add_paramrule(self):
-        # V2 update
-        # Set the value of one of Nanowire's Parameters
+        """ Add a new parameter rule to the selected parameter. """
 
         try:
             self.set_init_x()
@@ -3062,14 +3068,14 @@ class Notebook:
         return
 
     def refresh_paramrule_listbox(self):
-        # The View button has two jobs: change the listbox to the new param and display a snapshot of it
+        """ Update the listbox to show rules for the selected param and display a snapshot of it"""
         if self.nanowire.spacegrid_is_set:
             self.update_paramrule_listbox(self.paramtoolkit_viewer_selection.get())
             self.update_IC_plot(plot_ID="custom")
         return
     
     def update_paramrule_listbox(self, param_name):
-        # Grab current param's rules from Nanowire and show them in the param_rule listbox
+        """ Grab current param's rules from Nanowire and show them in the param_rule listbox"""
         if param_name == "":
             self.write(self.ICtab_status, "Select a parameter")
             return
@@ -3092,6 +3098,7 @@ class Notebook:
 
     # These two reposition the order of param_rules
     def moveup_paramrule(self):
+        """ Shift selected param rule upward. This changes order in which rules are used to generate a distribution. """
         try:
             currentSelectionIndex = self.active_paramrule_listbox.curselection()[0]
         except IndexError:
@@ -3111,6 +3118,7 @@ class Notebook:
         return
 
     def movedown_paramrule(self):
+        """ Shift selected param rule downward. This changes order in which rules are used to generate a distribution. """
         try:
             currentSelectionIndex = self.active_paramrule_listbox.curselection()[0] + 1
         except IndexError:
@@ -3127,7 +3135,7 @@ class Notebook:
         return
 
     def hideall_paramrules(self, doPlotUpdate=True):
-        # Wrapper - Call hide_paramrule() until listbox is empty
+        """ Wrapper - Call hide_paramrule() until listbox is empty"""
         while (self.active_paramrule_list.__len__() > 0):
             # These first two lines mimic user repeatedly selecting topmost paramrule in listbox
             self.active_paramrule_listbox.select_set(0)
@@ -3137,14 +3145,14 @@ class Notebook:
         return
 
     def hide_paramrule(self):
-        # Remove user-selected param rule from box (but don't touch Nanowire's saved info)
+        """Remove user-selected param rule from box (but don't touch Module's saved info)"""
         self.active_paramrule_list.pop(self.active_paramrule_listbox.curselection()[0])
         self.active_paramrule_listbox.delete(self.active_paramrule_listbox.curselection()[0])
         return
     
     def deleteall_paramrule(self, doPlotUpdate=True):
-        # Note: deletes all rules for currentparam
-        # Use reset_IC instead to delete all rules for every param
+        """ Deletes all rules for current param. 
+            Use reset_IC instead to delete all rules for every param"""
         if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
             self.nanowire.removeall_param_rules(self.paramtoolkit_currentparam)
             self.hideall_paramrules()
@@ -3152,7 +3160,7 @@ class Notebook:
         return
 
     def delete_paramrule(self):
-        # Remove user-selected param rule from box AND from Nanowire's list of param_rules
+        """ Deletes selected rule for current param. """
         if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
             try:
                 self.nanowire.remove_param_rule(self.paramtoolkit_currentparam, self.active_paramrule_listbox.curselection()[0])
@@ -3163,8 +3171,9 @@ class Notebook:
                 return
         return
 
-    # Fill IC arrays using list from .txt file
+    
     def add_listupload(self):
+        """ Generate a parameter distribution using list from .txt file"""
         try:
             self.set_init_x()
             assert self.nanowire.spacegrid_is_set
@@ -3246,9 +3255,7 @@ class Notebook:
         return
 
     def update_IC_plot(self, plot_ID, warn=False):
-        # V2 update: can now plot any parameter
-        # Plot 2 is for recently changed parameter while plot 1 is for user-selected views
-
+        """ Plot selected parameter distribution on Initial Condition tab."""
         if plot_ID=="recent": plot = self.recent_param_subplot
         elif plot_ID=="custom": plot = self.custom_param_subplot
         elif plot_ID=="LGC": plot = self.LGC_subplot
@@ -3305,6 +3312,7 @@ class Notebook:
     ## Initial Condition I/O
 
     def create_batch_init(self):
+        """ Workhorse of batch init tool. Creates a batch of similar IC files based on the inputted parameter grid."""
         warning_flag = 0
         try:
             batch_values = {}
@@ -3373,9 +3381,11 @@ class Notebook:
         else:
             self.write(self.batch_status, "Warning: failed to create some batch files - see console")
         return
+    
 
-	# Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked
     def save_ICfile(self):
+        """Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked"""
+    
         try:
             assert self.nanowire.spacegrid_is_set, "Error: set a space grid first"
             new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], title="Save IC text file", filetypes=[("Text files","*.txt")])
@@ -3394,7 +3404,7 @@ class Notebook:
         return
 
     def write_init_file(self, newFileName, dir_name=""):
-
+        """ Write current state of module into an initial condition (IC) file."""
         try:
             with open(newFileName, "w+") as ofstream:
                 print(dir_name + newFileName + " opened successfully")
@@ -3434,8 +3444,9 @@ class Notebook:
         self.write(self.ICtab_status, "IC file generated")
         return
 
-    # Wrapper for load_ICfile with user selection from IC tab
+    
     def select_init_file(self):
+        """Wrapper for load_ICfile with user selection from IC tab"""
         self.IC_file_name = tk.filedialog.askopenfilename(initialdir = self.default_dirs["Initial"], title="Select IC text files", filetypes=[("Text files","*.txt")])
         if self.IC_file_name == "": return # If user closes dialog box without selecting a file
 
@@ -3443,6 +3454,7 @@ class Notebook:
         return
 
     def load_ICfile(self, cycle_through_IC_plots=True):
+        """Read parameters from IC file and store into module."""
         warning_flag = False
         warning_mssg = ""
 
@@ -3587,7 +3599,7 @@ class Notebook:
     # Data I/O
 
     def export_plot(self, from_integration):
-
+        """ Write out currently plotted data as .csv file"""
         if from_integration:
             plot_ID = self.active_integrationplot_ID.get()
             datagroup = self.integration_plots[plot_ID].datagroup
