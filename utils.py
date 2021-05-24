@@ -226,7 +226,8 @@ def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False,
     
 def autoscale(val_array=None, min_val=None, max_val=None):
     """Help a matplotlib plot determine whether a log or linear scale should be used
-       when plotting val_array"""
+       when plotting val_array
+    """
     if max_val is not None and min_val is not None:
         pass
     elif val_array is not None:

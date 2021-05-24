@@ -25,12 +25,10 @@ import itertools
 # This lets us pass params to functions called by tkinter buttons
 from functools import partial 
 
-
 import carrier_excitations
 from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, \
                         Integrated_Data_Set, Analysis_Plot_State, \
                         Integration_Plot_State
-
 from utils import to_index, to_pos, to_array, get_all_combinations, \
                   extract_values, u_read, check_valid_filename, \
                   autoscale, new_integrate
@@ -66,8 +64,10 @@ class Notebook:
         
         self.do_module_popup()
         self.root.wait_window(self.select_module_popup)
-        if self.nanowire is None: return
-        if not self.verified: return
+        if self.nanowire is None: 
+            return
+        if not self.verified: 
+            return
         self.prep_notebook()
         
         
@@ -276,7 +276,8 @@ class Notebook:
         self.do_confirmation_popup("All unsaved data will be lost. "
                                    "Are you sure you want to close TEDs?")
         self.root.wait_window(self.confirmation_popup)
-        if not self.confirmed: return
+        if not self.confirmed: 
+            return
         self.root.destroy()
         print("Closed TEDs")
         matplotlib.use(starting_backend)
@@ -299,7 +300,8 @@ class Notebook:
                                    "of TEDs (and all unsaved data). Are you sure "
                                    "you want to select a new module?")
         self.root.wait_window(self.confirmation_popup)
-        if not self.confirmed: return
+        if not self.confirmed: 
+            return
         
         self.notebook.destroy()
         self.do_module_popup()
@@ -1110,14 +1112,16 @@ class Notebook:
 
     def DEBUG(self):
         """ Print a custom message regarding the system state; 
-            this changes often depending on what is being worked on"""
+            this changes often depending on what is being worked on
+        """
         for flag in self.sys_flag_dict:
             print(flag + ": " + str(self.sys_flag_dict[flag].tk_var.get()))
         return
 
     def update_system_summary(self):
         """ Transfer parameter values from the Initial Condition tab 
-            to the summary popup windows."""
+            to the summary popup windows.
+        """
         if self.sys_printsummary_popup_isopen:
             self.write(self.printsummary_textbox, self.nanowire.DEBUG_print())
             
@@ -1170,7 +1174,8 @@ class Notebook:
     
     def on_select_module_popup_close(self, continue_=False):
         """ Do basic verification checks defined by OneD_Model.verify() 
-            and inform tkinter of selected module """
+            and inform tkinter of selected module 
+        """
         try:
             if continue_:
                 self.verified=False
@@ -1190,7 +1195,8 @@ class Notebook:
         
     def do_confirmation_popup(self, text, hide_cancel=False):
         """ General purpose popup for important operations (e.g. deleting something)
-            which should require user confirmation"""
+            which should require user confirmation
+        """
         self.confirmation_popup = tk.Toplevel(self.root)
         
         self.confirmation_text = tk.Message(self.confirmation_popup, text=text, 
@@ -1217,7 +1223,8 @@ class Notebook:
     
     def on_confirmation_popup_close(self, continue_=False):
         """ Inform caller of do_confirmation_popup of whether user confirmation 
-            was received """
+            was received 
+        """
         self.confirmed = continue_
         self.confirmation_popup.destroy()
         return
@@ -1251,7 +1258,8 @@ class Notebook:
     
     def do_sys_plotsummary_popup(self):
         """ Display as series of plots the current parameter distributions. """
-        if not self.nanowire.spacegrid_is_set: return
+        if not self.nanowire.spacegrid_is_set: 
+            return
         
         if not self.sys_plotsummary_popup_isopen:
             self.sys_plotsummary_popup = tk.Toplevel(self.root)
@@ -1350,8 +1358,10 @@ class Notebook:
                 
                 if isinstance(self.nanowire.param_dict[param].value, (float, int)):
                     formatted_val = self.nanowire.param_dict[param].value
-                    if formatted_val > 1e4: formatted_val = "{:.3e}".format(formatted_val)
-                    else: formatted_val = str(formatted_val)
+                    if formatted_val > 1e4: 
+                        formatted_val = "{:.3e}".format(formatted_val)
+                    else: 
+                        formatted_val = str(formatted_val)
                     
                     self.enter(self.sys_param_entryboxes_dict[param], formatted_val)
                 
@@ -1386,7 +1396,8 @@ class Notebook:
                 changed_params = []
                 for param in self.nanowire.param_dict:
                     val = self.sys_param_entryboxes_dict[param].get()
-                    if not val: continue
+                    if not val: 
+                        continue
                     else:
                         try:
                             val = float(val)
@@ -1519,9 +1530,10 @@ class Notebook:
                 batch_param_entry = tk.ttk.Entry(self.batch_entry_frame, width=80)
                 batch_param_entry.grid(row=i,column=1,columnspan=2)
                 
-                if i == 0: self.enter(batch_param_entry, 
-                                      "Enter a list of space-separated "
-                                      "values for the selected Batch Parameter")
+                if i == 0: 
+                    self.enter(batch_param_entry, 
+                               "Enter a list of space-separated "
+                               "values for the selected Batch Parameter")
                 
                 self.batchables_array.append(Batchable(optionmenu, 
                                                        batch_param_entry, 
@@ -1910,7 +1922,8 @@ class Notebook:
 
                     width = float(self.integration_width_entry.get())
 
-                    if width < 0: raise KeyError("Error: width must be non-negative")
+                    if width < 0: 
+                        raise KeyError("Error: width must be non-negative")
 
                     for center in centers:
                         if center < 0:
@@ -1940,7 +1953,8 @@ class Notebook:
 
     def do_PL_xaxis_popup(self):
         """ If integrating over single timestep, 
-            select which parameter to plot as horizontal axis. """
+            select which parameter to plot as horizontal axis. 
+        """
         if not self.PL_xaxis_popup_isopen:
             self.xaxis_param = ""
             self.xaxis_selection = tk.StringVar()
@@ -1995,11 +2009,13 @@ class Notebook:
         # Don't open if no data plotted
         if from_integration:
             plot_ID = self.active_integrationplot_ID.get()
-            if self.integration_plots[plot_ID].datagroup.size() == 0: return
+            if self.integration_plots[plot_ID].datagroup.size() == 0: 
+                return
 
         else:
             plot_ID = self.active_analysisplot_ID.get()
-            if self.analysis_plots[plot_ID].datagroup.size() == 0: return
+            if self.analysis_plots[plot_ID].datagroup.size() == 0: 
+                return
 
         if not self.change_axis_popup_isopen:
             self.change_axis_popup = tk.Toplevel(self.root)
@@ -2193,7 +2209,8 @@ class Notebook:
         """ Open a tool to regenerate IC files based on current state of analysis plots. """
         plot_ID = self.active_analysisplot_ID.get()
         # Don't open if no data plotted
-        if self.analysis_plots[plot_ID].datagroup.size() == 0: return
+        if self.analysis_plots[plot_ID].datagroup.size() == 0: 
+            return
 
         if not self.IC_carry_popup_isopen:
             self.IC_carry_popup = tk.Toplevel(self.root)
@@ -2240,7 +2257,8 @@ class Notebook:
                 plot_ID = self.active_analysisplot_ID.get()
                 active_sets = self.analysis_plots[plot_ID].datagroup.datasets
                 datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
-                if not len(datasets): return
+                if not len(datasets): 
+                    return
                 
                 include_flags = {}
                 for iflag in self.carryover_include_flags:
@@ -2251,9 +2269,11 @@ class Notebook:
                     new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], 
                                                                    title="Save IC text file for {}".format(key), 
                                                                    filetypes=[("Text files","*.txt")])
-                    if new_filename == "": continue
+                    if new_filename == "": 
+                        continue
 
-                    if new_filename.endswith(".txt"): new_filename = new_filename[:-4]
+                    if new_filename.endswith(".txt"): 
+                        new_filename = new_filename[:-4]
                     
                     param_dict_copy = dict(active_sets[key].params_dict)
 
@@ -2302,7 +2322,8 @@ class Notebook:
                     status_msg += "{}-->{}\n".format(filename, new_filename)
                     
                 # If NO new files saved
-                if status_msg == "Files generated:\n": status_msg += "(none)"
+                if status_msg == "Files generated:\n": 
+                    status_msg += "(none)"
                 self.do_confirmation_popup(status_msg, hide_cancel=True)
                 self.root.wait_window(self.confirmation_popup)
 
@@ -2319,7 +2340,8 @@ class Notebook:
         return
 
     def do_bayesim_popup(self, plot_ID=0):
-        if self.integration_plots[plot_ID].datagroup.size() == 0: return
+        if self.integration_plots[plot_ID].datagroup.size() == 0: 
+            return
 
         if not self.bayesim_popup_isopen:
 
@@ -2444,9 +2466,11 @@ class Notebook:
         with open(path, "r") as ifstream:
             param_values_dict = {}
             for line in ifstream:
-                if "$" in line: continue
+                if "$" in line: 
+                    continue
 
-                elif "#" in line: continue
+                elif "#" in line: 
+                    continue
             
                 elif "System_class" in line:
                     system_class = line[line.find(' ') + 1:].strip('\n')
@@ -2470,7 +2494,8 @@ class Notebook:
     
     def plot_overview_analysis(self):
         """ Plot dataset and calculations from OneD_Model.get_overview_analysis() 
-            on Overview tab. """
+            on Overview tab. 
+        """
         data_dirname = tk.filedialog.askdirectory(title="Select a dataset", 
                                                   initialdir=self.default_dirs["Data"])
         if not data_dirname:
@@ -2516,7 +2541,8 @@ class Notebook:
             try:
                 values = data_dict[output_name]
                 
-                if not isinstance(values, np.ndarray): raise KeyError
+                if not isinstance(values, np.ndarray): 
+                    raise KeyError
             except KeyError:
                 warning_msg += "Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.nanowire.system_ID, output_name)
                 continue
@@ -2663,7 +2689,8 @@ class Notebook:
         plot_ID = self.active_analysisplot_ID.get()
         self.do_plotter_popup(plot_ID)
         self.root.wait_window(self.plotter_popup)
-        if not self.confirmed: return
+        if not self.confirmed: 
+            return
         active_plot = self.analysis_plots[plot_ID]
         datatype = self.data_var.get()
 
@@ -2764,7 +2791,8 @@ class Notebook:
 
     def do_Batch(self):
         """ Interpret values entered into simulate tab and prepare simulations 
-            for each selected IC file"""
+            for each selected IC file
+        """
         # Test for valid entry values
         try:
             self.simtime = float(self.simtime_entry.get())      # [ns]
@@ -2789,21 +2817,24 @@ class Notebook:
                                            "Results may be less accurate with large stepsizes. "
                                            "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
-                if not self.confirmed: return
+                if not self.confirmed: 
+                    return
                 
             if self.hmax and self.hmax < 1e-3:
                 self.do_confirmation_popup("Warning: a very small solver stepsize was entered. "
                                            "Results may be slow with small solver stepsizes. "
                                            "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
-                if not self.confirmed: return
+                if not self.confirmed: 
+                    return
                 
             if (self.n > 1e5):
                 self.do_confirmation_popup("Warning: a very small time stepsize was entered. "
                                            "Results may be slow with small time stepsizes. "
                                            "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
-                if not self.confirmed: return
+                if not self.confirmed: 
+                    return
             
         except ValueError:
             self.write(self.status, "Error: Invalid parameters")
@@ -2816,7 +2847,8 @@ class Notebook:
         IC_files = tk.filedialog.askopenfilenames(initialdir=self.default_dirs["Initial"], 
                                                   title="Select IC text file", 
                                                   filetypes=[("Text files","*.txt")])
-        if (IC_files.__len__() == 0): return
+        if not len(IC_files): 
+            return
 
         batch_num = 0
         self.sim_warning_msg = ""
@@ -2842,7 +2874,8 @@ class Notebook:
     def do_Calculate(self):
         """ Setup initial condition using IC file and OneD_Model.calc_inits(), 
             simulate using OneD_Model.simulate(),
-            and prepare output directory for results."""
+            and prepare output directory for results.
+        """
         ## Setup parameters
         try:
             # Construct the data folder's name from the corresponding IC file's name
@@ -3007,7 +3040,8 @@ class Notebook:
 
         active_plot = self.analysis_plots[plot_ID]
         active_datagroup = active_plot.datagroup
-        if active_datagroup.datasets.__len__() == 0: return
+        if active_datagroup.datasets.__len__() == 0: 
+            return
 
         # Collect instructions from user using a series of popup windows
         if not bypass_inputs:
@@ -3253,7 +3287,8 @@ class Notebook:
             # 1. Remove all param_rules from all selected Parameters in the listbox
             # 2. Remove all param_rules from all selected Parameters stored in Module
             # 3. Remove values stored in Module
-            # + any visual changes to appeal to the user"""
+            # + any visual changes to appeal to the user
+        """
 
         self.do_resetIC_popup()
         self.root.wait_window(self.resetIC_popup)
@@ -3312,7 +3347,8 @@ class Notebook:
     def set_init_x(self):
         """Generate and lock in new spatial mesh. 
            A new mesh can only be generated when the previous mesh 
-           is discarded using reset_IC()."""
+           is discarded using reset_IC().
+        """
         if self.nanowire.spacegrid_is_set:
             return
 
@@ -3331,7 +3367,8 @@ class Notebook:
                                        "Results may be less accurate with large stepsizes. "
                                        "Are you sure you want to continue?")
             self.root.wait_window(self.confirmation_popup)
-            if not self.confirmed: return
+            if not self.confirmed: 
+                return
 
         self.nanowire.total_length = thickness
         self.nanowire.dx = dx
@@ -3526,7 +3563,8 @@ class Notebook:
 
         try:
             new_param_name = self.init_var_selection.get()
-            if "[" in new_param_name: new_param_name = new_param_name[:new_param_name.find("[")]
+            if "[" in new_param_name: 
+                new_param_name = new_param_name[:new_param_name.find("[")]
 
             assert (float(self.paramrule_lbound_entry.get()) >= 0),  "Error: left bound coordinate too low"
             
@@ -3683,7 +3721,8 @@ class Notebook:
     
     def deleteall_paramrule(self, doPlotUpdate=True):
         """ Deletes all rules for current param. 
-            Use reset_IC instead to delete all rules for every param"""
+            Use reset_IC instead to delete all rules for every param
+        """
         if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
             self.nanowire.removeall_param_rules(self.paramtoolkit_currentparam)
             self.hideall_paramrules()
@@ -3733,7 +3772,8 @@ class Notebook:
         IC_values_list = []
         with open(valuelist_filename, 'r') as ifstream:
             for line in ifstream:
-                if (line.strip('\n') == "" or "#" in line): continue
+                if (line.strip('\n') == "" or "#" in line): 
+                    continue
 
                 else: IC_values_list.append(line.strip('\n'))
 
@@ -3765,13 +3805,15 @@ class Notebook:
             rindex = to_index(second_valueset[0], self.nanowire.dx, 
                               self.nanowire.total_length, is_edge)
             
-            if (first_valueset[0] - to_pos(lindex, self.nanowire.dx, is_edge) >= self.nanowire.dx / 2): lindex += 1
+            if (first_valueset[0] - to_pos(lindex, self.nanowire.dx, is_edge) >= self.nanowire.dx / 2): 
+                lindex += 1
 
             intermediate_x_indices = np.arange(lindex, rindex + 1, 1)
 
             for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
                 try:
-                    if (second_valueset[0] > self.nanowire.total_length): raise IndexError
+                    if (second_valueset[0] > self.nanowire.total_length): 
+                        raise IndexError
                     temp_IC_values[j] = first_valueset[1] + (to_pos(j, self.nanowire.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
                 except IndexError:
                     self.write(self.ICtab_status, "Warning: some points out of bounds")
@@ -3781,7 +3823,8 @@ class Notebook:
                     warning_flag = True
                 
         if self.nanowire.system_ID == "Nanowire":
-            if var == "deltaN" or var == "deltaP": self.using_LGC = False
+            if var == "deltaN" or var == "deltaP": 
+                self.using_LGC = False
         
         self.paramtoolkit_currentparam = var
         self.deleteall_paramrule()
@@ -3792,14 +3835,20 @@ class Notebook:
 
     def update_IC_plot(self, plot_ID, warn=False):
         """ Plot selected parameter distribution on Initial Condition tab."""
-        if plot_ID=="recent": plot = self.recent_param_subplot
-        elif plot_ID=="custom": plot = self.custom_param_subplot
-        elif plot_ID=="LGC": plot = self.LGC_subplot
-        elif plot_ID=="listupload": plot = self.listupload_subplot
+        if plot_ID=="recent": 
+            plot = self.recent_param_subplot
+        elif plot_ID=="custom": 
+            plot = self.custom_param_subplot
+        elif plot_ID=="LGC": 
+            plot = self.LGC_subplot
+        elif plot_ID=="listupload": 
+            plot = self.listupload_subplot
         plot.cla()
 
-        if plot_ID=="LGC": param_name="deltaN"
-        else: param_name = self.paramtoolkit_currentparam
+        if plot_ID=="LGC":
+            param_name="deltaN"
+        else: 
+            param_name = self.paramtoolkit_currentparam
         
         param_obj = self.nanowire.param_dict[param_name]
         grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
@@ -3846,7 +3895,8 @@ class Notebook:
             self.listupload_fig.tight_layout()
             self.listupload_fig.canvas.draw()
 
-        if not warn: self.write(self.ICtab_status, "Initial Condition Updated")
+        if not warn: 
+            self.write(self.ICtab_status, "Initial Condition Updated")
         return
 
     ## Initial Condition I/O
@@ -3905,7 +3955,8 @@ class Notebook:
                     self.nanowire.param_dict[param].value = batch_set[param]
 
                 
-            if self.nanowire.system_ID == "Nanowire" and self.using_LGC: self.add_LGC()
+            if self.nanowire.system_ID == "Nanowire" and self.using_LGC: 
+                self.add_LGC()
                 
             try:
                 self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], 
@@ -3936,9 +3987,11 @@ class Notebook:
                                                            title="Save IC text file", 
                                                            filetypes=[("Text files","*.txt")])
             
-            if new_filename == "": return
+            if new_filename == "": 
+                return
 
-            if new_filename.endswith(".txt"): new_filename = new_filename[:-4]
+            if new_filename.endswith(".txt"): 
+                new_filename = new_filename[:-4]
             self.write_init_file(new_filename + ".txt")
 
         except AssertionError as oops:
@@ -3996,7 +4049,8 @@ class Notebook:
         self.IC_file_name = tk.filedialog.askopenfilename(initialdir=self.default_dirs["Initial"], 
                                                           title="Select IC text files", 
                                                           filetypes=[("Text files","*.txt")])
-        if self.IC_file_name == "": return # If user closes dialog box without selecting a file
+        if self.IC_file_name == "": 
+            return # If user closes dialog box without selecting a file
 
         self.load_ICfile()
         return
@@ -4127,14 +4181,17 @@ class Notebook:
                 else: self.nanowire.param_dict[param].value = float(new_value)
                 
                 self.paramtoolkit_currentparam = param
-                if cycle_through_IC_plots: self.update_IC_plot(plot_ID="recent")
+                if cycle_through_IC_plots: 
+                    self.update_IC_plot(plot_ID="recent")
             except:
                 warning_mssg += ("\nWarning: could not apply value for param: {}".format(param))
                 warning_flag += 1
                 
-        if self.nanowire.system_ID == "Nanowire": self.using_LGC = False
+        if self.nanowire.system_ID == "Nanowire": 
+            self.using_LGC = False
         
-        if not warning_flag: self.write(self.ICtab_status, "IC file loaded successfully")
+        if not warning_flag: 
+            self.write(self.ICtab_status, "IC file loaded successfully")
         else: 
             self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
             self.do_confirmation_popup(warning_mssg, hide_cancel=True)
@@ -4149,7 +4206,8 @@ class Notebook:
             plot_ID = self.active_integrationplot_ID.get()
             datagroup = self.integration_plots[plot_ID].datagroup
             plot_info = self.integration_plots[plot_ID]
-            if datagroup.size() == 0: return
+            if datagroup.size() == 0: 
+                return
             
             if plot_info.mode == "Current time step": 
                 paired_data = [[datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type]] 
@@ -4169,7 +4227,8 @@ class Notebook:
 
         else:
             plot_ID = self.active_analysisplot_ID.get()
-            if self.analysis_plots[plot_ID].datagroup.size() == 0: return
+            if self.analysis_plots[plot_ID].datagroup.size() == 0: 
+                return
             paired_data = self.analysis_plots[plot_ID].datagroup.build(self.convert_out_dict)
             # We need some fancy footwork using itertools to transpose a non-rectangular array
             paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
@@ -4182,7 +4241,8 @@ class Notebook:
         # Export to .csv
         if not (export_filename == ""):
             try:
-                if export_filename.endswith(".csv"): export_filename = export_filename[:-4]
+                if export_filename.endswith(".csv"): 
+                    export_filename = export_filename[:-4]
                 np.savetxt("{}.csv".format(export_filename), paired_data, 
                            fmt='%.4e', delimiter=',', header=header)
                 self.write(self.analysis_status, "Export complete")
@@ -4252,7 +4312,8 @@ class Notebook:
                 self.write(self.analysis_status, "Bayesim export cancelled")
                 return
 
-            if not filename.endswith(".h5"): filename += ".h5"
+            if not filename.endswith(".h5"): 
+                filename += ".h5"
             print(filename)
             try:
                 dd.save(filename, full_data)

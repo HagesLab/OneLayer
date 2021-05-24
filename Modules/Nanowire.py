@@ -154,7 +154,8 @@ class Nanowire(OneD_Model):
     def prep_dataset(self, datatype, sim_data, params, for_integrate=False, 
                      i=0, j=0, nen=False, extra_data = None):
         """ Provides deltaN, deltaP, electric field, recombination, 
-            and spatial PL values on demand."""
+            and spatial PL values on demand.
+        """
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
         data = None
         if (datatype in self.simulation_outputs_dict):
@@ -234,10 +235,12 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1,
     # Element [i,j] is the proportion of node j's value that contributes to node i
     for i in range(0,m):
         distance_matrix[i] = np.concatenate((np.flip(distance[0:i+1], 0), distance[1:m - i]))
-        if symmetric: lf_distance_matrix[i] = distance + ((i+1) * dx)
+        if symmetric: 
+            lf_distance_matrix[i] = distance + ((i+1) * dx)
     
     weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
-    if symmetric: weight += np.exp(-(alphaCof + thetaCof) * lf_distance_matrix)
+    if symmetric: 
+        weight += np.exp(-(alphaCof + thetaCof) * lf_distance_matrix)
     return alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * weight
 
 def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, 
@@ -303,7 +306,8 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     ## N(t) = N(t-1) + dt * (dN/dt)
     #N_new = np.maximum(N_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
     dNdt = ((1/q) * dJz - rad_rec - non_rad_rec + G_array)
-    if do_ss: dNdt += init_N
+    if do_ss: 
+        dNdt += init_N
 
     ## Calculate dJp/dx
     dJz = (np.roll(Jp, -1)[:-1] - Jp[:-1]) / (dx)
@@ -311,7 +315,8 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     ## P(t) = P(t-1) + dt * (dP/dt)
     #P_new = np.maximum(P_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
     dPdt = ((1/q) * -dJz - rad_rec - non_rad_rec + G_array)
-    if do_ss: dPdt += init_P
+    if do_ss: 
+        dPdt += init_P
 
     ## Package results
     dydt = np.concatenate([dNdt, dPdt, dEdt], axis=None)
@@ -513,7 +518,8 @@ def radiative_recombination(sim_outputs, params):
 
 def nonradiative_recombination(sim_outputs, params):
     """Calculate nonradiative recombination using SRH model
-       Assumes quasi steady state trap level occupation"""
+       Assumes quasi steady state trap level occupation
+      """
     return (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"]) / ((params["Tau_N"] * sim_outputs["P"]) + (params["Tau_P"] * sim_outputs["N"]))
 
 def tau_diff(PL, dt):

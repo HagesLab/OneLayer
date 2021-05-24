@@ -51,7 +51,8 @@ class Param_Rule:
 class Flag:
     """This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
        but we interact with the checkbutton using the actual tk.CheckButton() element
-       So wrap both of those together in a single object and call it a day"""
+       So wrap both of those together in a single object and call it a day
+    """
     def __init__(self, master, display_name):
         self.tk_var = tk.IntVar()
         self.tk_element = tk.ttk.Checkbutton(master=master, text=display_name, 
@@ -228,7 +229,8 @@ class Analysis_Plot_State(Scalable_Plot_State):
 
     def add_time_index(self, offset):
         self.time_index += offset
-        if self.time_index < 0: self.time_index = 0
+        if self.time_index < 0: 
+            self.time_index = 0
         if self.time_index > self.datagroup.get_maxnumtsteps(): 
             self.time_index = self.datagroup.get_maxnumtsteps()
         return

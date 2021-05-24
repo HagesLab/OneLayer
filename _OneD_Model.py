@@ -164,7 +164,8 @@ class OneD_Model:
             
             # If the left bound coordinate exceeds the width of the node toIndex() (which always rounds down) 
             # assigned, it should actually be mapped to the next node
-            if (condition.l_bound - to_pos(i, self.dx, param.is_edge) > self.dx / 2): i += 1
+            if (condition.l_bound - to_pos(i, self.dx, param.is_edge) > self.dx / 2): 
+                i += 1
 
             if (condition.type == "POINT"):
                 new_param_value[i] = condition.l_boundval
