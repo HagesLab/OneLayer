@@ -140,10 +140,11 @@ class Raw_Data_Group(Data_Group):
 
     def add(self, data, tag):
         
-        if (len(self.datasets) == 0): # Allow the first set in to set the dt and t restrictions
-           self.dt = data.params_dict["dt"]
-           self.total_t = data.params_dict["Total-Time"]
-           self.type = data.type
+        if not self.datasets: 
+            # Allow the first set in to set the dt and t restrictions
+            self.dt = data.params_dict["dt"]
+            self.total_t = data.params_dict["Total-Time"]
+            self.type = data.type
 
         # Only allow datasets with identical time step size and total time
         if (self.dt == data.params_dict["dt"] and self.total_t == data.params_dict["Total-Time"] and self.type == data.type):
@@ -178,8 +179,9 @@ class Integrated_Data_Group(Data_Group):
         return
     
     def add(self, new_set):
-        if (len(self.datasets) == 0): # Allow the first set in to set the type restriction
-           self.type = new_set.type
+        if not self.datasets: 
+            # Allow the first set in to set the type restriction
+            self.type = new_set.type
 
         # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong
         if (self.type == new_set.type):

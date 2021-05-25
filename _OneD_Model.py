@@ -155,9 +155,9 @@ class OneD_Model:
         param = self.param_dict[param_name]
 
         if param.is_edge:
-            new_param_value = np.zeros(self.grid_x_edges.__len__())
+            new_param_value = np.zeros(len(self.grid_x_edges))
         else:
-            new_param_value = np.zeros(self.grid_x_nodes.__len__())
+            new_param_value = np.zeros(len(self.grid_x_nodes))
 
         for condition in param.param_rules:
             i = to_index(condition.l_bound, self.dx, self.total_length, param.is_edge)

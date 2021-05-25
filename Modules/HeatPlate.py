@@ -101,7 +101,7 @@ class HeatPlate(OneD_Model):
     
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
         """ Set temperature distribution of outgoing IC file"""
-        param_dict["T"] = sim_data["T"] if include_flags['T'] else np.zeros(grid_x.__len__())
+        param_dict["T"] = sim_data["T"] if include_flags['T'] else np.zeros(len(grid_x))
 
         return
     

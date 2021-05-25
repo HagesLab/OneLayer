@@ -147,9 +147,9 @@ def get_all_combinations(value_dict):
     iterable_param_lengths = {}
     for param in param_names:
         iterable_param_indexes[param] = 0
-        iterable_param_lengths[param] = value_dict[param].__len__()
+        iterable_param_lengths[param] = len(value_dict[param])
     
-    pivot_index = param_names.__len__() - 1
+    pivot_index = len(param_names) - 1
 
     current_params = dict(value_dict)
     # Create a list of all combinations of parameter values
@@ -173,13 +173,13 @@ def get_all_combinations(value_dict):
         # ...
         # {3,6,7},
         # {3,6,8}
-        pivot_index = param_names.__len__() - 1
+        pivot_index = len(param_names) - 1
         while (pivot_index >= 0 and iterable_param_indexes[param_names[pivot_index]] == iterable_param_lengths[param_names[pivot_index]] - 1):
             pivot_index -= 1
 
         iterable_param_indexes[param_names[pivot_index]] += 1
 
-        for i in range(pivot_index + 1, param_names.__len__()):
+        for i in range(pivot_index + 1, len(param_names)):
             iterable_param_indexes[param_names[i]] = 0
             
     return combinations

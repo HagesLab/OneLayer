@@ -91,10 +91,10 @@ class Nanowire(OneD_Model):
         init_P = (self.param_dict["P0"].value + self.param_dict["deltaP"].value) * self.convert_in_dict["P"]
         # "Typecast" single values to uniform arrays
         if not isinstance(init_N, np.ndarray):
-            init_N = np.ones(self.grid_x_nodes.__len__()) * init_N
+            init_N = np.ones(len(self.grid_x_nodes)) * init_N
             
         if not isinstance(init_P, np.ndarray):
-            init_P = np.ones(self.grid_x_nodes.__len__()) * init_P
+            init_P = np.ones(len(self.grid_x_nodes)) * init_P
             
         
         return {"N":init_N, "P":init_P}
@@ -193,9 +193,9 @@ class Nanowire(OneD_Model):
     
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
         """ Set deltaN and deltaP of outgoing regenerated IC file."""
-        param_dict["deltaN"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(grid_x.__len__())
+        param_dict["deltaN"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(len(grid_x))
                     
-        param_dict["deltaP"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(grid_x.__len__())
+        param_dict["deltaP"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(len(grid_x))
 
         return
     
@@ -544,7 +544,7 @@ def tau_diff(PL, dt):
     except Exception:
         print("Error: could not calculate tau_diff from non-positive PL values")
         return np.zeros(len(PL))
-    dln_PLdt = np.zeros(ln_PL.__len__())
+    dln_PLdt = np.zeros(len(ln_PL))
     dln_PLdt[0] = (ln_PL[1] - ln_PL[0]) / dt
     dln_PLdt[-1] = (ln_PL[-1] - ln_PL[-2]) / dt
     dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)

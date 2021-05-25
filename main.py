@@ -1411,7 +1411,7 @@ class Notebook:
                     self.nanowire.param_dict[param].value = val
                     changed_params.append(param)
                     
-                if changed_params.__len__() > 0:
+                if changed_params:
                     self.update_IC_plot(plot_ID="recent")
                     self.do_confirmation_popup("Updated: {}".format(changed_params), 
                                                hide_cancel=True)
@@ -1725,7 +1725,7 @@ class Notebook:
 
                 #self.analysis_plots[plot_ID].remove_duplicate_filenames()
                 
-                assert len(self.analysis_plots[plot_ID].data_filenames), "Select data files"
+                assert self.analysis_plots[plot_ID].data_filenames, "Select data files"
 
             self.plotter_popup.destroy()
             print("Plotter popup closed")
@@ -1994,7 +1994,7 @@ class Notebook:
         try:
             if continue_:
                 self.xaxis_param = self.xaxis_selection.get()
-                if self.xaxis_param == "":
+                if not self.xaxis_param:
                     self.write(self.PL_xaxis_status, "Select a parameter")
                     return
             self.PL_xaxis_popup.destroy()
@@ -2258,7 +2258,7 @@ class Notebook:
                 plot_ID = self.active_analysisplot_ID.get()
                 active_sets = self.analysis_plots[plot_ID].datagroup.datasets
                 datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
-                if not len(datasets): 
+                if not datasets: 
                     return
                 
                 include_flags = {}
@@ -2270,7 +2270,7 @@ class Notebook:
                     new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], 
                                                                    title="Save IC text file for {}".format(key), 
                                                                    filetypes=[("Text files","*.txt")])
-                    if new_filename == "": 
+                    if not new_filename: 
                         continue
 
                     if new_filename.endswith(".txt"): 
@@ -2698,7 +2698,7 @@ class Notebook:
         active_plot.time_index = 0
         active_plot.datagroup.clear()
         err_msg = ""
-        for i in range(0, active_plot.data_filenames.__len__()):
+        for i in range(0, len(active_plot.data_filenames)):
             data_filename = active_plot.data_filenames[i]
             short_filename = data_filename[data_filename.rfind('/') + 1:]
             new_data = self.make_rawdataset(short_filename, plot_ID, datatype)
@@ -2708,7 +2708,7 @@ class Notebook:
             else:
                 active_plot.datagroup.add(new_data, new_data.tag())
     
-        if len(err_msg):
+        if err_msg:
             self.do_confirmation_popup("Error: the following data could not be plotted\n" + err_msg, 
                                        hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
@@ -2806,7 +2806,7 @@ class Notebook:
             assert (self.simtime > 0),"Error: Invalid simulation time"
             assert (self.dt > 0 and self.dt <= self.simtime),"Error: Invalid dt"
             
-            if self.hmax == "": # Default hmax
+            if not self.hmax: # Default hmax
                 self.hmax = 0
                 
             self.hmax = float(self.hmax)
@@ -2848,7 +2848,7 @@ class Notebook:
         IC_files = tk.filedialog.askopenfilenames(initialdir=self.default_dirs["Initial"], 
                                                   title="Select IC text file", 
                                                   filetypes=[("Text files","*.txt")])
-        if not len(IC_files): 
+        if not IC_files: 
             return
 
         batch_num = 0
@@ -2860,12 +2860,12 @@ class Notebook:
             self.load_ICfile()
             self.write(self.status, 
                        "Now calculating {} : ({} of {})".format(self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")], 
-                                                                str(batch_num), str(IC_files.__len__())))
+                                                                str(batch_num), str(len(IC_files))))
             self.do_Calculate()
             
         self.write(self.status, "Simulations complete")
 
-        if not self.sim_warning_msg == "":
+        if self.sim_warning_msg:
             sim_warning_popup = tk.Toplevel(self.root)
             sim_warning_textbox = tk.ttk.Label(sim_warning_popup, 
                                                text=self.sim_warning_msg)
@@ -3041,14 +3041,14 @@ class Notebook:
 
         active_plot = self.analysis_plots[plot_ID]
         active_datagroup = active_plot.datagroup
-        if active_datagroup.datasets.__len__() == 0: 
+        if not active_datagroup.datasets: 
             return
 
         # Collect instructions from user using a series of popup windows
         if not bypass_inputs:
             self.do_integration_timemode_popup()
             self.root.wait_window(self.integration_popup) # Pause here until popup is closed
-            if self.PL_mode == "":
+            if not self.PL_mode:
                 self.write(self.analysis_status, "Integration cancelled")
                 return
     
@@ -3060,7 +3060,7 @@ class Notebook:
             if self.PL_mode == "Current time step":
                 self.do_PL_xaxis_popup()
                 self.root.wait_window(self.PL_xaxis_popup)
-                if self.xaxis_param == "":
+                if not self.xaxis_param:
                     self.write(self.analysis_status, "Integration cancelled")
                     return
                 print("Selected param {}".format(self.xaxis_param))
@@ -3206,7 +3206,7 @@ class Notebook:
                                                                                 data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
             
                 counter += 1
-                print("Integration: {} of {} complete".format(counter, active_datagroup.size() * self.integration_bounds.__len__()))
+                print("Integration: {} of {} complete".format(counter, active_datagroup.size() * len(self.integration_bounds)))
 
         subplot = self.integration_plots[ip_ID].plot_obj
         datagroup = self.integration_plots[ip_ID].datagroup
@@ -3641,7 +3641,7 @@ class Notebook:
     
     def update_paramrule_listbox(self, param_name):
         """ Grab current param's rules from Nanowire and show them in the param_rule listbox"""
-        if param_name == "":
+        if not param_name:
             self.write(self.ICtab_status, "Select a parameter")
             return
 
@@ -3654,7 +3654,7 @@ class Notebook:
 
         for param_rule in current_param_rules:
             self.active_paramrule_list.append(param_rule)
-            self.active_paramrule_listbox.insert(self.active_paramrule_list.__len__() - 1,
+            self.active_paramrule_listbox.insert(len(self.active_paramrule_list) - 1,
                                                  param_rule.get())
 
         
@@ -3692,7 +3692,7 @@ class Notebook:
         except IndexError:
             return
         
-        if (currentSelectionIndex < self.active_paramrule_list.__len__()):
+        if (currentSelectionIndex < len(self.active_paramrule_list)):
             self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
             self.active_paramrule_listbox.delete(currentSelectionIndex)
             self.active_paramrule_listbox.insert(currentSelectionIndex - 1, 
@@ -3706,7 +3706,7 @@ class Notebook:
 
     def hideall_paramrules(self, doPlotUpdate=True):
         """ Wrapper - Call hide_paramrule() until listbox is empty"""
-        while (self.active_paramrule_list.__len__() > 0):
+        while (self.active_paramrule_list):
             # These first two lines mimic user repeatedly selecting topmost paramrule in listbox
             self.active_paramrule_listbox.select_set(0)
             self.active_paramrule_listbox.event_generate("<<ListboxSelect>>")
@@ -3724,7 +3724,7 @@ class Notebook:
         """ Deletes all rules for current param. 
             Use reset_IC instead to delete all rules for every param
         """
-        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
+        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules):
             self.nanowire.removeall_param_rules(self.paramtoolkit_currentparam)
             self.hideall_paramrules()
             self.update_IC_plot(plot_ID="recent")
@@ -3732,7 +3732,7 @@ class Notebook:
 
     def delete_paramrule(self):
         """ Deletes selected rule for current param. """
-        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules.__len__() > 0):
+        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules):
             try:
                 self.nanowire.remove_param_rule(self.paramtoolkit_currentparam, 
                                                 self.active_paramrule_listbox.curselection()[0])
@@ -3767,31 +3767,31 @@ class Notebook:
         valuelist_filename = tk.filedialog.askopenfilename(initialdir="", 
                                                            title="Select Values from text file", 
                                                            filetypes=[("Text files","*.txt")])
-        if valuelist_filename == "": # If no file selected
+        if not valuelist_filename: # If no file selected
             return
 
         IC_values_list = []
         with open(valuelist_filename, 'r') as ifstream:
             for line in ifstream:
-                if (line.strip('\n') == "" or "#" in line): 
+                if (not line.strip('\n') or "#" in line): 
                     continue
 
                 else: IC_values_list.append(line.strip('\n'))
 
            
-        temp_IC_values = np.zeros(self.nanowire.grid_x_nodes.__len__()) if not is_edge else np.zeros(self.nanowire.grid_x_edges.__len__())
+        temp_IC_values = np.zeros(len(self.nanowire.grid_x_nodes)) if not is_edge else np.zeros(len(self.nanowire.grid_x_edges))
 
         try:
             IC_values_list.sort(key = lambda x:float(x[0:x.find('\t')]))
             
-            if IC_values_list.__len__() < 2: # if not enough points in list
+            if len(IC_values_list) < 2: # if not enough points in list
                 raise ValueError
         except Exception:
             self.write(self.ICtab_status, "Error: Unable to read point list")
             return
         
     
-        for i in range(IC_values_list.__len__() - 1):
+        for i in range(len(IC_values_list) - 1):
             try:
                 first_valueset = extract_values(IC_values_list[i], '\t') #[x1, y(x1)]
                 second_valueset = extract_values(IC_values_list[i+1], '\t') #[x2, y(x2)]
@@ -3988,7 +3988,7 @@ class Notebook:
                                                            title="Save IC text file", 
                                                            filetypes=[("Text files","*.txt")])
             
-            if new_filename == "": 
+            if not new_filename: 
                 return
 
             if new_filename.endswith(".txt"): 
@@ -4050,7 +4050,7 @@ class Notebook:
         self.IC_file_name = tk.filedialog.askopenfilename(initialdir=self.default_dirs["Initial"], 
                                                           title="Select IC text files", 
                                                           filetypes=[("Text files","*.txt")])
-        if self.IC_file_name == "": 
+        if not self.IC_file_name: 
             return # If user closes dialog box without selecting a file
 
         self.load_ICfile()
@@ -4083,7 +4083,7 @@ class Notebook:
                 # Extract parameters, ICs
                 for line in ifstream:
                     
-                    if ("#" in line) or (line.strip('\n').__len__() == 0):
+                    if ("#" in line) or not line.strip('\n'):
                         continue
 
                     # There are three "$" markers in an IC file: "Space Grid", "System Parameters" and "System Flags"
@@ -4103,10 +4103,10 @@ class Notebook:
                         
                     elif (initFlag == 1):
                         line = line.strip('\n')
-                        if line[0:line.find(':')] == "Total_length":
+                        if line.startswith("Total_length"):
                             total_length = (line[line.find(' ') + 1:])
                             
-                        elif line[0:line.find(':')] == "Node_width":
+                        elif line.startswith("Node_width"):
                             dx = (line[line.find(' ') + 1:])
                             
                     elif (initFlag == 2):
@@ -4220,7 +4220,7 @@ class Notebook:
 
             else: # if self.I_plot.mode == "All time steps"
                 raw_data = np.array([datagroup.datasets[key].data * self.convert_out_dict[datagroup.type] for key in datagroup.datasets])
-                grid_x = np.reshape(plot_info.global_gridx, (1,plot_info.global_gridx.__len__()))
+                grid_x = np.reshape(plot_info.global_gridx, (1,len(plot_info.global_gridx)))
                 paired_data = np.concatenate((grid_x, raw_data), axis=0).T
                 header = "Time [ns],"
                 for key in datagroup.datasets:
@@ -4240,7 +4240,7 @@ class Notebook:
                                                           filetypes=[("csv (comma-separated-values)","*.csv")])
         
         # Export to .csv
-        if not (export_filename == ""):
+        if export_filename:
             try:
                 if export_filename.endswith(".csv"): 
                     export_filename = export_filename[:-4]
