@@ -1,8 +1,5 @@
 #################################################
-# Wrapper functions for calculations, as well as
-# non-differential equation calculations.
-# The differential equations are located in odefuncs.py, 
-# while these do the rest of the math.
+# Functions for common device excitation profiles
 ################################################# 
 
 import numpy as np
@@ -73,7 +70,7 @@ def pulse_laser_totalgen(total_gen, total_length, alpha, x_array, hc=6.626e-34*2
     total_gen : float
         Total excited carrier density.
     total_length : float
-        Length of nanowire.
+        Length of system.
     See pulse_laser_power_spotsize for more details.
 
     """

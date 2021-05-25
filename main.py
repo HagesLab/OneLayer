@@ -1,6 +1,6 @@
 #################################################
 # Transient Electron Dynamics Simulator
-# Model photoluminescent behavior in one-dimensional nanowire
+# Model a variety of custom one-dimensional time-variant problems
 # Last modified: Nov 25, 2020
 # Author: Calvin Fai, Charles Hages
 # Contact:
@@ -57,14 +57,14 @@ class Notebook:
 
     def __init__(self, title):
         """ Create main tkinter object and select module. """
-        self.nanowire = None
+        self.module = None
         self.root = tk.Tk()
         self.root.attributes('-fullscreen', False)
         self.root.title(title)
         
         self.do_module_popup()
         self.root.wait_window(self.select_module_popup)
-        if self.nanowire is None: 
+        if self.module is None: 
             return
         if not self.verified: 
             return
@@ -128,8 +128,8 @@ class Notebook:
 
         # Flags and containers for IC arrays
         
-        self.convert_in_dict = self.nanowire.convert_in_dict
-        self.convert_out_dict = self.nanowire.convert_out_dict
+        self.convert_in_dict = self.module.convert_in_dict
+        self.convert_out_dict = self.module.convert_out_dict
 
         self.active_paramrule_list = []
         self.paramtoolkit_currentparam = ""
@@ -137,17 +137,17 @@ class Notebook:
         self.IC_file_name = ""
         
         # Add (e.g. for Nanowire) module-specific functionality
-        if self.nanowire.system_ID == "Nanowire":
+        if self.module.system_ID == "Nanowire":
             self.using_LGC = False
             self.LGC_stim_mode = tk.StringVar()
             self.LGC_gen_power_mode = tk.StringVar()
 
         self.carryover_include_flags = {}
-        for var in self.nanowire.simulation_outputs_dict:
+        for var in self.module.simulation_outputs_dict:
             self.carryover_include_flags[var] = tk.IntVar()
             
         self.check_bay_params = {}
-        for param in self.nanowire.param_dict:
+        for param in self.module.param_dict:
             self.check_bay_params[param] = tk.IntVar()
             
         self.bay_mode = tk.StringVar(value="model")
@@ -247,9 +247,9 @@ class Notebook:
             print("PL Directory detected")
             
         print("Checking whether the current system class ({}) "
-              "has a dedicated data subdirectory...".format(self.nanowire.system_ID))
+              "has a dedicated data subdirectory...".format(self.module.system_ID))
         try:
-            os.mkdir(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID)
+            os.mkdir(self.default_dirs["Data"] + "\\" + self.module.system_ID)
             print("No such subdirectory detected; automatically creating...")
         except FileExistsError:
             print("Subdirectory detected")
@@ -258,7 +258,7 @@ class Notebook:
         return
 
     def run(self):
-        if self.nanowire is None: 
+        if self.module is None: 
             self.root.destroy()
             return
 
@@ -306,7 +306,7 @@ class Notebook:
         self.notebook.destroy()
         self.do_module_popup()
         self.root.wait_window(self.select_module_popup)
-        if self.nanowire is None: 
+        if self.module is None: 
             return
         self.prep_notebook()
         
@@ -321,10 +321,10 @@ class Notebook:
         self.tab_rules_init = tk.ttk.Frame(self.tab_inputs)
         self.tab_explicit_init = tk.ttk.Frame(self.tab_inputs)
 
-        var_dropdown_list = [str(param + self.nanowire.param_dict[param].units) 
-                             for param in self.nanowire.param_dict]
+        var_dropdown_list = [str(param + self.module.param_dict[param].units) 
+                             for param in self.module.param_dict]
         paramtoolkit_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
-        unitless_dropdown_list = [param for param in self.nanowire.param_dict]
+        unitless_dropdown_list = [param for param in self.module.param_dict]
         
         self.line_sep_style = tk.ttk.Style()
         self.line_sep_style.configure("Grey Bar.TSeparator", background='#000000', 
@@ -366,7 +366,7 @@ class Notebook:
 
         self.thickness_label = tk.ttk.Label(self.spacegrid_frame, 
                                             text="Thickness " 
-                                            + self.nanowire.length_unit)
+                                            + self.module.length_unit)
         self.thickness_label.grid(row=1,column=0)
 
         self.thickness_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
@@ -374,7 +374,7 @@ class Notebook:
 
         self.dx_label = tk.ttk.Label(self.spacegrid_frame, 
                                      text="Node width " 
-                                     + self.nanowire.length_unit)
+                                     + self.module.length_unit)
         self.dx_label.grid(row=2,column=0)
 
         self.dx_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
@@ -403,12 +403,12 @@ class Notebook:
         # Procedurally generated elements for flags
         i = 1
         self.sys_flag_dict = {}
-        for flag in self.nanowire.flags_dict:
+        for flag in self.module.flags_dict:
             self.sys_flag_dict[flag] = Flag(self.flags_frame, 
-                                            self.nanowire.flags_dict[flag][0])
-            self.sys_flag_dict[flag].tk_var.set(self.nanowire.flags_dict[flag][1])
+                                            self.module.flags_dict[flag][0])
+            self.sys_flag_dict[flag].tk_var.set(self.module.flags_dict[flag][1])
             
-            if self.nanowire.flags_dict[flag][1]:
+            if self.module.flags_dict[flag][1]:
                 continue
             else:
                 self.sys_flag_dict[flag].tk_element.grid(row=i,column=0)
@@ -610,7 +610,7 @@ class Notebook:
                                                              self.listupload_toolbar_frame)
 
         ## Laser Generation Condition (LGC): extra input mtds for nanowire-specific applications
-        if self.nanowire.system_ID == "Nanowire":
+        if self.module.system_ID == "Nanowire":
             self.create_LGC_frame()
             self.tab_inputs.add(self.tab_generation_init, 
                                 text="Laser Generation Conditions")
@@ -666,16 +666,16 @@ class Notebook:
         self.line3_separator.grid(row=0,rowspan=30,column=2,sticky="ns")
 
         self.subtitle = tk.ttk.Label(self.tab_simulate, 
-                                     text="Simulation - {}".format(self.nanowire.system_ID))
+                                     text="Simulation - {}".format(self.module.system_ID))
         self.subtitle.grid(row=0,column=3,columnspan=3)
         
         self.sim_fig = Figure(figsize=(14, 8))
         count = 1
-        cdim = np.ceil(np.sqrt(self.nanowire.simulation_outputs_count))
+        cdim = np.ceil(np.sqrt(self.module.simulation_outputs_count))
         
-        rdim = np.ceil(self.nanowire.simulation_outputs_count / cdim)
+        rdim = np.ceil(self.module.simulation_outputs_count / cdim)
         self.sim_subplots = {}
-        for variable in self.nanowire.simulation_outputs_dict:
+        for variable in self.module.simulation_outputs_dict:
             self.sim_subplots[variable] = self.sim_fig.add_subplot(int(rdim), 
                                                                    int(cdim), 
                                                                    int(count))
@@ -702,13 +702,13 @@ class Notebook:
         self.analyze_overview_fig = Figure(figsize=(15,8))
         self.overview_subplots = {}
         count = 1
-        rdim = np.floor(np.sqrt(self.nanowire.total_outputs_count))
-        cdim = np.ceil(self.nanowire.total_outputs_count / rdim)
-        for output in self.nanowire.simulation_outputs_dict:
+        rdim = np.floor(np.sqrt(self.module.total_outputs_count))
+        cdim = np.ceil(self.module.total_outputs_count / rdim)
+        for output in self.module.simulation_outputs_dict:
             self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
             count += 1
             
-        for output in self.nanowire.calculated_outputs_dict:
+        for output in self.module.calculated_outputs_dict:
             self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
             count += 1
         
@@ -1124,14 +1124,14 @@ class Notebook:
             to the summary popup windows.
         """
         if self.sys_printsummary_popup_isopen:
-            self.write(self.printsummary_textbox, self.nanowire.DEBUG_print())
+            self.write(self.printsummary_textbox, self.module.DEBUG_print())
             
         if self.sys_plotsummary_popup_isopen:
-            for param_name in self.nanowire.param_dict:
-                param = self.nanowire.param_dict[param_name]
-                val = to_array(param.value, len(self.nanowire.grid_x_nodes), 
+            for param_name in self.module.param_dict:
+                param = self.module.param_dict[param_name]
+                val = to_array(param.value, len(self.module.grid_x_nodes), 
                                param.is_edge)
-                grid_x = self.nanowire.grid_x_nodes if not param.is_edge else self.nanowire.grid_x_edges
+                grid_x = self.module.grid_x_nodes if not param.is_edge else self.module.grid_x_edges
                 self.sys_param_summaryplots[param_name].plot(grid_x, val)
                 self.sys_param_summaryplots[param_name].set_yscale(autoscale(val_array=val))
                 
@@ -1180,8 +1180,8 @@ class Notebook:
         try:
             if continue_:
                 self.verified=False
-                self.nanowire = self.modules_list[self.module_names[self.module_listbox.curselection()[0]]]()
-                self.nanowire.verify()
+                self.module = self.modules_list[self.module_names[self.module_listbox.curselection()[0]]]()
+                self.module.verify()
                 self.verified=True
                 
             self.select_module_popup.destroy()
@@ -1259,16 +1259,16 @@ class Notebook:
     
     def do_sys_plotsummary_popup(self):
         """ Display as series of plots the current parameter distributions. """
-        if not self.nanowire.spacegrid_is_set: 
+        if not self.module.spacegrid_is_set: 
             return
         
         if not self.sys_plotsummary_popup_isopen:
             self.sys_plotsummary_popup = tk.Toplevel(self.root)
 
             count = 1
-            rdim = np.floor(np.sqrt(self.nanowire.param_count))
+            rdim = np.floor(np.sqrt(self.module.param_count))
             #rdim = 4
-            cdim = np.ceil(self.nanowire.param_count / rdim)
+            cdim = np.ceil(self.module.param_count / rdim)
             
             if self.sys_flag_dict['symmetric_system'].value():
                 self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, 
@@ -1278,10 +1278,10 @@ class Notebook:
 
             self.plotsummary_fig = Figure(figsize=(20,10))
             self.sys_param_summaryplots = {}
-            for param_name in self.nanowire.param_dict:
+            for param_name in self.module.param_dict:
                 
                 self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
-                self.sys_param_summaryplots[param_name].set_title("{} {}".format(param_name,self.nanowire.param_dict[param_name].units))
+                self.sys_param_summaryplots[param_name].set_title("{} {}".format(param_name,self.module.param_dict[param_name].units))
                 count += 1
             
             self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, 
@@ -1312,7 +1312,7 @@ class Notebook:
         if not self.sys_param_shortcut_popup_isopen:
             try:
                 self.set_init_x()
-                assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
+                assert self.module.spacegrid_is_set, "Error: could not set space grid"
     
             except ValueError:
                 self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
@@ -1346,10 +1346,10 @@ class Notebook:
             row_count = 0
             col_count = 0
             max_per_col = 6
-            for param in self.nanowire.param_dict:
+            for param in self.module.param_dict:
                 self.sys_param_labels_dict[param] = tk.ttk.Label(self.sys_param_list_frame, 
                                                                  text="{} {}".format(param, 
-                                                                                     self.nanowire.param_dict[param].units))
+                                                                                     self.module.param_dict[param].units))
                 self.sys_param_labels_dict[param].grid(row=row_count, 
                                                        column=col_count)
                 self.sys_param_entryboxes_dict[param] = tk.ttk.Entry(self.sys_param_list_frame, 
@@ -1357,8 +1357,8 @@ class Notebook:
                 self.sys_param_entryboxes_dict[param].grid(row=row_count, 
                                                            column=col_count + 1)
                 
-                if isinstance(self.nanowire.param_dict[param].value, (float, int)):
-                    formatted_val = self.nanowire.param_dict[param].value
+                if isinstance(self.module.param_dict[param].value, (float, int)):
+                    formatted_val = self.module.param_dict[param].value
                     if formatted_val > 1e4: 
                         formatted_val = "{:.3e}".format(formatted_val)
                     else: 
@@ -1395,7 +1395,7 @@ class Notebook:
         try:
             if continue_:
                 changed_params = []
-                for param in self.nanowire.param_dict:
+                for param in self.module.param_dict:
                     val = self.sys_param_entryboxes_dict[param].get()
                     if not val: 
                         continue
@@ -1408,7 +1408,7 @@ class Notebook:
                     
                     self.paramtoolkit_currentparam = param
                     self.deleteall_paramrule()
-                    self.nanowire.param_dict[param].value = val
+                    self.module.param_dict[param].value = val
                     changed_params.append(param)
                     
                 if changed_params:
@@ -1430,7 +1430,7 @@ class Notebook:
         """ Open tool for making batches of similar initial condition files. """
         try:
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
+            assert self.module.spacegrid_is_set, "Error: could not set space grid"
         
         except Exception:
             self.write(self.ICtab_status, "Error: missing space grid")
@@ -1481,12 +1481,12 @@ class Notebook:
 
             # Contextually-dependent options for batchable params
             self.batchables_array = []
-            batchable_params = [param for param in self.nanowire.param_dict 
-                                if not (self.nanowire.system_ID == "Nanowire" 
+            batchable_params = [param for param in self.module.param_dict 
+                                if not (self.module.system_ID == "Nanowire" 
                                         and self.using_LGC 
                                         and (param == "deltaN" or param == "deltaP"))]
             
-            if self.nanowire.system_ID == "Nanowire" and self.using_LGC:
+            if self.module.system_ID == "Nanowire" and self.using_LGC:
                 
                 self.LGC_instruction1 = tk.Message(self.batch_popup, 
                                                    text="Additional options for generating "
@@ -1518,7 +1518,7 @@ class Notebook:
 
             for i in range(max_batchable_params):
                 batch_param_name = tk.StringVar()
-                if self.nanowire.system_ID == "Nanowire" and self.using_LGC:
+                if self.module.system_ID == "Nanowire" and self.using_LGC:
                     optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, 
                                                    batch_param_name, "", "", 
                                                    *batchable_params, *LGC_params)
@@ -1587,13 +1587,13 @@ class Notebook:
             self.resetIC_checkbutton_frame.grid(row=1,column=0,columnspan=2)
 
             # Let's try some procedurally generated checkbuttons: 
-            # one created automatically per nanowire parameter
+            # one created automatically per module parameter
             self.resetIC_checkparams = {}
             self.resetIC_checkbuttons = {}
             cb_row = 0
             cb_col = 0
             cb_per_col = 3
-            for param in self.nanowire.param_dict:
+            for param in self.module.param_dict:
                 self.resetIC_checkparams[param] = tk.IntVar()
 
                 self.resetIC_checkbuttons[param] = tk.ttk.Checkbutton(self.resetIC_checkbutton_frame, 
@@ -1672,8 +1672,8 @@ class Notebook:
             self.plotter_title_label.grid(row=0,column=0,columnspan=2)
 
             self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, 
-                                                 *(output for output in self.nanowire.outputs_dict 
-                                                   if self.nanowire.outputs_dict[output].analysis_plotable))
+                                                 *(output for output in self.module.outputs_dict 
+                                                   if self.module.outputs_dict[output].analysis_plotable))
             self.var_select_menu.grid(row=1,column=0)
 
             self.autointegrate_checkbutton = tk.Checkbutton(self.plotter_popup, 
@@ -1693,7 +1693,7 @@ class Notebook:
                                            selectmode="extended")
             self.data_listbox.grid(row=2,rowspan=13,column=0)
             self.data_listbox.delete(0,tk.END)
-            self.data_list = [file for file in os.listdir(self.default_dirs["Data"] + "\\" + self.nanowire.system_ID) 
+            self.data_list = [file for file in os.listdir(self.default_dirs["Data"] + "\\" + self.module.system_ID) 
                               if not file.endswith(".txt")]
             self.data_listbox.insert(0,*(self.data_list))
 
@@ -1814,7 +1814,7 @@ class Notebook:
 
             self.integration_getbounds_title_label = tk.Label(self.integration_getbounds_popup, 
                                                               text="Enter bounds of integration " 
-                                                              + self.nanowire.length_unit)
+                                                              + self.module.length_unit)
             self.integration_getbounds_title_label.grid(row=0,column=2,columnspan=4)
 
             self.lower = tk.Label(self.integration_getbounds_popup, 
@@ -1852,7 +1852,7 @@ class Notebook:
             self.integration_center_label = tk.Label(self.integration_getbounds_popup, 
                                                      text="Enter space-separated "
                                                      "e.g. (100 200 300...) Centers "
-                                                     "{}: ".format(self.nanowire.length_unit))
+                                                     "{}: ".format(self.module.length_unit))
             self.integration_center_label.grid(row=5,column=2)
 
             self.integration_center_entry = tk.Entry(self.integration_getbounds_popup, 
@@ -1860,7 +1860,7 @@ class Notebook:
             self.integration_center_entry.grid(row=5,column=3,columnspan=3)
 
             self.integration_width_label = tk.Label(self.integration_getbounds_popup, 
-                                                    text="Width {}: +/- ".format(self.nanowire.length_unit))
+                                                    text="Width {}: +/- ".format(self.module.length_unit))
             self.integration_width_label.grid(row=6,column=2)
 
             self.integration_width_entry = tk.Entry(self.integration_getbounds_popup, 
@@ -1968,7 +1968,7 @@ class Notebook:
 
             self.xaxis_param_menu = tk.OptionMenu(self.PL_xaxis_popup, 
                                                   self.xaxis_selection, 
-                                                  *[param for param in self.nanowire.param_dict])
+                                                  *[param for param in self.module.param_dict])
             self.xaxis_param_menu.grid(row=1,column=1)
 
             self.PL_xaxis_continue_button = tk.Button(self.PL_xaxis_popup, 
@@ -2223,7 +2223,7 @@ class Notebook:
             
             self.carry_checkbuttons = {}
             rcount = 1
-            for var in self.nanowire.simulation_outputs_dict:
+            for var in self.module.simulation_outputs_dict:
                 self.carry_checkbuttons[var] = tk.Checkbutton(self.IC_carry_popup, 
                                                               text=var, 
                                                               variable=self.carryover_include_flags[var])
@@ -2282,14 +2282,14 @@ class Notebook:
                     
                     filename = active_sets[key].filename
                     sim_data = {}
-                    for var in self.nanowire.simulation_outputs_dict:
+                    for var in self.module.simulation_outputs_dict:
                         path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                                  self.nanowire.system_ID, 
+                                                                  self.module.system_ID, 
                                                                   filename, filename, var)
                         sim_data[var] = u_read(path_name, t0=active_sets[key].show_index, 
                                                single_tstep=True)
 
-                    self.nanowire.get_IC_carry(sim_data, param_dict_copy, 
+                    self.module.get_IC_carry(sim_data, param_dict_copy, 
                                                include_flags, node_x)
 
                     with open(new_filename + ".txt", "w+") as ofstream:
@@ -2297,13 +2297,13 @@ class Notebook:
                                        + str(datetime.datetime.now().date()) 
                                        + " AT " + str(datetime.datetime.now().time()) 
                                        + "\n")
-                        ofstream.write("System_class: {}\n".format(self.nanowire.system_ID))
+                        ofstream.write("System_class: {}\n".format(self.module.system_ID))
                         ofstream.write("$ Space Grid:\n")
                         ofstream.write("Total_length: {}\n".format(active_sets[key].params_dict["Total_length"]))
                         ofstream.write("Node_width: {}\n".format(active_sets[key].params_dict["Node_width"]))
                         ofstream.write("$ System Parameters:\n")
                         for param in param_dict_copy:
-                            if not (param == "Total_length" or param == "Node_width" or param == "Total-Time" or param == "dt" or param == "steady_state_exc" or param in self.nanowire.flags_dict): 
+                            if not (param == "Total_length" or param == "Node_width" or param == "Total-Time" or param == "dt" or param == "steady_state_exc" or param in self.module.flags_dict): 
                                 param_values = param_dict_copy[param] * self.convert_out_dict[param]
                                 if isinstance(param_values, np.ndarray):
                                     ofstream.write("{}: {:.8e}".format(param, param_values[0]))
@@ -2317,7 +2317,7 @@ class Notebook:
                         ofstream.write("$ System Flags:\n")
                         
                         for param in param_dict_copy:
-                            if param in self.nanowire.flags_dict: 
+                            if param in self.module.flags_dict: 
                                 ofstream.write("{}: {}\n".format(param, int(param_dict_copy[param])))
 
                     status_msg += "{}-->{}\n".format(filename, new_filename)
@@ -2391,7 +2391,7 @@ class Notebook:
             rdim = 4
             rcount = 0
             ccount = 0
-            for param in self.nanowire.param_dict:
+            for param in self.module.param_dict:
                 self.bay_checks[param] = tk.ttk.Checkbutton(self.check_frame, text=param, variable=self.check_bay_params[param], onvalue=1,offvalue=0)
                 self.bay_checks[param].grid(row=rcount, column=ccount)
                 rcount += 1
@@ -2432,7 +2432,7 @@ class Notebook:
     def update_sim_plots(self, index, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
         
-        for variable, output_obj in self.nanowire.simulation_outputs_dict.items():
+        for variable, output_obj in self.module.simulation_outputs_dict.items():
             
             plot = self.sim_subplots[variable]
             
@@ -2446,10 +2446,10 @@ class Notebook:
 
             plot.set_yscale(output_obj.yscale)
             
-            grid_x = self.nanowire.grid_x_nodes if not output_obj.is_edge else self.nanowire.grid_x_edges
+            grid_x = self.module.grid_x_nodes if not output_obj.is_edge else self.module.grid_x_edges
             plot.plot(grid_x, self.sim_data[variable] * self.convert_out_dict[variable])
 
-            plot.set_xlabel("x {}".format(self.nanowire.length_unit))
+            plot.set_xlabel("x {}".format(self.module.length_unit))
             plot.set_ylabel("{} {}".format(variable, output_obj.units))
 
             plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
@@ -2461,8 +2461,8 @@ class Notebook:
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
         """ Read and store parameters from a metadata.txt file """
-        path = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + "metadata.txt"
-        assert os.path.exists(path), "Error: Missing metadata for {}".format(self.nanowire.system_ID)
+        path = self.default_dirs["Data"] + "\\" + self.module.system_ID + "\\" + data_filename + "\\" + "metadata.txt"
+        assert os.path.exists(path), "Error: Missing metadata for {}".format(self.module.system_ID)
         
         with open(path, "r") as ifstream:
             param_values_dict = {}
@@ -2475,7 +2475,7 @@ class Notebook:
             
                 elif "System_class" in line:
                     system_class = line[line.find(' ') + 1:].strip('\n')
-                    assert self.nanowire.system_ID == system_class, "Error: File is not a {}".format(self.nanowire.system_ID)
+                    assert self.module.system_ID == system_class, "Error: File is not a {}".format(self.module.system_ID)
 
                 else:
                     param = line[0:line.find(':')]
@@ -2490,7 +2490,7 @@ class Notebook:
             if param in self.convert_in_dict:
                 param_values_dict[param] *= self.convert_in_dict[param]
             
-        assert set(self.nanowire.param_dict.keys()).issubset(set(param_values_dict.keys())), "Error: metadata is missing params"
+        assert set(self.module.param_dict.keys()).issubset(set(param_values_dict.keys())), "Error: metadata is missing params"
         return param_values_dict
     
     def plot_overview_analysis(self):
@@ -2526,26 +2526,26 @@ class Notebook:
         
         for subplot in self.overview_subplots:
             plot_obj = self.overview_subplots[subplot]
-            output_info_obj = self.nanowire.outputs_dict[subplot]
+            output_info_obj = self.module.outputs_dict[subplot]
             plot_obj.cla()
             plot_obj.set_yscale(output_info_obj.yscale)
             plot_obj.set_xlabel(output_info_obj.xlabel)
             plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
             
             
-        data_dict = self.nanowire.get_overview_analysis(param_values_dict, 
+        data_dict = self.module.get_overview_analysis(param_values_dict, 
                                                         tstep_list, data_dirname, 
                                                         data_filename)
         
         warning_msg = ""
-        for output_name, output_info in self.nanowire.outputs_dict.items():
+        for output_name, output_info in self.module.outputs_dict.items():
             try:
                 values = data_dict[output_name]
                 
                 if not isinstance(values, np.ndarray): 
                     raise KeyError
             except KeyError:
-                warning_msg += "Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.nanowire.system_ID, output_name)
+                warning_msg += "Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.module.system_ID, output_name)
                 continue
             
             except Exception:
@@ -2570,7 +2570,7 @@ class Notebook:
             else: # Time variant only
                 self.overview_subplots[output_name].plot(grid_x, values)
 
-        for output_name in self.nanowire.simulation_outputs_dict:
+        for output_name in self.module.simulation_outputs_dict:
             self.overview_subplots[output_name].legend().set_draggable(True)
             break
         if warning_msg:
@@ -2617,7 +2617,7 @@ class Notebook:
                 label = dataset.tag(for_matplotlib=True) + "*" if dataset.params_dict["symmetric_system"] else dataset.tag(for_matplotlib=True)
                 subplot.plot(dataset.grid_x, dataset.data * self.convert_out_dict[active_datagroup.type], label=label)
 
-            subplot.set_xlabel("x {}".format(self.nanowire.length_unit))
+            subplot.set_xlabel("x {}".format(self.module.length_unit))
             subplot.set_ylabel(active_datagroup.type)
             if active_plot_data.display_legend:
                 subplot.legend().set_draggable(True)
@@ -2659,19 +2659,19 @@ class Notebook:
 
 		# Now that we have the parameters from metadata, fetch the data itself
         sim_data = {}
-        for sim_datatype in self.nanowire.simulation_outputs_dict:
+        for sim_datatype in self.module.simulation_outputs_dict:
             path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                      self.nanowire.system_ID, 
+                                                      self.module.system_ID, 
                                                       data_filename, data_filename, 
                                                       sim_datatype)
             sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
                                             single_tstep=True)
         
         try:
-            values = self.nanowire.prep_dataset(datatype, sim_data, param_values_dict)
+            values = self.module.prep_dataset(datatype, sim_data, param_values_dict)
             assert isinstance(values, np.ndarray)
             assert values.ndim == 1
-            if self.nanowire.outputs_dict[datatype].is_edge: 
+            if self.module.outputs_dict[datatype].is_edge: 
                 return Raw_Data_Set(values, data_edge_x, data_node_x, 
                                     param_values_dict, datatype, data_filename, 
                                     active_plot.time_index)
@@ -2739,16 +2739,16 @@ class Notebook:
         # Search data files for data at new time step
         for tag, dataset in active_datagroup.datasets.items():
             sim_data = {}
-            for sim_datatype in self.nanowire.simulation_outputs_dict:
+            for sim_datatype in self.module.simulation_outputs_dict:
                 path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                          self.nanowire.system_ID, 
+                                                          self.module.system_ID, 
                                                           dataset.filename, 
                                                           dataset.filename, 
                                                           sim_datatype)
                 sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
                                                 single_tstep=True)
         
-            dataset.data = self.nanowire.prep_dataset(active_datagroup.type, sim_data, 
+            dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
                                                       dataset.params_dict)
             dataset.show_index = active_plot.time_index
             
@@ -2883,19 +2883,19 @@ class Notebook:
             shortened_IC_name = self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")]
             data_file_name = shortened_IC_name
             
-            self.m = int(0.5 + self.nanowire.total_length / self.nanowire.dx)         # Number of space steps
+            self.m = int(0.5 + self.module.total_length / self.module.dx)         # Number of space steps
             
 
             temp_sim_dict = {}
 
             # Convert into TEDs units
-            for param in self.nanowire.param_dict:
-                temp_sim_dict[param] = self.nanowire.param_dict[param].value * self.convert_in_dict[param]
+            for param in self.module.param_dict:
+                temp_sim_dict[param] = self.module.param_dict[param].value * self.convert_in_dict[param]
 
-            init_conditions = self.nanowire.calc_inits()
+            init_conditions = self.module.calc_inits()
             assert isinstance(init_conditions, dict), "Error: module calc_inits() did not return a dict of initial conditions\n"
             
-            for variable in self.nanowire.simulation_outputs_dict:
+            for variable in self.module.simulation_outputs_dict:
                 assert variable in init_conditions, "Error: Module calc_inits() did not return value for simulation output variable {}\n".format(variable)
                 assert isinstance(init_conditions[variable], np.ndarray), "Error: module calc_inits() returned an invalid value (values must be numpy arrays) for output {}\n".format(variable)
                 assert init_conditions[variable].ndim == 1, "Error: module calc_inits() did not return a 1D numpy array for output {}\n".format(variable)
@@ -2915,12 +2915,12 @@ class Notebook:
         try:
             print("Attempting to create {} data folder".format(data_file_name))
             full_path_name = "{}\\{}\\{}".format(self.default_dirs["Data"], 
-                                                 self.nanowire.system_ID, 
+                                                 self.module.system_ID, 
                                                  data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
             assert "Data" in full_path_name
-            assert self.nanowire.system_ID in full_path_name
+            assert self.module.system_ID in full_path_name
             if os.path.isdir(full_path_name):
                 print("{} folder already exists; trying alternate name".format(data_file_name))
                 append = 1
@@ -2947,9 +2947,9 @@ class Notebook:
         atom = tables.Float64Atom()
 
         ## Create data files
-        for variable in self.nanowire.simulation_outputs_dict:
+        for variable in self.module.simulation_outputs_dict:
             with tables.open_file("{}\\{}-{}.h5".format(full_path_name, data_file_name, variable), mode='w') as ofstream:
-                length = self.m if not self.nanowire.simulation_outputs_dict[variable].is_edge else self.m + 1
+                length = self.m if not self.module.simulation_outputs_dict[variable].is_edge else self.m + 1
 
                 # Important - "data" must be used as the array name here, as pytables will use the string "data" 
                 # to name the attribute earray.data, which is then used to access the array
@@ -2962,7 +2962,7 @@ class Notebook:
         self.update_sim_plots(0)
 
         try:
-            self.nanowire.simulate("{}\\{}".format(full_path_name,data_file_name), 
+            self.module.simulate("{}\\{}".format(full_path_name,data_file_name), 
                                    self.m, self.n, self.dt, temp_sim_dict, 
                                    self.sys_flag_dict, self.hmax, init_conditions)
             
@@ -2991,7 +2991,7 @@ class Notebook:
             for i in range(1,6):
                 for var in self.sim_data:
                     path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                              self.nanowire.system_ID, 
+                                                              self.module.system_ID, 
                                                               data_file_name, 
                                                               data_file_name, var)
                     self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
@@ -3006,9 +3006,9 @@ class Notebook:
 
         with open(full_path_name + "\\metadata.txt", "w+") as ofstream:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON {} AT {}\n".format(datetime.datetime.now().date(),datetime.datetime.now().time()))
-            ofstream.write("System_class: {}\n".format(self.nanowire.system_ID))
-            ofstream.write("Total_length: {}\n".format(self.nanowire.total_length))
-            ofstream.write("Node_width: {}\n".format(self.nanowire.dx))
+            ofstream.write("System_class: {}\n".format(self.module.system_ID))
+            ofstream.write("Total_length: {}\n".format(self.module.total_length))
+            ofstream.write("Node_width: {}\n".format(self.module.dx))
             
             for param in temp_sim_dict:
                 param_values = temp_sim_dict[param] * self.convert_out_dict[param]
@@ -3143,31 +3143,31 @@ class Notebook:
 
                 do_curr_t = self.PL_mode == "Current time step"
                 
-                pathname = self.default_dirs["Data"] + "\\" + self.nanowire.system_ID + "\\" + data_filename + "\\" + data_filename
+                pathname = self.default_dirs["Data"] + "\\" + self.module.system_ID + "\\" + data_filename + "\\" + data_filename
                 
                 if include_negative:
                     sim_data = {}
                     extra_data = {}
                     
-                    for sim_datatype in self.nanowire.simulation_outputs_dict:
+                    for sim_datatype in self.module.simulation_outputs_dict:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
                                                         t0=show_index, l=0, r=i+1, 
                                                         single_tstep=do_curr_t, need_extra_node=nen[0]) 
                         extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
                                                           t0=show_index, single_tstep=do_curr_t)
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, 
+                    data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
                                                       True, 0, i, nen[0], extra_data)
                     I_data = new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
                     sim_data = {}
                     
-                    for sim_datatype in self.nanowire.simulation_outputs_dict:
+                    for sim_datatype in self.module.simulation_outputs_dict:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
                                                         t0=show_index, l=0, r=j+1, 
                                                         single_tstep=do_curr_t, need_extra_node=nen[1]) 
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, 
+                    data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
                                                       True, 0, j, nen[1], extra_data)
                     I_data += new_integrate(data, 0, u_bound, dx, total_length, nen[1])
@@ -3175,14 +3175,14 @@ class Notebook:
                 else:
                     sim_data = {}
                     extra_data = {}
-                    for sim_datatype in self.nanowire.simulation_outputs_dict:
+                    for sim_datatype in self.module.simulation_outputs_dict:
                         sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
                                                         t0=show_index, l=i, r=j+1, 
                                                         single_tstep=do_curr_t, need_extra_node=nen) 
                         extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
                                                           t0=show_index, single_tstep=do_curr_t) 
             
-                    data = self.nanowire.prep_dataset(datatype, sim_data, 
+                    data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
                                                       True, i, j, nen, extra_data)
                     
@@ -3249,7 +3249,7 @@ class Notebook:
         
         self.write(self.analysis_status, "Integration complete")
 
-        if (self.nanowire.system_ID == "Nanowire" 
+        if (self.module.system_ID == "Nanowire" 
             and self.PL_mode == "All time steps" and datatype == "PL"):
             # Calculate tau_D
             if self.integration_plots[ip_ID].datagroup.size(): # If has tau_diff data to plot
@@ -3310,16 +3310,16 @@ class Notebook:
             self.deleteall_paramrule()
             
             # Step 3
-            self.nanowire.param_dict[param].value = 0
+            self.module.param_dict[param].value = 0
             self.update_IC_plot(plot_ID="recent")
 
         if self.resetIC_do_clearall:
             self.set_thickness_and_dx_entryboxes(state='unlock')
-            self.nanowire.total_length = None
-            self.nanowire.dx = None
-            self.nanowire.grid_x_edges = []
-            self.nanowire.grid_x_nodes = []
-            self.nanowire.spacegrid_is_set = False
+            self.module.total_length = None
+            self.module.dx = None
+            self.module.grid_x_edges = []
+            self.module.grid_x_nodes = []
+            self.module.spacegrid_is_set = False
             self.update_system_summary()
 
         self.write(self.ICtab_status, "Selected params cleared")
@@ -3350,7 +3350,7 @@ class Notebook:
            A new mesh can only be generated when the previous mesh 
            is discarded using reset_IC().
         """
-        if self.nanowire.spacegrid_is_set:
+        if self.module.spacegrid_is_set:
             return
 
         thickness = float(self.thickness_entry.get())
@@ -3371,11 +3371,11 @@ class Notebook:
             if not self.confirmed: 
                 return
 
-        self.nanowire.total_length = thickness
-        self.nanowire.dx = dx
-        self.nanowire.grid_x_nodes = np.linspace(dx / 2,thickness - dx / 2, int(0.5 + thickness / dx))
-        self.nanowire.grid_x_edges = np.linspace(0, thickness, int(0.5 + thickness / dx) + 1)
-        self.nanowire.spacegrid_is_set = True
+        self.module.total_length = thickness
+        self.module.dx = dx
+        self.module.grid_x_nodes = np.linspace(dx / 2,thickness - dx / 2, int(0.5 + thickness / dx))
+        self.module.grid_x_edges = np.linspace(0, thickness, int(0.5 + thickness / dx) + 1)
+        self.module.spacegrid_is_set = True
         self.set_thickness_and_dx_entryboxes(state='lock')
         return
 
@@ -3383,7 +3383,7 @@ class Notebook:
         """Calculate and store laser generation profile"""
         try:
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
+            assert self.module.spacegrid_is_set, "Error: could not set space grid"
 
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
@@ -3481,9 +3481,9 @@ class Notebook:
                     return
 
             # Note: add_LGC() automatically converts into TEDs units. For consistency add_LGC should really deposit values in common units.
-            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, 
+            self.module.param_dict["deltaN"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, 
                                                                                                       freq, wavelength, alpha_nm, 
-                                                                                                      self.nanowire.grid_x_nodes, hc=hc_nm)
+                                                                                                      self.module.grid_x_nodes, hc=hc_nm)
         
         elif (LGC_options["power_mode"] == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
@@ -3507,9 +3507,9 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, 
+            self.module.param_dict["deltaN"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, 
                                                                                                     wavelength, alpha_nm, 
-                                                                                                    self.nanowire.grid_x_nodes, hc=hc_nm)
+                                                                                                    self.module.grid_x_nodes, hc=hc_nm)
         
         elif (LGC_options["power_mode"] == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
@@ -3517,8 +3517,8 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
-            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, 
-                                                                                              self.nanowire.grid_x_nodes)
+            self.module.param_dict["deltaN"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, 
+                                                                                              self.module.grid_x_nodes)
         
         elif (LGC_options["power_mode"] == "total-gen"):
             try: total_gen = float(self.total_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
@@ -3526,17 +3526,17 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
-            self.nanowire.param_dict["deltaN"].value = carrier_excitations.pulse_laser_totalgen(total_gen, self.nanowire.total_length, 
-                                                                                                alpha_nm, self.nanowire.grid_x_nodes)
+            self.module.param_dict["deltaN"].value = carrier_excitations.pulse_laser_totalgen(total_gen, self.module.total_length, 
+                                                                                                alpha_nm, self.module.grid_x_nodes)
         
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
         
         
-        self.nanowire.param_dict["deltaN"].value *= self.convert_out_dict["deltaN"]
+        self.module.param_dict["deltaN"].value *= self.convert_out_dict["deltaN"]
         ## Assuming that the initial distributions of holes and electrons are identical
-        self.nanowire.param_dict["deltaP"].value = self.nanowire.param_dict["deltaN"].value
+        self.module.param_dict["deltaP"].value = self.module.param_dict["deltaN"].value
 
         self.update_IC_plot(plot_ID="LGC")
         self.paramtoolkit_currentparam = "deltaN"
@@ -3552,7 +3552,7 @@ class Notebook:
 
         try:
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
+            assert self.module.spacegrid_is_set, "Error: could not set space grid"
 
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
@@ -3570,7 +3570,7 @@ class Notebook:
             assert (float(self.paramrule_lbound_entry.get()) >= 0),  "Error: left bound coordinate too low"
             
             if (self.init_shape_selection.get() == "POINT"):
-                assert (float(self.paramrule_lbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_lbound_entry.get()) <= self.module.total_length), "Error: right bound coordinate too large"
                 
                 new_param_rule = Param_Rule(new_param_name, "POINT", 
                                             float(self.paramrule_lbound_entry.get()), 
@@ -3579,7 +3579,7 @@ class Notebook:
                                             -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
-                assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_rbound_entry.get()) <= self.module.total_length), "Error: right bound coordinate too large"
                 assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
                 new_param_rule = Param_Rule(new_param_name, "FILL", 
@@ -3589,7 +3589,7 @@ class Notebook:
                                             -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
-                assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_rbound_entry.get()) <= self.module.total_length), "Error: right bound coordinate too large"
                 assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
                 new_param_rule = Param_Rule(new_param_name, "LINE", 
@@ -3599,7 +3599,7 @@ class Notebook:
                                             float(self.paramrule_rvalue_entry.get()))
 
             elif (self.init_shape_selection.get() == "EXP"):
-                assert (float(self.paramrule_rbound_entry.get()) <= self.nanowire.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_rbound_entry.get()) <= self.module.total_length), "Error: right bound coordinate too large"
                 assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
                 assert (float(self.paramrule_lvalue_entry.get()) != 0), "Error: left value cannot be 0"
                 assert (float(self.paramrule_rvalue_entry.get()) != 0), "Error: right value cannot be 0"
@@ -3621,12 +3621,12 @@ class Notebook:
             self.write(self.ICtab_status, str(oops))
             return
 
-        self.nanowire.add_param_rule(new_param_name, new_param_rule)
+        self.module.add_param_rule(new_param_name, new_param_rule)
 
         self.paramtoolkit_viewer_selection.set(new_param_name)
         self.update_paramrule_listbox(new_param_name)
 
-        if self.nanowire.system_ID == "Nanowire":
+        if self.module.system_ID == "Nanowire":
             if new_param_name == "deltaN" or new_param_name == "deltaP": 
                 self.using_LGC = False
         self.update_IC_plot(plot_ID="recent")
@@ -3634,13 +3634,13 @@ class Notebook:
 
     def refresh_paramrule_listbox(self):
         """ Update the listbox to show rules for the selected param and display a snapshot of it"""
-        if self.nanowire.spacegrid_is_set:
+        if self.module.spacegrid_is_set:
             self.update_paramrule_listbox(self.paramtoolkit_viewer_selection.get())
             self.update_IC_plot(plot_ID="custom")
         return
     
     def update_paramrule_listbox(self, param_name):
-        """ Grab current param's rules from Nanowire and show them in the param_rule listbox"""
+        """ Grab current param's rules from module and show them in the param_rule listbox"""
         if not param_name:
             self.write(self.ICtab_status, "Select a parameter")
             return
@@ -3649,7 +3649,7 @@ class Notebook:
         self.hideall_paramrules()
 
         # 2. Write in the new rules
-        current_param_rules = self.nanowire.param_dict[param_name].param_rules
+        current_param_rules = self.module.param_dict[param_name].param_rules
         self.paramtoolkit_currentparam = param_name
 
         for param_rule in current_param_rules:
@@ -3680,7 +3680,7 @@ class Notebook:
             self.active_paramrule_listbox.selection_set(currentSelectionIndex - 1)
 
             # 2. Change the order param rules are applied when calculating Parameter's values
-            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, 
+            self.module.swap_param_rules(self.paramtoolkit_currentparam, 
                                            currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
@@ -3699,7 +3699,7 @@ class Notebook:
                                                  self.active_paramrule_list[currentSelectionIndex - 1].get())
             self.active_paramrule_listbox.selection_set(currentSelectionIndex)
             
-            self.nanowire.swap_param_rules(self.paramtoolkit_currentparam, 
+            self.module.swap_param_rules(self.paramtoolkit_currentparam, 
                                            currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
@@ -3724,17 +3724,17 @@ class Notebook:
         """ Deletes all rules for current param. 
             Use reset_IC instead to delete all rules for every param
         """
-        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules):
-            self.nanowire.removeall_param_rules(self.paramtoolkit_currentparam)
+        if (self.module.param_dict[self.paramtoolkit_currentparam].param_rules):
+            self.module.removeall_param_rules(self.paramtoolkit_currentparam)
             self.hideall_paramrules()
             self.update_IC_plot(plot_ID="recent")
         return
 
     def delete_paramrule(self):
         """ Deletes selected rule for current param. """
-        if (self.nanowire.param_dict[self.paramtoolkit_currentparam].param_rules):
+        if (self.module.param_dict[self.paramtoolkit_currentparam].param_rules):
             try:
-                self.nanowire.remove_param_rule(self.paramtoolkit_currentparam, 
+                self.module.remove_param_rule(self.paramtoolkit_currentparam, 
                                                 self.active_paramrule_listbox.curselection()[0])
                 self.hide_paramrule()
                 self.update_IC_plot(plot_ID="recent")
@@ -3748,7 +3748,7 @@ class Notebook:
         """ Generate a parameter distribution using list from .txt file"""
         try:
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
+            assert self.module.spacegrid_is_set, "Error: could not set space grid"
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
@@ -3762,7 +3762,7 @@ class Notebook:
         
         warning_flag = False
         var = self.listupload_var_selection.get()
-        is_edge = self.nanowire.param_dict[var].is_edge
+        is_edge = self.module.param_dict[var].is_edge
         
         valuelist_filename = tk.filedialog.askopenfilename(initialdir="", 
                                                            title="Select Values from text file", 
@@ -3779,7 +3779,7 @@ class Notebook:
                 else: IC_values_list.append(line.strip('\n'))
 
            
-        temp_IC_values = np.zeros(len(self.nanowire.grid_x_nodes)) if not is_edge else np.zeros(len(self.nanowire.grid_x_edges))
+        temp_IC_values = np.zeros(len(self.module.grid_x_nodes)) if not is_edge else np.zeros(len(self.module.grid_x_edges))
 
         try:
             IC_values_list.sort(key = lambda x:float(x[0:x.find('\t')]))
@@ -3801,21 +3801,21 @@ class Notebook:
                 warning_flag = True
 
             # Linear interpolate from provided param list to specified grid points
-            lindex = to_index(first_valueset[0], self.nanowire.dx, 
-                              self.nanowire.total_length, is_edge)
-            rindex = to_index(second_valueset[0], self.nanowire.dx, 
-                              self.nanowire.total_length, is_edge)
+            lindex = to_index(first_valueset[0], self.module.dx, 
+                              self.module.total_length, is_edge)
+            rindex = to_index(second_valueset[0], self.module.dx, 
+                              self.module.total_length, is_edge)
             
-            if (first_valueset[0] - to_pos(lindex, self.nanowire.dx, is_edge) >= self.nanowire.dx / 2): 
+            if (first_valueset[0] - to_pos(lindex, self.module.dx, is_edge) >= self.module.dx / 2): 
                 lindex += 1
 
             intermediate_x_indices = np.arange(lindex, rindex + 1, 1)
 
             for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
                 try:
-                    if (second_valueset[0] > self.nanowire.total_length): 
+                    if (second_valueset[0] > self.module.total_length): 
                         raise IndexError
-                    temp_IC_values[j] = first_valueset[1] + (to_pos(j, self.nanowire.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
+                    temp_IC_values[j] = first_valueset[1] + (to_pos(j, self.module.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
                 except IndexError:
                     self.write(self.ICtab_status, "Warning: some points out of bounds")
                     warning_flag = True
@@ -3823,13 +3823,13 @@ class Notebook:
                     temp_IC_values[j] = 0
                     warning_flag = True
                 
-        if self.nanowire.system_ID == "Nanowire":
+        if self.module.system_ID == "Nanowire":
             if var == "deltaN" or var == "deltaP": 
                 self.using_LGC = False
         
         self.paramtoolkit_currentparam = var
         self.deleteall_paramrule()
-        self.nanowire.param_dict[var].value = temp_IC_values
+        self.module.param_dict[var].value = temp_IC_values
         self.update_IC_plot(plot_ID="listupload", warn=warning_flag)
         self.update_IC_plot(plot_ID="recent", warn=warning_flag)
         return
@@ -3851,11 +3851,11 @@ class Notebook:
         else: 
             param_name = self.paramtoolkit_currentparam
         
-        param_obj = self.nanowire.param_dict[param_name]
-        grid_x = self.nanowire.grid_x_edges if param_obj.is_edge else self.nanowire.grid_x_nodes
+        param_obj = self.module.param_dict[param_name]
+        grid_x = self.module.grid_x_edges if param_obj.is_edge else self.module.grid_x_nodes
         # Support for constant value shortcut: temporarily create distribution
-        # simulating filling across nanowire with that value
-        val_array = to_array(param_obj.value, len(self.nanowire.grid_x_nodes), 
+        # simulating filling across module with that value
+        val_array = to_array(param_obj.value, len(self.module.grid_x_nodes), 
                              param_obj.is_edge)
 
         plot.set_yscale(autoscale(val_array=val_array))
@@ -3871,7 +3871,7 @@ class Notebook:
         else:
             plot.plot(grid_x, val_array, label=param_name)
 
-        plot.set_xlabel("x {}".format(self.nanowire.length_unit))
+        plot.set_xlabel("x {}".format(self.module.length_unit))
         plot.set_ylabel("{} {}".format(param_name, param_obj.units))
         
         if plot_ID=="recent": 
@@ -3935,28 +3935,28 @@ class Notebook:
                        "Error: {} folder already exists".format(batch_dir_name))
             return
         
-        # Record the original values of the Nanowire, so we can restore them after the batch algo finishes
+        # Record the original values of the module, so we can restore them after the batch algo finishes
         original_param_values = {}
-        for param in self.nanowire.param_dict:
-            original_param_values[param] = self.nanowire.param_dict[param].value
+        for param in self.module.param_dict:
+            original_param_values[param] = self.module.param_dict[param].value
                 
         # This algorithm was shamelessly stolen from our bay.py script...                
         batch_combinations = get_all_combinations(batch_values)        
                 
-        # Apply each combination to Nanowire, going through LGC if necessary
+        # Apply each combination to module, going through LGC if necessary
         for batch_set in batch_combinations:
             filename = ""
             for param in batch_set:
                 filename += str("__{}_{:.4e}".format(param, batch_set[param]))
                 
-                if self.nanowire.system_ID == "Nanowire" and (param in self.LGC_entryboxes_dict):
+                if self.module.system_ID == "Nanowire" and (param in self.LGC_entryboxes_dict):
                     self.enter(self.LGC_entryboxes_dict[param], str(batch_set[param]))
                     
                 else:
-                    self.nanowire.param_dict[param].value = batch_set[param]
+                    self.module.param_dict[param].value = batch_set[param]
 
                 
-            if self.nanowire.system_ID == "Nanowire" and self.using_LGC: 
+            if self.module.system_ID == "Nanowire" and self.using_LGC: 
                 self.add_LGC()
                 
             try:
@@ -3966,9 +3966,9 @@ class Notebook:
                 print("Error: failed to create batch file {}".format(filename))
                 warning_flag += 1
                 
-        # Restore the original values of Nanowire
-        for param in self.nanowire.param_dict:
-            self.nanowire.param_dict[param].value = original_param_values[param]
+        # Restore the original values of module
+        for param in self.module.param_dict:
+            self.module.param_dict[param].value = original_param_values[param]
         
         if not warning_flag:
             self.write(self.batch_status, 
@@ -3983,7 +3983,7 @@ class Notebook:
         """Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked"""
     
         try:
-            assert self.nanowire.spacegrid_is_set, "Error: set a space grid first"
+            assert self.module.spacegrid_is_set, "Error: set a space grid first"
             new_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Initial"], 
                                                            title="Save IC text file", 
                                                            filetypes=[("Text files","*.txt")])
@@ -4011,16 +4011,16 @@ class Notebook:
 
                 # We don't really need to note down the time of creation, but it could be useful for interaction with other programs.
                 ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
-                ofstream.write("System_class: {}\n".format(self.nanowire.system_ID))
+                ofstream.write("System_class: {}\n".format(self.module.system_ID))
                 ofstream.write("$ Space Grid:\n")
-                ofstream.write("Total_length: {}\n".format(self.nanowire.total_length))
-                ofstream.write("Node_width: {}\n".format(self.nanowire.dx))
+                ofstream.write("Total_length: {}\n".format(self.module.total_length))
+                ofstream.write("Node_width: {}\n".format(self.module.dx))
                 
                 ofstream.write("$ System Parameters:\n")
                 
-                # Saves occur as-is: any missing parameters are saved with whatever default value Nanowire gives them
-                for param in self.nanowire.param_dict:
-                    param_values = self.nanowire.param_dict[param].value
+                # Saves occur as-is: any missing parameters are saved with whatever default value module gives them
+                for param in self.module.param_dict:
+                    param_values = self.module.param_dict[param].value
                     if isinstance(param_values, np.ndarray):
                         # Write the array in a more convenient format
                         ofstream.write("{}: {:.8e}".format(param, param_values[0]))
@@ -4034,7 +4034,7 @@ class Notebook:
 
                 ofstream.write("$ System Flags:\n")
                 
-                for flag in self.nanowire.flags_dict:
+                for flag in self.module.flags_dict:
                     ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
                 
         except OSError:
@@ -4077,8 +4077,8 @@ class Notebook:
                 
                 system_class = next(ifstream).strip('\n')
                 system_class = system_class[system_class.find(' ') + 1:]
-                if not system_class == self.nanowire.system_ID:
-                    raise ValueError("Error: selected file is not a {}".format(self.nanowire.system_ID))
+                if not system_class == self.module.system_ID:
+                    raise ValueError("Error: selected file is not a {}".format(self.module.system_ID))
                                 
                 # Extract parameters, ICs
                 for line in ifstream:
@@ -4133,30 +4133,30 @@ class Notebook:
             return
         
         # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and any other values that may exist on the GUI
-        if self.nanowire.system_ID == "Nanowire":
+        if self.module.system_ID == "Nanowire":
             for key in self.LGC_entryboxes_dict:
                 self.enter(self.LGC_entryboxes_dict[key], "")
             
-        for param in self.nanowire.param_dict:
+        for param in self.module.param_dict:
             self.paramtoolkit_currentparam = param
             
             self.update_paramrule_listbox(param)            
             self.deleteall_paramrule()
             
-            self.nanowire.param_dict[param].value = 0
+            self.module.param_dict[param].value = 0
 
         self.set_thickness_and_dx_entryboxes(state='unlock')
-        self.nanowire.total_length = None
-        self.nanowire.dx = None
-        self.nanowire.grid_x_edges = []
-        self.nanowire.grid_x_nodes = []
-        self.nanowire.spacegrid_is_set = False
+        self.module.total_length = None
+        self.module.dx = None
+        self.module.grid_x_edges = []
+        self.module.grid_x_nodes = []
+        self.module.spacegrid_is_set = False
 
         try:
             self.enter(self.thickness_entry, total_length)
             self.enter(self.dx_entry, dx)
             self.set_init_x()
-            assert self.nanowire.spacegrid_is_set, "Error: could not set space grid"
+            assert self.module.spacegrid_is_set, "Error: could not set space grid"
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
@@ -4165,7 +4165,7 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-        for flag in self.nanowire.flags_dict:
+        for flag in self.module.flags_dict:
             # All we need to do here is mark the appropriate GUI elements as selected
             try:
                 self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
@@ -4174,12 +4174,12 @@ class Notebook:
                 warning_mssg += "\nFlags must have integer value 1 or 0"
                 warning_flag += 1
             
-        for param in self.nanowire.param_dict:
+        for param in self.module.param_dict:
             try:
                 new_value = init_param_values_dict[param]
                 if '\t' in new_value:
-                    self.nanowire.param_dict[param].value = np.array(extract_values(new_value, '\t'))
-                else: self.nanowire.param_dict[param].value = float(new_value)
+                    self.module.param_dict[param].value = np.array(extract_values(new_value, '\t'))
+                else: self.module.param_dict[param].value = float(new_value)
                 
                 self.paramtoolkit_currentparam = param
                 if cycle_through_IC_plots: 
@@ -4188,7 +4188,7 @@ class Notebook:
                 warning_mssg += ("\nWarning: could not apply value for param: {}".format(param))
                 warning_flag += 1
                 
-        if self.nanowire.system_ID == "Nanowire": 
+        if self.module.system_ID == "Nanowire": 
             self.using_LGC = False
         
         if not warning_flag: 
@@ -4215,7 +4215,7 @@ class Notebook:
                                for key in datagroup.datasets]
 
                 header = "{} {}, {}".format(plot_info.x_param, 
-                                            self.nanowire.param_dict[plot_info.x_param].units, 
+                                            self.module.param_dict[plot_info.x_param].units, 
                                             datagroup.type)
 
             else: # if self.I_plot.mode == "All time steps"
@@ -4233,7 +4233,7 @@ class Notebook:
             paired_data = self.analysis_plots[plot_ID].datagroup.build(self.convert_out_dict)
             # We need some fancy footwork using itertools to transpose a non-rectangular array
             paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
-            header = "".join(["x {},".format(self.nanowire.length_unit) + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
+            header = "".join(["x {},".format(self.module.length_unit) + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
                                                           title="Save data", 
