@@ -322,9 +322,11 @@ class Notebook:
         self.tab_explicit_init = tk.ttk.Frame(self.tab_inputs)
 
         var_dropdown_list = [str(param + self.module.param_dict[param].units) 
-                             for param in self.module.param_dict]
+                             for param in self.module.param_dict
+                             if self.module.param_dict[param].is_space_dependent]
         paramtoolkit_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
-        unitless_dropdown_list = [param for param in self.module.param_dict]
+        unitless_dropdown_list = [param for param in self.module.param_dict
+                                  if self.module.param_dict[param].is_space_dependent]
         
         self.line_sep_style = tk.ttk.Style()
         self.line_sep_style.configure("Grey Bar.TSeparator", background='#000000', 
@@ -588,8 +590,8 @@ class Notebook:
         
         self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, 
                                                      self.listupload_var_selection, 
-                                                     unitless_dropdown_list[0], 
-                                                     *unitless_dropdown_list)
+                                                     var_dropdown_list[0], 
+                                                     *var_dropdown_list)
         self.listupload_dropdown.grid(row=1,column=0)
 
         self.add_listupload_button = tk.ttk.Button(self.listupload_frame, 
@@ -4177,9 +4179,11 @@ class Notebook:
         for param in self.module.param_dict:
             try:
                 new_value = init_param_values_dict[param]
-                if '\t' in new_value:
+                if '\t' in new_value: # If an array / list of points was stored
+                    assert self.module.param_dict[param].is_space_dependent
                     self.module.param_dict[param].value = np.array(extract_values(new_value, '\t'))
-                else: self.module.param_dict[param].value = float(new_value)
+                else: 
+                    self.module.param_dict[param].value = float(new_value)
                 
                 self.paramtoolkit_currentparam = param
                 if cycle_through_IC_plots: 

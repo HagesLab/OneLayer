@@ -7,7 +7,8 @@ Created on Sun Jan 10 15:49:49 2021
 
 class Characteristic:
     def __init__(self, units, is_edge):
-        """
+        """ Base class for module variables.
+        
         Parameters
         ----------
         units : str
@@ -23,25 +24,45 @@ class Characteristic:
         return
 
 class Parameter(Characteristic):
-    """Helper class to store info about each of a Module's parameters and initial distributions"""
-    def __init__(self, units, is_edge):
+    def __init__(self, units, is_edge, is_space_dependent=True):
+        """ Helper class to store info about each of a Module's parameters
+        and their initial distributions
+
+        Parameters
+        ----------
+        is_space_dependent : bool, optional
+            Whether the GUI should allow assigning a space-dependent distribution
+            (i.e. an array of node values) to this parameter.
+            
+            Usually this should be true, but some parameters involving boundary
+            conditions, like surface recombination rates, should always
+            be single-valued and thus have this as False.
+            
+            The default is True.
+
+        Returns
+        -------
+        None.
+
+        """
         super().__init__(units, is_edge)
 
         self.value = 0
         
         # TODO: Implement value verification using this
         self.valid_range = (None, None) # Min, max
-        
+        self.is_space_dependent = is_space_dependent
         self.param_rules = []
         return
     
 class Output(Characteristic):
     
     def __init__(self, display_name, units, xlabel, xvar, is_edge, calc_func=None, is_integrated=False, analysis_plotable=True, yscale='symlog', yfactors=(1,1)):
-        """
+        """ Helper class for managing info about each of a Module's output values.
+        
         Parameters
         ----------
-        display_name : str
+        display_name : strs
             What the GUI should list this item as. Can be different from internal keys used by module outputs_dict.
         xlabel : str
             Unit to be printed on horizontal plot axes.
@@ -77,7 +98,7 @@ class Output(Characteristic):
         self.xlabel = xlabel
         self.xvar = xvar
         self.is_integrated = is_integrated
-        self.analysis_plotable = analysis_plotable # Whether this Output can be selected from analysis tab's plot feature
+        self.analysis_plotable = analysis_plotable
         self.yscale = yscale
         self.yfactors = yfactors
         self.calc_func = calc_func

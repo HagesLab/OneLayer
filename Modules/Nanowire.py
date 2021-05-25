@@ -19,16 +19,26 @@ class Nanowire(OneD_Model):
         self.system_ID = "Nanowire"
         self.length_unit = "[nm]"
         self.time_unit = "[ns]"
-        self.param_dict = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True), "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True), 
-                            "N0":Parameter(units="[cm^-3]", is_edge=False), "P0":Parameter(units="[cm^-3]", is_edge=False), 
-                            "B":Parameter(units="[cm^3 / s]", is_edge=False), "Tau_N":Parameter(units="[ns]", is_edge=False), 
-                            "Tau_P":Parameter(units="[ns]", is_edge=False), "Sf":Parameter(units="[cm / s]", is_edge=False), 
-                            "Sb":Parameter(units="[cm / s]", is_edge=False), "Temperature":Parameter(units="[K]", is_edge=True), 
-                            "Rel-Permitivity":Parameter(units="", is_edge=True), "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
-                            "Theta":Parameter(units="[cm^-1]", is_edge=False), "Alpha":Parameter(units="[cm^-1]", is_edge=False), 
-                            "Delta":Parameter(units="", is_edge=False), "Frac-Emitted":Parameter(units="", is_edge=False),
-                            "deltaN":Parameter(units="[cm^-3]", is_edge=False), "deltaP":Parameter(units="[cm^-3]", is_edge=False), 
-                            "Ec":Parameter(units="[eV]", is_edge=True), "electron_affinity":Parameter(units="[eV]", is_edge=True)}
+        self.param_dict = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True), 
+                           "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True), 
+                            "N0":Parameter(units="[cm^-3]", is_edge=False), 
+                            "P0":Parameter(units="[cm^-3]", is_edge=False), 
+                            "B":Parameter(units="[cm^3 / s]", is_edge=False), 
+                            "Tau_N":Parameter(units="[ns]", is_edge=False), 
+                            "Tau_P":Parameter(units="[ns]", is_edge=False), 
+                            "Sf":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False), 
+                            "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False), 
+                            "Temperature":Parameter(units="[K]", is_edge=True), 
+                            "Rel-Permitivity":Parameter(units="", is_edge=True), 
+                            "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
+                            "Theta":Parameter(units="[cm^-1]", is_edge=False), 
+                            "Alpha":Parameter(units="[cm^-1]", is_edge=False), 
+                            "Delta":Parameter(units="", is_edge=False), 
+                            "Frac-Emitted":Parameter(units="", is_edge=False),
+                            "deltaN":Parameter(units="[cm^-3]", is_edge=False), 
+                            "deltaP":Parameter(units="[cm^-3]", is_edge=False), 
+                            "Ec":Parameter(units="[eV]", is_edge=True), 
+                            "electron_affinity":Parameter(units="[eV]", is_edge=True)}
         
 
         self.param_count = len(self.param_dict)
