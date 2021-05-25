@@ -11,30 +11,30 @@ from utils import u_read, to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
 
-class Nanowire(OneD_Model):
+class Std_SingleLayer(OneD_Model):
     # A Nanowire object stores all information regarding the initial state being edited in the IC tab
     # And functions for managing other previously simulated nanowire data as they are loaded in
     def __init__(self):
         super().__init__()
-        self.system_ID = "Nanowire"
+        self.system_ID = "OneLayer"
         self.length_unit = "[nm]"
         self.time_unit = "[ns]"
-        self.param_dict = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True), 
-                           "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True), 
+        self.param_dict = {"mu_N":Parameter(units="[cm^2 / V s]", is_edge=True), 
+                           "mu_P":Parameter(units="[cm^2 / V s]", is_edge=True), 
                             "N0":Parameter(units="[carr / cm^3]", is_edge=False), 
                             "P0":Parameter(units="[carr / cm^3]", is_edge=False), 
                             "B":Parameter(units="[cm^3 / s]", is_edge=False), 
-                            "Tau_N":Parameter(units="[ns]", is_edge=False), 
-                            "Tau_P":Parameter(units="[ns]", is_edge=False), 
+                            "tau_N":Parameter(units="[ns]", is_edge=False), 
+                            "tau_P":Parameter(units="[ns]", is_edge=False), 
                             "Sf":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False), 
                             "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False), 
-                            "Temperature":Parameter(units="[K]", is_edge=True), 
-                            "Rel-Permitivity":Parameter(units="", is_edge=True), 
+                            "temperature":Parameter(units="[K]", is_edge=True), 
+                            "rel_permitivity":Parameter(units="", is_edge=True), 
                             "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
-                            "Theta":Parameter(units="[cm^-1]", is_edge=False), 
-                            "Alpha":Parameter(units="[cm^-1]", is_edge=False), 
-                            "Delta":Parameter(units="", is_edge=False), 
-                            "Frac-Emitted":Parameter(units="", is_edge=False),
+                            "back_reflectivity":Parameter(units="", is_edge=False, is_space_dependent=False), 
+                            "alpha":Parameter(units="[cm^-1]", is_edge=False), 
+                            "delta":Parameter(units="", is_edge=False), 
+                            "frac_emitted":Parameter(units="", is_edge=False, is_space_dependent=False),
                             "delta_N":Parameter(units="[carr / cm^3]", is_edge=False), 
                             "delta_P":Parameter(units="[carr / cm^3]", is_edge=False), 
                             "Ec":Parameter(units="[eV]", is_edge=True), 
@@ -43,8 +43,8 @@ class Nanowire(OneD_Model):
 
         self.param_count = len(self.param_dict)
         
-        self.flags_dict = {"ignore_alpha":("Ignore Photon Recycle",1, 1),
-                           "symmetric_system":("Symmetric System",0, 1),
+        self.flags_dict = {"ignore_recycle":("Ignore Photon Recycle",1, 0),
+                           #"symmetric_system":("Symmetric System",0, 0),
                            "check_do_ss":("Steady State Input",1, 0)}
 
         # List of all variables active during the finite difference simulating        
@@ -69,15 +69,16 @@ class Nanowire(OneD_Model):
         self.total_outputs_count = self.simulation_outputs_count + self.calculated_outputs_count
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
-        self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
+        self.convert_in_dict = {"mu_N": ((1e7) ** 2) / (1e9), "mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
                                 "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
                                 "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
-                                "Tau_N": 1, "Tau_P": 1,                                     # [ns]
+                                "tau_N": 1, "tau_P": 1,                                     # [ns]
                                 "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
-                                "Temperature": 1, "Rel-Permitivity": 1, 
+                                "temperature": 1, "rel_permitivity": 1, 
                                 "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
-                                "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
-                                "Delta": 1, "Frac-Emitted": 1,
+                                "alpha": 1e-7,                               # [cm^-1] to [nm^-1]
+                                "delta": 1, "frac_emitted": 1,
+                                "back_reflectivity": 1,
                                 "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
                                 "Ec": 1, "electron_affinity": 1,
                                 "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
@@ -85,7 +86,7 @@ class Nanowire(OneD_Model):
                                 "tau_diff": 1}
         
         self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
-        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["Tau_N"]
+        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["tau_N"]
         self.convert_in_dict["PL"] = self.convert_in_dict["RR"]
         
         self.convert_in_dict["integration_scale"] = 1e7 # cm to nm
@@ -113,7 +114,7 @@ class Nanowire(OneD_Model):
     def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
         """Calls ODEINT solver."""
         ode_nanowire(data_path, m, n, self.dx, dt, params,
-                     not flags['ignore_alpha'].value(), 
+                     not flags['ignore_recycle'].value(), 
                      flags['symmetric_system'].value(), 
                      flags['check_do_ss'].value(), hmax_, True,
                      init_conditions["N"], init_conditions["P"])
@@ -210,10 +211,10 @@ class Nanowire(OneD_Model):
 
         return
     
-def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1, 
-                            fracEmitted=0, symmetric=True):
+def gen_weight_distribution(m, dx, alpha=0, delta_frac=1, 
+                            back_refl_frac=1, frac_emitted=0):
     """
-    Distance-dependent alpha weighting matrix for nanowire regeneration term
+    Distance-dependent alpha weighting matrix for one-layer system regeneration term
 
     Parameters
     ----------
@@ -221,17 +222,20 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1,
         Number of space nodes.
     dx : float
         Space node width.
-    alphaCof : float, optional
-        Regeneration coefficient. The default is 0.
-    thetaCof : float, optional
-        Photon propagation coefficient. The default is 0.
+    alpha : float, optional
+        Absorption coefficient. The default is 0.
+    back_refl_frac : float, optional
+        Proportion of photons which reflect off the back surface.
+        The default is 1.
     delta_frac : float, optional
-        Proportion of excitons affected by regeneration only. The default is 1.
-    fracEmitted : float, optional
-        Proportion of photons that escape the nanowire (and thus do not propogate). The default is 0.
-    symmetric : bool, optional
-        Whether contributions from symmetric half of nanowire should be considered. The default is True.
-
+        Fraction of radiative recombination which overlaps 
+        with material absorption spectrum. 
+        The default is 1.
+    frac_emitted : float, optional
+        Proportion of photons that escape the system at surface 
+        (and thus do not reflect back inward). 
+        The default is 0.
+    
     Returns
     -------
     2D ndarray
@@ -239,24 +243,32 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1,
 
     """
     distance = np.arange(0, m*dx, dx)
-    distance_matrix = np.zeros((m, m))
-    lf_distance_matrix = np.zeros((m, m)) # Account for "other half" of a symmetric system
+    direct_distance_matrix = np.zeros((m, m))
+    front_refl_distance_matrix = np.zeros((m, m))
+    back_refl_distance_matrix = np.zeros((m, m))
 
     # Each row in distance_matrix represents the weight function centered around a different position
     # Element [i,j] is the proportion of node j's value that contributes to node i
     for i in range(0,m):
-        distance_matrix[i] = np.concatenate((np.flip(distance[0:i+1], 0), distance[1:m - i]))
-        if symmetric: 
-            lf_distance_matrix[i] = distance + ((i+1) * dx)
+        direct_distance_matrix[i] = np.concatenate((np.flip(distance[0:i+1], 0), distance[1:m - i]))
+        front_refl_distance_matrix[i] = distance + ((i+1) * dx)
+        back_refl_distance_matrix[i] = 2 * m * dx - (distance + ((i+1)*dx))
+        
+    direct_weight = np.exp((-alpha) * direct_distance_matrix)
     
-    weight = np.exp(-(alphaCof + thetaCof) * distance_matrix)
-    if symmetric: 
-        weight += np.exp(-(alphaCof + thetaCof) * lf_distance_matrix)
-    return alphaCof * 0.5 * (1 - fracEmitted) * delta_frac * weight
+    front_refl_weight = ((1 - frac_emitted)
+                        * np.exp((-alpha) * front_refl_distance_matrix)
+                        )
+    back_refl_weight = (back_refl_frac
+                       * np.exp((-alpha) * back_refl_distance_matrix)
+                       )
+    return (alpha * delta_frac / 2 * 
+            (direct_weight + front_refl_weight + back_refl_weight)
+           )
 
 def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, 
           eps, eps0, q, q_C, kB, recycle_photons=True, do_ss=False, 
-          alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, 
+          alpha=0, back_refl_frac=1, delta_frac=1, frac_emitted=0, 
           combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_N=0, init_P=0):
     """Derivative function for drift-diffusion-decay carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
@@ -307,8 +319,13 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
         
     ## Calculate generation term from photon recycling, if photon recycling is being considered
     if recycle_photons:
-        G_array = intg.trapz(rad_rec * combined_weight, dx=dx, axis=1) \
-                  + (1 - fracEmitted) * 0.5 * alphaCof * delta_frac * rad_rec
+        G_array = (intg.trapz(rad_rec * combined_weight, dx=dx, axis=1) 
+                   + rad_rec * (0.5 * alpha * delta_frac)
+                   * (1
+                     - ((1 - frac_emitted) * np.exp(-2 * alpha * np.arange(0, m*dx, dx)))
+                     - (back_refl_frac * np.exp(-2 * alpha * (m*dx - np.arange(0, m*dx, dx))))
+                     )
+                  )
     else:
         G_array = 0
     ## Calculate dJn/dx
@@ -387,20 +404,20 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     ## Unpack params; typecast non-array params to arrays if needed
     Sf = params["Sf"]
     Sb = params["Sb"]
-    mu_n = to_array(params["Mu_N"], m, True)
-    mu_p = to_array(params["Mu_P"], m, True)
-    T = to_array(params["Temperature"], m, True)
+    mu_n = to_array(params["mu_N"], m, True)
+    mu_p = to_array(params["mu_P"], m, True)
+    T = to_array(params["temperature"], m, True)
     n0 = to_array(params["N0"], m, False)
     p0 = to_array(params["P0"], m, False)
-    tauN = to_array(params["Tau_N"], m, False)
-    tauP = to_array(params["Tau_P"], m, False)
+    tauN = to_array(params["tau_N"], m, False)
+    tauP = to_array(params["tau_P"], m, False)
     B = to_array(params["B"], m, False)
-    eps = to_array(params["Rel-Permitivity"], m, True)
+    eps = to_array(params["rel_permitivity"], m, True)
     E_field_ext = to_array(params["Ext_E-Field"], m, True)
-    alphaCof = to_array(params["Alpha"], m, False) if recycle_photons else np.zeros(m)
-    thetaCof = to_array(params["Theta"], m, False)
-    delta_frac = to_array(params["Delta"], m, False)
-    fracEmitted = to_array(params["Frac-Emitted"], m, False)
+    alpha = to_array(params["alpha"], m, False)
+    back_refl_frac = params["back_reflectivity"]
+    delta_frac = to_array(params["delta"], m, False) if recycle_photons else np.zeros(m)
+    frac_emitted = to_array(params["frac_emitted"], m, False)
     init_Ec = to_array(params["Ec"], m, True)
     init_Chi = to_array(params["electron_affinity"], m, True)
            
@@ -413,7 +430,7 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     ## Package initial condition
     # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
     init_E_field = E_field({"N":init_N, "P":init_P}, 
-                           {"Rel-Permitivity":eps, "N0":n0, "P0":p0, "Node_width":dx})
+                           {"rel_permitivity":eps, "N0":n0, "P0":p0, "Node_width":dx})
     #init_E_field = np.zeros(m+1)
     
     init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)
@@ -428,8 +445,8 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
 
     ## Generate a weight distribution needed for photon recycle term if photon recycle is being considered
     if recycle_photons:
-        combined_weight = gen_weight_distribution(m, dx, alphaCof, thetaCof, 
-                                                  delta_frac, fracEmitted, symmetric)
+        combined_weight = gen_weight_distribution(m, dx, alpha, delta_frac, 
+                                                  back_refl_frac, frac_emitted)
     else:
         combined_weight = np.zeros((m, m))
 
@@ -455,8 +472,8 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     data, error_data = intg.odeint(dydt2, init_condition, tSteps, 
                                    args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
                                          tauN, tauP, B, eps, eps0, q, q_C, kB, 
-                                         recycle_photons, do_ss, alphaCof, thetaCof, 
-                                         delta_frac, fracEmitted, combined_weight, 
+                                         recycle_photons, do_ss, alpha, back_refl_frac, 
+                                         delta_frac, frac_emitted, combined_weight, 
                                          E_field_ext, dEcdz, dChidz, init_N_copy, 
                                          init_P_copy),
                                    tfirst=True, full_output=True, hmax=hmax_)
@@ -468,8 +485,8 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
             data, error_data = intg.odeint(dydt2, init_condition, tSteps, 
                                            args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
                                                  tauN, tauP, B, eps, eps0, q, q_C, kB, 
-                                                 recycle_photons, do_ss, alphaCof, thetaCof, 
-                                                 delta_frac, fracEmitted, combined_weight, 
+                                                 recycle_photons, do_ss, alpha, back_refl_frac, 
+                                                 delta_frac, frac_emitted, combined_weight, 
                                                  E_field_ext, dEcdz, dChidz, init_N_copy, 
                                                  init_P_copy),
                                            tfirst=True, full_output=True, hmax=hmax)
@@ -501,10 +518,10 @@ def E_field(sim_outputs, params):
     """Calculate electric field from N, P"""
     eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
     q_C = 1.602e-19 # [C per carrier]
-    if isinstance(params["Rel-Permitivity"], np.ndarray):
-        averaged_rel_permitivity = (params["Rel-Permitivity"][:-1] + np.roll(params["Rel-Permitivity"], -1)[:-1]) / 2
+    if isinstance(params["rel_permitivity"], np.ndarray):
+        averaged_rel_permitivity = (params["rel_permitivity"][:-1] + np.roll(params["rel_permitivity"], -1)[:-1]) / 2
     else:
-        averaged_rel_permitivity = params["Rel-Permitivity"]
+        averaged_rel_permitivity = params["rel_permitivity"]
     
     dEdx = q_C * (delta_p(sim_outputs, params) - delta_n(sim_outputs, params)) / (eps0 * averaged_rel_permitivity)
     if dEdx.ndim == 1:
@@ -561,54 +578,7 @@ def tau_diff(PL, dt):
     dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)
     return -(dln_PLdt ** -1)
 
-def PL_weight_distribution(m, dx, total_length, i, j, alpha, theta, delta, 
-                           frac_emitted, need_extra_node, symmetric=True):
-    """
-    Distance-dependent alpha+theta weighting for PL propagation
-    
-    Parameters
-    ----------
-    total_length : float
-        Length of nanowire.
-    i : int
-        Index of leftmost node being integrated over
-    j : int
-        Index of rightmost node being integrated over
-    need_extra_node : bool
-        Whether the 'j+1'th node should be included. 
-        This is a correction between the discrete nodes and the actual bounds of integration.
-    See gen_weight_distribution() for more details
-    Returns
-    -------
-    2D ndarray
-        Weighting matrix of size [(j-i+1),m] or [(j-i+2),m].
-
-    """
-    distance = np.arange(0, total_length, dx)
-
-    # Make room for the extra node if needed
-    r = j + 2 if need_extra_node else j+1
-
-    distance_matrix = np.zeros((r - i, m))
-    lf_distance_matrix = np.zeros((r - i, m))
-
-    # Each row in weight will represent the weight function centered around a different position
-    # Additional lf_weight counted in if wire is symmetric
-    # Element [u,v] is the proportion of node v that contributes to node u.
-    for n in range(i, r):
-        distance_matrix[n - i] = np.concatenate((np.flip(distance[0:n+1], 0), distance[1:m - n]))
-        lf_distance_matrix[n - i] = distance + ((n+1) * dx)
-    
-    weight = np.exp(-(alpha + theta) * distance_matrix)
-    weight2 = np.exp(-(theta) * distance_matrix)
-    
-    if symmetric:
-        weight += np.exp(-(alpha + theta) * lf_distance_matrix) 
-        weight2 += np.exp(-(theta) * lf_distance_matrix)
-        
-    return (1 - frac_emitted) * 0.5 * theta * (delta * weight + (1 - delta) * weight2)
-
-def prep_PL(radRec, i, j, need_extra_node, params):
+def prep_PL(rad_rec, i, j, need_extra_node, params):
     """
     Calculates PL(x,t) given radiative recombination data plus propogation contributions.
 
@@ -617,7 +587,7 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     radRec : 1D or 2D ndarray
         Radiative Recombination(x,t) values.
     i : int
-        Leftmost node to calculate for.
+        Leftmost node index to calculate for.
     j : int
         Rightmost node index to calculate for.
     need_extra_node : bool
@@ -632,29 +602,17 @@ def prep_PL(radRec, i, j, need_extra_node, params):
 
     """
     
-    frac_emitted = params["Frac-Emitted"]
-    alpha = 0 if params["ignore_alpha"] else params["Alpha"]
-    theta = params["Theta"]
-    delta = params["Delta"]
+    frac_emitted = params["frac_emitted"]
+    alpha = params["alpha"]
+    back_refl_frac = params["back_reflectivity"]
+    delta = 0 if params["ignore_recycle"] else params["delta"]
     dx = params["Node_width"]
     total_length = params["Total_length"]
-    m = int(total_length / dx)
-    
-    if np.ndim(radRec) == 1:
-        radRec = radRec[None]
-            
-    if need_extra_node:
-        temp_RR = radRec[:, i:j+2]
-    else:
-        temp_RR = radRec[:, i:j+1]
-    PL_base = frac_emitted * temp_RR
-    
-    combined_weight = PL_weight_distribution(m, dx, total_length, i, j, alpha, 
-                                             theta, delta, frac_emitted, need_extra_node, 
-                                             params["symmetric_system"])
 
-    for p in range(len(PL_base[0])):
-        PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).T \
-                        + radRec[:,i+p] * theta * (1-frac_emitted) * 0.5
+    lbound = to_pos(i, dx)
+    ubound = to_pos(j, dx)
+    distance = np.arange(lbound, ubound+dx, dx)
+    PL_base = rad_rec * ((1 - delta) + (0.5 * delta * np.exp(-alpha * distance))
+                         + (0.5 * delta * back_refl_frac * np.exp(-alpha * (total_length + distance))))
     
     return PL_base

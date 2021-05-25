@@ -389,6 +389,11 @@ class OneD_Model:
         params_in_cdict = set(self.convert_in_dict.keys())
         assert (params.issubset(params_in_cdict)), "Error: conversion_dict is missing entries {}".format(params.difference(params_in_cdict))
         
+        if not "symmetric_system" in self.flags_dict:
+            print("Warning: no symmetric_system flag defined."
+                  "Automatically setting symmetric_system to FALSE")
+            self.flags_dict["symmetric_system"] = ("Symmetric System", 0, 0)
+        
         if not "integration_scale" in self.convert_in_dict:
             print("Warning: no integration_scale correction defined. "
                   "Integration may have incorrect units.")

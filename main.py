@@ -36,6 +36,7 @@ from utils import to_index, to_pos, to_array, get_all_combinations, \
 ## ADD MODULES HERE
 from Modules.Nanowire import Nanowire, tau_diff
 from Modules.HeatPlate import HeatPlate
+from Modules.Std_SingleLayer import Std_SingleLayer
 
 ## AND HERE
 def mod_list():
@@ -49,7 +50,9 @@ def mod_list():
 
     """
     
-    return {"Nanowire":Nanowire, "Neumann Bound Heatplate":HeatPlate}
+    return {"Standard One-Layer":Std_SingleLayer,
+            "Nanowire":Nanowire, 
+            "Neumann Bound Heatplate":HeatPlate}
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
@@ -137,7 +140,8 @@ class Notebook:
         self.IC_file_name = ""
         
         # Add (e.g. for Nanowire) module-specific functionality
-        if self.module.system_ID == "Nanowire":
+        self.LGC_eligible_modules = ("Nanowire", "OneLayer")
+        if self.module.system_ID in self.LGC_eligible_modules:
             self.using_LGC = False
             self.LGC_stim_mode = tk.StringVar()
             self.LGC_gen_power_mode = tk.StringVar()
@@ -590,8 +594,8 @@ class Notebook:
         
         self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, 
                                                      self.listupload_var_selection, 
-                                                     var_dropdown_list[0], 
-                                                     *var_dropdown_list)
+                                                     unitless_dropdown_list[0], 
+                                                     *unitless_dropdown_list)
         self.listupload_dropdown.grid(row=1,column=0)
 
         self.add_listupload_button = tk.ttk.Button(self.listupload_frame, 
@@ -612,7 +616,7 @@ class Notebook:
                                                              self.listupload_toolbar_frame)
 
         ## Laser Generation Condition (LGC): extra input mtds for nanowire-specific applications
-        if self.module.system_ID == "Nanowire":
+        if self.module.system_ID in self.LGC_eligible_modules:
             self.create_LGC_frame()
             self.tab_inputs.add(self.tab_generation_init, 
                                 text="Laser Generation Conditions")
@@ -1484,15 +1488,15 @@ class Notebook:
             # Contextually-dependent options for batchable params
             self.batchables_array = []
             batchable_params = [param for param in self.module.param_dict 
-                                if not (self.module.system_ID == "Nanowire" 
+                                if not (self.module.system_ID in self.LGC_eligibie_modules
                                         and self.using_LGC 
-                                        and (param == "deltaN" or param == "deltaP"))]
+                                        and (param == "delta_N" or param == "delta_P"))]
             
-            if self.module.system_ID == "Nanowire" and self.using_LGC:
+            if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC:
                 
                 self.LGC_instruction1 = tk.Message(self.batch_popup, 
                                                    text="Additional options for generating "
-                                                        "deltaN and deltaP batches "
+                                                        "delta_N and delta_P batches "
                                                         "are available when using the "
                                                         "Laser Generation Condition tool.", 
                                                    width=300)
@@ -1520,7 +1524,7 @@ class Notebook:
 
             for i in range(max_batchable_params):
                 batch_param_name = tk.StringVar()
-                if self.module.system_ID == "Nanowire" and self.using_LGC:
+                if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC:
                     optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, 
                                                    batch_param_name, "", "", 
                                                    *batchable_params, *LGC_params)
@@ -3252,7 +3256,7 @@ class Notebook:
         
         self.write(self.analysis_status, "Integration complete")
 
-        if (self.module.system_ID == "Nanowire" 
+        if (self.module.system_ID in self.LGC_eligible_modules
             and self.PL_mode == "All time steps" and datatype == "PL"):
             # Calculate tau_D
             if self.integration_plots[ip_ID].datagroup.size(): # If has tau_diff data to plot
@@ -3401,16 +3405,16 @@ class Notebook:
                        "incidence":self.LGC_stim_mode.get(),
                        "power_mode":self.LGC_gen_power_mode.get()}
         try:
-            assert (LGC_options["long_expfactor"] and LGC_options["power_mode"]), "Error: select material param and power generation options "
+            assert (not (LGC_options["long_expfactor"] == "") and LGC_options["power_mode"]), "Error: select material param and power generation options "
         except AssertionError as oops:
             self.write(self.ICtab_status, oops)
             return
 
-        # Remove all param_rules for deltaN and deltaP, 
+        # Remove all param_rules for delta_N and delta_P, 
         # as we will be reassigning them shortly.
-        self.paramtoolkit_currentparam = "deltaN"
+        self.paramtoolkit_currentparam = "delta_N"
         self.deleteall_paramrule()
-        self.paramtoolkit_currentparam = "deltaP"
+        self.paramtoolkit_currentparam = "delta_P"
         self.deleteall_paramrule()
 
         # Establish constants; calculate alpha
@@ -3484,7 +3488,7 @@ class Notebook:
                     return
 
             # Note: add_LGC() automatically converts into TEDs units. For consistency add_LGC should really deposit values in common units.
-            self.module.param_dict["deltaN"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, 
+            self.module.param_dict["delta_N"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, 
                                                                                                       freq, wavelength, alpha_nm, 
                                                                                                       self.module.grid_x_nodes, hc=hc_nm)
         
@@ -3510,7 +3514,7 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.module.param_dict["deltaN"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, 
+            self.module.param_dict["delta_N"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, 
                                                                                                     wavelength, alpha_nm, 
                                                                                                     self.module.grid_x_nodes, hc=hc_nm)
         
@@ -3520,7 +3524,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
-            self.module.param_dict["deltaN"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, 
+            self.module.param_dict["delta_N"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, 
                                                                                               self.module.grid_x_nodes)
         
         elif (LGC_options["power_mode"] == "total-gen"):
@@ -3529,7 +3533,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
-            self.module.param_dict["deltaN"].value = carrier_excitations.pulse_laser_totalgen(total_gen, self.module.total_length, 
+            self.module.param_dict["delta_N"].value = carrier_excitations.pulse_laser_totalgen(total_gen, self.module.total_length, 
                                                                                                 alpha_nm, self.module.grid_x_nodes)
         
         else:
@@ -3537,14 +3541,14 @@ class Notebook:
             return
         
         
-        self.module.param_dict["deltaN"].value *= self.convert_out_dict["deltaN"]
+        self.module.param_dict["delta_N"].value *= self.convert_out_dict["delta_N"]
         ## Assuming that the initial distributions of holes and electrons are identical
-        self.module.param_dict["deltaP"].value = self.module.param_dict["deltaN"].value
+        self.module.param_dict["delta_P"].value = self.module.param_dict["delta_N"].value
 
         self.update_IC_plot(plot_ID="LGC")
-        self.paramtoolkit_currentparam = "deltaN"
+        self.paramtoolkit_currentparam = "delta_N"
         self.update_IC_plot(plot_ID="custom")
-        self.paramtoolkit_currentparam = "deltaP"
+        self.paramtoolkit_currentparam = "delta_P"
         self.update_IC_plot(plot_ID="recent")
         self.using_LGC = True
         return
@@ -3629,8 +3633,8 @@ class Notebook:
         self.paramtoolkit_viewer_selection.set(new_param_name)
         self.update_paramrule_listbox(new_param_name)
 
-        if self.module.system_ID == "Nanowire":
-            if new_param_name == "deltaN" or new_param_name == "deltaP": 
+        if self.module.system_ID in self.LGC_eligible_modules:
+            if new_param_name == "delta_N" or new_param_name == "delta_P": 
                 self.using_LGC = False
         self.update_IC_plot(plot_ID="recent")
         return
@@ -3826,8 +3830,8 @@ class Notebook:
                     temp_IC_values[j] = 0
                     warning_flag = True
                 
-        if self.module.system_ID == "Nanowire":
-            if var == "deltaN" or var == "deltaP": 
+        if self.module.system_ID in self.LGC_eligible_modules:
+            if var == "delta_N" or var == "delta_P": 
                 self.using_LGC = False
         
         self.paramtoolkit_currentparam = var
@@ -3850,7 +3854,7 @@ class Notebook:
         plot.cla()
 
         if plot_ID=="LGC":
-            param_name="deltaN"
+            param_name="delta_N"
         else: 
             param_name = self.paramtoolkit_currentparam
         
@@ -3952,14 +3956,14 @@ class Notebook:
             for param in batch_set:
                 filename += str("__{}_{:.4e}".format(param, batch_set[param]))
                 
-                if self.module.system_ID == "Nanowire" and (param in self.LGC_entryboxes_dict):
+                if self.module.system_ID in self.LGC_eligible_modules and (param in self.LGC_entryboxes_dict):
                     self.enter(self.LGC_entryboxes_dict[param], str(batch_set[param]))
                     
                 else:
                     self.module.param_dict[param].value = batch_set[param]
 
                 
-            if self.module.system_ID == "Nanowire" and self.using_LGC: 
+            if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC: 
                 self.add_LGC()
                 
             try:
@@ -4136,7 +4140,7 @@ class Notebook:
             return
         
         # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and any other values that may exist on the GUI
-        if self.module.system_ID == "Nanowire":
+        if self.module.system_ID in self.LGC_eligible_modules:
             for key in self.LGC_entryboxes_dict:
                 self.enter(self.LGC_entryboxes_dict[key], "")
             
@@ -4193,7 +4197,7 @@ class Notebook:
                 warning_mssg += ("\nWarning: could not apply value for param: {}".format(param))
                 warning_flag += 1
                 
-        if self.module.system_ID == "Nanowire": 
+        if self.module.system_ID in self.LGC_eligible_modules: 
             self.using_LGC = False
         
         if not warning_flag: 
