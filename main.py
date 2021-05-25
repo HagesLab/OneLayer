@@ -2620,7 +2620,7 @@ class Notebook:
                 subplot.plot(dataset.grid_x, dataset.data * self.convert_out_dict[active_datagroup.type], label=label)
 
             subplot.set_xlabel("x {}".format(self.module.length_unit))
-            subplot.set_ylabel(active_datagroup.type)
+            subplot.set_ylabel("{} {}".format(active_datagroup.type, self.module.outputs_dict[active_datagroup.type].units))
             if active_plot_data.display_legend:
                 subplot.legend().set_draggable(True)
             subplot.set_title("Time: " 
@@ -3202,6 +3202,7 @@ class Notebook:
                     grid_xaxis = -1 # A dummy value for the I_Set constructor
                     xaxis_label = "Time [ns]"
 
+                I_data *= self.module.convert_out_dict["integration_scale"]
                 self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, 
                                                                                 active_datagroup.datasets[tag].params_dict, 
                                                                                 active_datagroup.datasets[tag].type, 

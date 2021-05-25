@@ -66,6 +66,11 @@ class OneD_Model:
                                 "deltaN": ((1e-7) ** 3)                    # [cm^-3] to [nm^-3]
                                 }
         
+        # The integration tool uses whatever units self.dx is in.
+        # Define the "integration_scale" entry to correct for any mismatches
+        # between the integrand's and self.dx's length units.
+        self.convert_in_dict["integration_scale"] = 1
+        
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
         self.convert_out_dict = {}
         for param in self.convert_in_dict:
@@ -381,4 +386,10 @@ class OneD_Model:
         params = set(self.param_dict.keys()).union(set(self.outputs_dict.keys()))
         params_in_cdict = set(self.convert_in_dict.keys())
         assert (params.issubset(params_in_cdict)), "Error: conversion_dict is missing entries {}".format(params.difference(params_in_cdict))
+        
+        if not "integration_scale" in self.convert_in_dict:
+            print("Warning: no integration_scale correction defined. "
+                  "Integration may have incorrect units.")
+            self.convert_in_dict["integration_scale"] = 1
+            self.convert_out_dict["integration_scale"] = 1
         return

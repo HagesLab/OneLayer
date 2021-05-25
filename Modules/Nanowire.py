@@ -21,8 +21,8 @@ class Nanowire(OneD_Model):
         self.time_unit = "[ns]"
         self.param_dict = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True), 
                            "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True), 
-                            "N0":Parameter(units="[cm^-3]", is_edge=False), 
-                            "P0":Parameter(units="[cm^-3]", is_edge=False), 
+                            "N0":Parameter(units="[carr / cm^3]", is_edge=False), 
+                            "P0":Parameter(units="[carr / cm^3]", is_edge=False), 
                             "B":Parameter(units="[cm^3 / s]", is_edge=False), 
                             "Tau_N":Parameter(units="[ns]", is_edge=False), 
                             "Tau_P":Parameter(units="[ns]", is_edge=False), 
@@ -35,8 +35,8 @@ class Nanowire(OneD_Model):
                             "Alpha":Parameter(units="[cm^-1]", is_edge=False), 
                             "Delta":Parameter(units="", is_edge=False), 
                             "Frac-Emitted":Parameter(units="", is_edge=False),
-                            "deltaN":Parameter(units="[cm^-3]", is_edge=False), 
-                            "deltaP":Parameter(units="[cm^-3]", is_edge=False), 
+                            "deltaN":Parameter(units="[carr / cm^3]", is_edge=False), 
+                            "deltaP":Parameter(units="[carr / cm^3]", is_edge=False), 
                             "Ec":Parameter(units="[eV]", is_edge=True), 
                             "electron_affinity":Parameter(units="[eV]", is_edge=True)}
         
@@ -49,17 +49,17 @@ class Nanowire(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[cm^-3]", xlabel="nm", xvar="position",is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)),
+        self.simulation_outputs_dict = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
+                                        "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)),
                                         }
         
         # List of all variables calculated from those in simulation_outputs_dict
         self.calculated_outputs_dict = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True, calc_func=E_field, is_integrated=False),
-                                        "deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_n, is_integrated=False),
-                                         "deltaP":Output("delta_P", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_p, is_integrated=False),
-                                         "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, calc_func=radiative_recombination, is_integrated=False),
-                                         "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, calc_func=nonradiative_recombination, is_integrated=False),
-                                         "PL":Output("TRPL", units="[WIP]", xlabel="ns", xvar="time", is_edge=False, calc_func=new_integrate, is_integrated=True),
+                                        "deltaN":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_n, is_integrated=False),
+                                         "deltaP":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_p, is_integrated=False),
+                                         "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, calc_func=radiative_recombination, is_integrated=False),
+                                         "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, calc_func=nonradiative_recombination, is_integrated=False),
+                                         "PL":Output("TRPL", units="[phot / cm^3 s]", xlabel="ns", xvar="time", is_edge=False, calc_func=new_integrate, is_integrated=True),
                                          "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[ns]", xlabel="ns", xvar="time", is_edge=False, calc_func=tau_diff, is_integrated=True, analysis_plotable=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
@@ -71,7 +71,6 @@ class Nanowire(OneD_Model):
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
         self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
                                 "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
-                                "Thickness": 1, "dx": 1,
                                 "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
                                 "Tau_N": 1, "Tau_P": 1,                                     # [ns]
                                 "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
@@ -87,7 +86,9 @@ class Nanowire(OneD_Model):
         
         self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
         self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["Tau_N"]
-        self.convert_in_dict["PL"] = self.convert_in_dict["RR"] * self.convert_in_dict["Theta"]
+        self.convert_in_dict["PL"] = self.convert_in_dict["RR"]
+        
+        self.convert_in_dict["integration_scale"] = 1e7 # cm to nm
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
         self.convert_out_dict = {}
         for param in self.convert_in_dict:
