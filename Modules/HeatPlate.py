@@ -25,7 +25,7 @@ class HeatPlate(OneD_Model):
         
         self.param_count = len(self.param_dict)
         
-        self.flags_dict = {"symmetric_system":"Symmetric System"}
+        self.flags_dict = {"symmetric_system":("Symmetric System",1, 0)}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!

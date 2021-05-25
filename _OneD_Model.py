@@ -43,8 +43,10 @@ class OneD_Model:
         self.param_dict = {}
         self.param_count = len(self.param_dict)
         
-        # dict {"Flag's internal name":("Flag's display name",whether Flag1 is "always on")}
-        self.flags_dict = {"Flag1":("Flag1's name",0)}
+        # dict {"Flag's internal name":
+        #       ("Flag's display name",whether Flag1 is toggleable, Flag1's default value)
+        #      }
+        self.flags_dict = {"Flag1":("Flag1's name",1, 0)}
         
         # dict {"Variable name":Output()} of all dependent variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!

@@ -408,9 +408,9 @@ class Notebook:
         for flag in self.module.flags_dict:
             self.sys_flag_dict[flag] = Flag(self.flags_frame, 
                                             self.module.flags_dict[flag][0])
-            self.sys_flag_dict[flag].tk_var.set(self.module.flags_dict[flag][1])
+            self.sys_flag_dict[flag].tk_var.set(self.module.flags_dict[flag][2])
             
-            if self.module.flags_dict[flag][1]:
+            if not self.module.flags_dict[flag][1]:
                 continue
             else:
                 self.sys_flag_dict[flag].tk_element.grid(row=i,column=0)
