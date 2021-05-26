@@ -1116,6 +1116,10 @@ class Notebook:
                                     "Max_Gen":self.max_gen_entry, 
                                     "Total_Gen":self.total_gen_entry}
         
+        self.LGC_optionboxes = {"long_expfactor":self.check_calculate_init_material_expfactor, 
+                                "incidence":self.LGC_stim_mode,
+                                "power_mode":self.LGC_gen_power_mode}
+        self.LGC_options = {}
         self.LGC_values = {}
         return
 
@@ -1125,6 +1129,7 @@ class Notebook:
         """
         print("Using LGC: {}".format(self.using_LGC))
         print("LGC values: {}".format(self.LGC_values))
+        print("LGC options: {}".format(self.LGC_options))
         return
 
     def update_system_summary(self):
@@ -1490,7 +1495,7 @@ class Notebook:
             # Contextually-dependent options for batchable params
             self.batchables_array = []
             batchable_params = [param for param in self.module.param_dict 
-                                if not (self.module.system_ID in self.LGC_eligibie_modules
+                                if not (self.module.system_ID in self.LGC_eligible_modules
                                         and self.using_LGC 
                                         and (param == "delta_N" or param == "delta_P"))]
             
@@ -3321,8 +3326,17 @@ class Notebook:
             # Step 3
             self.module.param_dict[param].value = 0
             self.update_IC_plot(plot_ID="recent")
+            
+        
 
         if self.resetIC_do_clearall:
+            self.update_IC_plot(plot_ID="custom")
+            if self.using_LGC:
+                self.using_LGC = False
+                self.LGC_values = {}
+                self.LGC_options = {}
+                self.update_IC_plot(plot_ID="LGC")
+                
             self.set_thickness_and_dx_entryboxes(state='unlock')
             self.module.total_length = None
             self.module.dx = None
@@ -3330,6 +3344,8 @@ class Notebook:
             self.module.grid_x_nodes = []
             self.module.spacegrid_is_set = False
             self.update_system_summary()
+            
+            
 
         self.write(self.ICtab_status, "Selected params cleared")
         return
@@ -3403,11 +3419,12 @@ class Notebook:
             return
 
         # Check for valid option choices
-        LGC_options = {"long_expfactor":self.check_calculate_init_material_expfactor.get(), 
-                       "incidence":self.LGC_stim_mode.get(),
-                       "power_mode":self.LGC_gen_power_mode.get()}
+        
+        # {"long_expfactor":self.check_calculate_init_material_expfactor.get(), 
+        #                "incidence":self.LGC_stim_mode.get(),
+        #                "power_mode":self.LGC_gen_power_mode.get()}
         try:
-            assert (not (LGC_options["long_expfactor"] == "") and LGC_options["power_mode"]), "Error: select material param and power generation options "
+            assert (not (self.LGC_optionboxes["long_expfactor"].get() == "") and self.LGC_optionboxes["power_mode"].get()), "Error: select material param and power generation options "
         except AssertionError as oops:
             self.write(self.ICtab_status, oops)
             return
@@ -3425,7 +3442,7 @@ class Notebook:
         hc_evnm = h * c * 6.241e18 * 1e9    # [J*m] to [eV*nm]
         hc_nm = h * c * 1e9     # [J*m] to [J*nm] 
 
-        if (LGC_options["long_expfactor"]):
+        if (self.LGC_optionboxes["long_expfactor"].get()):
             try: 
                 A0 = float(self.A0_entry.get())   # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
             except Exception:
@@ -3445,10 +3462,10 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing or invalid pulsed laser wavelength")
                 return
 
-            if LGC_options["incidence"] == "direct":
+            if self.LGC_optionboxes["incidence"].get() == "direct":
                 alpha = A0 * (hc_evnm / wavelength - Eg) ** 0.5     # [cm^-1]
 
-            elif LGC_options["incidence"] == "indirect":
+            elif self.LGC_optionboxes["incidence"].get() == "indirect":
                 alpha = A0 * (hc_evnm / wavelength - Eg) ** 2
 
             else:
@@ -3466,7 +3483,7 @@ class Notebook:
 
         alpha_nm = alpha * 1e-7 # [cm^-1] to [nm^-1]
 
-        if (LGC_options["power_mode"] == "power-spot"):
+        if (self.LGC_optionboxes["power_mode"].get() == "power-spot"):
             try: 
                 power = float(self.power_entry.get()) * 1e-6  # [uJ/s] to [J/s]
                 spotsize = float(self.spotsize_entry.get()) * ((1e7) ** 2)     # [cm^2] to [nm^2]
@@ -3498,7 +3515,7 @@ class Notebook:
                                                                                                       freq, wavelength, alpha_nm, 
                                                                                                       self.module.grid_x_nodes, hc=hc_nm)
         
-        elif (LGC_options["power_mode"] == "density"):
+        elif (self.LGC_optionboxes["power_mode"].get() == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
             except Exception:
                 self.write(self.ICtab_status, "Error: missing power density")
@@ -3524,7 +3541,7 @@ class Notebook:
                                                                                                     wavelength, alpha_nm, 
                                                                                                     self.module.grid_x_nodes, hc=hc_nm)
         
-        elif (LGC_options["power_mode"] == "max-gen"):
+        elif (self.LGC_optionboxes["power_mode"].get() == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
             except Exception:
                 self.write(self.ICtab_status, "Error: missing max gen")
@@ -3533,7 +3550,7 @@ class Notebook:
             self.module.param_dict["delta_N"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, 
                                                                                               self.module.grid_x_nodes)
         
-        elif (LGC_options["power_mode"] == "total-gen"):
+        elif (self.LGC_optionboxes["power_mode"].get() == "total-gen"):
             try: total_gen = float(self.total_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
             except Exception:
                 self.write(self.ICtab_status, "Error: missing total gen")
@@ -3559,23 +3576,27 @@ class Notebook:
         self.using_LGC = True
         
         # If LGC profile successful, record all parameters used to generate
+        self.LGC_options = {LGC_option: self.LGC_optionboxes[LGC_option].get() \
+                            for LGC_option in self.LGC_optionboxes}
+        
         self.LGC_values = {}
-        if (LGC_options["long_expfactor"]):
+        if (self.LGC_options["long_expfactor"]):
             self.LGC_values["A0"] = A0
             self.LGC_values["Eg"] = Eg
             self.LGC_values["Pulse_Wavelength"] = wavelength
         else:
             self.LGC_values["LGC_absorption_cof"] = alpha
             
-        if (LGC_options["power_mode"] == "power-spot"):
+        if (self.LGC_options["power_mode"] == "power-spot"):
             self.LGC_values["Power"] = power * 1e6
             self.LGC_values["Spotsize"] = spotsize * (1e-7) ** 2
+            self.LGC_values["Pulse_Wavelength"] = wavelength
             if (self.pulse_freq_entry.get() == "cw" or self.sys_flag_dict["check_do_ss"].value()):
                 pass
             else:
                 self.LGC_values["Pulse_Freq"] = freq * 1e-3
                     
-        elif (LGC_options["power_mode"] == "density"):
+        elif (self.LGC_options["power_mode"] == "density"):
             self.LGC_values["Power_Density"] = power_density * 1e6 * ((1e7) ** 2)
             self.LGC_values["Pulse_Wavelength"] = wavelength
 
@@ -3584,10 +3605,10 @@ class Notebook:
             else:
                 self.LGC_values["Pulse_Freq"] = freq * 1e-3
                 
-        elif (LGC_options["power_mode"] == "max-gen"):
+        elif (self.LGC_options["power_mode"] == "max-gen"):
             self.LGC_values["Max_Gen"] = max_gen * ((1e7) ** 3)
 
-        elif (LGC_options["power_mode"] == "total-gen"):
+        elif (self.LGC_options["power_mode"] == "total-gen"):
             self.LGC_values["Total_Gen"] = total_gen * ((1e7) ** 3)
         
         return
@@ -4087,7 +4108,10 @@ class Notebook:
                     ofstream.write("$ Laser Parameters\n")
                     for laser_param in self.LGC_values:
                         ofstream.write("{}: {}\n".format(laser_param, self.LGC_values[laser_param]))
-                    
+
+                    ofstream.write("$ Laser Options\n")
+                    for laser_option in self.LGC_options:
+                        ofstream.write("{}: {}\n".format(laser_option, self.LGC_options[laser_option]))
                 
         except OSError:
             self.write(self.ICtab_status, "Error: failed to create IC file")
@@ -4120,6 +4144,7 @@ class Notebook:
 
                 flag_values_dict = {}
                 LGC_values = {}
+                LGC_options = {}
                 total_length = 0
                 dx = 0
 
@@ -4160,6 +4185,12 @@ class Notebook:
                             print("Warning: laser params found for unsupported module (these will be ignored)")
                         initFlag = 4
                         
+                    elif "$ Laser Options" in line:
+                        print("Now searching for laser options...")
+                        if self.module.system_ID not in self.LGC_eligible_modules:
+                            print("Warning: laser options found for unsupported module (these will be ignored)")
+                        initFlag = 5
+                        
                     elif (initFlag == 1):
                         line = line.strip('\n')
                         if line.startswith("Total_length"):
@@ -4179,6 +4210,11 @@ class Notebook:
                     elif (initFlag == 4):
                         line = line.strip('\n')
                         LGC_values[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+                        
+                    elif (initFlag == 5):
+                        line = line.strip('\n')
+                        LGC_options[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+
 
         except Exception as oops:
             self.write(self.ICtab_status, oops)
@@ -4252,7 +4288,7 @@ class Notebook:
             except Exception:
                 warning_mssg += ("\nWarning: could not apply value for param: {}".format(param))
                 warning_flag += 1
-                
+                    
         if self.module.system_ID in self.LGC_eligible_modules: 
             self.using_LGC = bool(LGC_values)
             if LGC_values:
@@ -4262,7 +4298,11 @@ class Notebook:
                     else:
                         self.enter(self.LGC_entryboxes_dict[laser_param], LGC_values[laser_param])
             
+            for laser_option in LGC_options:
+                self.LGC_optionboxes[laser_option].set(LGC_options[laser_option])
         
+            self.add_LGC()
+            
         if not warning_flag: 
             self.write(self.ICtab_status, "IC file loaded successfully")
         else: 
