@@ -246,7 +246,7 @@ class OneD_Model:
         Uses the provided args to call a numerical solver and write results to .h5 files.
         
         No strict rules on how simulate() needs to look or if all parameters must be utilised - 
-        nor is finite.py or even ODEINT() required (although these are recommended) - 
+        nor is ODEINT() required (although these are suggested) - 
         as long as this function simulates and writes output files.
         
         Parameters
@@ -331,7 +331,7 @@ class OneD_Model:
         nen : bool, optional
             Short for "need extra node". Whether an extra (the 'j+1'th) node should be counted.
             This is determined by a correction between the node values and the actual bounds of the integration.
-            See finite.prep_PL and GUI's do_integrate for an example of this.
+            See Nanowire.prep_PL and GUI's do_integrate for an example of this.
             The default is False.
         extra_data : dict {"datatype": 2D numpy array}, optional
             A copy of the full set of raw data over all time and space. Some integrals like the weighted PL need this.

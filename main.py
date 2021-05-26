@@ -2682,20 +2682,25 @@ class Notebook:
         
         try:
             values = self.module.prep_dataset(datatype, sim_data, param_values_dict)
+        except Exception as e:
+            return "Error: Unable to calculate {} using prep_dataset\n{}".format(datatype, e)
+        
+        try:
             assert isinstance(values, np.ndarray)
             assert values.ndim == 1
-            if self.module.outputs_dict[datatype].is_edge: 
-                return Raw_Data_Set(values, data_edge_x, data_node_x, 
-                                    param_values_dict, datatype, data_filename, 
-                                    active_plot.time_index)
-            else:
-                return Raw_Data_Set(values, data_node_x, data_node_x, 
-                                    param_values_dict, datatype, data_filename, 
-                                    active_plot.time_index)
-    
+            
         except Exception:
-            return "Error: Unable to calculate {} using prep_dataset\n".format(datatype)
+            return ("Error: Unable to calculate {} using prep_dataset\n"
+                    "prep_dataset did not return a 1D array".format(datatype))
 
+        if self.module.outputs_dict[datatype].is_edge: 
+            return Raw_Data_Set(values, data_edge_x, data_node_x, 
+                                param_values_dict, datatype, data_filename, 
+                                active_plot.time_index)
+        else:
+            return Raw_Data_Set(values, data_node_x, data_node_x, 
+                                param_values_dict, datatype, data_filename, 
+                                active_plot.time_index)
 
     def load_datasets(self):
         """ Interpret selection from do_plotter_popup()."""

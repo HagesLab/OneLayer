@@ -59,7 +59,7 @@ class Std_SingleLayer(OneD_Model):
                                          "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_p, is_integrated=False),
                                          "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, calc_func=radiative_recombination, is_integrated=False),
                                          "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, calc_func=nonradiative_recombination, is_integrated=False),
-                                         "PL":Output("TRPL", units="[phot / cm^3 s]", xlabel="ns", xvar="time", is_edge=False, calc_func=new_integrate, is_integrated=True),
+                                         "PL":Output("TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, calc_func=new_integrate, is_integrated=True),
                                          "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[ns]", xlabel="ns", xvar="time", is_edge=False, calc_func=tau_diff, is_integrated=True, analysis_plotable=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
@@ -85,8 +85,8 @@ class Std_SingleLayer(OneD_Model):
                                 "E_field": 1, 
                                 "tau_diff": 1}
         
-        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
-        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["tau_N"]
+        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"] # [cm^-3 s^-1] to [m^-3 ns^-1]
+        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         self.convert_in_dict["PL"] = self.convert_in_dict["RR"]
         
         self.convert_in_dict["integration_scale"] = 1e7 # cm to nm
@@ -196,7 +196,7 @@ class Std_SingleLayer(OneD_Model):
                     data = prep_PL(rad_rec, i, j, nen, params)
                 else:
                     rad_rec = radiative_recombination(sim_data, params)
-                    data = prep_PL(rad_rec, 0, len(rad_rec), need_extra_node=False, 
+                    data = prep_PL(rad_rec, 0, len(rad_rec)-1, need_extra_node=False, 
                                    params=params).flatten()
             else:
                 raise ValueError
@@ -548,7 +548,7 @@ def nonradiative_recombination(sim_outputs, params):
     """Calculate nonradiative recombination using SRH model
        Assumes quasi steady state trap level occupation
       """
-    return (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"]) / ((params["Tau_N"] * sim_outputs["P"]) + (params["Tau_P"] * sim_outputs["N"]))
+    return (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"]) / ((params["tau_N"] * sim_outputs["P"]) + (params["tau_P"] * sim_outputs["N"]))
 
 def tau_diff(PL, dt):
     """
@@ -591,7 +591,8 @@ def prep_PL(rad_rec, i, j, need_extra_node, params):
     j : int
         Rightmost node index to calculate for.
     need_extra_node : bool
-        Whether the 'j+1'th node should be considered
+        Whether the 'j+1'th node should be considered.
+        Most slices involving the index j should include j+1 too
     params : dict {"param name":float or 1D ndarray}
         Collection of parameters from metadata
 
@@ -610,9 +611,18 @@ def prep_PL(rad_rec, i, j, need_extra_node, params):
     total_length = params["Total_length"]
 
     lbound = to_pos(i, dx)
-    ubound = to_pos(j, dx)
+    if need_extra_node:
+        ubound = to_pos(j+1, dx)
+    else:
+        ubound = to_pos(j, dx)
     distance = np.arange(lbound, ubound+dx, dx)
-    PL_base = rad_rec * ((1 - delta) + (0.5 * delta * np.exp(-alpha * distance))
-                         + (0.5 * delta * back_refl_frac * np.exp(-alpha * (total_length + distance))))
+    if rad_rec.ndim == 2: # for integrals of partial thickness
+        if need_extra_node:
+            rad_rec = rad_rec[:,i:j+2]
+        else:
+            rad_rec = rad_rec[:,i:j+1]
+    
+    PL_base = frac_emitted * (rad_rec * ((1 - delta) + (0.5 * delta * np.exp(-alpha * distance))
+                              + (0.5 * delta * back_refl_frac * np.exp(-alpha * (total_length + distance)))))
     
     return PL_base

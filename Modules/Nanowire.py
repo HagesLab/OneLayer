@@ -85,7 +85,7 @@ class Nanowire(OneD_Model):
                                 "tau_diff": 1}
         
         self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
-        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] / self.convert_in_dict["Tau_N"]
+        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] * 1e-9
         self.convert_in_dict["PL"] = self.convert_in_dict["RR"]
         
         self.convert_in_dict["integration_scale"] = 1e7 # cm to nm
