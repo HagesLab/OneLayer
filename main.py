@@ -1076,7 +1076,7 @@ class Notebook:
         self.total_gen_rb_label.grid(row=9,column=1)
 
         self.total_gen_label = tk.Label(self.gen_power_param_frame, 
-                                        text="Total Generation [carr/cm^3]")
+                                        text="Average Generation [carr/cm^3]")
         self.total_gen_label.grid(row=9,column=2)
 
         self.total_gen_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
@@ -1115,14 +1115,16 @@ class Notebook:
                                     "Power_Density":self.power_density_entry,
                                     "Max_Gen":self.max_gen_entry, 
                                     "Total_Gen":self.total_gen_entry}
+        
+        self.LGC_values = {}
         return
 
     def DEBUG(self):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        for flag in self.sys_flag_dict:
-            print(flag + ": " + str(self.sys_flag_dict[flag].tk_var.get()))
+        print("Using LGC: {}".format(self.using_LGC))
+        print("LGC values: {}".format(self.LGC_values))
         return
 
     def update_system_summary(self):
@@ -3424,12 +3426,14 @@ class Notebook:
         hc_nm = h * c * 1e9     # [J*m] to [J*nm] 
 
         if (LGC_options["long_expfactor"]):
-            try: A0 = float(self.A0_entry.get())   # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
+            try: 
+                A0 = float(self.A0_entry.get())   # [cm^-1 eV^-1/2] or [cm^-1 eV^-2]
             except Exception:
                 self.write(self.ICtab_status, "Error: missing or invalid A0")
                 return
 
-            try: Eg = float(self.Eg_entry.get())   # [eV]
+            try: 
+                Eg = float(self.Eg_entry.get())   # [eV]
             except Exception:
                 self.write(self.ICtab_status, "Error: missing or invalid Eg")
                 return
@@ -3458,6 +3462,7 @@ class Notebook:
             except Exception:
                 self.write(self.ICtab_status, "Error: missing or invalid α")
                 return
+            
 
         alpha_nm = alpha * 1e-7 # [cm^-1] to [nm^-1]
 
@@ -3470,6 +3475,7 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing power or spot size")
                 return
 
+            
             try: 
                 wavelength = float(self.pulse_wavelength_entry.get())              # [nm]
                 assert wavelength > 0
@@ -3551,6 +3557,39 @@ class Notebook:
         self.paramtoolkit_currentparam = "delta_P"
         self.update_IC_plot(plot_ID="recent")
         self.using_LGC = True
+        
+        # If LGC profile successful, record all parameters used to generate
+        self.LGC_values = {}
+        if (LGC_options["long_expfactor"]):
+            self.LGC_values["A0"] = A0
+            self.LGC_values["Eg"] = Eg
+            self.LGC_values["Pulse_Wavelength"] = wavelength
+        else:
+            self.LGC_values["LGC_absorption_cof"] = alpha
+            
+        if (LGC_options["power_mode"] == "power-spot"):
+            self.LGC_values["Power"] = power * 1e6
+            self.LGC_values["Spotsize"] = spotsize * (1e-7) ** 2
+            if (self.pulse_freq_entry.get() == "cw" or self.sys_flag_dict["check_do_ss"].value()):
+                pass
+            else:
+                self.LGC_values["Pulse_Freq"] = freq * 1e-3
+                    
+        elif (LGC_options["power_mode"] == "density"):
+            self.LGC_values["Power_Density"] = power_density * 1e6 * ((1e7) ** 2)
+            self.LGC_values["Pulse_Wavelength"] = wavelength
+
+            if (self.pulse_freq_entry.get() == "cw" or self.sys_flag_dict["check_do_ss"].value()):
+                pass
+            else:
+                self.LGC_values["Pulse_Freq"] = freq * 1e-3
+                
+        elif (LGC_options["power_mode"] == "max-gen"):
+            self.LGC_values["Max_Gen"] = max_gen * ((1e7) ** 3)
+
+        elif (LGC_options["power_mode"] == "total-gen"):
+            self.LGC_values["Total_Gen"] = total_gen * ((1e7) ** 3)
+        
         return
 
     ## Special functions for Parameter Toolkit:
@@ -4043,6 +4082,12 @@ class Notebook:
                 
                 for flag in self.module.flags_dict:
                     ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
+                    
+                if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC:
+                    ofstream.write("$ Laser Parameters\n")
+                    for laser_param in self.LGC_values:
+                        ofstream.write("{}: {}\n".format(laser_param, self.LGC_values[laser_param]))
+                    
                 
         except OSError:
             self.write(self.ICtab_status, "Error: failed to create IC file")
@@ -4074,6 +4119,7 @@ class Notebook:
                 init_param_values_dict = {}
 
                 flag_values_dict = {}
+                LGC_values = {}
                 total_length = 0
                 dx = 0
 
@@ -4108,6 +4154,12 @@ class Notebook:
                         print("Now searching for flag values...")
                         initFlag = 3
                         
+                    elif "$ Laser Parameters" in line:
+                        print("Now searching for laser parameters...")
+                        if self.module.system_ID not in self.LGC_eligible_modules:
+                            print("Warning: laser params found for unsupported module (these will be ignored)")
+                        initFlag = 4
+                        
                     elif (initFlag == 1):
                         line = line.strip('\n')
                         if line.startswith("Total_length"):
@@ -4123,6 +4175,10 @@ class Notebook:
                     elif (initFlag == 3):
                         line = line.strip('\n')
                         flag_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+                        
+                    elif (initFlag == 4):
+                        line = line.strip('\n')
+                        LGC_values[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
 
         except Exception as oops:
             self.write(self.ICtab_status, oops)
@@ -4198,7 +4254,14 @@ class Notebook:
                 warning_flag += 1
                 
         if self.module.system_ID in self.LGC_eligible_modules: 
-            self.using_LGC = False
+            self.using_LGC = bool(LGC_values)
+            if LGC_values:
+                for laser_param in LGC_values:
+                    if float(LGC_values[laser_param]) > 1e3:
+                        self.enter(self.LGC_entryboxes_dict[laser_param], "{:.3e}".format(float(LGC_values[laser_param])))
+                    else:
+                        self.enter(self.LGC_entryboxes_dict[laser_param], LGC_values[laser_param])
+            
         
         if not warning_flag: 
             self.write(self.ICtab_status, "IC file loaded successfully")
