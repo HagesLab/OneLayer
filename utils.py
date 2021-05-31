@@ -132,10 +132,15 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
 
     ufrac1 = min(u_bound - uncorrected_u_bound, dx / 2)
     u_bound_correction = integrand[j-i] * ufrac1
-
+    
     if u_bound > uncorrected_u_bound + dx / 2:
         ufrac2 = (u_bound - (uncorrected_u_bound + dx / 2))
-        u_bound_correction += integrand[j-i+1] * ufrac2
+        try:
+            u_bound_correction += integrand[j-i+1] * ufrac2
+        except Exception:
+            u_bound_correction += integrand[j-i] * ufrac2
+            print("An index mismatch occured while calculating u_bound_correction\n"
+                  "Values may differ slightly than expected")
 
     return u_bound_correction - l_bound_correction
     

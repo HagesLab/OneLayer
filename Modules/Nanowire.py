@@ -60,7 +60,7 @@ class Nanowire(OneD_Model):
                                          "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, calc_func=radiative_recombination, is_integrated=False),
                                          "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, calc_func=nonradiative_recombination, is_integrated=False),
                                          "PL":Output("TRPL", units="[phot / cm^3 s]", xlabel="ns", xvar="time", is_edge=False, calc_func=new_integrate, is_integrated=True),
-                                         "tau_diff":Output("-(dln(TRPL)/dt)^-1", units="[ns]", xlabel="ns", xvar="time", is_edge=False, calc_func=tau_diff, is_integrated=True, analysis_plotable=False)}
+                                         "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, calc_func=tau_diff, is_integrated=True, analysis_plotable=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         
@@ -638,11 +638,12 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     delta = params["Delta"]
     dx = params["Node_width"]
     total_length = params["Total_length"]
-    m = int(total_length / dx)
+    #m = int(total_length / dx)
     
     if np.ndim(radRec) == 1:
         radRec = radRec[None]
             
+    m = len(radRec[0])
     if need_extra_node:
         temp_RR = radRec[:, i:j+2]
     else:
