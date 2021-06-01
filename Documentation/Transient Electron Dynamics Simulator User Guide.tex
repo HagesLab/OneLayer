@@ -588,7 +588,7 @@
 			\item get\_IC\_carry()
 		\end{itemize}
 	
-		\par Additionally, any functions used by a module for calculating values should be defined within that module file. 
+		\par Additionally, any functions used by a module for calculating values should be defined within that module file. It is highly recommended that these employ numpy vectorization or similar for compatibility with both 1D and 2D inputs.
 	
 		\par Once complete, the module.py file must be placed into the Modules directory and imported into main.py. An entry must also be added into mod\_list() in main.py. The new module can then be selected when TEDs is started.
 		
@@ -618,10 +618,10 @@
 			\par This dictionary  \{“internal name”:”displayed name”\} can be used to define custom system flags, their default values, and whether these values should be toggleable. Examples of these are the "Steady State Input" and "Symmetric System" flags described in the Initial Tab Overview section.
 			
 			\item simulation\_outputs\_dict
-			\par This dictionary specifies which outputs are returned directly when TEDs simulates a system created from the module and uses Output() objects to store display information and operational flags regarding these outputs. For example, the One-Layer module simulates carrier densities; therefore the simulation outputs are $\Delta N$ and $\Delta P$. The display information is used to populate plot fields while the is\_integrated flag are provided for convenience for other parts of the module implementation.
+			\par This dictionary specifies which outputs are returned directly when TEDs simulates a system created from the module and uses Output() objects to store display information and operational flags regarding these outputs. For example, the One-Layer module simulates carrier densities; therefore the simulation outputs are $\Delta N$ and $\Delta P$. The display information is used to populate plot fields.
 			
 			\item calculated\_outputs\_dict
-			\par This dictionary specifies which outputs are calculated from those listed in simulation\_outputs\_dict but not simulated directly. For example, TRPL is not calculated during a simulation, but rather from $\Delta N$ and $\Delta P$ after the fact. Outputs here must also include a calc\_func attribute which indicates the function used to calculate itself.
+			\par This dictionary specifies which outputs are calculated from those listed in simulation\_outputs\_dict but not simulated directly. For example, TRPL is not calculated during a simulation, but rather from $\Delta N$ and $\Delta P$ after the fact.
 			
 			\par simulation\_ and calculated\_outputs\_dict are also combined into a outputs\_dict for convenience.
 			
@@ -636,10 +636,10 @@
 		\par This function is used by TEDs to call the function(s) responsible for (1) preprocessing inputs, (2) simulating the data, and (3) writing the data to output files. It is not required to use all of simulate()’s arguments, and any implementation which completes the three mentioned items is acceptable. For the One-Layer, all three of these tasks are completed by the driver function ode\_nanowire().
 		
 		\subsection{get\_overview\_analysis()}
-		\par Like calc\_inits(), this function must return a dictionary \{“param name”:np.ndarray\} containing one array per output in simulation\_ and calculated\_outputs\_dict. The u\_read() helper function is recommended for reading in a section of data over a specified time and space range. The module’s is\_calculated and is\_integrated may be helpful to specify which type of processing each output needs.
+		\par Like calc\_inits(), this function must return a dictionary \{“param name”:np.ndarray\} containing one array per output in simulation\_ and calculated\_outputs\_dict. The u\_read() helper function is recommended for reading in a section of data over a specified time and space range.
 		
 		\subsection{prep\_dataset()}
-		\par This function is used to do preprocessing of data prior to plotting and must return a 1D array of data (a single time step) to be plotted or a 2D array (time and space) to be integrated. For instance, the TRPL requires multiplying the radiative recombination by a weighting function prior to plotting. For most outputs preprocessing is simply reading the appropriate entry of sim\_data or calling the appropriate calc\_func. It is highly recommended that calc\_funcs employ numpy vectorization or similar for compatibility with both 1D and 2D inputs.
+		\par This function is used to do preprocessing of data prior to plotting and must return a 1D array of data (a single time step) to be plotted or a 2D array (time and space) to be integrated. For instance, the TRPL requires multiplying the radiative recombination by a weighting function prior to plotting. For most outputs preprocessing is simply reading the appropriate entry of sim\_data or calling the appropriate calculation function.
 		
 		\subsection{get\_IC\_carry()}
 		\par This function is used to assign current data values to param\_dict for regenerating MSF files using the carryover feature. This function must write into the appropriate entry of param\_dict using include\_flags to determine how to respond to which items are selected in the carryover feature.
