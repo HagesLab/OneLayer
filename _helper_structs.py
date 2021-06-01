@@ -57,7 +57,7 @@ class Parameter(Characteristic):
     
 class Output(Characteristic):
     
-    def __init__(self, display_name, units, xlabel, xvar, is_edge, calc_func=None, is_integrated=False, analysis_plotable=True, yscale='symlog', yfactors=(1,1)):
+    def __init__(self, display_name, units, xlabel, xvar, is_edge, analysis_plotable=True, yscale='symlog', yfactors=(1,1)):
         """ Helper class for managing info about each of a Module's output values.
         
         Parameters
@@ -68,19 +68,10 @@ class Output(Characteristic):
             Unit to be printed on horizontal plot axes.
         xvar : str, either "position" or "time"
             Used by GUI plot_overview_analysis to plot either with a time grid or a space grid.
-        calc_func : function, optional
-            finite.py function used to calculate this value, if applicable. 
-            Defined for convenience in module's plot_overview_analysis.
-            The default is None.
         is_integrated : bool, optional
             Whether this value is calculated using an integration procedure.
             Defined for convenience in module's plot_overview_analysis.
             The default is False.
-        analysis_plotable : bool, optional
-            Whether this output should be selectable from the detailed analysis tab. 
-            This is useful for if there are supplementary calculations desired while calculating this output,
-            but these should not be asked for by themselves. See nanowire tau_diff for an example.
-            The default is True.
         yscale : str, optional, must be a valid matplotlib plot scale
             Which plot scale the sim and overview plotters should use e.g. linear or log. The default is 'symlog'.
             Detailed analysis plots have an experimental autoscaling function.
@@ -97,9 +88,7 @@ class Output(Characteristic):
         self.display_name = display_name
         self.xlabel = xlabel
         self.xvar = xvar
-        self.is_integrated = is_integrated
         self.analysis_plotable = analysis_plotable
         self.yscale = yscale
         self.yfactors = yfactors
-        self.calc_func = calc_func
         return    

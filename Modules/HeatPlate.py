@@ -29,10 +29,10 @@ class HeatPlate(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"T":Output("Temperature", units="[K]", xlabel="m", xvar="position", is_edge=False, is_integrated=False, yscale='linear')}
+        self.simulation_outputs_dict = {"T":Output("Temperature", units="[K]", xlabel="m", xvar="position", is_edge=False, yscale='linear')}
         
         # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"q":Output("Heat Flux", units="[W/m^2]", xlabel="m", xvar="position", is_edge=True, calc_func=heatflux, is_integrated=False)}
+        self.calculated_outputs_dict = {"q":Output("Heat Flux", units="[W/m^2]", xlabel="m", xvar="position", is_edge=True)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         
@@ -74,9 +74,8 @@ class HeatPlate(OneD_Model):
             
             data_dict[raw_output_name] = np.array(data)
             
-        for calculated_output_name, output_obj in self.calculated_outputs_dict.items():
-            if not output_obj.is_integrated:
-                data_dict[calculated_output_name] = output_obj.calc_func(data_dict, params)
+
+        data_dict["Heat FLux"] = heatflux(data_dict, params)
                 
                 
         for data in data_dict:

@@ -50,10 +50,10 @@ class OneD_Model:
         
         # dict {"Variable name":Output()} of all dependent variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"Output1":Output("y", units="[hamburgers/football field]", xlabel="a.u.", xvar="position", is_edge=False, is_integrated=False, yscale='log', yfactors=(1e-4,1e1))}
+        self.simulation_outputs_dict = {"Output1":Output("y", units="[hamburgers/football field]", xlabel="a.u.", xvar="position", is_edge=False, yscale='log', yfactors=(1e-4,1e1))}
         
         # dict {"Variable name":Output()} of all secondary variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, calc_func=None, is_integrated=False)}
+        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         

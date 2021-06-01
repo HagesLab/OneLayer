@@ -49,18 +49,18 @@ class Nanowire(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False,is_integrated=False, yscale='symlog', yfactors=(1e-4,1e1)),
+        self.simulation_outputs_dict = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)), 
+                                        "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)),
                                         }
         
         # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True, calc_func=E_field, is_integrated=False),
-                                        "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_n, is_integrated=False),
-                                         "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, calc_func=delta_p, is_integrated=False),
-                                         "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, calc_func=radiative_recombination, is_integrated=False),
-                                         "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, calc_func=nonradiative_recombination, is_integrated=False),
-                                         "PL":Output("TRPL", units="[phot / cm^3 s]", xlabel="ns", xvar="time", is_edge=False, calc_func=new_integrate, is_integrated=True),
-                                         "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, calc_func=tau_diff, is_integrated=True, analysis_plotable=False)}
+        self.calculated_outputs_dict = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True),
+                                        "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
+                                         "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
+                                         "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False),
+                                         "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False),
+                                         "PL":Output("TRPL", units="[phot / cm^3 s]", xlabel="ns", xvar="time", is_edge=False),
+                                         "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, analysis_plotable=False)}
         
         self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
         
@@ -139,26 +139,30 @@ class Nanowire(OneD_Model):
             data_dict[raw_output_name] = np.array(data)
             
             
-        for calculated_output_name, output_obj in self.calculated_outputs_dict.items():
-            if not output_obj.is_integrated:
-                data_dict[calculated_output_name] = output_obj.calc_func(data_dict, params)
-                
+        data_dict["E_field"] = E_field(data_dict, params)
+        data_dict["delta_N"] = delta_n(data_dict, params)
+        data_dict["delta_P"] = delta_p(data_dict, params)
+        data_dict["RR"] = radiative_recombination(data_dict, params)
+        data_dict["NRR"] = nonradiative_recombination(data_dict, params)
                 
         with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
+            
         temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, params)
         PL_base = prep_PL(temp_RR, 0, to_index(params["Total_length"], 
                                                params["Node_width"], 
                                                params["Total_length"]), False, params)
-        data_dict["PL"] = self.calculated_outputs_dict["PL"].calc_func(PL_base, 0, params["Total_length"], 
-                                                                       params["Node_width"], params["Total_length"], 
-                                                                       False)
-        data_dict["tau_diff"] = self.calculated_outputs_dict["tau_diff"].calc_func(data_dict["PL"], params["dt"])
+        data_dict["PL"] = new_integrate(PL_base, 0, params["Total_length"], 
+                                        params["Node_width"], params["Total_length"], 
+                                        False)
+        data_dict["tau_diff"] = tau_diff(data_dict["PL"], params["dt"])
         
         for data in data_dict:
             data_dict[data] *= self.convert_out_dict[data]
+            
+        data_dict["PL"] *= self.convert_out_dict["integration_scale"]
         
         return data_dict
     
