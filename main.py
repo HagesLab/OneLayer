@@ -1408,6 +1408,7 @@ class Notebook:
         try:
             if continue_:
                 changed_params = []
+                err_msg = ["The following params were not updated:"]
                 for param in self.module.param_dict:
                     val = self.sys_param_entryboxes_dict[param].get()
                     if not val: 
@@ -1415,8 +1416,13 @@ class Notebook:
                     else:
                         try:
                             val = float(val)
+                            minimum = self.module.param_dict[param].valid_range[0]
+                            maximum = self.module.param_dict[param].valid_range[1]
+                            assert (val >= minimum), "Error: min value for {} is {} but {} was entered".format(param, minimum, val)
+                            assert (val <= maximum), "Error: max value for {} is {} but {} was entered".format(param, maximum, val)
                             
-                        except Exception:
+                        except Exception as e:
+                            err_msg.append("{}: {}".format(param, str(e)))
                             continue
                     
                     self.paramtoolkit_currentparam = param
@@ -1430,12 +1436,17 @@ class Notebook:
                                                hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
                     
+                if len(err_msg) > 1:
+                    self.do_confirmation_popup("\n".join(err_msg), hide_cancel=True)
+                    self.root.wait_window(self.confirmation_popup)
+                    
                     
             self.write(self.ICtab_status, "")
             self.sys_param_shortcut_popup.destroy()
             self.sys_param_shortcut_popup_isopen = False
-        except Exception:
+        except Exception as e:
             print("Error #2021: Failed to close shortcut popup.")
+            print(e)
         
         return
 
@@ -3400,7 +3411,16 @@ class Notebook:
             self.root.wait_window(self.confirmation_popup)
             if not self.confirmed: 
                 return
-
+            
+        if abs(thickness / dx - int(thickness / dx)) > 1e-10:
+            self.do_confirmation_popup("Warning: the selected thickness cannot be "
+                                       "partitioned evenly into the selected stepsize. "
+                                       "Integration may lose accuracy as a result. "
+                                       "Are you sure you want to continue?")
+            self.root.wait_window(self.confirmation_popup)
+            if not self.confirmed: 
+                return
+            
         self.module.total_length = thickness
         self.module.dx = dx
         self.module.grid_x_nodes = np.linspace(dx / 2,thickness - dx / 2, int(0.5 + thickness / dx))

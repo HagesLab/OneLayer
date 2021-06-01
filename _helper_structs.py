@@ -4,6 +4,7 @@ Created on Sun Jan 10 15:49:49 2021
 
 @author: cfai2
 """
+from numpy import inf
 
 class Characteristic:
     def __init__(self, units, is_edge):
@@ -24,7 +25,7 @@ class Characteristic:
         return
 
 class Parameter(Characteristic):
-    def __init__(self, units, is_edge, is_space_dependent=True):
+    def __init__(self, units, is_edge, valid_range=(-inf, inf), is_space_dependent=True):
         """ Helper class to store info about each of a Module's parameters
         and their initial distributions
 
@@ -48,9 +49,9 @@ class Parameter(Characteristic):
         super().__init__(units, is_edge)
 
         self.value = 0
-        
+        assert isinstance(valid_range, tuple), "A tuple was expected for Parameter valid range"
         # TODO: Implement value verification using this
-        self.valid_range = (None, None) # Min, max
+        self.valid_range = valid_range # Min, max
         self.is_space_dependent = is_space_dependent
         self.param_rules = []
         return
