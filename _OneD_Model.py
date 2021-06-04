@@ -10,15 +10,17 @@ from utils import u_read, to_index, to_array, to_pos
 import tables
 
 class OneD_Model:
-    """
-    Template class for modules.
+    """ Template class for modules.
     
-    Stores information regarding a module's parameters, outputs, and flags.
+    Modules act as blueprints used to create simulated models.
+    
+    This class stores information regarding a module's 
+    Layers, Parameters, Outputs, and Flags.
     
     Also stores information used to build the initial state of a model system,
-    such as space grid and parameter rules/distributions.
+    such as space grids and parameter rules/distributions.
     
-    All child classes must populate __init__'s dicts and implement:
+    All child modules must populate __init__'s dicts and implement:
         calc_inits()
         simulate()
         get_overview_analysis()
