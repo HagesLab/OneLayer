@@ -129,6 +129,7 @@ class Notebook:
         self.listupload_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
+        self.current_layer_ID = tk.StringVar()
         # Flags and containers for IC arrays
         
         self.convert_in_dict = self.module.convert_in_dict
@@ -363,7 +364,7 @@ class Notebook:
         self.reset_IC_button.grid(row=0, column=3)
 
         self.spacegrid_frame = tk.ttk.Frame(self.tab_inputs)
-        self.spacegrid_frame.grid(row=1,column=0,columnspan=2)
+        self.spacegrid_frame.grid(row=1,column=0,columnspan=2, pady=(10,10))
 
         self.steps_head = tk.ttk.Label(self.spacegrid_frame, 
                                        text="Space Grid - Start Here", 
@@ -387,7 +388,7 @@ class Notebook:
         self.dx_entry.grid(row=2,column=1)
 
         self.params_frame = tk.ttk.Frame(self.tab_inputs)
-        self.params_frame.grid(row=2,column=0,columnspan=2, rowspan=4)
+        self.params_frame.grid(row=2,column=0,columnspan=2, rowspan=4, pady=(10,10))
 
         self.system_params_head = tk.ttk.Label(self.params_frame, 
                                                text="Constant-value Parameters",
@@ -398,9 +399,9 @@ class Notebook:
                                                            text="Fast Param Entry Tool", 
                                                            command=self.do_sys_param_shortcut_popup)
         self.system_params_shortcut_button.grid(row=1,column=0,columnspan=2)
-
+        
         self.flags_frame = tk.ttk.Frame(self.tab_inputs)
-        self.flags_frame.grid(row=6,column=0,columnspan=2)
+        self.flags_frame.grid(row=6,column=0,columnspan=2, pady=(10,10))
 
         self.flags_head = tk.ttk.Label(self.flags_frame, text="Flags", 
                                        style="Header.TLabel")
@@ -434,7 +435,21 @@ class Notebook:
                                                    text="Show Init. State Plots", 
                                                    command=self.do_sys_plotsummary_popup)
         self.system_plotout_button.grid(row=9,column=0,columnspan=2)
-
+        
+        self.line0_separator = tk.ttk.Separator(self.tab_inputs, 
+                                                 orient="horizontal", 
+                                                 style="Grey Bar.TSeparator")
+        self.line0_separator.grid(row=10,column=0,columnspan=2, pady=(10,10), sticky="ew")
+        
+        # Init this dropdown with some default layer
+        self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_ID,
+                                                next(iter(self.module.layers)), *self.module.layers)
+        self.layer_dropdown.grid(row=11,column=0)
+        
+        self.change_layer_btn = tk.ttk.Button(self.tab_inputs, text="Change to Layer",
+                                              command=self.change_layer)
+        self.change_layer_btn.grid(row=11,column=1)
+        
         self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", 
                                                 style="Grey Bar.TSeparator")
         self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
@@ -1130,6 +1145,10 @@ class Notebook:
         print("Using LGC: {}".format(self.using_LGC))
         print("LGC values: {}".format(self.LGC_values))
         print("LGC options: {}".format(self.LGC_options))
+        return
+    
+    def change_layer(self):
+        print("helo ther")
         return
 
     def update_system_summary(self):
