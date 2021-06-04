@@ -15,12 +15,10 @@ class Layer:
     may be characterized by different processes / equations / rules,
     and may interact with other layers.
     """
-    def __init__(self, name, params, s_outputs, c_outputs, length_unit, convert_in):
+    def __init__(self, params, s_outputs, c_outputs, length_unit, convert_in):
         """
         Parameters
         ----------
-        name: str
-            Display name for this Layer.
         params: dict {"parameter name":Parameter}
             Permament state values associated with the Layer.
             
@@ -41,7 +39,6 @@ class Layer:
             Table of values to unit-convert from GUI inputs to internal values 
             for solver.
         """
-        self.name = name
         self.params = params
         self.param_count = len(params)
         self.s_outputs = s_outputs
@@ -65,16 +62,21 @@ class Layer:
         for param in self.convert_in:
             self.convert_out[param] = self.convert_in[param] ** -1
             
-        assert isinstance(params, dict), "Layer {} did not receive a dict of params".format(self.name)
+        assert isinstance(params, dict), "Layer did not receive a dict of params"
         for param in self.params:
-            assert isinstance(param, str), "Invalid param name {} in Layer {}".format(param, self.name)
-            assert isinstance(self.params[param], Parameter), "Invalid param object for param {} in Layer {}".format(param, self.name)
+            assert isinstance(param, str), "Invalid param name {} in Layer".format(param)
+            assert isinstance(self.params[param], Parameter), "Invalid param object for param {} in Layer".format(param)
         
         
-        assert isinstance(self.outputs, dict), "Layer {} did not receive a dict of simulated outputs".format(self.name)
+        assert isinstance(self.outputs, dict), "Layer did not receive a dict of simulated outputs"
         for output in self.outputs:
-            assert isinstance(output, str), "Invalid output name {} in Layer {}".format(param, self.name)
-            assert isinstance(self.outputs[output], Output), "Invalid output object for output {} in Layer {}".format(param, self.name)
+            assert isinstance(output, str), "Invalid output name {} in Layer".format(param)
+            assert isinstance(self.outputs[output], Output), "Invalid output object for output {} in Layer".format(param)
+        
+        
+        state_vars = set(self.params.keys()).union(set(self.outputs.keys()))
+        params_in_cdict = set(self.convert_in.keys())
+        assert (state_vars.issubset(params_in_cdict)), "Error: Layer conversion_dict is missing entries {}".format(params.difference(params_in_cdict))
         
         return
 

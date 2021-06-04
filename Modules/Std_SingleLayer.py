@@ -88,6 +88,22 @@ class Std_SingleLayer(OneD_Model):
             
         self.layers = {"OneLayer":Layer(params, simulation_outputs, calculated_outputs,
                                         "[nm]", convert_in)}
+
+        # TODO: Remove main's dependence on thses        
+        self.convert_in_dict = self.layers["OneLayer"].convert_in
+        self.convert_out_dict = self.layers["OneLayer"].convert_out
+        self.param_dict = self.layers["OneLayer"].params
+        self.simulation_outputs_dict = self.layers["OneLayer"].s_outputs
+        self.calculated_outputs_dict = self.layers["OneLayer"].c_outputs
+        self.outputs_dict = self.layers["OneLayer"].outputs
+        self.length_unit = self.layers["OneLayer"].length_unit
+        self.total_length = self.layers["OneLayer"].total_length
+        self.dx = self.layers["OneLayer"].dx
+        self.spacegrid_is_set = self.layers["OneLayer"].spacegrid_is_set
+        self.simulation_outputs_count = self.layers["OneLayer"].s_outputs_count
+        self.calculated_outputs_count = self.layers["OneLayer"].c_outputs_count
+        self.total_outputs_count = self.layers["OneLayer"].outputs_count
+        self.param_count = self.layers["OneLayer"].param_count
         return
     
     def calc_inits(self):
@@ -155,9 +171,9 @@ class Std_SingleLayer(OneD_Model):
         data_dict["tau_diff"] = tau_diff(data_dict["PL"], params["dt"])
         
         for data in data_dict:
-            data_dict[data] *= one_layer.convert_out_dict[data]
+            data_dict[data] *= one_layer.convert_out[data]
             
-        data_dict["PL"] *= one_layer.convert_out_dict["integration_scale"]
+        data_dict["PL"] *= one_layer.convert_out["integration_scale"]
         
         return data_dict
     

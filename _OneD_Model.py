@@ -380,17 +380,7 @@ class OneD_Model:
     def verify(self):
         """Performs basic syntactical checks on module's attributes."""
         print("Verifying selected module...")
-        for param in self.param_dict:
-            assert isinstance(param, str), "Error: invalid name {} in param dict. Param names must be strings".format(param)
-            assert isinstance(self.param_dict[param], Parameter), "Error: param dict {} is not a Parameter() object".format(param)
-
-        for output in self.outputs_dict:
-            assert isinstance(output, str), "Error: invalid name {} in outputs dict. Output names must be strings".format(output)
-            assert isinstance(self.outputs_dict[output], Output), "Error: output dict {} is not an Output() object".format(output)
         
-        params = set(self.param_dict.keys()).union(set(self.outputs_dict.keys()))
-        params_in_cdict = set(self.convert_in_dict.keys())
-        assert (params.issubset(params_in_cdict)), "Error: conversion_dict is missing entries {}".format(params.difference(params_in_cdict))
         
         if not "symmetric_system" in self.flags_dict:
             print("Warning: no symmetric_system flag defined."
