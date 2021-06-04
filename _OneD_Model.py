@@ -32,6 +32,7 @@ class OneD_Model:
         # Unique identifier for module.
         self.system_ID = "INSERT MODEL NAME HERE"
         
+        self.layers = {}
         # Space grid information.
         self.total_length = -1
         self.dx = -1

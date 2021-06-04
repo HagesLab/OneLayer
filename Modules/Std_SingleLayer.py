@@ -6,7 +6,7 @@ Created on Wed May 12 18:01:07 2021
 """
 import numpy as np
 from scipy import integrate as intg
-from _helper_structs import Parameter, Output
+from _helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
@@ -17,31 +17,30 @@ class Std_SingleLayer(OneD_Model):
     def __init__(self):
         super().__init__()
         self.system_ID = "OneLayer"
+        
+        
         self.length_unit = "[nm]"
         self.time_unit = "[ns]"
-        self.param_dict = {"mu_N":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
-                           "mu_P":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
-                            "N0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                            "P0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                            "B":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)), 
-                            "tau_N":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
-                            "tau_P":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
-                            "Sf":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
-                            "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
-                            "temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
-                            "rel_permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
-                            "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
-                            "back_reflectivity":Parameter(units="", is_edge=False, is_space_dependent=False, valid_range=(0,1)), 
-                            "alpha":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
-                            "delta":Parameter(units="", is_edge=False, valid_range=(0,1)), 
-                            "frac_emitted":Parameter(units="", is_edge=False, is_space_dependent=False, valid_range=(0,1)),
-                            "delta_N":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                            "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                            "Ec":Parameter(units="[eV]", is_edge=True), 
-                            "electron_affinity":Parameter(units="[eV]", is_edge=True)}
-        
-
-        self.param_count = len(self.param_dict)
+        params = {"mu_N":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
+                  "mu_P":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
+                  "N0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                  "P0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                  "B":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)), 
+                  "tau_N":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
+                  "tau_P":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
+                  "Sf":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
+                  "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
+                  "temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
+                  "rel_permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
+                  "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
+                  "back_reflectivity":Parameter(units="", is_edge=False, is_space_dependent=False, valid_range=(0,1)), 
+                  "alpha":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
+                  "delta":Parameter(units="", is_edge=False, valid_range=(0,1)), 
+                  "frac_emitted":Parameter(units="", is_edge=False, is_space_dependent=False, valid_range=(0,1)),
+                  "delta_N":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                  "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                  "Ec":Parameter(units="[eV]", is_edge=True), 
+                  "electron_affinity":Parameter(units="[eV]", is_edge=True)}
         
         self.flags_dict = {"ignore_recycle":("Ignore Photon Recycle",1, 0),
                            #"symmetric_system":("Symmetric System",0, 0),
@@ -49,71 +48,67 @@ class Std_SingleLayer(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)),
-                                        }
+        simulation_outputs = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)), 
+                              "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)),
+                             }
         
         # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True),
-                                        "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
-                                         "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
-                                         "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False),
-                                         "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False),
-                                         "PL":Output("TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False),
-                                         "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, analysis_plotable=False)}
+        calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True),
+                             "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
+                             "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
+                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False),
+                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False),
+                             "PL":Output("TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False),
+                             "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, analysis_plotable=False)}
         
-        self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
-        
-        self.simulation_outputs_count = len(self.simulation_outputs_dict)
-        self.calculated_outputs_count = len(self.calculated_outputs_dict)
-        self.total_outputs_count = self.simulation_outputs_count + self.calculated_outputs_count
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
-        self.convert_in_dict = {"mu_N": ((1e7) ** 2) / (1e9), "mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
-                                "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
-                                "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
-                                "tau_N": 1, "tau_P": 1,                                     # [ns]
-                                "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
-                                "temperature": 1, "rel_permitivity": 1, 
-                                "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
-                                "alpha": 1e-7,                               # [cm^-1] to [nm^-1]
-                                "delta": 1, "frac_emitted": 1,
-                                "back_reflectivity": 1,
-                                "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
-                                "Ec": 1, "electron_affinity": 1,
-                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
-                                "E_field": 1, 
-                                "tau_diff": 1}
+        convert_in = {"mu_N": ((1e7) ** 2) / (1e9), "mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
+                      "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
+                      "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
+                      "tau_N": 1, "tau_P": 1,                                     # [ns]
+                      "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
+                      "temperature": 1, "rel_permitivity": 1, 
+                      "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
+                      "alpha": 1e-7,                               # [cm^-1] to [nm^-1]
+                      "delta": 1, "frac_emitted": 1,
+                      "back_reflectivity": 1,
+                      "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
+                      "Ec": 1, "electron_affinity": 1,
+                      "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
+                      "E_field": 1, 
+                      "tau_diff": 1}
         
-        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"] # [cm^-3 s^-1] to [m^-3 ns^-1]
-        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
-        self.convert_in_dict["PL"] = self.convert_in_dict["RR"]
+        convert_in["RR"] = convert_in["B"] * convert_in["N"] * convert_in["P"] # [cm^-3 s^-1] to [m^-3 ns^-1]
+        convert_in["NRR"] = convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
+        convert_in["PL"] = convert_in["RR"]
         
-        self.convert_in_dict["integration_scale"] = 1e7 # cm to nm
+        convert_in["integration_scale"] = 1e7 # cm to nm
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
-        self.convert_out_dict = {}
-        for param in self.convert_in_dict:
-            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
-
+            
+        self.layers = {"OneLayer":Layer(params, simulation_outputs, calculated_outputs,
+                                        "[nm]", convert_in)}
         return
     
     def calc_inits(self):
         """Calculate initial electron and hole density distribution"""
-        init_N = (self.param_dict["N0"].value + self.param_dict["delta_N"].value) * self.convert_in_dict["N"]
-        init_P = (self.param_dict["P0"].value + self.param_dict["delta_P"].value) * self.convert_in_dict["P"]
+        one_layer = self.layers["OneLayer"]
+        init_N = (one_layer.params["N0"].value + one_layer.params["delta_N"].value) * one_layer.convert_in["N"]
+        init_P = (one_layer.params["P0"].value + one_layer.params["delta_P"].value) * one_layer.convert_in["P"]
         # "Typecast" single values to uniform arrays
         if not isinstance(init_N, np.ndarray):
-            init_N = np.ones(len(self.grid_x_nodes)) * init_N
+            init_N = np.ones(len(one_layer.grid_x_nodes)) * init_N
             
         if not isinstance(init_P, np.ndarray):
-            init_P = np.ones(len(self.grid_x_nodes)) * init_P
+            init_P = np.ones(len(one_layer.grid_x_nodes)) * init_P
             
         
         return {"N":init_N, "P":init_P}
     
     def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
         """Calls ODEINT solver."""
-        ode_nanowire(data_path, m, n, self.dx, dt, params,
+        one_layer = self.layers["OneLayer"]
+        ode_nanowire(data_path, m, n, one_layer.dx, dt, params,
                      not flags['ignore_recycle'].value(), 
                      flags['symmetric_system'].value(), 
                      flags['check_do_ss'].value(), hmax_, True,
@@ -128,9 +123,10 @@ class Std_SingleLayer(OneD_Model):
            
            Integrates over nanowire length: PL due to radiative recombination, waveguiding, and carrier regeneration"""
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
+        one_layer = self.layers["OneLayer"]
         data_dict = {}
         
-        for raw_output_name in self.simulation_outputs_dict:
+        for raw_output_name in one_layer.s_outputs:
             data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
                                                  raw_output_name)
             data = []
@@ -159,9 +155,9 @@ class Std_SingleLayer(OneD_Model):
         data_dict["tau_diff"] = tau_diff(data_dict["PL"], params["dt"])
         
         for data in data_dict:
-            data_dict[data] *= self.convert_out_dict[data]
+            data_dict[data] *= one_layer.convert_out_dict[data]
             
-        data_dict["PL"] *= self.convert_out_dict["integration_scale"]
+        data_dict["PL"] *= one_layer.convert_out_dict["integration_scale"]
         
         return data_dict
     
@@ -171,8 +167,9 @@ class Std_SingleLayer(OneD_Model):
             and spatial PL values on demand.
         """
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
+        one_layer = self.layers["OneLayer"]
         data = None
-        if (datatype in self.simulation_outputs_dict):
+        if (datatype in one_layer.s_outputs):
             data = sim_data[datatype]
         
         else:
