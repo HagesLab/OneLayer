@@ -74,6 +74,7 @@
 	    	\label{fig:top_left_menu}
 	    	\centering
 	    	\includegraphics[scale=1]{"top_left_menu"}
+	    	\caption{Main menu.}
 	    \end{figure}
 	    
 	    \par
@@ -91,6 +92,7 @@
 				\label{fig:labeled_main_interface}
 				\centering
 				\includegraphics[scale=1]{"labeled_main_interface"}
+				\caption{Key parts of Inputs Tab.}
 			\end{figure}
 		
 			\begin{enumerate}
@@ -131,6 +133,7 @@
 					\label{fig:flags}
 					\centering
 					\includegraphics[scale=1.5]{"flags"}
+					\caption{Flags for one-layer module.}
 				\end{figure}
 				
 				\par Module-specific flags can be toggled here. By default, two flags are available to the one-layer and nanowire modules.
@@ -164,6 +167,7 @@
 				\label{fig:LGC_blank}
 				\centering
 				\includegraphics[scale=0.6]{"LGC_blank"}
+				\caption{Laser Generation Condition Tab.}
 			\end{figure}
 		
 			\par For select modules, the Laser Generation Condition can be used to generate $\Delta N$ and $\Delta P$ according to a series of laser pulse excitation equations.
@@ -254,6 +258,7 @@
 			\label{fig:ptoolkit_fill_plot}
 			\centering
 			\includegraphics[scale=1]{"ptoolkit_fill_plot"}
+			\caption{In this example, three FILL commands are used to create a staircase-shaped distribution.}
 		\end{figure}
 		
 		\par The LINE method assigns the Left Bound Value to the Left Bound Coordinate, assigns the Right Bound Value to the Right Bound Coordinate, and performs linear interpolation to assign values to all intermediate space points. Each intermediate point differs from its neighbors by a common difference value.
@@ -267,6 +272,7 @@
 			\label{fig:ptoolkit_line_plot}
 			\centering
 			\includegraphics[scale=1]{"ptoolkit_line_plot"}
+			\caption{In this example, the LINE command is used to draw a distribution from (0 nm, 1) to (100 nm, 10).}
 		\end{figure}
 		
 		\par The EXP method is similar to LINE, but intermediate space points are instead filled by exponential interpolation between the left and right bounds. Each intermediate point differs from its neighbors by a common ratio.
@@ -280,6 +286,7 @@
 			\label{fig:ptoolkit_exp_plot}
 			\centering
 			\includegraphics[scale=1]{"ptoolkit_exp_plot"}
+			\caption{"In this example, an exponential curve is drawn from (0 nm, 100 000) to (80 nm, 10). The remaining space from 80 to 100 nm has value zero.}
 		\end{figure}
 		
 		\par These four methods can be combined to set up complex distributions.
@@ -293,6 +300,7 @@
 			\label{fig:ptoolkit_mixed_plot}
 			\centering
 			\includegraphics[scale=1]{"ptoolkit_mixed_plot"}
+			\caption{LINE and FILL methods combined to create a "sawtooth" distribution.}
 		\end{figure}
 	
 		\newpage
@@ -303,6 +311,7 @@
 			\label{fig:listupload_blank}
 			\centering
 			\includegraphics[scale=1]{"listupload_blank"}
+			\caption{List upload tab.}
 		\end{figure}
 	
 		\par In the following example, the file “points.txt” is applied to $\Delta N$ over the range z=0 nm to z=6000 nm.
@@ -318,6 +327,7 @@
 			\label{fig:listupload_example_plot}
 			\centering
 			\includegraphics[scale=1]{"listupload_example_plot"}
+			\caption{The data are then linear interpolated to produce a bumpy-looking distribution on a log-scale plot up to 6000 nm, the final point in the file.}
 		\end{figure}
 	
 		\subsection{Saving and Loading Model State Files}
@@ -343,6 +353,7 @@
 			\label{fig:save_menu}
 			\centering
 			\includegraphics[scale=1]{"batch_blank"}
+			\caption{Batch MSF Tool when first opened.}
 		\end{figure}
 	
 		\par In the following example, the Batch MSF Tool is used to generate copies of “2-9-21.txt” from \textit{Saving and Loading Initial Conditions} with varying values of the parameter $\tau_{N}$: 10, 25, 40, 100, 1 000, and 10 000.
@@ -351,6 +362,7 @@
 			\label{fig:batch_example}
 			\centering
 			\includegraphics[scale=1]{"batch_example"}
+			\caption{Batch tool with example values entered.}
 		\end{figure}
 	
 		\par When “Create Batch” is clicked, a directory is created within the Initial Directory, alongside any existing MSFs. Each file in the batch is procedurally named using the values of the varied parameters it has adopted.
@@ -359,6 +371,7 @@
 			\label{fig:batch_example_dir}
 			\centering
 			\includegraphics[scale=0.9]{"batch_example_dir"}
+			\caption{Resulting batch of MSF files.}
 		\end{figure}
 	
 		\par Up to four parameters may be varied at a time.
@@ -371,6 +384,7 @@
 			\label{fig:file_menu}
 			\centering
 			\includegraphics[scale=1]{"file_menu"}
+			\caption{Clicking the File menu reveals various management options for the overall program.}
 		\end{figure}
 	
 		\par Each of these opens the corresponding working directory, from where any files created by TEDs can be deleted.
@@ -384,6 +398,7 @@
 		\label{fig:simulate_overview}
 		\centering
 		\includegraphics[scale=0.6]{"simulate_overview"}
+		\caption{Key features of the Simulate Tab.}
 	\end{figure}
 	
 	\begin{enumerate}
@@ -418,12 +433,14 @@
 			\label{fig:overview_blank}
 			\centering
 			\includegraphics[scale=0.8]{"overview_blank"}
+			\caption{The Overview subtab when first opened. Click "Select Dataset" to choose a data set.}
 		\end{figure}
 	
 		\begin{figure}[H]
 			\label{fig:overview_example}
 			\centering
 			\includegraphics[scale=0.4]{"overview_example"}
+			\caption{An example overview of a One-Layer data set.}
 		\end{figure}
 	
 		\par To view other timesteps or TRPL over other ranges, for example, the Detailed Analysis tab should be used.
@@ -436,12 +453,14 @@
 			\label{fig:detailed_example}
 			\centering
 			\includegraphics[scale=1]{"detailed_example"}
+			\caption{An example of the Detailed Analysis tab in use. Here the PL data of three datasets is compared.}
 		\end{figure}
 		
 		\begin{figure}[H]
 			\label{fig:detailed_toolbar}
 			\centering
 			\includegraphics[scale=1]{"detailed_toolbar"}
+			\caption {Toolbar for analysis plots.}
 		\end{figure}
 	
 		\subsection{Plotting}
@@ -463,6 +482,7 @@
 			\label{fig:analyze_example}
 			\centering
 			\includegraphics[scale=1]{"analyze_example"}
+			\caption{PL data from the previously selected data sets. All data when first plotted show their initial t=0 values.}
 		\end{figure}
 	
 		\par One major limitation, as demonstrated above by the fact that only four of the seven selected datasets have been plotted, is that the plotter can only plot datasets together if they have the same total time and time step size. If datasets with different total time or time step size should be compared, plotting each on a different plot is recommended.
@@ -478,6 +498,7 @@
 			\label{fig:step_forward_example}
 			\centering
 			\includegraphics[scale=1.0]{"step_forward_example"}
+			\caption{Data sets at a later time.}
 		\end{figure}
 	
 		\par Stepping with a negative number of time steps will cause TEDs to move the datasets \textit{backward} that many time steps.
@@ -490,6 +511,7 @@
 			\label{fig:axis_settings_example}
 			\centering
 			\includegraphics[scale=1.2]{"axis_settings_example"}
+			\caption{Adjusting the x and y axes. When opened, the Axis Settings popup is populated with the current axis values.}
 		\end{figure}
 	
 		\par TEDs will attempt to determine the best axis range and scale (linear or log) based on the values spanned by the data and will update the axes continuously as the displayed data is changed. Sometimes this does not work well, and other times static axes are preferred. In that case the “Freeze Axes” option can be used to fix and specify the axes manually.
@@ -502,6 +524,7 @@
 			\label{fig:export_example}
 			\centering
 			\includegraphics[scale=0.8]{"export_example"}
+			\caption{Example exported .csv file viewed using Microsoft Excel.}
 		\end{figure}
 	
 		\subsection {Regenerating MSFs from Existing Data}
@@ -512,6 +535,7 @@
 			\label{fig:carryover_example}
 			\centering
 			\includegraphics[scale=1]{"carryover_example"}
+			\caption{Example MSF regeneration popup based on the currently loaded data sets.}
 		\end{figure}
 	
 		\par First, the checkboxes are used to indicate which variables should be copied into the new MSFs. For the one-layer and nanowire modules, $\Delta N$ and $\Delta P$ may be copied. The selection box, which functions like the “Plot” button’s, is then used to indicate which datasets MSFs should be generated for. When “Continue” is clicked, one MSF will be created with the selected variables for each dataset and prompts will appear to name the MSFs.
@@ -558,6 +582,7 @@
 			\label{fig:integration_xaxis_example}
 			\centering
 			\includegraphics{"integration_xaxis_example"}
+			\caption{The module parameters determine the available axes - in this case $\mu_{N}$ is selected because the data originate from MSFs with differing mobility values.}
 		\end{figure}
 	
 		\par The following plot is generated, but adjusting the vertical axis using the “Axis Settings” should prove helpful.
@@ -572,6 +597,7 @@
 			\label{fig:integration_result_adj}
 			\centering
 			\includegraphics{"integration_result_adj"}
+			\caption{Integration results before and after adjusting using Axis Settings.}
 		\end{figure}
 	
 	\newpage
