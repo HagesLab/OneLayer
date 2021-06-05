@@ -481,33 +481,36 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     dChidz[0] = (init_Chi[1] - init_Chi[0]) / dx
     dChidz[m] = (init_Chi[m] - init_Chi[m-1]) / dx
 
-
+    args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
+            tauN, tauP, B, eps, eps0, q, q_C, kB, 
+            recycle_photons, do_ss, alpha, back_refl_frac, 
+            delta_frac, frac_emitted, combined_weight, 
+            E_field_ext, dEcdz, dChidz, init_N_copy, 
+            init_P_copy)
     ## Do n time steps
     tSteps = np.linspace(0, n*dt, n+1)
     data, error_data = intg.odeint(dydt2, init_condition, tSteps, 
-                                   args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
-                                         tauN, tauP, B, eps, eps0, q, q_C, kB, 
-                                         recycle_photons, do_ss, alpha, back_refl_frac, 
-                                         delta_frac, frac_emitted, combined_weight, 
-                                         E_field_ext, dEcdz, dChidz, init_N_copy, 
-                                         init_P_copy),
-                                   tfirst=True, full_output=True, hmax=hmax_)
+                                    args=args,
+                                    tfirst=True, full_output=True, hmax=hmax_)
         
-    if (data[1:, 0:2*m] < 0).any():
-        h = np.geomspace(2**2, 2**-6, 9)
-        for hmax in h:
-            print("Simulation is not converging well, retrying with hmax={}".format(hmax))
-            data, error_data = intg.odeint(dydt2, init_condition, tSteps, 
-                                           args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
-                                                 tauN, tauP, B, eps, eps0, q, q_C, kB, 
-                                                 recycle_photons, do_ss, alpha, back_refl_frac, 
-                                                 delta_frac, frac_emitted, combined_weight, 
-                                                 E_field_ext, dEcdz, dChidz, init_N_copy, 
-                                                 init_P_copy),
-                                           tfirst=True, full_output=True, hmax=hmax)
+    
+    # sol = intg.solve_ivp(dydt2, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='LSODA', min_step=0)   #  Variable dt explicit
+    # data = sol.y.T
+    # if (data[1:, 0:2*m] < 0).any():
+    #     h = np.geomspace(2**2, 2**-6, 9)
+    #     for hmax in h:
+    #         print("Simulation is not converging well, retrying with hmax={}".format(hmax))
+    #         data, error_data = intg.odeint(dydt2, init_condition, tSteps, 
+    #                                        args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
+    #                                              tauN, tauP, B, eps, eps0, q, q_C, kB, 
+    #                                              recycle_photons, do_ss, alpha, back_refl_frac, 
+    #                                              delta_frac, frac_emitted, combined_weight, 
+    #                                              E_field_ext, dEcdz, dChidz, init_N_copy, 
+    #                                              init_P_copy),
+    #                                        tfirst=True, full_output=True, hmax=hmax)
                 
-            if not (data[1:, 0:2*m] < 0).any():
-                break
+    #         if not (data[1:, 0:2*m] < 0).any():
+    #             break
             
     if write_output:
         ## Prep output files
@@ -521,13 +524,13 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
             array_P.append(data[1:,m:2*(m)])
             #array_E_field.append(data[1:,2*(m):])
 
-        return error_data
+        return #error_data
 
     else:
         array_N = data[:,0:m]
         array_P = data[:,m:2*(m)]
 
-        return array_N, array_P, error_data
+        return #array_N, array_P, error_data
     
 def E_field(sim_outputs, params):
     """Calculate electric field from N, P"""

@@ -421,7 +421,6 @@ class Notebook:
                 self.sys_flag_dict[flag].tk_element.grid(row=i,column=0)
                 i += 1
                 
-        
         self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=8)
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
@@ -442,9 +441,9 @@ class Notebook:
         self.line0_separator.grid(row=10,column=0,columnspan=2, pady=(10,10), sticky="ew")
         
         # Init this dropdown with some default layer
-        self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_ID,
-                                                next(iter(self.module.layers)), *self.module.layers)
-        self.layer_dropdown.grid(row=11,column=0)
+        # self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_ID,
+        #                                         next(iter(self.module.layers)), *self.module.layers)
+        # self.layer_dropdown.grid(row=11,column=0)
         
         self.change_layer_btn = tk.ttk.Button(self.tab_inputs, text="Change to Layer",
                                               command=self.change_layer)
