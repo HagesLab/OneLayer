@@ -42,6 +42,12 @@ class Std_SingleLayer(OneD_Model):
                   "Ec":Parameter(units="[eV]", is_edge=True), 
                   "electron_affinity":Parameter(units="[eV]", is_edge=True)}
         
+        dummy_params = {"init_S":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)),
+                        "mu_S":Parameter(units="[cm^2 / V s]", is_edge=True),
+                        "boundary vallue":Parameter(units="[a.u.]", is_edge=False, is_space_dependent=False, valid_range=(0,1))}
+        
+        dummy_convert = {p:10 for p in dummy_params}
+        
         self.flags_dict = {"ignore_recycle":("Ignore Photon Recycle",1, 0),
                            #"symmetric_system":("Symmetric System",0, 0),
                            "check_do_ss":("Steady State Input",1, 0)}
@@ -87,7 +93,8 @@ class Std_SingleLayer(OneD_Model):
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
             
         self.layers = {"OneLayer":Layer(params, simulation_outputs, calculated_outputs,
-                                        "[nm]", convert_in)}
+                                        "[nm]", convert_in),
+                       "dummy layer":Layer(dummy_params, {}, {}, "[nm]", dummy_convert)}
 
         # TODO: Remove main's dependence on thses        
         self.convert_in_dict = self.layers["OneLayer"].convert_in

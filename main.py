@@ -441,9 +441,9 @@ class Notebook:
         self.line0_separator.grid(row=10,column=0,columnspan=2, pady=(10,10), sticky="ew")
         
         # Init this dropdown with some default layer
-        # self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_ID,
-        #                                         next(iter(self.module.layers)), *self.module.layers)
-        # self.layer_dropdown.grid(row=11,column=0)
+        self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_ID,
+                                                next(iter(self.module.layers)), *self.module.layers)
+        self.layer_dropdown.grid(row=11,column=0)
         
         self.change_layer_btn = tk.ttk.Button(self.tab_inputs, text="Change to Layer",
                                               command=self.change_layer)
@@ -1160,11 +1160,12 @@ class Notebook:
         if self.sys_plotsummary_popup_isopen:
             for param_name in self.module.param_dict:
                 param = self.module.param_dict[param_name]
-                val = to_array(param.value, len(self.module.grid_x_nodes), 
-                               param.is_edge)
-                grid_x = self.module.grid_x_nodes if not param.is_edge else self.module.grid_x_edges
-                self.sys_param_summaryplots[param_name].plot(grid_x, val)
-                self.sys_param_summaryplots[param_name].set_yscale(autoscale(val_array=val))
+                if param.is_space_dependent:
+                    val = to_array(param.value, len(self.module.grid_x_nodes), 
+                                   param.is_edge)
+                    grid_x = self.module.grid_x_nodes if not param.is_edge else self.module.grid_x_edges
+                    self.sys_param_summaryplots[param_name].plot(grid_x, val)
+                    self.sys_param_summaryplots[param_name].set_yscale(autoscale(val_array=val))
                 
             self.plotsummary_fig.tight_layout()
             self.plotsummary_fig.canvas.draw()
@@ -1310,10 +1311,10 @@ class Notebook:
             self.plotsummary_fig = Figure(figsize=(20,10))
             self.sys_param_summaryplots = {}
             for param_name in self.module.param_dict:
-                
-                self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
-                self.sys_param_summaryplots[param_name].set_title("{} {}".format(param_name,self.module.param_dict[param_name].units))
-                count += 1
+                if self.module.param_dict[param_name].is_space_dependent:
+                    self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
+                    self.sys_param_summaryplots[param_name].set_title("{} {}".format(param_name,self.module.param_dict[param_name].units))
+                    count += 1
             
             self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, 
                                                               master=self.sys_plotsummary_popup)
