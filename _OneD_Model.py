@@ -216,18 +216,22 @@ class OneD_Model:
 
         """
         
-        mssg = ""
-        if self.spacegrid_is_set:
-            mssg += ("Space Grid is set\n")
-            mssg += ("Nodes: {}\n".format(self.grid_x_nodes))
-            mssg += ("Edges: {}\n".format(self.grid_x_edges))
-        else:
-            mssg += ("Grid is not set\n")
-
-        for param in self.param_dict:
-            mssg += ("{} {}: {}\n".format(param, self.param_dict[param].units, self.param_dict[param].value))
-
-        return mssg
+        
+        mssg = []
+        for layer in self.layers:
+            mssg.append("LAYER: {}".format(layer))
+            if self.layers[layer].spacegrid_is_set:
+                mssg.append("Space Grid is set")
+                mssg.append("Nodes: {}".format(self.layers[layer].grid_x_nodes))
+                mssg.append("Edges: {}".format(self.layers[layer].grid_x_edges))
+            else:
+                mssg.append("Grid is not set")
+    
+            for param in self.layers[layer].params:
+                mssg.append("{} {}: {}".format(param, self.layers[layer].params[param].units,
+                                               self.layers[layer].params[param].value))
+            mssg.append("#########")
+        return "\n".join(mssg)
     
     def calc_inits(self):
         """

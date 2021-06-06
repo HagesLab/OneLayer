@@ -1369,9 +1369,10 @@ class Notebook:
     def do_sys_param_shortcut_popup(self):
         """ Open a box for inputting (spatially constant) parameters. """ 
         if not self.sys_param_shortcut_popup_isopen:
+            current_layer = self.module.layers[self.current_layer_name]
             try:
                 self.set_init_x()
-                assert self.module.spacegrid_is_set, "Error: could not set space grid"
+                assert current_layer.spacegrid_is_set, "Error: could not set space grid"
     
             except ValueError:
                 self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
@@ -1405,10 +1406,10 @@ class Notebook:
             row_count = 0
             col_count = 0
             max_per_col = 6
-            for param in self.module.param_dict:
+            for param in current_layer.params:
                 self.sys_param_labels_dict[param] = tk.ttk.Label(self.sys_param_list_frame, 
                                                                  text="{} {}".format(param, 
-                                                                                     self.module.param_dict[param].units))
+                                                                                     current_layer.params[param].units))
                 self.sys_param_labels_dict[param].grid(row=row_count, 
                                                        column=col_count)
                 self.sys_param_entryboxes_dict[param] = tk.ttk.Entry(self.sys_param_list_frame, 
@@ -1416,8 +1417,8 @@ class Notebook:
                 self.sys_param_entryboxes_dict[param].grid(row=row_count, 
                                                            column=col_count + 1)
                 
-                if isinstance(self.module.param_dict[param].value, (float, int)):
-                    formatted_val = self.module.param_dict[param].value
+                if isinstance(current_layer.params[param].value, (float, int)):
+                    formatted_val = current_layer.params[param].value
                     if formatted_val > 1e4: 
                         formatted_val = "{:.3e}".format(formatted_val)
                     else: 
@@ -1453,17 +1454,18 @@ class Notebook:
         """ Transfer and store collected parameters. """ 
         try:
             if continue_:
+                current_layer = self.module.layers[self.current_layer_name]
                 changed_params = []
                 err_msg = ["The following params were not updated:"]
-                for param in self.module.param_dict:
+                for param in current_layer.params:
                     val = self.sys_param_entryboxes_dict[param].get()
                     if not val: 
                         continue
                     else:
                         try:
                             val = float(val)
-                            minimum = self.module.param_dict[param].valid_range[0]
-                            maximum = self.module.param_dict[param].valid_range[1]
+                            minimum = current_layer.params[param].valid_range[0]
+                            maximum = current_layer.params[param].valid_range[1]
                             assert (val >= minimum), "Error: min value for {} is {} but {} was entered".format(param, minimum, val)
                             assert (val <= maximum), "Error: max value for {} is {} but {} was entered".format(param, maximum, val)
                             
@@ -1473,7 +1475,7 @@ class Notebook:
                     
                     self.paramtoolkit_currentparam = param
                     self.deleteall_paramrule()
-                    self.module.param_dict[param].value = val
+                    current_layer.params[param].value = val
                     changed_params.append(param)
                     
                 if changed_params:
@@ -3987,14 +3989,22 @@ class Notebook:
 
         if plot_ID=="LGC":
             param_name="delta_N"
+            # Find the layer that contains the parameter delta_N
+            for layer in self.module.layers:
+                try:
+                    param_obj = self.module.layers[layer].params[param_name]
+                except KeyError:
+                    continue
+                grid_x = (self.module.layers[layer].grid_x_edges 
+                          if param_obj.is_edge else self.module.layers[layer].grid_x_nodes)
         else: 
             param_name = self.paramtoolkit_currentparam
-        
-        param_obj = self.module.param_dict[param_name]
-        grid_x = self.module.grid_x_edges if param_obj.is_edge else self.module.grid_x_nodes
+            param_obj = self.module.layers[self.current_layer_name].params[param_name]
+            grid_x = (self.module.layers[self.current_layer_name].grid_x_edges 
+                      if param_obj.is_edge else self.module.layers[self.current_layer_name].grid_x_nodes)
         # Support for constant value shortcut: temporarily create distribution
         # simulating filling across module with that value
-        val_array = to_array(param_obj.value, len(self.module.grid_x_nodes), 
+        val_array = to_array(param_obj.value, len(self.module.layers[self.current_layer_name].grid_x_nodes), 
                              param_obj.is_edge)
 
         plot.set_yscale(autoscale(val_array=val_array))
@@ -4010,7 +4020,7 @@ class Notebook:
         else:
             plot.plot(grid_x, val_array, label=param_name)
 
-        plot.set_xlabel("x {}".format(self.module.length_unit))
+        plot.set_xlabel("x {}".format(self.module.layers[self.current_layer_name].length_unit))
         plot.set_ylabel("{} {}".format(param_name, param_obj.units))
         
         if plot_ID=="recent": 

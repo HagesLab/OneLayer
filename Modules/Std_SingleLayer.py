@@ -94,7 +94,7 @@ class Std_SingleLayer(OneD_Model):
             
         self.layers = {"OneLayer":Layer(params, simulation_outputs, calculated_outputs,
                                         "[nm]", convert_in),
-                       "dummy layer":Layer(dummy_params, {}, {}, "[nm]", dummy_convert)}
+                       "dummy layer":Layer(dummy_params, {}, {}, "[jm]", dummy_convert)}
 
         # TODO: Remove main's dependence on thses        
         self.convert_in_dict = self.layers["OneLayer"].convert_in
