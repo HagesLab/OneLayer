@@ -124,7 +124,8 @@ class Std_SingleLayer(OneD_Model):
     def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
         """Calls ODEINT solver."""
         one_layer = self.layers["OneLayer"]
-        ode_nanowire(data_path, m, n, one_layer.dx, dt, params,
+        ## TODO: replace self.dx with one_layer.dx when GUI is ready
+        ode_nanowire(data_path, m, n, self.dx, dt, params,
                      not flags['ignore_recycle'].value(), 
                      flags['symmetric_system'].value(), 
                      flags['check_do_ss'].value(), hmax_, True,
@@ -489,28 +490,9 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
             init_P_copy)
     ## Do n time steps
     tSteps = np.linspace(0, n*dt, n+1)
-    data, error_data = intg.odeint(dydt2, init_condition, tSteps, 
-                                    args=args,
-                                    tfirst=True, full_output=True, hmax=hmax_)
-        
     
-    # sol = intg.solve_ivp(dydt2, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='LSODA', min_step=0)   #  Variable dt explicit
-    # data = sol.y.T
-    # if (data[1:, 0:2*m] < 0).any():
-    #     h = np.geomspace(2**2, 2**-6, 9)
-    #     for hmax in h:
-    #         print("Simulation is not converging well, retrying with hmax={}".format(hmax))
-    #         data, error_data = intg.odeint(dydt2, init_condition, tSteps, 
-    #                                        args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
-    #                                              tauN, tauP, B, eps, eps0, q, q_C, kB, 
-    #                                              recycle_photons, do_ss, alpha, back_refl_frac, 
-    #                                              delta_frac, frac_emitted, combined_weight, 
-    #                                              E_field_ext, dEcdz, dChidz, init_N_copy, 
-    #                                              init_P_copy),
-    #                                        tfirst=True, full_output=True, hmax=hmax)
-                
-    #         if not (data[1:, 0:2*m] < 0).any():
-    #             break
+    sol = intg.solve_ivp(dydt2, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
+    data = sol.y.T
             
     if write_output:
         ## Prep output files

@@ -2854,7 +2854,7 @@ class Notebook:
             assert (self.dt > 0 and self.dt <= self.simtime),"Error: Invalid dt"
             
             if not self.hmax: # Default hmax
-                self.hmax = 0
+                self.hmax = np.inf
                 
             self.hmax = float(self.hmax)
             
