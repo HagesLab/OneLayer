@@ -129,7 +129,14 @@ class Notebook:
         self.listupload_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
 
-        self.current_layer_ID = tk.StringVar()
+        # Stores whatever layer is being displayed in the layer selection box
+        self.current_layer_selection = tk.StringVar()
+        # Stores whatever layer TEDs is currently operating on
+        self.current_layer_name = ""
+        
+        # Pressing the layer change button updates self.current_layer_name to the
+        # value of self.current_layer_selection
+        
         # Flags and containers for IC arrays
         
         self.convert_in_dict = self.module.convert_in_dict
@@ -230,6 +237,9 @@ class Notebook:
         self.add_tab_analyze()
         self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_selected)
         #self.tab_inputs.bind("<<NotebookTabChanged>>", self.on_input_subtab_selected)
+        
+        # Initialize to default layer
+        self.change_layer()
 
         print("Initialization complete")
         print("Detecting Initial Condition and Data Directories...")
@@ -441,7 +451,7 @@ class Notebook:
         self.line0_separator.grid(row=10,column=0,columnspan=2, pady=(10,10), sticky="ew")
         
         # Init this dropdown with some default layer
-        self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_ID,
+        self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_selection,
                                                 next(iter(self.module.layers)), *self.module.layers)
         self.layer_dropdown.grid(row=11,column=0)
         
@@ -1141,13 +1151,30 @@ class Notebook:
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        print("Using LGC: {}".format(self.using_LGC))
-        print("LGC values: {}".format(self.LGC_values))
-        print("LGC options: {}".format(self.LGC_options))
+        for layer in self.module.layers:
+            print("Layer {}:".format(layer))
+            print(self.module.layers[layer].total_length)
+            print(self.module.layers[layer].dx)
         return
     
     def change_layer(self):
-        print("helo ther")
+        self.current_layer_name = self.current_layer_selection.get()
+        
+        current_layer = self.module.layers[self.current_layer_name]
+        self.set_thickness_and_dx_entryboxes(state='unlock')
+        if current_layer.spacegrid_is_set:
+            self.enter(self.thickness_entry, str(current_layer.total_length))
+            self.enter(self.dx_entry, str(current_layer.dx))
+            self.set_thickness_and_dx_entryboxes(state='lock')
+        else:
+            self.enter(self.thickness_entry, "")
+            self.enter(self.dx_entry, "")
+        
+        
+        
+        self.write(self.ICtab_status, "Switched to layer:\n{}".format(self.current_layer_name))
+        
+        
         return
 
     def update_system_summary(self):
@@ -3410,7 +3437,8 @@ class Notebook:
            A new mesh can only be generated when the previous mesh 
            is discarded using reset_IC().
         """
-        if self.module.spacegrid_is_set:
+        current_layer = self.module.layers[self.current_layer_name]
+        if current_layer.spacegrid_is_set:
             return
 
         thickness = float(self.thickness_entry.get())
@@ -3440,11 +3468,11 @@ class Notebook:
             if not self.confirmed: 
                 return
             
-        self.module.total_length = thickness
-        self.module.dx = dx
-        self.module.grid_x_nodes = np.linspace(dx / 2,thickness - dx / 2, int(0.5 + thickness / dx))
-        self.module.grid_x_edges = np.linspace(0, thickness, int(0.5 + thickness / dx) + 1)
-        self.module.spacegrid_is_set = True
+        current_layer.total_length = thickness
+        current_layer.dx = dx
+        current_layer.grid_x_nodes = np.linspace(dx / 2,thickness - dx / 2, int(0.5 + thickness / dx))
+        current_layer.grid_x_edges = np.linspace(0, thickness, int(0.5 + thickness / dx) + 1)
+        current_layer.spacegrid_is_set = True
         self.set_thickness_and_dx_entryboxes(state='lock')
         return
 
