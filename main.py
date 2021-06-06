@@ -335,13 +335,16 @@ class Notebook:
         self.tab_generation_init = tk.ttk.Frame(self.tab_inputs)
         self.tab_rules_init = tk.ttk.Frame(self.tab_inputs)
         self.tab_explicit_init = tk.ttk.Frame(self.tab_inputs)
+        
+        first_layer = next(iter(self.module.layers))
 
-        var_dropdown_list = [str(param + self.module.param_dict[param].units) 
-                             for param in self.module.param_dict
-                             if self.module.param_dict[param].is_space_dependent]
+        var_dropdown_list = [str(param_name + param.units) 
+                             for param_name, param in self.module.layers[first_layer].params.items()
+                             if param.is_space_dependent]
         paramtoolkit_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
-        unitless_dropdown_list = [param for param in self.module.param_dict
-                                  if self.module.param_dict[param].is_space_dependent]
+        unitless_dropdown_list = [param_name 
+                                  for param_name, param in self.module.layers[first_layer].params.items()
+                                  if param.is_space_dependent]
         
         self.line_sep_style = tk.ttk.Style()
         self.line_sep_style.configure("Grey Bar.TSeparator", background='#000000', 
@@ -452,7 +455,7 @@ class Notebook:
         
         # Init this dropdown with some default layer
         self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_selection,
-                                                next(iter(self.module.layers)), *self.module.layers)
+                                                first_layer, *self.module.layers)
         self.layer_dropdown.grid(row=11,column=0)
         
         self.change_layer_btn = tk.ttk.Button(self.tab_inputs, text="Change to Layer",
@@ -1169,7 +1172,33 @@ class Notebook:
         else:
             self.enter(self.thickness_entry, "")
             self.enter(self.dx_entry, "")
+            
+        # Put new layer's params into param selection tabs
+        var_dropdown_list = [str(param_name + param.units) 
+                             for param_name, param in self.module.layers[self.current_layer_name].params.items()
+                             if param.is_space_dependent]
+        unitless_dropdown_list = [param_name 
+                                  for param_name, param in self.module.layers[self.current_layer_name].params.items()
+                                  if param.is_space_dependent]
+        self.paramrule_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, 
+                                                        self.init_var_selection, 
+                                                        var_dropdown_list[0], 
+                                                        *var_dropdown_list)
+        self.paramrule_var_dropdown.grid(row=4,column=1)
         
+        self.paramrule_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, 
+                                                           self.paramtoolkit_viewer_selection, 
+                                                           unitless_dropdown_list[0], 
+                                                           *unitless_dropdown_list)
+        self.paramrule_viewer_dropdown.grid(row=2,column=4)
+        self.update_paramrule_listbox(unitless_dropdown_list[0])
+        
+        
+        self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, 
+                                                     self.listupload_var_selection, 
+                                                     unitless_dropdown_list[0], 
+                                                     *unitless_dropdown_list)
+        self.listupload_dropdown.grid(row=1,column=0)
         
         
         self.write(self.ICtab_status, "Switched to layer:\n{}".format(self.current_layer_name))
@@ -3690,10 +3719,10 @@ class Notebook:
     ## Special functions for Parameter Toolkit:
     def add_paramrule(self):
         """ Add a new parameter rule to the selected parameter. """
-
+        current_layer = self.module.layers[self.current_layer_name]
         try:
             self.set_init_x()
-            assert self.module.spacegrid_is_set, "Error: could not set space grid"
+            assert current_layer.spacegrid_is_set, "Error: could not set space grid"
 
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
@@ -3711,7 +3740,7 @@ class Notebook:
             assert (float(self.paramrule_lbound_entry.get()) >= 0),  "Error: left bound coordinate too low"
             
             if (self.init_shape_selection.get() == "POINT"):
-                assert (float(self.paramrule_lbound_entry.get()) <= self.module.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_lbound_entry.get()) <= current_layer.total_length), "Error: right bound coordinate too large"
                 
                 new_param_rule = Param_Rule(new_param_name, "POINT", 
                                             float(self.paramrule_lbound_entry.get()), 
@@ -3720,7 +3749,7 @@ class Notebook:
                                             -1)
 
             elif (self.init_shape_selection.get() == "FILL"):
-                assert (float(self.paramrule_rbound_entry.get()) <= self.module.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_rbound_entry.get()) <= current_layer.total_length), "Error: right bound coordinate too large"
                 assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
                 new_param_rule = Param_Rule(new_param_name, "FILL", 
@@ -3730,7 +3759,7 @@ class Notebook:
                                             -1)
 
             elif (self.init_shape_selection.get() == "LINE"):
-                assert (float(self.paramrule_rbound_entry.get()) <= self.module.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_rbound_entry.get()) <= current_layer.total_length), "Error: right bound coordinate too large"
                 assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
 
                 new_param_rule = Param_Rule(new_param_name, "LINE", 
@@ -3740,7 +3769,7 @@ class Notebook:
                                             float(self.paramrule_rvalue_entry.get()))
 
             elif (self.init_shape_selection.get() == "EXP"):
-                assert (float(self.paramrule_rbound_entry.get()) <= self.module.total_length), "Error: right bound coordinate too large"
+                assert (float(self.paramrule_rbound_entry.get()) <= current_layer.total_length), "Error: right bound coordinate too large"
                 assert (float(self.paramrule_lbound_entry.get()) < float(self.paramrule_rbound_entry.get())), "Error: Left bound coordinate is larger than right bound coordinate"
                 assert (float(self.paramrule_lvalue_entry.get()) != 0), "Error: left value cannot be 0"
                 assert (float(self.paramrule_rvalue_entry.get()) != 0), "Error: right value cannot be 0"
@@ -3762,7 +3791,7 @@ class Notebook:
             self.write(self.ICtab_status, str(oops))
             return
 
-        self.module.add_param_rule(new_param_name, new_param_rule)
+        self.module.add_param_rule(self.current_layer_name, new_param_name, new_param_rule)
 
         self.paramtoolkit_viewer_selection.set(new_param_name)
         self.update_paramrule_listbox(new_param_name)
@@ -3775,7 +3804,7 @@ class Notebook:
 
     def refresh_paramrule_listbox(self):
         """ Update the listbox to show rules for the selected param and display a snapshot of it"""
-        if self.module.spacegrid_is_set:
+        if self.module.layers[self.current_layer_name].spacegrid_is_set:
             self.update_paramrule_listbox(self.paramtoolkit_viewer_selection.get())
             self.update_IC_plot(plot_ID="custom")
         return
@@ -3790,7 +3819,7 @@ class Notebook:
         self.hideall_paramrules()
 
         # 2. Write in the new rules
-        current_param_rules = self.module.param_dict[param_name].param_rules
+        current_param_rules = self.module.layers[self.current_layer_name].params[param_name].param_rules
         self.paramtoolkit_currentparam = param_name
 
         for param_rule in current_param_rules:
@@ -3821,7 +3850,7 @@ class Notebook:
             self.active_paramrule_listbox.selection_set(currentSelectionIndex - 1)
 
             # 2. Change the order param rules are applied when calculating Parameter's values
-            self.module.swap_param_rules(self.paramtoolkit_currentparam, 
+            self.module.swap_param_rules(self.current_layer_name, self.paramtoolkit_currentparam, 
                                            currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
@@ -3840,7 +3869,7 @@ class Notebook:
                                                  self.active_paramrule_list[currentSelectionIndex - 1].get())
             self.active_paramrule_listbox.selection_set(currentSelectionIndex)
             
-            self.module.swap_param_rules(self.paramtoolkit_currentparam, 
+            self.module.swap_param_rules(self.current_layer_name, self.paramtoolkit_currentparam, 
                                            currentSelectionIndex)
             self.update_IC_plot(plot_ID="recent")
         return
@@ -3865,23 +3894,30 @@ class Notebook:
         """ Deletes all rules for current param. 
             Use reset_IC instead to delete all rules for every param
         """
-        if (self.module.param_dict[self.paramtoolkit_currentparam].param_rules):
-            self.module.removeall_param_rules(self.paramtoolkit_currentparam)
-            self.hideall_paramrules()
-            self.update_IC_plot(plot_ID="recent")
+        try:
+            if (self.module.layers[self.current_layer_name].params[self.paramtoolkit_currentparam].param_rules):
+                self.module.removeall_param_rules(self.current_layer_name, self.paramtoolkit_currentparam)
+                self.hideall_paramrules()
+                self.update_IC_plot(plot_ID="recent")
+            
+        except KeyError:
+            return
         return
 
     def delete_paramrule(self):
         """ Deletes selected rule for current param. """
-        if (self.module.param_dict[self.paramtoolkit_currentparam].param_rules):
-            try:
-                self.module.remove_param_rule(self.paramtoolkit_currentparam, 
-                                                self.active_paramrule_listbox.curselection()[0])
-                self.hide_paramrule()
-                self.update_IC_plot(plot_ID="recent")
-            except IndexError:
-                self.write(self.ICtab_status, "No rule selected")
-                return
+        try:
+            if (self.module.layers[self.current_layer_name].params[self.paramtoolkit_currentparam].param_rules):
+                try:
+                    self.module.remove_param_rule(self.current_layer_name, self.paramtoolkit_currentparam, 
+                                                    self.active_paramrule_listbox.curselection()[0])
+                    self.hide_paramrule()
+                    self.update_IC_plot(plot_ID="recent")
+                except IndexError:
+                    self.write(self.ICtab_status, "No rule selected")
+                    return
+        except KeyError:
+            return
         return
 
     

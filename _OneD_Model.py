@@ -34,6 +34,7 @@ class OneD_Model:
         
         self.layers = {}
         # Space grid information.
+        #TODO: Remove basically all of these
         self.total_length = -1
         self.dx = -1
         self.length_unit = "INSERT LENGTH UNIT HERE"
@@ -83,13 +84,15 @@ class OneD_Model:
 
         return
     
-    def add_param_rule(self, param_name, new_rule):
+    def add_param_rule(self, layer, param_name, new_rule):
         """
 
         Parameters
         ----------
+        layer : str
+            Layer from which param should be selected.
         param_name : str
-            Name of a parameter from self.param_dict.
+            Name of a parameter from a layers' params dict.
         new_rule : helper_structs.Parameter()
             New Parameter() instance created from TEDs.add_paramrule()
 
@@ -98,17 +101,19 @@ class OneD_Model:
         None.
 
         """
-        self.param_dict[param_name].param_rules.append(new_rule)
-        self.update_param_toarray(param_name)
+        self.layers[layer].params[param_name].param_rules.append(new_rule)
+        self.update_param_toarray(layer, param_name)
         return
 
-    def swap_param_rules(self, param_name, i):
+    def swap_param_rules(self, layer, param_name, i):
         """
 
         Parameters
         ----------
+        layer : str
+            Layer from which param should be selected.
         param_name : str
-            Name of a parameter from self.param_dict
+            Name of a parameter from a layer's param dict
         i : int
             Index of parameter rule to be swapped with i-1
 
@@ -117,17 +122,20 @@ class OneD_Model:
         None.
 
         """
-        self.param_dict[param_name].param_rules[i], self.param_dict[param_name].param_rules[i-1] = self.param_dict[param_name].param_rules[i-1], self.param_dict[param_name].param_rules[i]
-        self.update_param_toarray(param_name)
+        param = self.layers[layer].params[param_name]
+        param.param_rules[i], param.param_rules[i-1] = param.param_rules[i-1], param.param_rules[i]
+        self.update_param_toarray(layer, param_name)
         return
 
-    def remove_param_rule(self, param_name, i):
+    def remove_param_rule(self, layer, param_name, i):
         """
 
         Parameters
         ----------
+        layer : str
+            Layer from which param should be selected.
         param_name : str
-            Name of parameter from self.param_dict
+            Name of a parameter from a layer's param dict
         i : int
             Index of parameter rule to be deleted
 
@@ -136,63 +144,67 @@ class OneD_Model:
         None.
 
         """
-        self.param_dict[param_name].param_rules.pop(i)
-        self.update_param_toarray(param_name)
+        self.layers[layer].params[param_name].param_rules.pop(i)
+        self.update_param_toarray(layer, param_name)
         return
     
-    def removeall_param_rules(self, param_name):
+    def removeall_param_rules(self, layer, param_name):
         """
         Deletes all parameter rules and resets stored distribution for a given parameter
 
         Parameters
         ----------
+        layer : str
+            Layer from which param should be selected.
         param_name : str
-            Name of parameter from self.param_dict
+            Name of a parameter from a layer's param dict
 
         Returns
         -------
         None.
 
         """
-        self.param_dict[param_name].param_rules = []
-        self.param_dict[param_name].value = 0
+        self.layers[layer].params[param_name].param_rules = []
+        self.layers[layer].params[param_name].value = 0
         return
     
-    def update_param_toarray(self, param_name):
+    def update_param_toarray(self, layer, param_name):
         """ Recalculate a Parameter from its Param_Rules"""
         # This should be done every time the Param_Rules are changed
-        # All params are stored as array, even if the param is space invariant
-        param = self.param_dict[param_name]
+        # All params calculated in this fashion are stored as array, 
+        # even if the param is space invariant
+        param = self.layers[layer].params[param_name]
 
         if param.is_edge:
-            new_param_value = np.zeros(len(self.grid_x_edges))
+            new_param_value = np.zeros(len(self.layers[layer].grid_x_edges))
         else:
-            new_param_value = np.zeros(len(self.grid_x_nodes))
+            new_param_value = np.zeros(len(self.layers[layer].grid_x_nodes))
 
         for condition in param.param_rules:
-            i = to_index(condition.l_bound, self.dx, self.total_length, param.is_edge)
+            i = to_index(condition.l_bound, self.layers[layer].dx, 
+                         self.layers[layer].total_length, param.is_edge)
             
             # If the left bound coordinate exceeds the width of the node toIndex() (which always rounds down) 
             # assigned, it should actually be mapped to the next node
-            if (condition.l_bound - to_pos(i, self.dx, param.is_edge) > self.dx / 2): 
+            if (condition.l_bound - to_pos(i, self.layers[layer].dx, param.is_edge) > self.layers[layer].dx / 2): 
                 i += 1
 
             if (condition.type == "POINT"):
                 new_param_value[i] = condition.l_boundval
 
             elif (condition.type == "FILL"):
-                j = to_index(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                j = to_index(condition.r_bound, self.layers[layer].dx, self.layers[layer].total_length, param.is_edge)
                 new_param_value[i:j+1] = condition.l_boundval
 
             elif (condition.type == "LINE"):
                 slope = (condition.r_boundval - condition.l_boundval) / (condition.r_bound - condition.l_bound)
-                j = to_index(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                j = to_index(condition.r_bound, self.layers[layer].dx, self.layers[layer].total_length, param.is_edge)
 
-                ndx = np.linspace(0, self.dx * (j - i), j - i + 1)
+                ndx = np.linspace(0, self.layers[layer].dx * (j - i), j - i + 1)
                 new_param_value[i:j+1] = condition.l_boundval + ndx * slope
 
             elif (condition.type == "EXP"):
-                j = to_index(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                j = to_index(condition.r_bound, self.layers[layer].dx, self.layers[layer].total_length, param.is_edge)
 
                 ndx = np.linspace(0, j - i, j - i + 1)
                 try:
