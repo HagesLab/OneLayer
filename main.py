@@ -3004,6 +3004,17 @@ class Notebook:
                 
             os.rmdir(full_path_name)
             return
+        
+        except KeyboardInterrupt:
+            print("### Aborting {} ###".format(data_file_name))
+            self.sim_warning_msg += ("Abort signal received while simulating {}\n".format(data_file_name))
+            for file in os.listdir(full_path_name):
+                tpath = full_path_name + "\\" + file
+                os.remove(tpath)
+                
+            os.rmdir(full_path_name)
+            return
+        
         except Exception as oops:
             self.sim_warning_msg += ("Error \"{}\" occurred while simulating {}\n".format(oops, data_file_name))
             for file in os.listdir(full_path_name):
