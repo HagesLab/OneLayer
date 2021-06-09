@@ -1254,8 +1254,8 @@ class Notebook:
                         val = to_array(param.value, len(layer.grid_x_nodes), 
                                        param.is_edge)
                         grid_x = layer.grid_x_nodes if not param.is_edge else layer.grid_x_edges
-                        self.sys_param_summaryplots[param_name].plot(grid_x, val)
-                        self.sys_param_summaryplots[param_name].set_yscale(autoscale(val_array=val))
+                        self.sys_param_summaryplots[(layer_name,param_name)].plot(grid_x, val)
+                        self.sys_param_summaryplots[(layer_name,param_name)].set_yscale(autoscale(val_array=val))
                 
             self.plotsummary_fig.tight_layout()
             self.plotsummary_fig.canvas.draw()
@@ -1406,8 +1406,8 @@ class Notebook:
                 layer = self.module.layers[layer_name]
                 for param_name in layer.params:
                     if layer.params[param_name].is_space_dependent:
-                        self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
-                        self.sys_param_summaryplots[param_name].set_title("{} {}".format(param_name,layer.params[param_name].units))
+                        self.sys_param_summaryplots[(layer_name,param_name)] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
+                        self.sys_param_summaryplots[(layer_name,param_name)].set_title("{}-{} {}".format(layer_name, param_name,layer.params[param_name].units))
                         count += 1
             
             self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, 
@@ -3440,11 +3440,11 @@ class Notebook:
             return
 
         for layer_name in self.resetIC_selected_layers:
-            
-            if self.module.layers[layer_name].spacegrid_is_set:
+            layer = self.module.layers[layer_name]
+            if layer.spacegrid_is_set:
                 self.current_layer_selection.set(layer_name)
                 self.change_layer()
-                for param in self.module.layers[layer_name].params:
+                for param in layer.params:
                     # Step 1 and 2
                     self.paramtoolkit_currentparam = param
                 
@@ -3456,7 +3456,7 @@ class Notebook:
                     self.deleteall_paramrule()
                     
                     # Step 3
-                    self.module.layers[layer_name].params[param].value = 0
+                    layer.params[param].value = 0
                    
                 if self.using_LGC[layer_name]:
                     self.using_LGC[layer_name] = False
@@ -3464,11 +3464,11 @@ class Notebook:
                     self.LGC_options[layer_name] = {}
             
                 self.set_thickness_and_dx_entryboxes(state='unlock')
-                self.module.layers[layer_name].total_length = None
-                self.module.layers[layer_name].dx = None
-                self.module.layers[layer_name].grid_x_edges = []
-                self.module.layers[layer_name].grid_x_nodes = []
-                self.module.layers[layer_name].spacegrid_is_set = False
+                layer.total_length = None
+                layer.dx = None
+                layer.grid_x_edges = []
+                layer.grid_x_nodes = []
+                layer.spacegrid_is_set = False
 
 
         self.update_IC_plot(plot_ID="clearall")                             
