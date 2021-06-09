@@ -234,8 +234,15 @@ class OneD_Model:
             mssg.append("LAYER: {}".format(layer))
             if self.layers[layer].spacegrid_is_set:
                 mssg.append("Space Grid is set")
-                mssg.append("Nodes: {}".format(self.layers[layer].grid_x_nodes))
-                mssg.append("Edges: {}".format(self.layers[layer].grid_x_edges))
+                if len(self.layers[layer].grid_x_nodes) > 20:
+                    mssg.append("Nodes: [{}...{}]".format(", ".join(map(str,self.layers[layer].grid_x_nodes[0:3])),
+                                                        ", ".join(map(str,self.layers[layer].grid_x_nodes[-3:]))))
+                    mssg.append("Edges: [{}...{}]".format(", ".join(map(str,self.layers[layer].grid_x_edges[0:3])),
+                                                        ", ".join(map(str,self.layers[layer].grid_x_edges[-3:]))))
+                    
+                else:
+                    mssg.append("Nodes: {}".format(self.layers[layer].grid_x_nodes))
+                    mssg.append("Edges: {}".format(self.layers[layer].grid_x_edges))
             else:
                 mssg.append("Grid is not set")
     
