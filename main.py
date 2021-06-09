@@ -1726,27 +1726,21 @@ class Notebook:
             self.resetIC_checkbutton_frame.grid(row=1,column=0,columnspan=2)
 
             # Let's try some procedurally generated checkbuttons: 
-            # one created automatically per module parameter
-            self.resetIC_checkparams = {}
+            # one created automatically per layer
+            self.resetIC_checklayers = {}
             self.resetIC_checkbuttons = {}
-            cb_row = 0
-            cb_col = 0
-            cb_per_col = 3
-            for param in self.module.param_dict:
-                self.resetIC_checkparams[param] = tk.IntVar()
 
-                self.resetIC_checkbuttons[param] = tk.ttk.Checkbutton(self.resetIC_checkbutton_frame, 
-                                                                      text=param, 
-                                                                      variable=self.resetIC_checkparams[param], 
-                                                                      onvalue=1, 
-                                                                      offvalue=0)
+            for layer_name in self.module.layers:
+                self.resetIC_checklayers[layer_name] = tk.IntVar()
 
-            for cb in self.resetIC_checkbuttons:
-                self.resetIC_checkbuttons[cb].grid(row=cb_row,column=cb_col, pady=(6,6))
-                cb_row += 1
-                if cb_row == cb_per_col:
-                    cb_row = 0
-                    cb_col += 1
+                self.resetIC_checkbuttons[layer_name] = tk.ttk.Checkbutton(self.resetIC_checkbutton_frame, 
+                                                                           text=layer_name, 
+                                                                           variable=self.resetIC_checklayers[layer_name], 
+                                                                           onvalue=1, 
+                                                                           offvalue=0)
+
+            for i, cb in enumerate(self.resetIC_checkbuttons):
+                self.resetIC_checkbuttons[cb].grid(row=i,column=0, pady=(6,6))
 
             
             self.hline10_separator = tk.ttk.Separator(self.resetIC_popup, 
@@ -1781,15 +1775,15 @@ class Notebook:
 
     def on_resetIC_popup_close(self, continue_=False):
         try:
-            self.resetIC_selected_params = []
+            self.resetIC_selected_layers = []
             self.resetIC_do_clearall = False
             if continue_:
                 self.resetIC_do_clearall = self.resetIC_check_clearall.get()
                 if self.resetIC_do_clearall:
-                    self.resetIC_selected_params = list(self.resetIC_checkparams.keys())
+                    self.resetIC_selected_layers = list(self.resetIC_checklayers.keys())
                 else:
-                    self.resetIC_selected_params = [param for param in self.resetIC_checkparams 
-                                                    if self.resetIC_checkparams[param].get()]
+                    self.resetIC_selected_layers = [layer_name for layer_name in self.resetIC_checklayers 
+                                                    if self.resetIC_checklayers[layer_name].get()]
 
             self.resetIC_popup.destroy()
             print("resetIC popup closed")
@@ -3430,55 +3424,56 @@ class Notebook:
 
     def reset_IC(self, force=False):
         """ On IC tab:
-            # 1. Remove all param_rules from all selected Parameters in the listbox
-            # 2. Remove all param_rules from all selected Parameters stored in Module
-            # 3. Remove values stored in Module
-            # + any visual changes to appeal to the user
+            For each selected layer with a set spacegrid 
+            (i.e. has values that need resetting):
+            # 1. Remove all param_rules from the listbox
+            # 2. Remove all param_rules stored in Module
+            # 3. Remove all values stored in Module
+            # + any cool visual effects
         """
 
         self.do_resetIC_popup()
         self.root.wait_window(self.resetIC_popup)
 
-        if (not self.resetIC_selected_params):
-            print("No params selected :(")
+        if (not self.resetIC_selected_layers):
+            print("No layers selected :(")
             return
 
-        for param in self.resetIC_selected_params:
-            # Step 1 and 2
-            self.paramtoolkit_currentparam = param
+        for layer_name in self.resetIC_selected_layers:
             
-            # These two lines changes the text displayed in the param_rule 
-            # display box's menu and is for cosmetic purposes only
-            self.update_paramrule_listbox(param)
-            self.paramtoolkit_viewer_selection.set(param)
-            
-            self.deleteall_paramrule()
-            
-            # Step 3
-            self.module.param_dict[param].value = 0
-            self.update_IC_plot(plot_ID="recent")
-            
-        
-
-        if self.resetIC_do_clearall:
-            self.update_IC_plot(plot_ID="custom")
-            if self.using_LGC:
-                self.using_LGC = False
-                self.LGC_values = {}
-                self.LGC_options = {}
-                self.update_IC_plot(plot_ID="LGC")
+            if self.module.layers[layer_name].spacegrid_is_set:
+                self.current_layer_selection.set(layer_name)
+                self.change_layer()
+                for param in self.module.layers[layer_name].params:
+                    # Step 1 and 2
+                    self.paramtoolkit_currentparam = param
                 
-            self.set_thickness_and_dx_entryboxes(state='unlock')
-            self.module.total_length = None
-            self.module.dx = None
-            self.module.grid_x_edges = []
-            self.module.grid_x_nodes = []
-            self.module.spacegrid_is_set = False
-            self.update_system_summary()
+                    # These two lines changes the text displayed in the param_rule 
+                    # display box's menu and is for cosmetic purposes only
+                    self.update_paramrule_listbox(param)
+                    self.paramtoolkit_viewer_selection.set(param)
+                    
+                    self.deleteall_paramrule()
+                    
+                    # Step 3
+                    self.module.layers[layer_name].params[param].value = 0
+                   
+                if self.using_LGC[layer_name]:
+                    self.using_LGC[layer_name] = False
+                    self.LGC_values[layer_name] = {}
+                    self.LGC_options[layer_name] = {}
             
-            
+                self.set_thickness_and_dx_entryboxes(state='unlock')
+                self.module.layers[layer_name].total_length = None
+                self.module.layers[layer_name].dx = None
+                self.module.layers[layer_name].grid_x_edges = []
+                self.module.layers[layer_name].grid_x_nodes = []
+                self.module.layers[layer_name].spacegrid_is_set = False
 
-        self.write(self.ICtab_status, "Selected params cleared")
+
+        self.update_IC_plot(plot_ID="clearall")                             
+        self.update_system_summary()                    
+        self.write(self.ICtab_status, "Selected layers cleared")
         return
 
 	## This is a patch of a consistency issue involving initial conditions - 
@@ -3992,7 +3987,6 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
         
-        warning_flag = False
         var = self.listupload_var_selection.get()
         is_edge = current_layer.params[var].is_edge
         
@@ -4083,6 +4077,17 @@ class Notebook:
             plot = self.LGC_subplot
         elif plot_ID=="listupload": 
             plot = self.listupload_subplot
+        elif plot_ID=="clearall":
+            self.recent_param_subplot.cla()
+            self.recent_param_fig.canvas.draw()
+            self.custom_param_subplot.cla()
+            self.custom_param_fig.canvas.draw()
+            self.LGC_subplot.cla()
+            self.LGC_fig.canvas.draw()
+            self.listupload_subplot.cla()
+            self.listupload_fig.canvas.draw()
+            return
+            
         plot.cla()
 
         if plot_ID=="LGC":
