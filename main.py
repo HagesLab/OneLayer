@@ -1214,14 +1214,18 @@ class Notebook:
             self.write(self.printsummary_textbox, self.module.DEBUG_print())
             
         if self.sys_plotsummary_popup_isopen:
-            for param_name in self.module.param_dict:
-                param = self.module.param_dict[param_name]
-                if param.is_space_dependent:
-                    val = to_array(param.value, len(self.module.grid_x_nodes), 
-                                   param.is_edge)
-                    grid_x = self.module.grid_x_nodes if not param.is_edge else self.module.grid_x_edges
-                    self.sys_param_summaryplots[param_name].plot(grid_x, val)
-                    self.sys_param_summaryplots[param_name].set_yscale(autoscale(val_array=val))
+            set_layers = {name for name in self.module.layers 
+                          if self.module.layers[name].spacegrid_is_set}
+            for layer_name in set_layers:
+                layer = self.module.layers[layer_name]
+                for param_name in layer.params:
+                    param = layer.params[param_name]
+                    if param.is_space_dependent:
+                        val = to_array(param.value, len(layer.grid_x_nodes), 
+                                       param.is_edge)
+                        grid_x = layer.grid_x_nodes if not param.is_edge else layer.grid_x_edges
+                        self.sys_param_summaryplots[param_name].plot(grid_x, val)
+                        self.sys_param_summaryplots[param_name].set_yscale(autoscale(val_array=val))
                 
             self.plotsummary_fig.tight_layout()
             self.plotsummary_fig.canvas.draw()
@@ -1347,16 +1351,18 @@ class Notebook:
     
     def do_sys_plotsummary_popup(self):
         """ Display as series of plots the current parameter distributions. """
-        if not self.module.spacegrid_is_set: 
+        set_layers = {name for name in self.module.layers if self.module.layers[name].spacegrid_is_set}
+        if not set_layers: 
             return
         
         if not self.sys_plotsummary_popup_isopen:
             self.sys_plotsummary_popup = tk.Toplevel(self.root)
-
+            plot_count = sum([self.module.layers[layer_name].param_count
+                              for layer_name in set_layers])
             count = 1
-            rdim = np.floor(np.sqrt(self.module.param_count))
+            rdim = np.floor(np.sqrt(plot_count))
             #rdim = 4
-            cdim = np.ceil(self.module.param_count / rdim)
+            cdim = np.ceil(plot_count / rdim)
             
             if self.sys_flag_dict['symmetric_system'].value():
                 self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, 
@@ -1366,11 +1372,13 @@ class Notebook:
 
             self.plotsummary_fig = Figure(figsize=(20,10))
             self.sys_param_summaryplots = {}
-            for param_name in self.module.param_dict:
-                if self.module.param_dict[param_name].is_space_dependent:
-                    self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
-                    self.sys_param_summaryplots[param_name].set_title("{} {}".format(param_name,self.module.param_dict[param_name].units))
-                    count += 1
+            for layer_name in set_layers:
+                layer = self.module.layers[layer_name]
+                for param_name in layer.params:
+                    if layer.params[param_name].is_space_dependent:
+                        self.sys_param_summaryplots[param_name] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
+                        self.sys_param_summaryplots[param_name].set_title("{} {}".format(param_name,layer.params[param_name].units))
+                        count += 1
             
             self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, 
                                                               master=self.sys_plotsummary_popup)

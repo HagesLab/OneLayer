@@ -77,6 +77,8 @@ class Layer:
         state_vars = set(self.params.keys()).union(set(self.outputs.keys()))
         params_in_cdict = set(self.convert_in.keys())
         assert (state_vars.issubset(params_in_cdict)), "Error: Layer conversion_dict is missing entries {}".format(params.difference(params_in_cdict))
+        ## TODO: Forbid duplicate layer names
+        ## TODO: Accomodate duplicate param names
         
         return
 
