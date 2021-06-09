@@ -42,8 +42,8 @@ class Std_SingleLayer(OneD_Model):
                   "Ec":Parameter(units="[eV]", is_edge=True), 
                   "electron_affinity":Parameter(units="[eV]", is_edge=True)}
         
-        dummy_params = {"init_S":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)),
-                        "mu_S":Parameter(units="[cm^2 / V s]", is_edge=True),
+        dummy_params = {"delta_N":Parameter(units="[cm^-3]", is_edge=True, valid_range=(0,np.inf)),
+                        "delta_P":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)),
                         "boundary vallue":Parameter(units="[a.u.]", is_edge=False, is_space_dependent=False, valid_range=(0,1))}
         
         dummy_convert = {p:10 for p in dummy_params}

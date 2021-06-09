@@ -117,8 +117,6 @@ class Notebook:
         self.check_display_legend = tk.IntVar()
         self.check_freeze_axes = tk.IntVar()
         self.check_autointegrate = tk.IntVar(value=0)
-
-        self.check_calculate_init_material_expfactor = tk.IntVar()
         
         self.active_analysisplot_ID = tk.IntVar()
         self.active_integrationplot_ID = tk.IntVar()
@@ -150,9 +148,9 @@ class Notebook:
         # Add (e.g. for Nanowire) module-specific functionality
         self.LGC_eligible_modules = ("Nanowire", "OneLayer")
         if self.module.system_ID in self.LGC_eligible_modules:
-            self.using_LGC = False
-            self.LGC_stim_mode = tk.StringVar()
-            self.LGC_gen_power_mode = tk.StringVar()
+            self.using_LGC = {}
+            self.LGC_options = {}
+            self.LGC_values = {}
 
         self.carryover_include_flags = {}
         for var in self.module.simulation_outputs_dict:
@@ -902,6 +900,11 @@ class Notebook:
         return
     
     def create_LGC_frame(self):
+        self.check_calculate_init_material_expfactor = tk.IntVar()
+        self.LGC_layer = tk.StringVar()
+        self.LGC_stim_mode = tk.StringVar()
+        self.LGC_gen_power_mode = tk.StringVar()
+        
         self.LGC_frame = tk.ttk.Frame(self.tab_generation_init)
         self.LGC_frame.grid(row=0,column=0, padx=(330,0))
 
@@ -909,6 +912,7 @@ class Notebook:
                                      text="Generation from Laser Excitation", 
                                      style="Header.TLabel")
         self.LGC_head.grid(row=0,column=0,columnspan=3)
+        
 
         # A sub-frame attached to a sub-frame
         # With these we can group related elements into a common region
@@ -1108,11 +1112,34 @@ class Notebook:
 
         self.total_gen_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.total_gen_entry.grid(row=9,column=3)
+        
+        self.LGC_layer_frame = tk.ttk.Frame(self.LGC_frame)
+        self.LGC_layer_frame.grid(row=2,column=1,padx=(20,0))
+        
+        LGC_eligible_layers = [layer_name for layer_name in self.module.layers
+                               if "delta_N" in self.module.layers[layer_name].params
+                               and "delta_P" in self.module.layers[layer_name].params]
+        
+        for layer_name in LGC_eligible_layers:
+            self.LGC_options[layer_name] = {}
+            self.LGC_values[layer_name] = {}
+            self.using_LGC[layer_name] = False
+        
+        self.LGC_layer_rbtns = {}
+        self.LGC_layer_frame_title = tk.Label(self.LGC_layer_frame, text="Apply to layer: ")
+        self.LGC_layer_frame_title.grid(row=0,column=0,columnspan=2)
+        for i, layer_name in enumerate(LGC_eligible_layers):
+            self.LGC_layer_rbtns[layer_name] = tk.ttk.Radiobutton(self.LGC_layer_frame, 
+                                                      variable=self.LGC_layer, 
+                                                      value=layer_name)
+            self.LGC_layer_rbtns[layer_name].grid(row=i+1,column=0)
+            layer_rbtn_label = tk.ttk.Label(self.LGC_layer_frame, text=layer_name)
+            layer_rbtn_label.grid(row=i+1,column=1)
 
         self.load_LGC_button = tk.ttk.Button(self.LGC_frame, 
                                              text="Generate Initial Condition", 
                                              command=self.add_LGC)
-        self.load_LGC_button.grid(row=2,column=0,columnspan=3)
+        self.load_LGC_button.grid(row=3,column=0,columnspan=3)
 
         self.LGC_description = tk.Message(self.LGC_frame, 
                                           text="The Laser Generation Condition "
@@ -1120,19 +1147,20 @@ class Notebook:
                                           "to generate an initial carrier "
                                           "distribution based on an applied "
                                           "laser excitation.", width=320)
-        self.LGC_description.grid(row=3,column=0,columnspan=3)
+        self.LGC_description.grid(row=4,column=0,columnspan=3)
         
         self.LGC_fig = Figure(figsize=(5,3.1))
         self.LGC_subplot = self.LGC_fig.add_subplot(111)
         self.LGC_canvas = tkagg.FigureCanvasTkAgg(self.LGC_fig, master=self.LGC_frame)
         self.LGC_plotwidget = self.LGC_canvas.get_tk_widget()
-        self.LGC_plotwidget.grid(row=4, column=0, columnspan=3)
+        self.LGC_plotwidget.grid(row=5, column=0, columnspan=3)
         
         self.LGC_toolbar_frame = tk.ttk.Frame(master=self.LGC_frame)
-        self.LGC_toolbar_frame.grid(row=5,column=0,columnspan=3)
+        self.LGC_toolbar_frame.grid(row=6,column=0,columnspan=3)
         self.LGC_toolbar = tkagg.NavigationToolbar2Tk(self.LGC_canvas, 
                                                       self.LGC_toolbar_frame)
         
+        ## TODO: Assign these directly
         self.LGC_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, 
                                     "LGC_absorption_cof":self.LGC_absorption_cof_entry, 
                                     "Pulse_Freq":self.pulse_freq_entry, 
@@ -1146,18 +1174,15 @@ class Notebook:
         self.LGC_optionboxes = {"long_expfactor":self.check_calculate_init_material_expfactor, 
                                 "incidence":self.LGC_stim_mode,
                                 "power_mode":self.LGC_gen_power_mode}
-        self.LGC_options = {}
-        self.LGC_values = {}
         return
 
     def DEBUG(self):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        for layer in self.module.layers:
-            print("Layer {}:".format(layer))
-            print(self.module.layers[layer].total_length)
-            print(self.module.layers[layer].dx)
+        print(self.using_LGC)
+        print(self.LGC_options)
+        print(self.LGC_values)
         return
     
     def change_layer(self):
@@ -3517,9 +3542,19 @@ class Notebook:
 
     def add_LGC(self):
         """Calculate and store laser generation profile"""
+        # Update current working layer
+        if not self.LGC_layer.get():
+            self.write(self.ICtab_status, "Select a layer to apply this excitation on")
+            return
+        
+        if not self.current_layer_name == self.LGC_layer.get():
+            self.current_layer_selection.set(self.LGC_layer.get())
+            self.change_layer()
+        current_layer = self.module.layers[self.current_layer_name]
+        
         try:
             self.set_init_x()
-            assert self.module.spacegrid_is_set, "Error: could not set space grid"
+            assert current_layer.spacegrid_is_set, "Error: could not set space grid"
 
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
@@ -3529,11 +3564,6 @@ class Notebook:
             self.write(self.ICtab_status, oops)
             return
 
-        # Check for valid option choices
-        
-        # {"long_expfactor":self.check_calculate_init_material_expfactor.get(), 
-        #                "incidence":self.LGC_stim_mode.get(),
-        #                "power_mode":self.LGC_gen_power_mode.get()}
         try:
             assert (not (self.LGC_optionboxes["long_expfactor"].get() == "") and self.LGC_optionboxes["power_mode"].get()), "Error: select material param and power generation options "
         except AssertionError as oops:
@@ -3552,6 +3582,17 @@ class Notebook:
         c = 2.997e8     # [m/s]
         hc_evnm = h * c * 6.241e18 * 1e9    # [J*m] to [eV*nm]
         hc_nm = h * c * 1e9     # [J*m] to [J*nm] 
+        
+        try:
+            if current_layer.params['delta_N'].is_edge and current_layer.params['delta_P'].is_edge:
+                grid_x = current_layer.grid_x_edges
+            elif not (current_layer.params['delta_N'].is_edge or current_layer.params['delta_P'].is_edge):
+                grid_x = current_layer.grid_x_nodes
+            else:
+                raise ValueError
+        except ValueError:
+            self.write(self.ICtab_status, "Node mismatch - dN is edge but dP is node or vice versa")
+            return
 
         if (self.LGC_optionboxes["long_expfactor"].get()):
             try: 
@@ -3622,9 +3663,9 @@ class Notebook:
                     return
 
             # Note: add_LGC() automatically converts into TEDs units. For consistency add_LGC should really deposit values in common units.
-            self.module.param_dict["delta_N"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, 
-                                                                                                      freq, wavelength, alpha_nm, 
-                                                                                                      self.module.grid_x_nodes, hc=hc_nm)
+            current_layer.params["delta_N"].value = carrier_excitations.pulse_laser_power_spotsize(power, spotsize, 
+                                                                                                   freq, wavelength, alpha_nm, 
+                                                                                                   grid_x, hc=hc_nm)
         
         elif (self.LGC_optionboxes["power_mode"].get() == "density"):
             try: power_density = float(self.power_density_entry.get()) * 1e-6 * ((1e-7) ** 2)  # [uW / cm^2] to [J/s nm^2]
@@ -3648,9 +3689,9 @@ class Notebook:
                     self.write(self.ICtab_status, "Error: missing or invalid pulse frequency")
                     return
 
-            self.module.param_dict["delta_N"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, 
-                                                                                                    wavelength, alpha_nm, 
-                                                                                                    self.module.grid_x_nodes, hc=hc_nm)
+            current_layer.params["delta_N"].value = carrier_excitations.pulse_laser_powerdensity(power_density, freq, 
+                                                                                                 wavelength, alpha_nm, 
+                                                                                                 grid_x, hc=hc_nm)
         
         elif (self.LGC_optionboxes["power_mode"].get() == "max-gen"):
             try: max_gen = float(self.max_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
@@ -3658,8 +3699,8 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing max gen")
                 return
 
-            self.module.param_dict["delta_N"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, 
-                                                                                              self.module.grid_x_nodes)
+            current_layer.params["delta_N"].value = carrier_excitations.pulse_laser_maxgen(max_gen, alpha_nm, 
+                                                                                           grid_x)
         
         elif (self.LGC_optionboxes["power_mode"].get() == "total-gen"):
             try: total_gen = float(self.total_gen_entry.get()) * ((1e-7) ** 3) # [cm^-3] to [nm^-3]
@@ -3667,60 +3708,59 @@ class Notebook:
                 self.write(self.ICtab_status, "Error: missing total gen")
                 return
 
-            self.module.param_dict["delta_N"].value = carrier_excitations.pulse_laser_totalgen(total_gen, self.module.total_length, 
-                                                                                                alpha_nm, self.module.grid_x_nodes)
+            current_layer.params["delta_N"].value = carrier_excitations.pulse_laser_totalgen(total_gen, current_layer.total_length, 
+                                                                                             alpha_nm, grid_x)
         
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
         
         
-        self.module.param_dict["delta_N"].value *= self.convert_out_dict["delta_N"]
+        current_layer.params["delta_N"].value *= current_layer.convert_out["delta_N"]
         ## Assuming that the initial distributions of holes and electrons are identical
-        self.module.param_dict["delta_P"].value = self.module.param_dict["delta_N"].value
+        current_layer.params["delta_P"].value = current_layer.params["delta_N"].value
 
         self.update_IC_plot(plot_ID="LGC")
         self.paramtoolkit_currentparam = "delta_N"
         self.update_IC_plot(plot_ID="custom")
         self.paramtoolkit_currentparam = "delta_P"
         self.update_IC_plot(plot_ID="recent")
-        self.using_LGC = True
+        self.using_LGC[self.current_layer_name] = True
         
         # If LGC profile successful, record all parameters used to generate
-        self.LGC_options = {LGC_option: self.LGC_optionboxes[LGC_option].get() \
-                            for LGC_option in self.LGC_optionboxes}
+        self.LGC_options[self.current_layer_name] = {LGC_option: self.LGC_optionboxes[LGC_option].get() \
+                                                     for LGC_option in self.LGC_optionboxes}
         
-        self.LGC_values = {}
-        if (self.LGC_options["long_expfactor"]):
-            self.LGC_values["A0"] = A0
-            self.LGC_values["Eg"] = Eg
-            self.LGC_values["Pulse_Wavelength"] = wavelength
+        if (self.LGC_options[self.current_layer_name]["long_expfactor"]):
+            self.LGC_values[self.current_layer_name]["A0"] = A0
+            self.LGC_values[self.current_layer_name]["Eg"] = Eg
+            self.LGC_values[self.current_layer_name]["Pulse_Wavelength"] = wavelength
         else:
-            self.LGC_values["LGC_absorption_cof"] = alpha
+            self.LGC_values[self.current_layer_name]["LGC_absorption_cof"] = alpha
             
-        if (self.LGC_options["power_mode"] == "power-spot"):
-            self.LGC_values["Power"] = power * 1e6
-            self.LGC_values["Spotsize"] = spotsize * (1e-7) ** 2
-            self.LGC_values["Pulse_Wavelength"] = wavelength
+        if (self.LGC_options[self.current_layer_name]["power_mode"] == "power-spot"):
+            self.LGC_values[self.current_layer_name]["Power"] = power * 1e6
+            self.LGC_values[self.current_layer_name]["Spotsize"] = spotsize * (1e-7) ** 2
+            self.LGC_values[self.current_layer_name]["Pulse_Wavelength"] = wavelength
             if (self.pulse_freq_entry.get() == "cw" or self.sys_flag_dict["check_do_ss"].value()):
                 pass
             else:
-                self.LGC_values["Pulse_Freq"] = freq * 1e-3
+                self.LGC_values[self.current_layer_name]["Pulse_Freq"] = freq * 1e-3
                     
-        elif (self.LGC_options["power_mode"] == "density"):
-            self.LGC_values["Power_Density"] = power_density * 1e6 * ((1e7) ** 2)
-            self.LGC_values["Pulse_Wavelength"] = wavelength
+        elif (self.LGC_options[self.current_layer_name]["power_mode"] == "density"):
+            self.LGC_values[self.current_layer_name]["Power_Density"] = power_density * 1e6 * ((1e7) ** 2)
+            self.LGC_values[self.current_layer_name]["Pulse_Wavelength"] = wavelength
 
             if (self.pulse_freq_entry.get() == "cw" or self.sys_flag_dict["check_do_ss"].value()):
                 pass
             else:
-                self.LGC_values["Pulse_Freq"] = freq * 1e-3
+                self.LGC_values[self.current_layer_name]["Pulse_Freq"] = freq * 1e-3
                 
-        elif (self.LGC_options["power_mode"] == "max-gen"):
-            self.LGC_values["Max_Gen"] = max_gen * ((1e7) ** 3)
+        elif (self.LGC_options[self.current_layer_name]["power_mode"] == "max-gen"):
+            self.LGC_values[self.current_layer_name]["Max_Gen"] = max_gen * ((1e7) ** 3)
 
-        elif (self.LGC_options["power_mode"] == "total-gen"):
-            self.LGC_values["Total_Gen"] = total_gen * ((1e7) ** 3)
+        elif (self.LGC_options[self.current_layer_name]["power_mode"] == "total-gen"):
+            self.LGC_values[self.current_layer_name]["Total_Gen"] = total_gen * ((1e7) ** 3)
         
         return
 
@@ -3806,7 +3846,7 @@ class Notebook:
 
         if self.module.system_ID in self.LGC_eligible_modules:
             if new_param_name == "delta_N" or new_param_name == "delta_P": 
-                self.using_LGC = False
+                self.using_LGC[self.current_layer_name] = False
         self.update_IC_plot(plot_ID="recent")
         return
 
@@ -4012,7 +4052,7 @@ class Notebook:
                 
         if self.module.system_ID in self.LGC_eligible_modules:
             if var == "delta_N" or var == "delta_P": 
-                self.using_LGC = False
+                self.using_LGC[self.current_layer_name] = False
         
         self.paramtoolkit_currentparam = var
         self.deleteall_paramrule()
@@ -4025,7 +4065,7 @@ class Notebook:
             self.root.wait_window(self.confirmation_popup)
         return
 
-    def update_IC_plot(self, plot_ID, warn=False):
+    def update_IC_plot(self, plot_ID):
         """ Plot selected parameter distribution on Initial Condition tab."""
         if plot_ID=="recent": 
             plot = self.recent_param_subplot
@@ -4039,19 +4079,11 @@ class Notebook:
 
         if plot_ID=="LGC":
             param_name="delta_N"
-            # Find the layer that contains the parameter delta_N
-            for layer in self.module.layers:
-                try:
-                    param_obj = self.module.layers[layer].params[param_name]
-                except KeyError:
-                    continue
-                grid_x = (self.module.layers[layer].grid_x_edges 
-                          if param_obj.is_edge else self.module.layers[layer].grid_x_nodes)
         else: 
             param_name = self.paramtoolkit_currentparam
-            param_obj = self.module.layers[self.current_layer_name].params[param_name]
-            grid_x = (self.module.layers[self.current_layer_name].grid_x_edges 
-                      if param_obj.is_edge else self.module.layers[self.current_layer_name].grid_x_nodes)
+        param_obj = self.module.layers[self.current_layer_name].params[param_name]
+        grid_x = (self.module.layers[self.current_layer_name].grid_x_edges 
+                  if param_obj.is_edge else self.module.layers[self.current_layer_name].grid_x_nodes)
         # Support for constant value shortcut: temporarily create distribution
         # simulating filling across module with that value
         val_array = to_array(param_obj.value, len(self.module.layers[self.current_layer_name].grid_x_nodes), 
@@ -4095,8 +4127,7 @@ class Notebook:
             self.listupload_fig.tight_layout()
             self.listupload_fig.canvas.draw()
 
-        if not warn: 
-            self.write(self.ICtab_status, "Initial Condition Updated")
+        self.write(self.ICtab_status, "Initial Condition Updated")
         return
 
     ## Initial Condition I/O
