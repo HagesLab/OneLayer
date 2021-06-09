@@ -3923,28 +3923,27 @@ class Notebook:
     
     def add_listupload(self):
         """ Generate a parameter distribution using list from .txt file"""
+        current_layer = self.module.layers[self.current_layer_name]
+        msg = ["The following occured while importing the list:"]
         try:
             self.set_init_x()
-            assert self.module.spacegrid_is_set, "Error: could not set space grid"
+            assert current_layer.spacegrid_is_set, "Error: could not set space grid"
         except ValueError:
             self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
             return
 
-        except AssertionError:
-            return
-        
         except (AssertionError, Exception) as oops:
             self.write(self.ICtab_status, oops)
             return
         
         warning_flag = False
         var = self.listupload_var_selection.get()
-        is_edge = self.module.param_dict[var].is_edge
+        is_edge = current_layer.params[var].is_edge
         
         valuelist_filename = tk.filedialog.askopenfilename(initialdir="", 
                                                            title="Select Values from text file", 
                                                            filetypes=[("Text files","*.txt")])
-        if not valuelist_filename: # If no file selected
+        if not valuelist_filename:
             return
 
         IC_values_list = []
@@ -3956,15 +3955,18 @@ class Notebook:
                 else: IC_values_list.append(line.strip('\n'))
 
            
-        temp_IC_values = np.zeros(len(self.module.grid_x_nodes)) if not is_edge else np.zeros(len(self.module.grid_x_edges))
+        temp_IC_values = np.zeros_like(current_layer.grid_x_nodes) if not is_edge else np.zeros_like(current_layer.grid_x_edges)
 
         try:
             IC_values_list.sort(key = lambda x:float(x[0:x.find('\t')]))
             
-            if len(IC_values_list) < 2: # if not enough points in list
-                raise ValueError
-        except Exception:
-            self.write(self.ICtab_status, "Error: Unable to read point list")
+            if len(IC_values_list) < 2:
+                raise ValueError("Not enough points in list")
+        except Exception as e:
+            msg.append("Error: Unable to read point list")
+            msg.append(str(e))
+            self.do_confirmation_popup("\n".join(msg), hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
             return
         
     
@@ -3974,31 +3976,31 @@ class Notebook:
                 second_valueset = extract_values(IC_values_list[i+1], '\t') #[x2, y(x2)]
                 
             except ValueError:
-                self.write(self.ICtab_status, "Warning: Unusual point list content")
-                warning_flag = True
+                msg.append("Warning: Unusual point list content")
 
             # Linear interpolate from provided param list to specified grid points
-            lindex = to_index(first_valueset[0], self.module.dx, 
-                              self.module.total_length, is_edge)
-            rindex = to_index(second_valueset[0], self.module.dx, 
-                              self.module.total_length, is_edge)
+            lindex = to_index(first_valueset[0], current_layer.dx, 
+                              current_layer.total_length, is_edge)
+            rindex = to_index(second_valueset[0], current_layer.dx, 
+                              current_layer.total_length, is_edge)
             
-            if (first_valueset[0] - to_pos(lindex, self.module.dx, is_edge) >= self.module.dx / 2): 
+            if (first_valueset[0] - to_pos(lindex, current_layer.dx, is_edge) >= current_layer.dx / 2): 
                 lindex += 1
 
             intermediate_x_indices = np.arange(lindex, rindex + 1, 1)
 
             for j in intermediate_x_indices: # y-y0 = (y1-y0)/(x1-x0) * (x-x0)
                 try:
-                    if (second_valueset[0] > self.module.total_length): 
+                    if (second_valueset[0] > current_layer.total_length): 
                         raise IndexError
-                    temp_IC_values[j] = first_valueset[1] + (to_pos(j, self.module.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
+                    temp_IC_values[j] = first_valueset[1] + (to_pos(j, current_layer.dx) - first_valueset[0]) * (second_valueset[1] - first_valueset[1]) / (second_valueset[0] - first_valueset[0])
                 except IndexError:
-                    self.write(self.ICtab_status, "Warning: some points out of bounds")
-                    warning_flag = True
-                except Exception:
+                    msg.append("Warning: point {} out of bounds".format(second_valueset))
+                    break
+                except Exception as e:
+                    msg.append("Warning: unable to assign value for position {}".format(j))
+                    msg.append(str(e))
                     temp_IC_values[j] = 0
-                    warning_flag = True
                 
         if self.module.system_ID in self.LGC_eligible_modules:
             if var == "delta_N" or var == "delta_P": 
@@ -4006,9 +4008,13 @@ class Notebook:
         
         self.paramtoolkit_currentparam = var
         self.deleteall_paramrule()
-        self.module.param_dict[var].value = temp_IC_values
-        self.update_IC_plot(plot_ID="listupload", warn=warning_flag)
-        self.update_IC_plot(plot_ID="recent", warn=warning_flag)
+        current_layer.params[var].value = temp_IC_values
+        self.update_IC_plot(plot_ID="listupload")
+        self.update_IC_plot(plot_ID="recent")
+        
+        if len(msg) > 1:
+            self.do_confirmation_popup("\n".join(msg), hide_cancel=True)
+            self.root.wait_window(self.confirmation_popup)
         return
 
     def update_IC_plot(self, plot_ID, warn=False):
