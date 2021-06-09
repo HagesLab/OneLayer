@@ -432,7 +432,7 @@ class Notebook:
                 self.sys_flag_dict[flag].tk_element.grid(row=i,column=0)
                 i += 1
                 
-        self.ICtab_status = tk.Text(self.tab_inputs, width=20,height=8)
+        self.ICtab_status = tk.Text(self.tab_inputs, width=24,height=8)
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
         
@@ -451,14 +451,17 @@ class Notebook:
                                                  style="Grey Bar.TSeparator")
         self.line0_separator.grid(row=10,column=0,columnspan=2, pady=(10,10), sticky="ew")
         
+        self.layer_statusbox = tk.Text(self.tab_inputs, width=24, height=1)
+        self.layer_statusbox.grid(row=11,column=0,columnspan=2)
+        
         # Init this dropdown with some default layer
         self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_selection,
                                                 first_layer, *self.module.layers)
-        self.layer_dropdown.grid(row=11,column=0)
+        self.layer_dropdown.grid(row=12,column=0)
         
         self.change_layer_btn = tk.ttk.Button(self.tab_inputs, text="Change to Layer",
                                               command=self.change_layer)
-        self.change_layer_btn.grid(row=11,column=1)
+        self.change_layer_btn.grid(row=12,column=1)
         
         self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", 
                                                 style="Grey Bar.TSeparator")
@@ -1185,7 +1188,7 @@ class Notebook:
         print(self.LGC_values)
         return
     
-    def change_layer(self):
+    def change_layer(self, clear=True):
         self.current_layer_name = self.current_layer_selection.get()
         
         current_layer = self.module.layers[self.current_layer_name]
@@ -1195,8 +1198,9 @@ class Notebook:
             self.enter(self.dx_entry, str(current_layer.dx))
             self.set_thickness_and_dx_entryboxes(state='lock')
         else:
-            self.enter(self.thickness_entry, "")
-            self.enter(self.dx_entry, "")
+            if clear:
+                self.enter(self.thickness_entry, "")
+                self.enter(self.dx_entry, "")
             
         # Put new layer's params into param selection tabs
         var_dropdown_list = [str(param_name + param.units) 
@@ -1228,6 +1232,7 @@ class Notebook:
         
         self.write(self.ICtab_status, "Switched to layer:\n{}".format(self.current_layer_name))
         
+        self.write(self.layer_statusbox, "On layer: {}".format(self.current_layer_name))
         
         return
 
@@ -3549,7 +3554,10 @@ class Notebook:
         
         if not self.current_layer_name == self.LGC_layer.get():
             self.current_layer_selection.set(self.LGC_layer.get())
-            self.change_layer()
+            
+            # User shortcut - if no layers' spacegrids set yet, let the first LGC set a spacegrid
+            any_layers_set =  any([layer.spacegrid_is_set for name, layer in self.module.layers.items()])
+            self.change_layer(clear=any_layers_set)
         current_layer = self.module.layers[self.current_layer_name]
         
         try:
