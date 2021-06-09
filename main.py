@@ -2928,6 +2928,7 @@ class Notebook:
 
         return
 
+
     def do_Batch(self):
         """ Interpret values entered into simulate tab and prepare simulations 
             for each selected IC file
@@ -4307,7 +4308,7 @@ class Notebook:
                                                           title="Select IC text files", 
                                                           filetypes=[("Text files","*.txt")])
         if not self.IC_file_name: 
-            return # If user closes dialog box without selecting a file
+            return
 
         self.load_ICfile()
         return
@@ -4325,8 +4326,8 @@ class Notebook:
                 flag_values_dict = {}
                 LGC_values = {}
                 LGC_options = {}
-                total_length = 0
-                dx = 0
+                total_length = {}
+                dx = {}
 
                 initFlag = 0
                 
@@ -4347,53 +4348,61 @@ class Notebook:
                     # There are three "$" markers in an IC file: "Space Grid", "System Parameters" and "System Flags"
                     # each corresponding to a different section of the file
                     
-                    elif "$ Space Grid" in line:
-                        print("Now searching for space grid parameters: total length and dx")
-                        initFlag = 1
+                    elif "L$" in line:
+                        layer_name = line[line.find(":")+1:].strip(' \n')
+                        init_param_values_dict[layer_name] = {}
+                        LGC_values[layer_name] = {}
+                        LGC_options[layer_name] = {}
+                        print("Found layer {}".format(layer_name))
+                        continue
                         
-                    elif "$ System Parameters" in line:
+                    elif "p$ Space Grid" in line:
+                        print("Now searching for space grid: length and dx")
+                        initFlag = 'g'
+                        
+                    elif "p$ System Parameters" in line:
                         print("Now searching for system parameters...")
-                        initFlag = 2
+                        initFlag = 'p'
                         
-                    elif "$ System Flags" in line:
+                    elif "f$" in line:
                         print("Now searching for flag values...")
-                        initFlag = 3
+                        initFlag = 'f'
                         
                     elif "$ Laser Parameters" in line:
                         print("Now searching for laser parameters...")
                         if self.module.system_ID not in self.LGC_eligible_modules:
                             print("Warning: laser params found for unsupported module (these will be ignored)")
-                        initFlag = 4
+                        initFlag = 'l'
                         
                     elif "$ Laser Options" in line:
                         print("Now searching for laser options...")
                         if self.module.system_ID not in self.LGC_eligible_modules:
                             print("Warning: laser options found for unsupported module (these will be ignored)")
-                        initFlag = 5
+                        initFlag = 'o'
                         
-                    elif (initFlag == 1):
+                    elif (initFlag == 'g'):
                         line = line.strip('\n')
                         if line.startswith("Total_length"):
-                            total_length = (line[line.find(' ') + 1:])
+                            total_length[layer_name] = (line[line.rfind(' ') + 1:])
                             
                         elif line.startswith("Node_width"):
-                            dx = (line[line.find(' ') + 1:])
+                            dx[layer_name] = (line[line.rfind(' ') + 1:])
                             
-                    elif (initFlag == 2):
+                    elif (initFlag == 'p'):
                         line = line.strip('\n')
-                        init_param_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+                        init_param_values_dict[layer_name][line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
 
-                    elif (initFlag == 3):
+                    elif (initFlag == 'f'):
                         line = line.strip('\n')
-                        flag_values_dict[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+                        flag_values_dict[line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
                         
-                    elif (initFlag == 4):
+                    elif (initFlag == 'l'):
                         line = line.strip('\n')
-                        LGC_values[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+                        LGC_values[layer_name][line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
                         
-                    elif (initFlag == 5):
+                    elif (initFlag == 'o'):
                         line = line.strip('\n')
-                        LGC_options[line[0:line.find(':')]] = (line[line.find(' ') + 1:])
+                        LGC_options[layer_name][line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
 
 
         except Exception as oops:
@@ -4402,13 +4411,16 @@ class Notebook:
 
         ## At this point everything from the file has been read. 
         # Whether those values are valid is another story, but having a valid space grid is essential.
+        
         try:
-            total_length = float(total_length)
-            dx = float(dx)
-            if (total_length <= 0) or (dx <= 0) or (dx > total_length / 2):
-                raise ValueError
+            for layer_name in self.module.layers:
+                total_length[layer_name] = float(total_length[layer_name])
+                dx[layer_name] = float(dx[layer_name])
+                if ((total_length[layer_name] <= 0) or (dx[layer_name] <= 0)
+                    or (dx[layer_name] > total_length[layer_name] / 2)):
+                    raise ValueError
         except Exception:
-            self.write(self.ICtab_status, "Error: invalid space grid")
+            self.write(self.ICtab_status, "Error: invalid space grid for layer {}".format(layer_name))
             return
         
         # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and any other values that may exist on the GUI
@@ -4416,33 +4428,39 @@ class Notebook:
             for key in self.LGC_entryboxes_dict:
                 self.enter(self.LGC_entryboxes_dict[key], "")
             
-        for param in self.module.param_dict:
-            self.paramtoolkit_currentparam = param
-            
-            self.update_paramrule_listbox(param)            
-            self.deleteall_paramrule()
-            
-            self.module.param_dict[param].value = 0
+        for layer_name, layer in self.module.layers.items():
+            self.current_layer_name = layer_name
+            for param in layer.params:
+                self.paramtoolkit_currentparam = param
+                
+                self.update_paramrule_listbox(param)            
+                self.deleteall_paramrule()
+                
+                layer.params[param].value = 0
 
-        self.set_thickness_and_dx_entryboxes(state='unlock')
-        self.module.total_length = None
-        self.module.dx = None
-        self.module.grid_x_edges = []
-        self.module.grid_x_nodes = []
-        self.module.spacegrid_is_set = False
+            self.set_thickness_and_dx_entryboxes(state='unlock')
+            layer.total_length = None
+            layer.dx = None
+            layer.grid_x_edges = []
+            layer.grid_x_nodes = []
+            layer.spacegrid_is_set = False
 
-        try:
-            self.enter(self.thickness_entry, total_length)
-            self.enter(self.dx_entry, dx)
-            self.set_init_x()
-            assert self.module.spacegrid_is_set, "Error: could not set space grid"
-        except ValueError:
-            self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
-            return
 
-        except (AssertionError, Exception) as oops:
-            self.write(self.ICtab_status, oops)
-            return
+        for layer_name, layer in self.module.layers.items():
+            self.current_layer_name = layer_name
+            try:
+                self.set_thickness_and_dx_entryboxes(state='unlock')
+                self.enter(self.thickness_entry, total_length[self.current_layer_name])
+                self.enter(self.dx_entry, dx[self.current_layer_name])
+                self.set_init_x()
+                assert layer.spacegrid_is_set, "Error: could not set space grid"
+            except ValueError:
+                self.write(self.ICtab_status, "Error: invalid thickness or space stepsize")
+                return
+    
+            except (AssertionError, Exception) as oops:
+                self.write(self.ICtab_status, oops)
+                return
 
         for flag in self.module.flags_dict:
             # All we need to do here is mark the appropriate GUI elements as selected
@@ -4453,36 +4471,43 @@ class Notebook:
                 warning_mssg += "\nFlags must have integer value 1 or 0"
                 warning_flag += 1
             
-        for param in self.module.param_dict:
-            try:
-                new_value = init_param_values_dict[param]
-                if '\t' in new_value: # If an array / list of points was stored
-                    assert self.module.param_dict[param].is_space_dependent
-                    self.module.param_dict[param].value = np.array(extract_values(new_value, '\t'))
-                else: 
-                    self.module.param_dict[param].value = float(new_value)
-                
-                self.paramtoolkit_currentparam = param
-                if cycle_through_IC_plots: 
-                    self.update_IC_plot(plot_ID="recent")
-            except Exception:
-                warning_mssg += ("\nWarning: could not apply value for param: {}".format(param))
-                warning_flag += 1
+        for layer_name, layer in self.module.layers.items():
+            self.current_layer_name = layer_name
+            for param_name, param in layer.params.items():
+                try:
+                    new_value = init_param_values_dict[layer_name][param_name]
+                    if '\t' in new_value: # If an array / list of points was stored
+                        assert param.is_space_dependent
+                        param.value = np.array(extract_values(new_value, '\t'))
+                    else: 
+                        param.value = float(new_value)
                     
-        if self.module.system_ID in self.LGC_eligible_modules: 
-            self.using_LGC = bool(LGC_values)
-            if LGC_values:
-                for laser_param in LGC_values:
-                    if float(LGC_values[laser_param]) > 1e3:
-                        self.enter(self.LGC_entryboxes_dict[laser_param], "{:.3e}".format(float(LGC_values[laser_param])))
-                    else:
-                        self.enter(self.LGC_entryboxes_dict[laser_param], LGC_values[laser_param])
+                    self.paramtoolkit_currentparam = param_name
+                    if cycle_through_IC_plots: 
+                        self.update_IC_plot(plot_ID="recent")
+                except Exception:
+                    warning_mssg += ("\nWarning: could not apply value for param: {}".format(param_name))
+                    warning_flag += 1
+                        
+            if self.module.system_ID in self.LGC_eligible_modules: 
+                self.using_LGC[layer_name] = bool(LGC_values[layer_name])
+                if LGC_values[layer_name]:
+                    for laser_param in LGC_values[layer_name]:
+                        if float(LGC_values[layer_name][laser_param]) > 1e3:
+                            self.enter(self.LGC_entryboxes_dict[laser_param], "{:.3e}".format(float(LGC_values[layer_name][laser_param])))
+                        else:
+                            self.enter(self.LGC_entryboxes_dict[laser_param], LGC_values[layer_name][laser_param])
+                
+                for laser_option in LGC_options[layer_name]:
+                    self.LGC_optionboxes[laser_option].set(LGC_options[layer_name][laser_option])
             
-            for laser_option in LGC_options:
-                self.LGC_optionboxes[laser_option].set(LGC_options[laser_option])
-        
-            self.add_LGC()
+                if self.using_LGC[layer_name]:
+                    self.LGC_layer.set(layer_name)
+                    self.add_LGC()
             
+        # Sync display to latest layer
+        self.current_layer_selection.set(self.current_layer_name)
+        self.change_layer()
         if not warning_flag: 
             self.write(self.ICtab_status, "IC file loaded successfully")
         else: 
