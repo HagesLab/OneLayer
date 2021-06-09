@@ -4226,7 +4226,7 @@ class Notebook:
         """Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked"""
     
         try:
-            assert self.module.spacegrid_is_set, "Error: set a space grid first"
+            assert all([layer.spacegrid_is_set for name, layer in self.module.layers.items()]), "Error: set all space grids first"
             new_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Initial"], 
                                                            title="Save IC text file", 
                                                            filetypes=[("Text files","*.txt")])
@@ -4255,39 +4255,43 @@ class Notebook:
                 # We don't really need to note down the time of creation, but it could be useful for interaction with other programs.
                 ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
                 ofstream.write("System_class: {}\n".format(self.module.system_ID))
-                ofstream.write("$ Space Grid:\n")
-                ofstream.write("Total_length: {}\n".format(self.module.total_length))
-                ofstream.write("Node_width: {}\n".format(self.module.dx))
-                
-                ofstream.write("$ System Parameters:\n")
-                
-                # Saves occur as-is: any missing parameters are saved with whatever default value module gives them
-                for param in self.module.param_dict:
-                    param_values = self.module.param_dict[param].value
-                    if isinstance(param_values, np.ndarray):
-                        # Write the array in a more convenient format
-                        ofstream.write("{}: {:.8e}".format(param, param_values[0]))
-                        for value in param_values[1:]:
-                            ofstream.write("\t{:.8e}".format(value))
-                            
-                        ofstream.write('\n')
-                    else:
-                        # The param value is just a single constant
-                        ofstream.write("{}: {}\n".format(param, param_values))
-
-                ofstream.write("$ System Flags:\n")
+                ofstream.write("f$ System Flags:\n")
                 
                 for flag in self.module.flags_dict:
                     ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
-                    
-                if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC:
-                    ofstream.write("$ Laser Parameters\n")
-                    for laser_param in self.LGC_values:
-                        ofstream.write("{}: {}\n".format(laser_param, self.LGC_values[laser_param]))
-
-                    ofstream.write("$ Laser Options\n")
-                    for laser_option in self.LGC_options:
-                        ofstream.write("{}: {}\n".format(laser_option, self.LGC_options[laser_option]))
+                      
+                for layer_name, layer in self.module.layers.items():
+                    ofstream.write("L$: {}\n".format(layer_name))
+                    ofstream.write("p$ Space Grid:\n")
+                    ofstream.write("Total_length: {}\n".format(layer.total_length))
+                    ofstream.write("Node_width: {}\n".format(layer.dx))
+                
+                    ofstream.write("p$ System Parameters:\n")
+                
+                    # Saves occur as-is: any missing parameters are saved with whatever default value module gives them
+                    for param in layer.params:
+                        param_values = layer.params[param].value
+                        if isinstance(param_values, np.ndarray):
+                            # Write the array in a more convenient format
+                            ofstream.write("{}: {:.8e}".format(param, param_values[0]))
+                            for value in param_values[1:]:
+                                ofstream.write("\t{:.8e}".format(value))
+                                
+                            ofstream.write('\n')
+                        else:
+                            # The param value is just a single constant
+                            ofstream.write("{}: {}\n".format(param, param_values))
+                      
+                    if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC[layer_name]:
+                        ofstream.write("p$ Laser Parameters\n")
+                        for laser_param in self.LGC_values[layer_name]:
+                            ofstream.write("{}: {}\n".format(laser_param,
+                                                             self.LGC_values[layer_name][laser_param]))
+    
+                        ofstream.write("p$ Laser Options\n")
+                        for laser_option in self.LGC_options[layer_name]:
+                            ofstream.write("{}: {}\n".format(laser_option, 
+                                                             self.LGC_options[layer_name][laser_option]))
                 
         except OSError:
             self.write(self.ICtab_status, "Error: failed to create IC file")
