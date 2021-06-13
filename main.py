@@ -358,42 +358,35 @@ class Notebook:
         self.IO_frame = tk.ttk.Frame(self.tab_inputs)
         self.IO_frame.grid(row=0,column=0,columnspan=2, pady=(25,0))
         
-        self.load_ICfile_button = tk.ttk.Button(self.IO_frame, text="Load", 
-                                                command=self.select_init_file)
-        self.load_ICfile_button.grid(row=0,column=0)
+        tk.ttk.Button(self.IO_frame, text="Load", 
+                      command=self.select_init_file).grid(row=0,column=0)
 
-        self.DEBUG_BUTTON = tk.ttk.Button(self.IO_frame, text="debug", 
-                                          command=self.DEBUG)
-        self.DEBUG_BUTTON.grid(row=0,column=1)
+        tk.ttk.Button(self.IO_frame, text="debug", 
+                      command=self.DEBUG).grid(row=0,column=1)
 
-        self.save_ICfile_button = tk.ttk.Button(self.IO_frame, text="Save", 
-                                                command=self.save_ICfile)
-        self.save_ICfile_button.grid(row=0,column=2)
+        tk.ttk.Button(self.IO_frame, text="Save", 
+                      command=self.save_ICfile).grid(row=0,column=2)
 
-        self.reset_IC_button = tk.ttk.Button(self.IO_frame, text="Reset", 
-                                             command=self.reset_IC)
-        self.reset_IC_button.grid(row=0, column=3)
+        tk.ttk.Button(self.IO_frame, text="Reset", 
+                      command=self.reset_IC).grid(row=0, column=3)
 
         self.spacegrid_frame = tk.ttk.Frame(self.tab_inputs)
         self.spacegrid_frame.grid(row=1,column=0,columnspan=2, pady=(10,10))
 
-        self.steps_head = tk.ttk.Label(self.spacegrid_frame, 
-                                       text="Space Grid - Start Here", 
-                                       style="Header.TLabel")
-        self.steps_head.grid(row=0,column=0,columnspan=2)
+        tk.ttk.Label(self.spacegrid_frame, 
+                    text="Space Grid - Start Here", 
+                    style="Header.TLabel").grid(row=0,column=0,columnspan=2)
 
-        self.thickness_label = tk.ttk.Label(self.spacegrid_frame, 
-                                            text="Thickness " 
-                                            + self.module.length_unit)
-        self.thickness_label.grid(row=1,column=0)
+        tk.ttk.Label(self.spacegrid_frame, 
+                    text="Thickness " 
+                    + self.module.layers[first_layer].length_unit).grid(row=1,column=0)
 
         self.thickness_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
         self.thickness_entry.grid(row=1,column=1)
 
-        self.dx_label = tk.ttk.Label(self.spacegrid_frame, 
-                                     text="Node width " 
-                                     + self.module.length_unit)
-        self.dx_label.grid(row=2,column=0)
+        tk.ttk.Label(self.spacegrid_frame, 
+                    text="Node width " 
+                    + self.module.layers[first_layer].length_unit).grid(row=2,column=0)
 
         self.dx_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
         self.dx_entry.grid(row=2,column=1)
@@ -401,22 +394,19 @@ class Notebook:
         self.params_frame = tk.ttk.Frame(self.tab_inputs)
         self.params_frame.grid(row=2,column=0,columnspan=2, rowspan=4, pady=(10,10))
 
-        self.system_params_head = tk.ttk.Label(self.params_frame, 
-                                               text="Constant-value Parameters",
-                                               style="Header.TLabel")
-        self.system_params_head.grid(row=0, column=0,columnspan=2)
+        tk.ttk.Label(self.params_frame, 
+                    text="Constant-value Parameters",
+                    style="Header.TLabel").grid(row=0, column=0,columnspan=2)
         
-        self.system_params_shortcut_button = tk.ttk.Button(self.params_frame, 
-                                                           text="Fast Param Entry Tool", 
-                                                           command=self.do_sys_param_shortcut_popup)
-        self.system_params_shortcut_button.grid(row=1,column=0,columnspan=2)
+        tk.ttk.Button(self.params_frame, 
+                      text="Fast Param Entry Tool", 
+                      command=self.do_sys_param_shortcut_popup).grid(row=1,column=0,columnspan=2)
         
         self.flags_frame = tk.ttk.Frame(self.tab_inputs)
         self.flags_frame.grid(row=6,column=0,columnspan=2, pady=(10,10))
 
-        self.flags_head = tk.ttk.Label(self.flags_frame, text="Flags", 
-                                       style="Header.TLabel")
-        self.flags_head.grid(row=0,column=0,columnspan=2)
+        tk.ttk.Label(self.flags_frame, text="Flags", 
+                     style="Header.TLabel").grid(row=0,column=0,columnspan=2)
         
         # Procedurally generated elements for flags
         i = 1
@@ -436,127 +426,107 @@ class Notebook:
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
         
-        self.system_printout_button = tk.ttk.Button(self.tab_inputs, 
-                                                    text="Print Init. State Summary", 
-                                                    command=self.do_sys_printsummary_popup)
-        self.system_printout_button.grid(row=8,column=0,columnspan=2)
+        tk.ttk.Button(self.tab_inputs, 
+                      text="Print Init. State Summary", 
+                      command=self.do_sys_printsummary_popup).grid(row=8,column=0,columnspan=2)
         
-        self.system_plotout_button = tk.ttk.Button(self.tab_inputs, 
-                                                   text="Show Init. State Plots", 
-                                                   command=self.do_sys_plotsummary_popup)
-        self.system_plotout_button.grid(row=9,column=0,columnspan=2)
+        tk.ttk.Button(self.tab_inputs, 
+                      text="Show Init. State Plots", 
+                      command=self.do_sys_plotsummary_popup).grid(row=9,column=0,columnspan=2)
         
-        self.line0_separator = tk.ttk.Separator(self.tab_inputs, 
-                                                 orient="horizontal", 
-                                                 style="Grey Bar.TSeparator")
-        self.line0_separator.grid(row=10,column=0,columnspan=2, pady=(10,10), sticky="ew")
+        tk.ttk.Separator(self.tab_inputs, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=10,column=0,columnspan=2, pady=(10,10), sticky="ew")
         
         self.layer_statusbox = tk.Text(self.tab_inputs, width=24, height=1)
         self.layer_statusbox.grid(row=11,column=0,columnspan=2)
         
         # Init this dropdown with some default layer
-        self.layer_dropdown = tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_selection,
-                                                first_layer, *self.module.layers)
-        self.layer_dropdown.grid(row=12,column=0)
+        tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_selection,
+                          first_layer, *self.module.layers).grid(row=12,column=0)
         
-        self.change_layer_btn = tk.ttk.Button(self.tab_inputs, text="Change to Layer",
-                                              command=self.change_layer)
-        self.change_layer_btn.grid(row=12,column=1)
+        tk.ttk.Button(self.tab_inputs, text="Change to Layer",
+                      command=self.change_layer).grid(row=12,column=1)
         
-        self.line1_separator = tk.ttk.Separator(self.tab_inputs, orient="vertical", 
-                                                style="Grey Bar.TSeparator")
-        self.line1_separator.grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
+        tk.ttk.Separator(self.tab_inputs, orient="vertical", 
+                         style="Grey Bar.TSeparator").grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
              
         ## Parameter Toolkit:
 
         self.param_rules_frame = tk.ttk.Frame(self.tab_rules_init)
         self.param_rules_frame.grid(row=0,column=0,padx=(370,0))
 
-        self.active_paramrule_list_title = tk.ttk.Label(self.param_rules_frame, 
-                                                        text="Add/Edit/Remove Space-Dependent Parameters", 
-                                                        style="Header.TLabel")
-        self.active_paramrule_list_title.grid(row=0,column=0,columnspan=3)
+        tk.ttk.Label(self.param_rules_frame, 
+                     text="Add/Edit/Remove Space-Dependent Parameters", 
+                     style="Header.TLabel").grid(row=0,column=0,columnspan=3)
 
         self.active_paramrule_listbox = tk.Listbox(self.param_rules_frame, width=86,
                                                    height=8)
         self.active_paramrule_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, 
                                            padx=(32,32))
 
-        self.paramrule_var_label = tk.ttk.Label(self.param_rules_frame, 
-                                                text="Select parameter to edit:")
-        self.paramrule_var_label.grid(row=4,column=0)
+        tk.ttk.Label(self.param_rules_frame, 
+                     text="Select parameter to edit:").grid(row=4,column=0)
         
-        self.paramrule_var_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, 
-                                                        self.init_var_selection, 
-                                                        var_dropdown_list[0], 
-                                                        *var_dropdown_list)
-        self.paramrule_var_dropdown.grid(row=4,column=1)
+        tk.ttk.OptionMenu(self.param_rules_frame, 
+                          self.init_var_selection, 
+                          var_dropdown_list[0], 
+                          *var_dropdown_list).grid(row=4,column=1)
 
-        self.paramrule_method_label = tk.ttk.Label(self.param_rules_frame, 
-                                                   text="Select calculation method:")
-        self.paramrule_method_label.grid(row=5,column=0)
+        tk.ttk.Label(self.param_rules_frame, 
+                     text="Select calculation method:").grid(row=5,column=0)
 
-        self.paramrule_method_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, 
-                                                           self.init_shape_selection,
-                                                           paramtoolkit_method_dropdown_list[0], 
-                                                           *paramtoolkit_method_dropdown_list)
-        self.paramrule_method_dropdown.grid(row=5, column=1)
+        tk.ttk.OptionMenu(self.param_rules_frame, 
+                          self.init_shape_selection,
+                          paramtoolkit_method_dropdown_list[0], 
+                          *paramtoolkit_method_dropdown_list).grid(row=5, column=1)
 
-        self.paramrule_lbound_label = tk.ttk.Label(self.param_rules_frame, 
-                                                   text="Left bound coordinate:")
-        self.paramrule_lbound_label.grid(row=6, column=0)
+        tk.ttk.Label(self.param_rules_frame, 
+                     text="Left bound coordinate:").grid(row=6, column=0)
 
         self.paramrule_lbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
         self.paramrule_lbound_entry.grid(row=6,column=1)
 
-        self.paramrule_rbound_label = tk.ttk.Label(self.param_rules_frame, 
-                                                   text="Right bound coordinate:")
-        self.paramrule_rbound_label.grid(row=7, column=0)
+        tk.ttk.Label(self.param_rules_frame, 
+                     text="Right bound coordinate:").grid(row=7, column=0)
 
         self.paramrule_rbound_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
         self.paramrule_rbound_entry.grid(row=7,column=1)
 
-        self.paramrule_lvalue_label = tk.ttk.Label(self.param_rules_frame, 
-                                                   text="Left bound value:")
-        self.paramrule_lvalue_label.grid(row=8, column=0)
+        tk.ttk.Label(self.param_rules_frame, 
+                     text="Left bound value:").grid(row=8, column=0)
 
         self.paramrule_lvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
         self.paramrule_lvalue_entry.grid(row=8,column=1)
 
-        self.paramrule_rvalue_label = tk.ttk.Label(self.param_rules_frame, 
-                                                   text="Right bound value:")
-        self.paramrule_rvalue_label.grid(row=9, column=0)
+        tk.ttk.Label(self.param_rules_frame, 
+                     text="Right bound value:").grid(row=9, column=0)
 
         self.paramrule_rvalue_entry = tk.ttk.Entry(self.param_rules_frame, width=8)
         self.paramrule_rvalue_entry.grid(row=9,column=1)
 
-        self.add_paramrule_button = tk.ttk.Button(self.param_rules_frame, 
-                                                  text="Add new parameter rule", 
-                                                  command=self.add_paramrule)
-        self.add_paramrule_button.grid(row=10,column=0,columnspan=2)
+        tk.ttk.Button(self.param_rules_frame, 
+                      text="Add new parameter rule", 
+                      command=self.add_paramrule).grid(row=10,column=0,columnspan=2)
 
-        self.delete_paramrule_button = tk.ttk.Button(self.param_rules_frame, 
-                                                     text="Delete highlighted rule", 
-                                                     command=self.delete_paramrule)
-        self.delete_paramrule_button.grid(row=4,column=2)
+        tk.ttk.Button(self.param_rules_frame, 
+                      text="Delete highlighted rule", 
+                      command=self.delete_paramrule).grid(row=4,column=2)
 
-        self.deleteall_paramrule_button = tk.ttk.Button(self.param_rules_frame, 
-                                                        text="Delete all rules for this parameter", 
-                                                        command=self.deleteall_paramrule)
-        self.deleteall_paramrule_button.grid(row=5,column=2)
+        tk.ttk.Button(self.param_rules_frame, 
+                      text="Delete all rules for this parameter", 
+                      command=self.deleteall_paramrule).grid(row=5,column=2)
 
-        self.paramtoolkit_description = tk.Message(self.param_rules_frame, 
-                                                   text="The Parameter Toolkit uses a series "
-                                                   "of rules and patterns to build a spatially "
-                                                   "dependent distribution for any parameter.", 
-                                                   width=250)
-        self.paramtoolkit_description.grid(row=6,rowspan=3,column=2,columnspan=2)
+        tk.Message(self.param_rules_frame, 
+                   text="The Parameter Toolkit uses a series "
+                   "of rules and patterns to build a spatially "
+                   "dependent distribution for any parameter.", 
+                   width=250).grid(row=6,rowspan=3,column=2,columnspan=2)
 
-        self.paramtoolkit_description2 = tk.Message(self.param_rules_frame, 
-                                                    text="Warning: Rules are applied "
-                                                    "from top to bottom. Order matters!", 
-                                                    width=250)
-        self.paramtoolkit_description2.grid(row=9,rowspan=3,column=2,columnspan=2)
+        tk.Message(self.param_rules_frame, 
+                   text="Warning: Rules are applied "
+                   "from top to bottom. Order matters!", 
+                   width=250).grid(row=9,rowspan=3,column=2,columnspan=2)
         
         # These plots were previously attached to self.tab_inputs so that it was visible on all three IC tabs,
         # but it was hard to position them correctly.
@@ -567,81 +537,71 @@ class Notebook:
         self.custom_param_subplot.format_coord = lambda x, y: ""
         self.custom_param_canvas = tkagg.FigureCanvasTkAgg(self.custom_param_fig, 
                                                            master=self.param_rules_frame)
-        self.custom_param_plotwidget = self.custom_param_canvas.get_tk_widget()
-        self.custom_param_plotwidget.grid(row=12, column=0, columnspan=2)
+        self.custom_param_canvas.get_tk_widget().grid(row=12, column=0, columnspan=2)
 
         self.custom_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
         self.custom_param_toolbar_frame.grid(row=13,column=0,columnspan=2)
-        self.custom_param_toolbar = tkagg.NavigationToolbar2Tk(self.custom_param_canvas, 
-                                                               self.custom_param_toolbar_frame)
+        tkagg.NavigationToolbar2Tk(self.custom_param_canvas, 
+                                   self.custom_param_toolbar_frame)
         
         self.recent_param_fig = Figure(figsize=(5,3.1))
         self.recent_param_subplot = self.recent_param_fig.add_subplot(111)
         self.recent_param_subplot.format_coord = lambda x, y: ""
         self.recent_param_canvas = tkagg.FigureCanvasTkAgg(self.recent_param_fig, 
                                                            master=self.param_rules_frame)
-        self.recent_param_plotwidget = self.recent_param_canvas.get_tk_widget()
-        self.recent_param_plotwidget.grid(row=12,column=2,columnspan=2)
+        self.recent_param_canvas.get_tk_widget().grid(row=12,column=2,columnspan=2)
 
         self.recent_param_toolbar_frame = tk.ttk.Frame(master=self.param_rules_frame)
         self.recent_param_toolbar_frame.grid(row=13,column=2,columnspan=2)
-        self.recent_param_toolbar = tkagg.NavigationToolbar2Tk(self.recent_param_canvas, 
-                                                               self.recent_param_toolbar_frame)
+        tkagg.NavigationToolbar2Tk(self.recent_param_canvas, 
+                                   self.recent_param_toolbar_frame)
 
-        self.moveup_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇧", 
-                                                     command=self.moveup_paramrule)
-        self.moveup_paramrule_button.grid(row=1,column=4)
+        tk.ttk.Button(self.param_rules_frame, text="⇧", 
+                      command=self.moveup_paramrule).grid(row=1,column=4)
 
-        self.paramrule_viewer_dropdown = tk.ttk.OptionMenu(self.param_rules_frame, 
-                                                           self.paramtoolkit_viewer_selection, 
-                                                           unitless_dropdown_list[0], 
-                                                           *unitless_dropdown_list)
-        self.paramrule_viewer_dropdown.grid(row=2,column=4)
+        tk.ttk.OptionMenu(self.param_rules_frame, 
+                          self.paramtoolkit_viewer_selection, 
+                          unitless_dropdown_list[0], 
+                          *unitless_dropdown_list).grid(row=2,column=4)
 
-        self.paramrule_view_button = tk.ttk.Button(self.param_rules_frame, 
-                                                   text="Change view", 
-                                                   command=self.refresh_paramrule_listbox)
-        self.paramrule_view_button.grid(row=2,column=5)
+        tk.ttk.Button(self.param_rules_frame, 
+                      text="Change view", 
+                      command=self.refresh_paramrule_listbox).grid(row=2,column=5)
 
-        self.movedown_paramrule_button = tk.ttk.Button(self.param_rules_frame, text="⇩", 
-                                                       command=self.movedown_paramrule)
-        self.movedown_paramrule_button.grid(row=3,column=4)
+        tk.ttk.Button(self.param_rules_frame, text="⇩", 
+                      command=self.movedown_paramrule).grid(row=3,column=4)
 
         ## Param List Upload:
 
         self.listupload_frame = tk.ttk.Frame(self.tab_explicit_init)
         self.listupload_frame.grid(row=0,column=0,padx=(440,0))
 
-        self.listupload_description = tk.Message(self.listupload_frame, 
-                                                 text="This tab provides an option "
-                                                 "to directly import a list of data points, "
-                                                 "on which the TED will do linear interpolation "
-                                                 "to fit to the specified space grid.", 
-                                                 width=360)
-        self.listupload_description.grid(row=0,column=0)
+        tk.Message(self.listupload_frame, 
+                   text="This tab provides an option "
+                   "to directly import a list of data points, "
+                   "on which the TED will do linear interpolation "
+                   "to fit to the specified space grid.", 
+                   width=360).grid(row=0,column=0)
         
-        self.listupload_dropdown = tk.ttk.OptionMenu(self.listupload_frame, 
-                                                     self.listupload_var_selection, 
-                                                     unitless_dropdown_list[0], 
-                                                     *unitless_dropdown_list)
-        self.listupload_dropdown.grid(row=1,column=0)
+        tk.ttk.OptionMenu(self.listupload_frame, 
+                          self.listupload_var_selection, 
+                          unitless_dropdown_list[0], 
+                          *unitless_dropdown_list).grid(row=1,column=0)
 
-        self.add_listupload_button = tk.ttk.Button(self.listupload_frame, 
-                                                   text="Import", 
-                                                   command=self.add_listupload)
-        self.add_listupload_button.grid(row=2,column=0)
+        tk.ttk.Button(self.listupload_frame, 
+                      text="Import", 
+                      command=self.add_listupload).grid(row=2,column=0)
         
         self.listupload_fig = Figure(figsize=(6,3.8))
         self.listupload_subplot = self.listupload_fig.add_subplot(111)
         self.listupload_canvas = tkagg.FigureCanvasTkAgg(self.listupload_fig, 
                                                          master=self.listupload_frame)
-        self.listupload_plotwidget = self.listupload_canvas.get_tk_widget()
-        self.listupload_plotwidget.grid(row=0, rowspan=3,column=1)
+        self.listupload_canvas.get_tk_widget().grid(row=0, rowspan=3,column=1)
         
         self.listupload_toolbar_frame = tk.ttk.Frame(master=self.listupload_frame)
         self.listupload_toolbar_frame.grid(row=3,column=1)
-        self.listupload_toolbar = tkagg.NavigationToolbar2Tk(self.listupload_canvas, 
-                                                             self.listupload_toolbar_frame)
+        tkagg.NavigationToolbar2Tk(self.listupload_canvas, 
+                                   self.listupload_toolbar_frame)
 
         ## Laser Generation Condition (LGC): extra input mtds for nanowire-specific applications
         if self.module.system_ID in self.LGC_eligible_modules:
@@ -658,25 +618,21 @@ class Notebook:
     def add_tab_simulate(self):
         self.tab_simulate = tk.ttk.Frame(self.notebook)
 
-        self.choose_ICfile_title = tk.ttk.Label(self.tab_simulate, 
-                                                text="Select Init. Cond.", 
-                                                style="Header.TLabel")
-        self.choose_ICfile_title.grid(row=0,column=0,columnspan=2, padx=(9,12))
+        tk.ttk.Label(self.tab_simulate, 
+                     text="Select Init. Cond.", 
+                     style="Header.TLabel").grid(row=0,column=0,columnspan=2, padx=(9,12))
 
-        self.simtime_label = tk.ttk.Label(self.tab_simulate, text="Simulation Time [ns]")
-        self.simtime_label.grid(row=2,column=0)
+        tk.ttk.Label(self.tab_simulate, text="Simulation Time [ns]").grid(row=2,column=0)
 
         self.simtime_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.simtime_entry.grid(row=2,column=1)
 
-        self.dt_label = tk.ttk.Label(self.tab_simulate, text="dt [ns]")
-        self.dt_label.grid(row=3,column=0)
+        tk.ttk.Label(self.tab_simulate, text="dt [ns]").grid(row=3,column=0)
 
         self.dt_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.dt_entry.grid(row=3,column=1)
         
-        self.hmax_label = tk.ttk.Label(self.tab_simulate, text="Max solver stepsize [ns]")
-        self.hmax_label.grid(row=4,column=0)
+        tk.ttk.Label(self.tab_simulate, text="Max solver stepsize [ns]").grid(row=4,column=0)
         
         self.hmax_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.hmax_entry.grid(row=4,column=1)
@@ -684,24 +640,20 @@ class Notebook:
         self.enter(self.dt_entry, "0.5")
         self.enter(self.hmax_entry, "0.25")
         
-        self.calculate_NP = tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", 
-                                          command=self.do_Batch)
-        self.calculate_NP.grid(row=6,column=0,columnspan=2,padx=(9,12))
+        tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", 
+                      command=self.do_Batch).grid(row=6,column=0,columnspan=2,padx=(9,12))
 
-        self.status_label = tk.ttk.Label(self.tab_simulate, text="Status")
-        self.status_label.grid(row=7, column=0, columnspan=2)
+        tk.ttk.Label(self.tab_simulate, text="Status").grid(row=7, column=0, columnspan=2)
 
         self.status = tk.Text(self.tab_simulate, width=28,height=4)
         self.status.grid(row=8, rowspan=2, column=0, columnspan=2)
         self.status.configure(state='disabled')
 
-        self.line3_separator = tk.ttk.Separator(self.tab_simulate, orient="vertical", 
-                                                style="Grey Bar.TSeparator")
-        self.line3_separator.grid(row=0,rowspan=30,column=2,sticky="ns")
+        tk.ttk.Separator(self.tab_simulate, orient="vertical", 
+                         style="Grey Bar.TSeparator").grid(row=0,rowspan=30,column=2,sticky="ns")
 
-        self.subtitle = tk.ttk.Label(self.tab_simulate, 
-                                     text="Simulation - {}".format(self.module.system_ID))
-        self.subtitle.grid(row=0,column=3,columnspan=3)
+        tk.ttk.Label(self.tab_simulate, 
+                     text="Simulation - {}".format(self.module.system_ID)).grid(row=0,column=3,columnspan=3)
         
         self.sim_fig = Figure(figsize=(14, 8))
         count = 1
@@ -717,13 +669,11 @@ class Notebook:
             count += 1
 
         self.sim_canvas = tkagg.FigureCanvasTkAgg(self.sim_fig, master=self.tab_simulate)
-        self.sim_plot_widget = self.sim_canvas.get_tk_widget()
-        self.sim_plot_widget.grid(row=1,column=3,rowspan=12,columnspan=2)
+        self.sim_canvas.get_tk_widget().grid(row=1,column=3,rowspan=12,columnspan=2)
         
         self.simfig_toolbar_frame = tk.ttk.Frame(master=self.tab_simulate)
         self.simfig_toolbar_frame.grid(row=13,column=3,columnspan=2)
-        self.simfig_toolbar = tkagg.NavigationToolbar2Tk(self.sim_canvas, 
-                                                         self.simfig_toolbar_frame)
+        tkagg.NavigationToolbar2Tk(self.sim_canvas, self.simfig_toolbar_frame)
 
         self.notebook.add(self.tab_simulate, text="Simulate")
         return
@@ -746,26 +696,22 @@ class Notebook:
             self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
             count += 1
         
-        self.analyze_overview_button = tk.ttk.Button(master=self.tab_overview_analysis, 
-                                                     text="Select Dataset", 
-                                                     command=self.plot_overview_analysis)
-        self.analyze_overview_button.grid(row=0,column=0)
+        tk.ttk.Button(master=self.tab_overview_analysis, 
+                      text="Select Dataset", 
+                      command=self.plot_overview_analysis).grid(row=0,column=0)
         
         self.analyze_overview_canvas = tkagg.FigureCanvasTkAgg(self.analyze_overview_fig, 
                                                                master=self.tab_overview_analysis)
-        self.analyze_overview_widget = self.analyze_overview_canvas.get_tk_widget()
-        self.analyze_overview_widget.grid(row=1,column=0)
+        self.analyze_overview_canvas.get_tk_widget().grid(row=1,column=0)
 
         self.overview_toolbar_frame = tk.ttk.Frame(self.tab_overview_analysis)
         self.overview_toolbar_frame.grid(row=2,column=0)
-        self.overview_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, 
-                                                           self.overview_toolbar_frame)
-        self.overview_toolbar.grid(row=0,column=0)
+        tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, 
+                                   self.overview_toolbar_frame).grid(row=0,column=0)
         
-        self.analysis_title = tk.ttk.Label(self.tab_detailed_analysis, 
-                                           text="Plot and Integrate Saved Datasets", 
-                                           style="Header.TLabel")
-        self.analysis_title.grid(row=0,column=0,columnspan=8)
+        tk.ttk.Label(self.tab_detailed_analysis, 
+                     text="Plot and Integrate Saved Datasets", 
+                     style="Header.TLabel").grid(row=0,column=0,columnspan=8)
         
         self.analyze_fig = Figure(figsize=(9.8,6))
         # add_subplot() starts counting indices with 1 instead of 0
@@ -780,88 +726,71 @@ class Notebook:
         
         self.analyze_canvas = tkagg.FigureCanvasTkAgg(self.analyze_fig, 
                                                       master=self.tab_detailed_analysis)
-        self.analyze_widget = self.analyze_canvas.get_tk_widget()
-        self.analyze_widget.grid(row=1,column=0,rowspan=1,columnspan=4, padx=(12,0))
+        self.analyze_canvas.get_tk_widget().grid(row=1,column=0,rowspan=1,columnspan=4, padx=(12,0))
 
         self.analyze_plotselector_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
         self.analyze_plotselector_frame.grid(row=2,rowspan=2,column=0,columnspan=4)
         
-        self.analysisplot_topleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
-                                                       variable=self.active_analysisplot_ID, 
-                                                       value=0)
-        self.analysisplot_topleft.grid(row=0,column=0)
+        tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
+                           variable=self.active_analysisplot_ID, 
+                           value=0).grid(row=0,column=0)
 
-        self.analysisplot_topleft_label = tk.ttk.Label(self.analyze_plotselector_frame, 
-                                                       text="Use: Top Left")
-        self.analysisplot_topleft_label.grid(row=0,column=1)
+        tk.ttk.Label(self.analyze_plotselector_frame, 
+                     text="Use: Top Left").grid(row=0,column=1)
         
-        self.analysisplot_topright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
-                                                        variable=self.active_analysisplot_ID, 
-                                                        value=1)
-        self.analysisplot_topright.grid(row=0,column=2)
+        tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
+                           variable=self.active_analysisplot_ID, 
+                           value=1).grid(row=0,column=2)
 
-        self.analysisplot_topright_label = tk.ttk.Label(self.analyze_plotselector_frame, 
-                                                        text="Use: Top Right")
-        self.analysisplot_topright_label.grid(row=0,column=3)
+        tk.ttk.Label(self.analyze_plotselector_frame, 
+                     text="Use: Top Right").grid(row=0,column=3)
         
-        self.analysisplot_bottomleft = tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
-                                                          variable=self.active_analysisplot_ID, 
-                                                          value=2)
-        self.analysisplot_bottomleft.grid(row=1,column=0)
+        tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
+                           variable=self.active_analysisplot_ID, 
+                           value=2).grid(row=1,column=0)
 
-        self.analysisplot_bottomleft_label = tk.ttk.Label(self.analyze_plotselector_frame, 
-                                                          text="Use: Bottom Left")
-        self.analysisplot_bottomleft_label.grid(row=1,column=1)
+        tk.ttk.Label(self.analyze_plotselector_frame, 
+                     text="Use: Bottom Left").grid(row=1,column=1)
         
-        self.analysisplot_bottomright = tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
-                                                           variable=self.active_analysisplot_ID, 
-                                                           value=3)
-        self.analysisplot_bottomright.grid(row=1,column=2)
+        tk.ttk.Radiobutton(self.analyze_plotselector_frame, 
+                           variable=self.active_analysisplot_ID, 
+                           value=3).grid(row=1,column=2)
 
-        self.analysisplot_bottomright_label = tk.ttk.Label(self.analyze_plotselector_frame, 
-                                                           text="Use: Bottom Right")
-        self.analysisplot_bottomright_label.grid(row=1,column=3)
+        tk.ttk.Label(self.analyze_plotselector_frame, 
+                     text="Use: Bottom Right").grid(row=1,column=3)
         
         self.analyze_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
         self.analyze_toolbar_frame.grid(row=4,column=0,rowspan=4,columnspan=4)
-        self.analyze_toolbar = tkagg.NavigationToolbar2Tk(self.analyze_canvas, 
-                                                          self.analyze_toolbar_frame)
-        self.analyze_toolbar.grid(row=0,column=0,columnspan=7)
+        tkagg.NavigationToolbar2Tk(self.analyze_canvas, self.analyze_toolbar_frame).grid(row=0,column=0,columnspan=7)
 
-        self.analyze_plot_button = tk.ttk.Button(self.analyze_toolbar_frame, 
-                                                 text="Plot", 
-                                                 command=partial(self.load_datasets))
-        self.analyze_plot_button.grid(row=1,column=0)
+        tk.ttk.Button(self.analyze_toolbar_frame, 
+                      text="Plot", 
+                      command=partial(self.load_datasets)).grid(row=1,column=0)
         
         self.analyze_tstep_entry = tk.ttk.Entry(self.analyze_toolbar_frame, width=9)
         self.analyze_tstep_entry.grid(row=1,column=1)
 
-        self.analyze_tstep_button = tk.ttk.Button(self.analyze_toolbar_frame, 
-                                                  text="Step >>", 
-                                                  command=partial(self.plot_tstep))
-        self.analyze_tstep_button.grid(row=1,column=2)
+        tk.ttk.Button(self.analyze_toolbar_frame, 
+                      text="Step >>", 
+                      command=partial(self.plot_tstep)).grid(row=1,column=2)
 
-        self.calculate_PL_button = tk.ttk.Button(self.analyze_toolbar_frame, 
-                                                 text=">> Integrate <<", 
-                                                 command=partial(self.do_Integrate))
-        self.calculate_PL_button.grid(row=1,column=3)
+        tk.ttk.Button(self.analyze_toolbar_frame, 
+                      text=">> Integrate <<", 
+                      command=partial(self.do_Integrate)).grid(row=1,column=3)
 
-        self.analyze_axis_button = tk.ttk.Button(self.analyze_toolbar_frame, 
-                                                 text="Axis Settings", 
-                                                 command=partial(self.do_change_axis_popup, 
-                                                                 from_integration=0))
-        self.analyze_axis_button.grid(row=1,column=4)
+        tk.ttk.Button(self.analyze_toolbar_frame, 
+                      text="Axis Settings", 
+                      command=partial(self.do_change_axis_popup, 
+                                      from_integration=0)).grid(row=1,column=4)
 
-        self.analyze_export_button = tk.ttk.Button(self.analyze_toolbar_frame, 
-                                                   text="Export", 
-                                                   command=partial(self.export_plot, 
-                                                                   from_integration=0))
-        self.analyze_export_button.grid(row=1,column=5)
+        tk.ttk.Button(self.analyze_toolbar_frame, 
+                      text="Export", 
+                      command=partial(self.export_plot, 
+                                      from_integration=0)).grid(row=1,column=5)
 
-        self.analyze_IC_carry_button = tk.ttk.Button(self.analyze_toolbar_frame, 
-                                                     text="Generate IC", 
-                                                     command=partial(self.do_IC_carry_popup))
-        self.analyze_IC_carry_button.grid(row=1,column=6)
+        tk.ttk.Button(self.analyze_toolbar_frame, 
+                      text="Generate IC", 
+                      command=partial(self.do_IC_carry_popup)).grid(row=1,column=6)
 
         self.integration_fig = Figure(figsize=(9,5))
         self.integration_subplot = self.integration_fig.add_subplot(111)
@@ -869,26 +798,22 @@ class Notebook:
 
         self.integration_canvas = tkagg.FigureCanvasTkAgg(self.integration_fig, 
                                                           master=self.tab_detailed_analysis)
-        self.integration_widget = self.integration_canvas.get_tk_widget()
-        self.integration_widget.grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
+        self.integration_canvas.get_tk_widget().grid(row=1,column=5,rowspan=1,columnspan=1, padx=(20,0))
 
         self.integration_toolbar_frame = tk.ttk.Frame(master=self.tab_detailed_analysis)
         self.integration_toolbar_frame.grid(row=3,column=5, rowspan=2,columnspan=1)
-        self.integration_toolbar = tkagg.NavigationToolbar2Tk(self.integration_canvas, 
-                                                              self.integration_toolbar_frame)
-        self.integration_toolbar.grid(row=0,column=0,columnspan=5)
+        tkagg.NavigationToolbar2Tk(self.integration_canvas, 
+                                   self.integration_toolbar_frame).grid(row=0,column=0,columnspan=5)
 
-        self.integration_axis_button = tk.ttk.Button(self.integration_toolbar_frame, 
-                                                     text="Axis Settings", 
-                                                     command=partial(self.do_change_axis_popup, 
-                                                                     from_integration=1))
-        self.integration_axis_button.grid(row=1,column=0)
+        tk.ttk.Button(self.integration_toolbar_frame, 
+                      text="Axis Settings", 
+                      command=partial(self.do_change_axis_popup, 
+                                      from_integration=1)).grid(row=1,column=0)
 
-        self.integration_export_button = tk.ttk.Button(self.integration_toolbar_frame, 
-                                                       text="Export", 
-                                                       command=partial(self.export_plot, 
-                                                                       from_integration=1))
-        self.integration_export_button.grid(row=1,column=1)
+        tk.ttk.Button(self.integration_toolbar_frame, 
+                      text="Export", 
+                      command=partial(self.export_plot, 
+                                      from_integration=1)).grid(row=1,column=1)
 
         # self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
         # self.integration_bayesim_button.grid(row=1,column=2)
@@ -911,10 +836,9 @@ class Notebook:
         self.LGC_frame = tk.ttk.Frame(self.tab_generation_init)
         self.LGC_frame.grid(row=0,column=0, padx=(330,0))
 
-        self.LGC_head = tk.ttk.Label(self.LGC_frame, 
-                                     text="Generation from Laser Excitation", 
-                                     style="Header.TLabel")
-        self.LGC_head.grid(row=0,column=0,columnspan=3)
+        tk.ttk.Label(self.LGC_frame, 
+                     text="Generation from Laser Excitation", 
+                     style="Header.TLabel").grid(row=0,column=0,columnspan=3)
         
 
         # A sub-frame attached to a sub-frame
@@ -924,71 +848,57 @@ class Notebook:
                                              highlightthickness=1)
         self.material_param_frame.grid(row=1,column=0)
 
-        self.material_param_label = tk.Label(self.material_param_frame, 
-                                             text="Material Params - Select One")
-        self.material_param_label.grid(row=0,column=0,columnspan=4)
+        tk.Label(self.material_param_frame, 
+                 text="Material Params - Select One").grid(row=0,column=0,columnspan=4)
 
-        self.hline1_separator = tk.ttk.Separator(self.material_param_frame, 
-                                                 orient="horizontal", 
-                                                 style="Grey Bar.TSeparator")
-        self.hline1_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
+        tk.ttk.Separator(self.material_param_frame, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.calc_LGC_absorption_cof = tk.ttk.Radiobutton(self.material_param_frame, 
-                                                          variable=self.check_calculate_init_material_expfactor, 
-                                                          value=1)
-        self.calc_LGC_absorption_cof.grid(row=2,column=0)
+        tk.ttk.Radiobutton(self.material_param_frame, 
+                           variable=self.check_calculate_init_material_expfactor, 
+                           value=1).grid(row=2,column=0)
 
-        self.calc_LGC_absorption_cof_label = tk.Label(self.material_param_frame, 
-                                                      text="Option 1")
-        self.calc_LGC_absorption_cof_label.grid(row=2,column=1)
+        tk.Label(self.material_param_frame, 
+                 text="Option 1").grid(row=2,column=1)
 
-        self.A0_label = tk.Label(self.material_param_frame, text="A0 [cm^-1 eV^-γ]")
-        self.A0_label.grid(row=2,column=2)
+        tk.Label(self.material_param_frame, text="A0 [cm^-1 eV^-γ]").grid(row=2,column=2)
 
         self.A0_entry = tk.ttk.Entry(self.material_param_frame, width=9)
         self.A0_entry.grid(row=2,column=3)
 
-        self.Eg_label = tk.Label(self.material_param_frame, text="Eg [eV]")
-        self.Eg_label.grid(row=3,column=2)
+        tk.Label(self.material_param_frame, text="Eg [eV]").grid(row=3,column=2)
 
         self.Eg_entry = tk.ttk.Entry(self.material_param_frame, width=9)
         self.Eg_entry.grid(row=3,column=3)
 
-        self.direct_LGC_stim = tk.ttk.Radiobutton(self.material_param_frame, 
-                                                  variable=self.LGC_stim_mode, 
-                                                  value="direct")
-        self.direct_LGC_stim.grid(row=4,column=2)
+        tk.ttk.Radiobutton(self.material_param_frame, 
+                           variable=self.LGC_stim_mode, 
+                           value="direct").grid(row=4,column=2)
 
-        self.direct_LGC_stim_label = tk.Label(self.material_param_frame,
-                                              text="Direct (γ=1/2)")
-        self.direct_LGC_stim_label.grid(row=4,column=3)
+        tk.Label(self.material_param_frame,
+                 text="Direct (γ=1/2)").grid(row=4,column=3)
 
-        self.indirect_LGC_stim = tk.ttk.Radiobutton(self.material_param_frame, 
-                                                    variable=self.LGC_stim_mode, 
-                                                    value="indirect")
-        self.indirect_LGC_stim.grid(row=5,column=2)
+        tk.ttk.Radiobutton(self.material_param_frame, 
+                           variable=self.LGC_stim_mode, 
+                           value="indirect").grid(row=5,column=2)
 
-        self.indirect_LGC_stim_label = tk.Label(self.material_param_frame,
-                                                text="Indirect (γ=2)")
-        self.indirect_LGC_stim_label.grid(row=5,column=3)
+        tk.Label(self.material_param_frame,
+                 text="Indirect (γ=2)").grid(row=5,column=3)
 
-        self.hline2_separator = tk.ttk.Separator(self.material_param_frame, 
-                                                 orient="horizontal", 
-                                                 style="Grey Bar.TSeparator")
-        self.hline2_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
+        tk.ttk.Separator(self.material_param_frame, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.enter_LGC_absorption_cof = tk.ttk.Radiobutton(self.material_param_frame, 
-                                                           variable=self.check_calculate_init_material_expfactor, 
-                                                           value=0)
-        self.enter_LGC_absorption_cof.grid(row=7,column=0)
+        tk.ttk.Radiobutton(self.material_param_frame, 
+                           variable=self.check_calculate_init_material_expfactor, 
+                           value=0).grid(row=7,column=0)
 
-        self.enter_LGC_absorption_cof_label = tk.Label(self.material_param_frame, 
-                                                       text="Option 2")
-        self.enter_LGC_absorption_cof_label.grid(row=7,column=1)
+        tk.Label(self.material_param_frame, 
+                 text="Option 2").grid(row=7,column=1)
 
-        self.LGC_absorption_cof_label = tk.Label(self.material_param_frame, 
-                                                 text="α [cm^-1]")
-        self.LGC_absorption_cof_label.grid(row=8,column=2)
+        tk.Label(self.material_param_frame, 
+                 text="α [cm^-1]").grid(row=8,column=2)
 
         self.LGC_absorption_cof_entry = tk.ttk.Entry(self.material_param_frame, 
                                                      width=9)
@@ -999,25 +909,21 @@ class Notebook:
                                           highlightthickness=1)
         self.pulse_laser_frame.grid(row=1,column=1, padx=(20,0))
 
-        self.pulse_laser_label = tk.Label(self.pulse_laser_frame, 
-                                          text="Pulse Laser Params")
-        self.pulse_laser_label.grid(row=0,column=0,columnspan=4)
+        tk.Label(self.pulse_laser_frame, 
+                 text="Pulse Laser Params").grid(row=0,column=0,columnspan=4)
 
-        self.hline3_separator = tk.ttk.Separator(self.pulse_laser_frame, 
-                                                 orient="horizontal", 
-                                                 style="Grey Bar.TSeparator")
-        self.hline3_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
+        tk.ttk.Separator(self.pulse_laser_frame, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.pulse_freq_label = tk.Label(self.pulse_laser_frame, 
-                                         text="Pulse frequency [kHz]")
-        self.pulse_freq_label.grid(row=2,column=2)
+        tk.Label(self.pulse_laser_frame, 
+                 text="Pulse frequency [kHz]").grid(row=2,column=2)
 
         self.pulse_freq_entry = tk.ttk.Entry(self.pulse_laser_frame, width=9)
         self.pulse_freq_entry.grid(row=2,column=3)
 
-        self.pulse_wavelength_label = tk.Label(self.pulse_laser_frame, 
-                                               text="Wavelength [nm]")
-        self.pulse_wavelength_label.grid(row=3,column=2)
+        tk.Label(self.pulse_laser_frame, 
+                 text="Wavelength [nm]").grid(row=3,column=2)
 
         self.pulse_wavelength_entry = tk.ttk.Entry(self.pulse_laser_frame, width=9)
         self.pulse_wavelength_entry.grid(row=3,column=3)
@@ -1027,91 +933,73 @@ class Notebook:
                                               highlightthickness=1)
         self.gen_power_param_frame.grid(row=1,column=2, padx=(20,0))
 
-        self.gen_power_param_label = tk.Label(self.gen_power_param_frame, 
-                                              text="Generation/Power Params - Select One")
-        self.gen_power_param_label.grid(row=0,column=0,columnspan=4)
+        tk.Label(self.gen_power_param_frame, 
+                 text="Generation/Power Params - Select One").grid(row=0,column=0,columnspan=4)
 
-        self.hline4_separator = tk.ttk.Separator(self.gen_power_param_frame, 
-                                                 orient="horizontal", 
-                                                 style="Grey Bar.TSeparator")
-        self.hline4_separator.grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
+        tk.ttk.Separator(self.gen_power_param_frame, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=1,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-        self.power_spot = tk.ttk.Radiobutton(self.gen_power_param_frame, 
-                                             variable=self.LGC_gen_power_mode, 
-                                             value="power-spot")
-        self.power_spot.grid(row=2,column=0)
+        tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                           variable=self.LGC_gen_power_mode, 
+                           value="power-spot").grid(row=2,column=0)
 
-        self.power_spot_label = tk.Label(self.gen_power_param_frame, text="Option 1")
-        self.power_spot_label.grid(row=2,column=1)
+        tk.Label(self.gen_power_param_frame, text="Option 1").grid(row=2,column=1)
 
-        self.power_label = tk.Label(self.gen_power_param_frame, text="Power [uW]")
-        self.power_label.grid(row=2,column=2)
+        tk.Label(self.gen_power_param_frame, text="Power [uW]").grid(row=2,column=2)
 
         self.power_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.power_entry.grid(row=2,column=3)
 
-        self.spotsize_label = tk.Label(self.gen_power_param_frame, text="Spot size [cm^2]")
-        self.spotsize_label.grid(row=3,column=2)
+        tk.Label(self.gen_power_param_frame, text="Spot size [cm^2]").grid(row=3,column=2)
 
         self.spotsize_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.spotsize_entry.grid(row=3,column=3)
 
-        self.hline5_separator = tk.ttk.Separator(self.gen_power_param_frame, 
-                                                 orient="horizontal", 
-                                                 style="Grey Bar.TSeparator")
-        self.hline5_separator.grid(row=4,column=0,columnspan=30, pady=(5,5), sticky="ew")
+        tk.ttk.Separator(self.gen_power_param_frame, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=4,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.power_density_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, 
-                                                   variable=self.LGC_gen_power_mode, 
-                                                   value="density")
-        self.power_density_rb.grid(row=5,column=0)
+        tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                           variable=self.LGC_gen_power_mode, 
+                           value="density").grid(row=5,column=0)
 
-        self.power_density_rb_label = tk.Label(self.gen_power_param_frame,text="Option 2")
-        self.power_density_rb_label.grid(row=5,column=1)
+        tk.Label(self.gen_power_param_frame,text="Option 2").grid(row=5,column=1)
 
-        self.power_density_label = tk.Label(self.gen_power_param_frame, 
-                                            text="Power Density [uW/cm^2]")
-        self.power_density_label.grid(row=5,column=2)
+        tk.Label(self.gen_power_param_frame, 
+                 text="Power Density [uW/cm^2]").grid(row=5,column=2)
 
         self.power_density_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.power_density_entry.grid(row=5,column=3)
 
-        self.hline6_separator = tk.ttk.Separator(self.gen_power_param_frame, 
-                                                 orient="horizontal", 
-                                                 style="Grey Bar.TSeparator")
-        self.hline6_separator.grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
+        tk.ttk.Separator(self.gen_power_param_frame, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=6,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.max_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, 
-                                             variable=self.LGC_gen_power_mode, 
-                                             value="max-gen")
-        self.max_gen_rb.grid(row=7,column=0)
+        tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                           variable=self.LGC_gen_power_mode, 
+                           value="max-gen").grid(row=7,column=0)
 
-        self.max_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 3")
-        self.max_gen_rb_label.grid(row=7,column=1)
+        tk.Label(self.gen_power_param_frame, text="Option 3").grid(row=7,column=1)
 
-        self.max_gen_label = tk.Label(self.gen_power_param_frame, 
-                                      text="Max Generation [carr/cm^3]")
-        self.max_gen_label.grid(row=7,column=2)
+        tk.Label(self.gen_power_param_frame, 
+                 text="Max Generation [carr/cm^3]").grid(row=7,column=2)
 
         self.max_gen_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.max_gen_entry.grid(row=7,column=3)
 
-        self.hline7_separator = tk.ttk.Separator(self.gen_power_param_frame, 
-                                                 orient="horizontal", 
-                                                 style="Grey Bar.TSeparator")
-        self.hline7_separator.grid(row=8,column=0,columnspan=30, pady=(5,5), sticky="ew")
+        tk.ttk.Separator(self.gen_power_param_frame, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=8,column=0,columnspan=30, pady=(5,5), sticky="ew")
 
-        self.total_gen_rb = tk.ttk.Radiobutton(self.gen_power_param_frame, 
-                                               variable=self.LGC_gen_power_mode, 
-                                               value="total-gen")
-        self.total_gen_rb.grid(row=9,column=0)
+        tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                           variable=self.LGC_gen_power_mode, 
+                           value="total-gen").grid(row=9,column=0)
 
-        self.total_gen_rb_label = tk.Label(self.gen_power_param_frame, text="Option 4")
-        self.total_gen_rb_label.grid(row=9,column=1)
+        tk.Label(self.gen_power_param_frame, text="Option 4").grid(row=9,column=1)
 
-        self.total_gen_label = tk.Label(self.gen_power_param_frame, 
-                                        text="Average Generation [carr/cm^3]")
-        self.total_gen_label.grid(row=9,column=2)
+        tk.Label(self.gen_power_param_frame, 
+                 text="Average Generation [carr/cm^3]").grid(row=9,column=2)
 
         self.total_gen_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.total_gen_entry.grid(row=9,column=3)
@@ -1139,29 +1027,26 @@ class Notebook:
             layer_rbtn_label = tk.ttk.Label(self.LGC_layer_frame, text=layer_name)
             layer_rbtn_label.grid(row=i+1,column=1)
 
-        self.load_LGC_button = tk.ttk.Button(self.LGC_frame, 
-                                             text="Generate Initial Condition", 
-                                             command=self.add_LGC)
-        self.load_LGC_button.grid(row=3,column=0,columnspan=3)
+        tk.ttk.Button(self.LGC_frame, 
+                      text="Generate Initial Condition", 
+                      command=self.add_LGC).grid(row=3,column=0,columnspan=3)
 
-        self.LGC_description = tk.Message(self.LGC_frame, 
-                                          text="The Laser Generation Condition "
-                                          "uses the above numerical parameters "
-                                          "to generate an initial carrier "
-                                          "distribution based on an applied "
-                                          "laser excitation.", width=320)
-        self.LGC_description.grid(row=4,column=0,columnspan=3)
+        tk.Message(self.LGC_frame, 
+                   text="The Laser Generation Condition "
+                   "uses the above numerical parameters "
+                   "to generate an initial carrier "
+                   "distribution based on an applied "
+                   "laser excitation.", width=320).grid(row=4,column=0,columnspan=3)
         
         self.LGC_fig = Figure(figsize=(5,3.1))
         self.LGC_subplot = self.LGC_fig.add_subplot(111)
         self.LGC_canvas = tkagg.FigureCanvasTkAgg(self.LGC_fig, master=self.LGC_frame)
-        self.LGC_plotwidget = self.LGC_canvas.get_tk_widget()
-        self.LGC_plotwidget.grid(row=5, column=0, columnspan=3)
+        self.LGC_canvas.get_tk_widget().grid(row=5, column=0, columnspan=3)
         
         self.LGC_toolbar_frame = tk.ttk.Frame(master=self.LGC_frame)
         self.LGC_toolbar_frame.grid(row=6,column=0,columnspan=3)
-        self.LGC_toolbar = tkagg.NavigationToolbar2Tk(self.LGC_canvas, 
-                                                      self.LGC_toolbar_frame)
+        tkagg.NavigationToolbar2Tk(self.LGC_canvas, 
+                                   self.LGC_toolbar_frame)
         
         ## TODO: Assign these directly
         self.LGC_entryboxes_dict = {"A0":self.A0_entry, "Eg":self.Eg_entry, 
@@ -1278,10 +1163,9 @@ class Notebook:
     def do_module_popup(self):
         """ Popup for selecting the active module (e.g. Nanowire) """
         self.select_module_popup = tk.Toplevel(self.root)
-        self.select_module_label = tk.Label(self.select_module_popup, 
-                                            text="The following TEDs modules were found; "
-                                            "select one to continue: ")
-        self.select_module_label.grid(row=0,column=0)
+        tk.Label(self.select_module_popup, 
+                 text="The following TEDs modules were found; "
+                 "select one to continue: ").grid(row=0,column=0)
         
         self.modules_list = mod_list()
         self.module_names = list(self.modules_list.keys())
@@ -1290,11 +1174,8 @@ class Notebook:
         self.module_listbox.delete(0,tk.END)
         self.module_listbox.insert(0,*(self.module_names))
         
-        self.module_continue_button = tk.Button(self.select_module_popup, 
-                                                text="Continue", 
-                                                command=partial(self.on_select_module_popup_close, 
-                                                                True))
-        self.module_continue_button.grid(row=2,column=0)
+        tk.Button(self.select_module_popup, text="Continue", 
+                  command=partial(self.on_select_module_popup_close, True)).grid(row=2,column=0)
         
         self.select_module_popup.protocol("WM_DELETE_WINDOW", 
                                           partial(self.on_select_module_popup_close, 
@@ -1334,22 +1215,17 @@ class Notebook:
         """
         self.confirmation_popup = tk.Toplevel(self.root)
         
-        self.confirmation_text = tk.Message(self.confirmation_popup, text=text, 
-                                            width=(float(self.root.winfo_screenwidth()) / 4))
-        self.confirmation_text.grid(row=0,column=0, columnspan=2)
+        tk.Message(self.confirmation_popup, text=text, 
+                   width=(float(self.root.winfo_screenwidth()) / 4)).grid(row=0,column=0, columnspan=2)
         
         if not hide_cancel:
-            self.confirmation_cancel_button = tk.Button(self.confirmation_popup, 
-                                                        text="Cancel", 
-                                                        command=partial(self.on_confirmation_popup_close, 
-                                                                        continue_=False))
-            self.confirmation_cancel_button.grid(row=1,column=0)
+            tk.Button(self.confirmation_popup, text="Cancel", 
+                      command=partial(self.on_confirmation_popup_close, 
+                                      continue_=False)).grid(row=1,column=0)
         
-        self.confirmation_continue_btn = tk.Button(self.confirmation_popup, 
-                                                   text='Continue', 
-                                                   command=partial(self.on_confirmation_popup_close, 
-                                                                   continue_=True))
-        self.confirmation_continue_btn.grid(row=1,column=1)
+        tk.Button(self.confirmation_popup, text='Continue', 
+                  command=partial(self.on_confirmation_popup_close, 
+                                  continue_=True)).grid(row=1,column=1)
         
         self.confirmation_popup.protocol("WM_DELETE_WINDOW", 
                                          self.on_confirmation_popup_close)
@@ -1463,19 +1339,17 @@ class Notebook:
         
             self.sys_param_shortcut_popup = tk.Toplevel(self.root)
             
-            self.sys_param_shortcut_title_label = tk.ttk.Label(self.sys_param_shortcut_popup, 
-                                                               text="Parameter Short-cut Tool", 
-                                                               style="Header.TLabel")
-            self.sys_param_shortcut_title_label.grid(row=0,column=0)
+            tk.ttk.Label(self.sys_param_shortcut_popup, 
+                         text="Parameter Short-cut Tool", 
+                         style="Header.TLabel").grid(row=0,column=0)
             
-            self.sys_param_instruction = tk.Message(self.sys_param_shortcut_popup, 
-                                                    text="Are the values of certain parameters "
-                                                    "constant across the system? "
-                                                    "Enter those values here and "
-                                                    "press \"Continue\" to apply "
-                                                    "them on all space grid points.", 
-                                                    width=300)
-            self.sys_param_instruction.grid(row=0,column=1)
+            tk.Message(self.sys_param_shortcut_popup, 
+                       text="Are the values of certain parameters "
+                       "constant across the system? "
+                       "Enter those values here and "
+                       "press \"Continue\" to apply "
+                       "them on all space grid points.", 
+                       width=300).grid(row=0,column=1)
             
             self.sys_param_list_frame = tk.ttk.Frame(self.sys_param_shortcut_popup)
             self.sys_param_list_frame.grid(row=1,column=0,columnspan=2)
@@ -1512,11 +1386,10 @@ class Notebook:
                     row_count = 0
                     col_count += 2
                     
-            self.shortcut_continue_button = tk.Button(self.sys_param_shortcut_popup, 
-                                                      text="Continue", 
-                                                      command=partial(self.on_sys_param_shortcut_popup_close, 
-                                                                      True))
-            self.shortcut_continue_button.grid(row=2,column=1)
+            tk.Button(self.sys_param_shortcut_popup, 
+                      text="Continue", 
+                      command=partial(self.on_sys_param_shortcut_popup_close, 
+                                      True)).grid(row=2,column=1)
                     
             self.sys_param_shortcut_popup.protocol("WM_DELETE_WINDOW", 
                                                    self.on_sys_param_shortcut_popup_close)
@@ -1596,43 +1469,37 @@ class Notebook:
 
             self.batch_popup = tk.Toplevel(self.root)
             
-            self.batch_title_label = tk.ttk.Label(self.batch_popup, 
-                                                  text="Batch IC Tool", 
-                                                  style="Header.TLabel")
-            self.batch_title_label.grid(row=0,column=0)
+            tk.ttk.Label(self.batch_popup, 
+                         text="Batch IC Tool", 
+                         style="Header.TLabel").grid(row=0,column=0)
             
-            self.batch_instruction1 = tk.Message(self.batch_popup, 
-                                                 text="This Batch Tool allows you "
-                                                      "to generate many copies of "
-                                                      "the currently-loaded IC, "
-                                                      "varying up to {} parameters "
-                                                      "between all of them.".format(max_batchable_params), 
-                                                      width=300)
-            self.batch_instruction1.grid(row=1,column=0)
+            tk.Message(self.batch_popup, 
+                       text="This Batch Tool allows you "
+                       "to generate many copies of "
+                       "the currently-loaded IC, "
+                       "varying up to {} parameters "
+                       "between all of them.".format(max_batchable_params), 
+                       width=300).grid(row=1,column=0)
 
-            self.batch_instruction2 = tk.Message(self.batch_popup, 
-                                                 text="All copies will be stored "
-                                                      "in a new folder with the name "
-                                                      "you enter into the appropriate box.", 
-                                                 width=300)
-            self.batch_instruction2.grid(row=2,column=0)
+            tk.Message(self.batch_popup, 
+                       text="All copies will be stored "
+                       "in a new folder with the name "
+                       "you enter into the appropriate box.", 
+                       width=300).grid(row=2,column=0)
 
-            self.batch_instruction3 = tk.Message(self.batch_popup, 
-                                                 text="For best results, load a "
-                                                      "complete IC file or fill "
-                                                      "in values for all params "
-                                                      "before using this tool.", 
-                                                 width=300)
-            self.batch_instruction3.grid(row=3,column=0)
+            tk.Message(self.batch_popup, 
+                       text="For best results, load a "
+                       "complete IC file or fill "
+                       "in values for all params "
+                       "before using this tool.", 
+                       width=300).grid(row=3,column=0)
 
-            self.batch_param_label = tk.ttk.Label(self.batch_popup, 
-                                                  text="Select Layer {} Batch Parameter:".format(self.current_layer_name))
-            self.batch_param_label.grid(row=0,column=1)
+            tk.ttk.Label(self.batch_popup, 
+                         text="Select Layer {} Batch Parameter:".format(self.current_layer_name)).grid(row=0,column=1)
             
             self.batch_entry_frame = tk.ttk.Frame(self.batch_popup)
             self.batch_entry_frame.grid(row=1,column=1,columnspan=3, rowspan=3)
            
-
             # Contextually-dependent options for batchable params
             self.batchables_array = []
             mask_dN_and_dP = (self.module.system_ID in self.LGC_eligible_modules 
@@ -1703,10 +1570,9 @@ class Notebook:
             self.enter(self.batch_name_entry, "Enter name for batch folder")
             self.batch_name_entry.grid(row=6,column=1)
 
-            self.create_batch_button = tk.ttk.Button(self.batch_popup, 
-                                                     text="Create Batch", 
-                                                     command=self.create_batch_init)
-            self.create_batch_button.grid(row=6,column=2)
+            tk.ttk.Button(self.batch_popup, 
+                          text="Create Batch", 
+                          command=self.create_batch_init).grid(row=6,column=2)
 
             self.batch_popup.protocol("WM_DELETE_WINDOW", self.on_batch_popup_close)
             self.batch_popup.grab_set()
@@ -1732,11 +1598,10 @@ class Notebook:
 
             self.resetIC_popup = tk.Toplevel(self.root)
 
-            self.resetIC_title_label1 = tk.ttk.Label(self.resetIC_popup, 
-                                                     text="Which Parameters "
-                                                     "should be cleared?", 
-                                                     style="Header.TLabel")
-            self.resetIC_title_label1.grid(row=0,column=0,columnspan=2)
+            tk.ttk.Label(self.resetIC_popup, 
+                         text="Which Parameters "
+                         "should be cleared?", 
+                         style="Header.TLabel").grid(row=0,column=0,columnspan=2)
 
             self.resetIC_checkbutton_frame = tk.ttk.Frame(self.resetIC_popup)
             self.resetIC_checkbutton_frame.grid(row=1,column=0,columnspan=2)
@@ -1759,24 +1624,20 @@ class Notebook:
                 self.resetIC_checkbuttons[cb].grid(row=i,column=0, pady=(6,6))
 
             
-            self.hline10_separator = tk.ttk.Separator(self.resetIC_popup, 
-                                                      orient="horizontal", 
-                                                      style="Grey Bar.TSeparator")
-            self.hline10_separator.grid(row=2,column=0,columnspan=2, pady=(10,10), 
-                                        sticky="ew")
+            tk.ttk.Separator(self.resetIC_popup, 
+                             orient="horizontal", 
+                             style="Grey Bar.TSeparator").grid(row=2,column=0,columnspan=2, pady=(10,10), sticky="ew")
 
             self.resetIC_check_clearall = tk.IntVar()
-            self.resetIC_clearall_checkbutton = tk.Checkbutton(self.resetIC_popup, 
-                                                               text="Clear All", 
-                                                               variable=self.resetIC_check_clearall, 
-                                                               onvalue=1, offvalue=0)
-            self.resetIC_clearall_checkbutton.grid(row=3,column=0)
+            tk.Checkbutton(self.resetIC_popup, 
+                           text="Clear All", 
+                           variable=self.resetIC_check_clearall, 
+                           onvalue=1, offvalue=0).grid(row=3,column=0)
 
-            self.resetIC_continue_button = tk.Button(self.resetIC_popup, 
-                                                     text="Continue", 
-                                                     command=partial(self.on_resetIC_popup_close, 
-                                                                     True))
-            self.resetIC_continue_button.grid(row=3,column=1)
+            tk.Button(self.resetIC_popup, 
+                      text="Continue", 
+                      command=partial(self.on_resetIC_popup_close, 
+                                      True)).grid(row=3,column=1)
 
             self.resetIC_popup.protocol("WM_DELETE_WINDOW", 
                                         self.on_resetIC_popup_close)
@@ -1815,27 +1676,23 @@ class Notebook:
 
             self.plotter_popup = tk.Toplevel(self.root)
 
-            self.plotter_title_label = tk.ttk.Label(self.plotter_popup, 
-                                                    text="Select a data type", 
-                                                    style="Header.TLabel")
-            self.plotter_title_label.grid(row=0,column=0,columnspan=2)
+            tk.ttk.Label(self.plotter_popup, 
+                         text="Select a data type", 
+                         style="Header.TLabel").grid(row=0,column=0,columnspan=2)
 
-            self.var_select_menu = tk.OptionMenu(self.plotter_popup, self.data_var, 
-                                                 *(output for output in self.module.outputs_dict 
-                                                   if self.module.outputs_dict[output].analysis_plotable))
-            self.var_select_menu.grid(row=1,column=0)
+            tk.OptionMenu(self.plotter_popup, self.data_var, 
+                          *(output for output in self.module.outputs_dict 
+                          if self.module.outputs_dict[output].analysis_plotable)).grid(row=1,column=0)
 
-            self.autointegrate_checkbutton = tk.Checkbutton(self.plotter_popup, 
-                                                            text="Auto integrate all space and time steps?", 
-                                                            variable=self.check_autointegrate, 
-                                                            onvalue=1, offvalue=0)
-            self.autointegrate_checkbutton.grid(row=1,column=1)
+            tk.Checkbutton(self.plotter_popup, 
+                           text="Auto integrate all space and time steps?", 
+                           variable=self.check_autointegrate, 
+                           onvalue=1, offvalue=0).grid(row=1,column=1)
             
-            self.plotter_continue_button = tk.Button(self.plotter_popup, 
-                                                     text="Continue", 
-                                                     command=partial(self.on_plotter_popup_close, 
-                                                                     plot_ID, continue_=True))
-            self.plotter_continue_button.grid(row=2,column=1)
+            tk.Button(self.plotter_popup, 
+                      text="Continue", 
+                      command=partial(self.on_plotter_popup_close, 
+                                      plot_ID, continue_=True)).grid(row=2,column=1)
 
             self.data_listbox = tk.Listbox(self.plotter_popup, width=20, 
                                            height=20, 
@@ -1892,35 +1749,28 @@ class Notebook:
         if not self.integration_popup_isopen:
             self.integration_popup = tk.Toplevel(self.root)
 
-            self.integration_title_label = tk.ttk.Label(self.integration_popup, 
-                                                        text="Select which time steps "
-                                                             "to integrate over", 
-                                                        style="Header.TLabel")
-            self.integration_title_label.grid(row=1,column=0,columnspan=3)
+            tk.ttk.Label(self.integration_popup, 
+                         text="Select which time steps "
+                         "to integrate over", 
+                         style="Header.TLabel").grid(row=1,column=0,columnspan=3)
 
-            self.overtime = tk.ttk.Radiobutton(self.integration_popup, 
-                                               variable=self.fetch_PLmode, 
-                                               value='All time steps')
-            self.overtime.grid(row=2,column=0)
+            tk.ttk.Radiobutton(self.integration_popup, 
+                               variable=self.fetch_PLmode, 
+                               value='All time steps').grid(row=2,column=0)
 
-            self.overtime_label = tk.Label(self.integration_popup, 
-                                           text="All time steps")
-            self.overtime_label.grid(row=2,column=1)
+            tk.Label(self.integration_popup, 
+                     text="All time steps").grid(row=2,column=1)
 
-            self.currentTS = tk.ttk.Radiobutton(self.integration_popup, 
-                                                variable=self.fetch_PLmode, 
-                                                value='Current time step')
-            self.currentTS.grid(row=3,column=0)
+            tk.ttk.Radiobutton(self.integration_popup, 
+                               variable=self.fetch_PLmode, 
+                               value='Current time step').grid(row=3,column=0)
 
-            self.currentTS_label = tk.Label(self.integration_popup, 
-                                            text="Current time step")
-            self.currentTS_label.grid(row=3,column=1)
+            tk.Label(self.integration_popup, 
+                     text="Current time step").grid(row=3,column=1)
 
-            self.integration_continue_button =  tk.Button(self.integration_popup, 
-                                                          text="Continue", 
-                                                          command=partial(self.on_integration_popup_close, 
-                                                                          continue_=True))
-            self.integration_continue_button.grid(row=4,column=0,columnspan=3)
+            tk.Button(self.integration_popup, text="Continue", 
+                      command=partial(self.on_integration_popup_close, 
+                                      continue_=True)).grid(row=4,column=0,columnspan=3)
 
             self.integration_popup.protocol("WM_DELETE_WINDOW", partial(self.on_integration_popup_close, 
                                                                         continue_=False))
@@ -1951,82 +1801,67 @@ class Notebook:
         if not self.integration_getbounds_popup_isopen:
             self.integration_getbounds_popup = tk.Toplevel(self.root)
 
-            self.single_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, 
-                                                  variable=self.fetch_intg_mode, 
-                                                  value='single')
-            self.single_intg.grid(row=0,column=0, rowspan=3)
+            tk.ttk.Radiobutton(self.integration_getbounds_popup, 
+                               variable=self.fetch_intg_mode, 
+                               value='single').grid(row=0,column=0, rowspan=3)
 
-            self.single_intg_label = tk.ttk.Label(self.integration_getbounds_popup, 
-                                                  text="Single integral", 
-                                                  style="Header.TLabel")
-            self.single_intg_label.grid(row=0,column=1, rowspan=3, padx=(0,20))
+            tk.ttk.Label(self.integration_getbounds_popup, 
+                         text="Single integral", 
+                         style="Header.TLabel").grid(row=0,column=1, rowspan=3, padx=(0,20))
 
-            self.integration_getbounds_title_label = tk.Label(self.integration_getbounds_popup, 
-                                                              text="Enter bounds of integration " 
-                                                              + self.module.length_unit)
-            self.integration_getbounds_title_label.grid(row=0,column=2,columnspan=4)
+            tk.Label(self.integration_getbounds_popup, 
+                     text="Enter bounds of integration " 
+                     + self.module.length_unit).grid(row=0,column=2,columnspan=4)
 
-            self.lower = tk.Label(self.integration_getbounds_popup, 
-                                  text="Lower bound: x=")
-            self.lower.grid(row=1,column=2)
+            tk.Label(self.integration_getbounds_popup, 
+                     text="Lower bound: x=").grid(row=1,column=2)
 
             self.integration_lbound_entry = tk.Entry(self.integration_getbounds_popup, 
                                                      width=9)
             self.integration_lbound_entry.grid(row=2,column=2)
 
-            self.upper = tk.Label(self.integration_getbounds_popup, 
-                                  text="Upper bound: x=")
-            self.upper.grid(row=1,column=5)
+            tk.Label(self.integration_getbounds_popup, 
+                     text="Upper bound: x=").grid(row=1,column=5)
 
             self.integration_ubound_entry = tk.Entry(self.integration_getbounds_popup, 
                                                      width=9)
             self.integration_ubound_entry.grid(row=2,column=5)
 
-            self.hline8_separator = tk.ttk.Separator(self.integration_getbounds_popup, 
-                                                     orient="horizontal", 
-                                                     style="Grey Bar.TSeparator")
-            self.hline8_separator.grid(row=3,column=0,columnspan=30, pady=(10,10), 
-                                       sticky="ew")
+            tk.ttk.Separator(self.integration_getbounds_popup, 
+                             orient="horizontal", 
+                             style="Grey Bar.TSeparator").grid(row=3,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-            self.multi_intg = tk.ttk.Radiobutton(self.integration_getbounds_popup, 
-                                                 variable=self.fetch_intg_mode, 
-                                                 value='multiple')
-            self.multi_intg.grid(row=4,column=0, rowspan=3)
+            tk.ttk.Radiobutton(self.integration_getbounds_popup, 
+                               variable=self.fetch_intg_mode, 
+                               value='multiple').grid(row=4,column=0, rowspan=3)
 
-            self.multi_intg_label = tk.ttk.Label(self.integration_getbounds_popup, 
-                                                 text="Multiple integrals", 
-                                                 style="Header.TLabel")
-            self.multi_intg_label.grid(row=4,column=1, rowspan=3, padx=(0,20))
+            tk.ttk.Label(self.integration_getbounds_popup, 
+                         text="Multiple integrals", 
+                         style="Header.TLabel").grid(row=4,column=1, rowspan=3, padx=(0,20))
 
-            self.integration_center_label = tk.Label(self.integration_getbounds_popup, 
-                                                     text="Enter space-separated "
-                                                     "e.g. (100 200 300...) Centers "
-                                                     "{}: ".format(self.module.length_unit))
-            self.integration_center_label.grid(row=5,column=2)
+            tk.Label(self.integration_getbounds_popup, 
+                     text="Enter space-separated "
+                     "e.g. (100 200 300...) Centers "
+                     "{}: ".format(self.module.length_unit)).grid(row=5,column=2)
 
             self.integration_center_entry = tk.Entry(self.integration_getbounds_popup, 
                                                      width=30)
             self.integration_center_entry.grid(row=5,column=3,columnspan=3)
 
-            self.integration_width_label = tk.Label(self.integration_getbounds_popup, 
-                                                    text="Width {}: +/- ".format(self.module.length_unit))
-            self.integration_width_label.grid(row=6,column=2)
+            tk.Label(self.integration_getbounds_popup, 
+                     text="Width {}: +/- ".format(self.module.length_unit)).grid(row=6,column=2)
 
             self.integration_width_entry = tk.Entry(self.integration_getbounds_popup, 
                                                     width=9)
             self.integration_width_entry.grid(row=6,column=3)
 
-            self.hline9_separator = tk.ttk.Separator(self.integration_getbounds_popup, 
-                                                     orient="horizontal", 
-                                                     style="Grey Bar.TSeparator")
-            self.hline9_separator.grid(row=7,column=0,columnspan=30, pady=(10,10), 
-                                       sticky="ew")
+            tk.ttk.Separator(self.integration_getbounds_popup, 
+                             orient="horizontal", 
+                             style="Grey Bar.TSeparator").grid(row=7,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-            self.integration_getbounds_continue_button = tk.Button(self.integration_getbounds_popup, 
-                                                                   text="Continue", 
-                                                                   command=partial(self.on_integration_getbounds_popup_close, 
-                                                                                   continue_=True))
-            self.integration_getbounds_continue_button.grid(row=8,column=5)
+            tk.Button(self.integration_getbounds_popup, text="Continue", 
+                      command=partial(self.on_integration_getbounds_popup_close, 
+                                      continue_=True)).grid(row=8,column=5)
 
             self.integration_getbounds_status = tk.Text(self.integration_getbounds_popup, 
                                                         width=24,height=2)
@@ -2110,21 +1945,16 @@ class Notebook:
             self.xaxis_selection = tk.StringVar()
             self.PL_xaxis_popup = tk.Toplevel(self.root)
 
-            self.PL_xaxis_title_label = tk.ttk.Label(self.PL_xaxis_popup, 
-                                                     text="Select parameter for x axis", 
-                                                     style="Header.TLabel")
-            self.PL_xaxis_title_label.grid(row=0,column=0,columnspan=3)
+            tk.ttk.Label(self.PL_xaxis_popup, text="Select parameter for x axis", 
+                         style="Header.TLabel").grid(row=0,column=0,columnspan=3)
 
-            self.xaxis_param_menu = tk.OptionMenu(self.PL_xaxis_popup, 
-                                                  self.xaxis_selection, 
-                                                  *[param for param in self.module.param_dict])
-            self.xaxis_param_menu.grid(row=1,column=1)
+            tk.OptionMenu(self.PL_xaxis_popup, 
+                          self.xaxis_selection, 
+                          *[param for param in self.module.param_dict]).grid(row=1,column=1)
 
-            self.PL_xaxis_continue_button = tk.Button(self.PL_xaxis_popup, 
-                                                      text="Continue", 
-                                                      command=partial(self.on_PL_xaxis_popup_close, 
-                                                                      continue_=True))
-            self.PL_xaxis_continue_button.grid(row=1,column=2)
+            tk.Button(self.PL_xaxis_popup, text="Continue", 
+                      command=partial(self.on_PL_xaxis_popup_close, 
+                                      continue_=True)).grid(row=1,column=2)
 
             self.PL_xaxis_status = tk.Text(self.PL_xaxis_popup, width=24,height=2)
             self.PL_xaxis_status.grid(row=2,rowspan=2,column=0,columnspan=3)
@@ -2170,39 +2000,31 @@ class Notebook:
         if not self.change_axis_popup_isopen:
             self.change_axis_popup = tk.Toplevel(self.root)
 
-            self.change_axis_title_label = tk.ttk.Label(self.change_axis_popup, 
-                                                        text="Select axis settings", 
-                                                        style="Header.TLabel")
-            self.change_axis_title_label.grid(row=0,column=0,columnspan=2)
+            tk.ttk.Label(self.change_axis_popup, 
+                         text="Select axis settings", 
+                         style="Header.TLabel").grid(row=0,column=0,columnspan=2)
 
             self.xframe = tk.Frame(master=self.change_axis_popup)
             self.xframe.grid(row=1,column=0,padx=(0,20),pady=(20,0))
 
-            self.xheader = tk.Label(self.xframe, text="X Axis")
-            self.xheader.grid(row=0,column=0,columnspan=2)
+            tk.Label(self.xframe, text="X Axis").grid(row=0,column=0,columnspan=2)
 
-            self.xlin = tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, 
-                                           value='linear')
-            self.xlin.grid(row=1,column=0)
+            tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, 
+                               value='linear').grid(row=1,column=0)
 
-            self.xlin_label = tk.Label(self.xframe, text="Linear")
-            self.xlin_label.grid(row=1,column=1)
+            tk.Label(self.xframe, text="Linear").grid(row=1,column=1)
 
-            self.xlog = tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, 
-                                           value='symlog')
-            self.xlog.grid(row=2,column=0)
+            tk.ttk.Radiobutton(self.xframe, variable=self.xaxis_type, 
+                               value='symlog').grid(row=2,column=0)
 
-            self.xlog_label = tk.Label(self.xframe, text="Log")
-            self.xlog_label.grid(row=2,column=1)
+            tk.Label(self.xframe, text="Log").grid(row=2,column=1)
 
-            self.xlbound_label = tk.Label(self.xframe, text="Lower")
-            self.xlbound_label.grid(row=3,column=0)
+            tk.Label(self.xframe, text="Lower").grid(row=3,column=0)
 
             self.xlbound = tk.Entry(self.xframe, width=9)
             self.xlbound.grid(row=3,column=1)
 
-            self.xubound_label = tk.Label(self.xframe, text="Upper")
-            self.xubound_label.grid(row=4,column=0)
+            tk.Label(self.xframe, text="Upper").grid(row=4,column=0)
 
             self.xubound = tk.Entry(self.xframe, width=9)
             self.xubound.grid(row=4,column=1)
@@ -2210,53 +2032,41 @@ class Notebook:
             self.yframe = tk.Frame(master=self.change_axis_popup)
             self.yframe.grid(row=1,column=1,padx=(0,20),pady=(20,0))
 
-            self.yheader = tk.Label(self.yframe, text="Y Axis")
-            self.yheader.grid(row=0,column=0,columnspan=2)
+            tk.Label(self.yframe, text="Y Axis").grid(row=0,column=0,columnspan=2)
 
-            self.ylin = tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, 
-                                           value='linear')
-            self.ylin.grid(row=1,column=0)
+            tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, 
+                               value='linear').grid(row=1,column=0)
 
-            self.ylin_label = tk.Label(self.yframe, text="Linear")
-            self.ylin_label.grid(row=1,column=1)
+            tk.Label(self.yframe, text="Linear").grid(row=1,column=1)
 
-            self.ylog = tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, 
-                                           value='symlog')
-            self.ylog.grid(row=2,column=0)
+            tk.ttk.Radiobutton(self.yframe, variable=self.yaxis_type, 
+                               value='symlog').grid(row=2,column=0)
 
-            self.ylog_label = tk.Label(self.yframe, text="Log")
-            self.ylog_label.grid(row=2,column=1)
+            tk.Label(self.yframe, text="Log").grid(row=2,column=1)
 
-            self.ylbound_label = tk.Label(self.yframe, text="Lower")
-            self.ylbound_label.grid(row=3,column=0)
+            tk.Label(self.yframe, text="Lower").grid(row=3,column=0)
 
             self.ylbound = tk.Entry(self.yframe, width=9)
             self.ylbound.grid(row=3,column=1)
 
-            self.yubound_label = tk.Label(self.yframe, text="Upper")
-            self.yubound_label.grid(row=4,column=0)
+            tk.Label(self.yframe, text="Upper").grid(row=4,column=0)
 
             self.yubound = tk.Entry(self.yframe, width=9)
             self.yubound.grid(row=4,column=1)
 
-            self.toggle_legend_checkbutton = tk.Checkbutton(self.change_axis_popup, 
-                                                            text="Display legend?", 
-                                                            variable=self.check_display_legend, 
-                                                            onvalue=1, offvalue=0)
-            self.toggle_legend_checkbutton.grid(row=2,column=0,columnspan=2)
+            tk.Checkbutton(self.change_axis_popup, 
+                           text="Display legend?", 
+                           variable=self.check_display_legend, 
+                           onvalue=1, offvalue=0).grid(row=2,column=0,columnspan=2)
             
-            self.toggle_axis_freeze_checkbutton = tk.Checkbutton(self.change_axis_popup, 
-                                                                 text="Freeze axes?", 
-                                                                 variable=self.check_freeze_axes, 
-                                                                 onvalue=1, offvalue=0)
-            self.toggle_axis_freeze_checkbutton.grid(row=3,column=0,columnspan=2)
+            tk.Checkbutton(self.change_axis_popup, 
+                           text="Freeze axes?", 
+                           variable=self.check_freeze_axes, 
+                           onvalue=1, offvalue=0).grid(row=3,column=0,columnspan=2)
 
-            self.change_axis_continue_button = tk.Button(self.change_axis_popup, 
-                                                         text="Continue", 
-                                                         command=partial(self.on_change_axis_popup_close, 
-                                                                         from_integration, 
-                                                                         continue_=True))
-            self.change_axis_continue_button.grid(row=4, column=0,columnspan=2)
+            tk.Button(self.change_axis_popup, text="Continue", 
+                      command=partial(self.on_change_axis_popup_close, 
+                                      from_integration, continue_=True)).grid(row=4, column=0,columnspan=2)
 
             self.change_axis_status = tk.Text(self.change_axis_popup, width=24,height=2)
             self.change_axis_status.grid(row=5,rowspan=2,column=0,columnspan=2)
@@ -2365,10 +2175,9 @@ class Notebook:
         if not self.IC_carry_popup_isopen:
             self.IC_carry_popup = tk.Toplevel(self.root)
 
-            self.IC_carry_title_label = tk.ttk.Label(self.IC_carry_popup, 
-                                                     text="Select data to include in new IC",
-                                                     style="Header.TLabel")
-            self.IC_carry_title_label.grid(row=0,column=0,columnspan=2)
+            tk.ttk.Label(self.IC_carry_popup, 
+                         text="Select data to include in new IC",
+                         style="Header.TLabel").grid(row=0,column=0,columnspan=2)
             
             self.carry_checkbuttons = {}
             rcount = 1
@@ -2385,11 +2194,9 @@ class Notebook:
             for key in self.analysis_plots[plot_ID].datagroup.datasets:
                 self.carry_IC_listbox.insert(tk.END, key)
 
-            self.IC_carry_continue_button = tk.Button(self.IC_carry_popup, 
-                                                      text="Continue", 
-                                                      command=partial(self.on_IC_carry_popup_close,
-                                                                      continue_=True))
-            self.IC_carry_continue_button.grid(row=5,column=0,columnspan=2)
+            tk.Button(self.IC_carry_popup, text="Continue", 
+                      command=partial(self.on_IC_carry_popup_close,
+                                      continue_=True)).grid(row=5,column=0,columnspan=2)
 
             self.IC_carry_popup.protocol("WM_DELETE_WINDOW", 
                                          partial(self.on_IC_carry_popup_close, 
