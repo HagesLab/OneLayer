@@ -6,7 +6,7 @@ Created on Wed May 12 18:01:07 2021
 """
 import numpy as np
 from scipy import integrate as intg
-from _helper_structs import Parameter, Output, Layer
+from helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
@@ -17,9 +17,6 @@ class Std_SingleLayer(OneD_Model):
     def __init__(self):
         super().__init__()
         self.system_ID = "OneLayer"
-        
-        
-        self.length_unit = "[nm]"
         self.time_unit = "[ns]"
         params = {"mu_N":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
                   "mu_P":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
@@ -41,31 +38,25 @@ class Std_SingleLayer(OneD_Model):
                   "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                   "Ec":Parameter(units="[eV]", is_edge=True), 
                   "electron_affinity":Parameter(units="[eV]", is_edge=True)}
-        
-        dummy_params = {"delta_N":Parameter(units="[cm^-3]", is_edge=True, valid_range=(0,np.inf)),
-                        "delta_P":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)),
-                        "boundary vallue":Parameter(units="[a.u.]", is_edge=False, is_space_dependent=False, valid_range=(0,1))}
-        
-        dummy_convert = {p:10 for p in dummy_params}
-        
+                
         self.flags_dict = {"ignore_recycle":("Ignore Photon Recycle",1, 0),
                            #"symmetric_system":("Symmetric System",0, 0),
                            "check_do_ss":("Steady State Input",1, 0)}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        simulation_outputs = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)), 
-                              "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)),
+        simulation_outputs = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)), 
+                              "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)),
                              }
         
         # List of all variables calculated from those in simulation_outputs_dict
-        calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True),
-                             "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
-                             "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
-                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False),
-                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False),
-                             "PL":Output("TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False),
-                             "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, analysis_plotable=False)}
+        calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True, layer="OneLayer"),
+                             "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
+                             "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
+                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
+                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
+                             "PL":Output("TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer"),
+                             "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer", analysis_plotable=False)}
         
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
@@ -94,7 +85,7 @@ class Std_SingleLayer(OneD_Model):
             
         self.layers = {"OneLayer":Layer(params, simulation_outputs, calculated_outputs,
                                         "[nm]", convert_in),
-                       "dummy layer":Layer(dummy_params, {}, {}, "[jm]", dummy_convert)}
+                       }
 
         # TODO: Remove main's dependence on thses        
         self.convert_in_dict = self.layers["OneLayer"].convert_in
@@ -128,11 +119,14 @@ class Std_SingleLayer(OneD_Model):
         
         return {"N":init_N, "P":init_P}
     
-    def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
         """Calls ODEINT solver."""
         one_layer = self.layers["OneLayer"]
+        for param_name, param in one_layer.params.items():
+            param.value *= one_layer.convert_in[param_name]
+
         ## TODO: replace self.dx with one_layer.dx when GUI is ready
-        ode_nanowire(data_path, m, n, self.dx, dt, params,
+        ode_nanowire(data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
                      not flags['ignore_recycle'].value(), 
                      flags['symmetric_system'].value(), 
                      flags['check_do_ss'].value(), hmax_, True,
@@ -396,8 +390,8 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
         Space node width.
     dt : float
         Time step size.
-    params : dict {"str":float or 1D array}
-        Collection of parameter values
+    params : dict {"str":Parameter}
+        Collection of parameter objects
     recycle_photons : bool, optional
         Whether carrier regeneration due to photons is considered. The default is True.
     symmetric : bool, optional
@@ -425,24 +419,24 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     atom = tables.Float64Atom()
 
     ## Unpack params; typecast non-array params to arrays if needed
-    Sf = params["Sf"]
-    Sb = params["Sb"]
-    mu_n = to_array(params["mu_N"], m, True)
-    mu_p = to_array(params["mu_P"], m, True)
-    T = to_array(params["temperature"], m, True)
-    n0 = to_array(params["N0"], m, False)
-    p0 = to_array(params["P0"], m, False)
-    tauN = to_array(params["tau_N"], m, False)
-    tauP = to_array(params["tau_P"], m, False)
-    B = to_array(params["B"], m, False)
-    eps = to_array(params["rel_permitivity"], m, True)
-    E_field_ext = to_array(params["Ext_E-Field"], m, True)
-    alpha = to_array(params["alpha"], m, False)
-    back_refl_frac = params["back_reflectivity"]
-    delta_frac = to_array(params["delta"], m, False) if recycle_photons else np.zeros(m)
-    frac_emitted = to_array(params["frac_emitted"], m, False)
-    init_Ec = to_array(params["Ec"], m, True)
-    init_Chi = to_array(params["electron_affinity"], m, True)
+    Sf = params["Sf"].value
+    Sb = params["Sb"].value
+    mu_n = to_array(params["mu_N"].value, m, True)
+    mu_p = to_array(params["mu_P"].value, m, True)
+    T = to_array(params["temperature"].value, m, True)
+    n0 = to_array(params["N0"].value, m, False)
+    p0 = to_array(params["P0"].value, m, False)
+    tauN = to_array(params["tau_N"].value, m, False)
+    tauP = to_array(params["tau_P"].value, m, False)
+    B = to_array(params["B"].value, m, False)
+    eps = to_array(params["rel_permitivity"].value, m, True)
+    E_field_ext = to_array(params["Ext_E-Field"].value, m, True)
+    alpha = to_array(params["alpha"].value, m, False)
+    back_refl_frac = params["back_reflectivity"].value
+    delta_frac = to_array(params["delta"].value, m, False) if recycle_photons else np.zeros(m)
+    frac_emitted = to_array(params["frac_emitted"].value, m, False)
+    init_Ec = to_array(params["Ec"].value, m, True)
+    init_Chi = to_array(params["electron_affinity"].value, m, True)
            
     ## Define constants
     eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}

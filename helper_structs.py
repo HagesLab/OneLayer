@@ -137,7 +137,7 @@ class Parameter(Characteristic):
     
 class Output(Characteristic):
 
-    def __init__(self, display_name, units, xlabel, xvar, is_edge, analysis_plotable=True, yscale='symlog', yfactors=(1,1)):
+    def __init__(self, display_name, units, xlabel, xvar, is_edge, layer, analysis_plotable=True, yscale='symlog', yfactors=(1,1)):
         """ Helper class for managing info about each of a Module's output values.
         
         Each Layer tracks a list of Outputs.
@@ -151,10 +151,12 @@ class Output(Characteristic):
             Unit to be printed on horizontal plot axes.
         xvar : str, either "position" or "time"
             Used by GUI plot_overview_analysis to plot either with a time grid or a space grid.
-        is_integrated : bool, optional
-            Whether this value is calculated using an integration procedure.
-            Defined for convenience in module's plot_overview_analysis.
-            The default is False.
+        layer : str
+            The name of the layer this output comes from. Used to match to the correct space grid.
+        analysis_plotable : bool, optional
+            Whether this value should be visible in the detailed analysis tab.
+            Generally true except for some special calculations which don't follow the space grids.
+            The default is True.
         yscale : str, optional, must be a valid matplotlib plot scale
             Which plot scale the sim and overview plotters should use e.g. linear or log. The default is 'symlog'.
             Detailed analysis plots have an experimental autoscaling function.
@@ -171,6 +173,7 @@ class Output(Characteristic):
         self.display_name = display_name
         self.xlabel = xlabel
         self.xvar = xvar
+        self.layer = layer
         self.analysis_plotable = analysis_plotable
         self.yscale = yscale
         self.yfactors = yfactors

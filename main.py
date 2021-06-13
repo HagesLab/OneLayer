@@ -657,16 +657,18 @@ class Notebook:
         
         self.sim_fig = Figure(figsize=(14, 8))
         count = 1
-        cdim = np.ceil(np.sqrt(self.module.simulation_outputs_count))
+        cdim = np.ceil(np.sqrt(self.module.count_s_outputs()))
         
-        rdim = np.ceil(self.module.simulation_outputs_count / cdim)
+        rdim = np.ceil(self.module.count_s_outputs() / cdim)
         self.sim_subplots = {}
-        for variable in self.module.simulation_outputs_dict:
-            self.sim_subplots[variable] = self.sim_fig.add_subplot(int(rdim), 
-                                                                   int(cdim), 
-                                                                   int(count))
-            self.sim_subplots[variable].set_title(variable)
-            count += 1
+        for layer_name, layer in self.module.layers.items():
+            self.sim_subplots[layer_name] = {}
+            for variable in layer.s_outputs:
+                self.sim_subplots[layer_name][variable] = self.sim_fig.add_subplot(int(rdim), 
+                                                                                   int(cdim), 
+                                                                                   int(count))
+                self.sim_subplots[layer_name][variable].set_title(variable)
+                count += 1
 
         self.sim_canvas = tkagg.FigureCanvasTkAgg(self.sim_fig, master=self.tab_simulate)
         self.sim_canvas.get_tk_widget().grid(row=1,column=3,rowspan=12,columnspan=2)
@@ -2388,27 +2390,29 @@ class Notebook:
     def update_sim_plots(self, index, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
         
-        for variable, output_obj in self.module.simulation_outputs_dict.items():
-            
-            plot = self.sim_subplots[variable]
-            
-            if do_clear_plots: 
-                plot.cla()
-
-                ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
-                ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
-                plot.set_ylim(ymin * self.convert_out_dict[variable], 
-                              ymax * self.convert_out_dict[variable])
-
-            plot.set_yscale(output_obj.yscale)
-            
-            grid_x = self.module.grid_x_nodes if not output_obj.is_edge else self.module.grid_x_edges
-            plot.plot(grid_x, self.sim_data[variable] * self.convert_out_dict[variable])
-
-            plot.set_xlabel("x {}".format(self.module.length_unit))
-            plot.set_ylabel("{} {}".format(variable, output_obj.units))
-
-            plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
+        for layer_name, layer in self.module.layers.items():
+            convert_out = layer.convert_out
+            for variable, output_obj in layer.s_outputs.items():
+                
+                plot = self.sim_subplots[layer_name][variable]
+                
+                if do_clear_plots: 
+                    plot.cla()
+    
+                    ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
+                    ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
+                    plot.set_ylim(ymin * convert_out[variable], 
+                                  ymax * convert_out[variable])
+    
+                plot.set_yscale(output_obj.yscale)
+                
+                grid_x = layer.grid_x_nodes if not output_obj.is_edge else layer.grid_x_edges
+                plot.plot(grid_x, self.sim_data[variable] * convert_out[variable])
+    
+                plot.set_xlabel("x {}".format(layer.length_unit))
+                plot.set_ylabel("{} {}".format(variable, output_obj.units))
+    
+                plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
             
         self.sim_fig.tight_layout()
         self.sim_fig.canvas.draw()
@@ -2814,8 +2818,7 @@ class Notebook:
             return
 
         batch_num = 0
-        self.sim_warning_msg = ""
-        
+        self.sim_warning_msg = ["The following occured while simulating:"]
         for IC in IC_files:
             batch_num += 1
             self.IC_file_name = IC
@@ -2827,11 +2830,8 @@ class Notebook:
             
         self.write(self.status, "Simulations complete")
 
-        if self.sim_warning_msg:
-            sim_warning_popup = tk.Toplevel(self.root)
-            sim_warning_textbox = tk.ttk.Label(sim_warning_popup, 
-                                               text=self.sim_warning_msg)
-            sim_warning_textbox.grid(row=0,column=0)
+        if len(self.sim_warning_msg) > 1:
+            self.do_confirmation_popup("\n".join(self.sim_warning_msg), hide_cancel=True)
         return
 
     def do_Calculate(self):
@@ -2844,34 +2844,32 @@ class Notebook:
             # Construct the data folder's name from the corresponding IC file's name
             shortened_IC_name = self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")]
             data_file_name = shortened_IC_name
-            
-            self.m = int(0.5 + self.module.total_length / self.module.dx)         # Number of space steps
-            
-
-            temp_sim_dict = {}
-
-            # Convert into TEDs units
-            for param in self.module.param_dict:
-                temp_sim_dict[param] = self.module.param_dict[param].value * self.convert_in_dict[param]
+            temp_params = {}
+            num_nodes = {}
+            for layer_name, layer in self.module.layers.items():
+                num_nodes[layer_name] = int(0.5 + layer.total_length / layer.dx)
+                temp_params[layer_name] = dict(layer.params)
 
             init_conditions = self.module.calc_inits()
             assert isinstance(init_conditions, dict), "Error: module calc_inits() did not return a dict of initial conditions\n"
             
-            for variable in self.module.simulation_outputs_dict:
-                assert variable in init_conditions, "Error: Module calc_inits() did not return value for simulation output variable {}\n".format(variable)
-                assert isinstance(init_conditions[variable], np.ndarray), "Error: module calc_inits() returned an invalid value (values must be numpy arrays) for output {}\n".format(variable)
-                assert init_conditions[variable].ndim == 1, "Error: module calc_inits() did not return a 1D numpy array for output {}\n".format(variable)
+            # Can't verify this ahead of time unfortunately so verify on demand
+            for layer_name, layer in self.module.layers.items():
+                for variable in layer.s_outputs:
+                    assert variable in init_conditions, "Error: Module calc_inits() did not return value for simulation output variable {}\n".format(variable)
+                    assert isinstance(init_conditions[variable], np.ndarray), "Error: module calc_inits() returned an invalid value (values must be numpy arrays) for output {}\n".format(variable)
+                    assert init_conditions[variable].ndim == 1, "Error: module calc_inits() did not return a 1D numpy array for output {}\n".format(variable)
         
         except ValueError:
-            self.sim_warning_msg += "Error: Invalid parameters for {}\n".format(data_file_name)
+            self.sim_warning_msg.append("Error: Invalid parameters for {}".format(data_file_name))
             return
         
         except AssertionError as oops:
-            self.sim_warning_msg += str(oops)
+            self.sim_warning_msg.append(str(oops))
             return
 
         except Exception as oops:
-            self.sim_warning_msg += "Error: \"{}\" reported while setting up {}\n".format(oops, data_file_name)
+            self.sim_warning_msg.append("Error: \"{}\" reported while setting up {}".format(oops, data_file_name))
             return
     
         try:
@@ -2892,16 +2890,16 @@ class Notebook:
                 full_path_name = "{}({})".format(full_path_name, append)
                 
                 
-                self.sim_warning_msg += "Overwrite warning - {} already exists " \
-                                        "in Data directory\nSaving as {} instead\n".format(data_file_name, full_path_name)
+                self.sim_warning_msg.append("Overwrite warning - {} already exists "
+                                            "in Data directory\nSaving as {} instead".format(data_file_name, full_path_name))
                 
                 data_file_name = "{}({})".format(data_file_name, append)
                 
             os.mkdir("{}".format(full_path_name))
 
         except Exception:
-            self.sim_warning_msg += "Error: unable to create directory for results " \
-                                    "of simulation {}\n".format(shortened_IC_name)
+            self.sim_warning_msg.append("Error: unable to create directory for results "
+                                        "of simulation {}\n".format(shortened_IC_name))
             return
 
 
@@ -2909,14 +2907,17 @@ class Notebook:
         atom = tables.Float64Atom()
 
         ## Create data files
-        for variable in self.module.simulation_outputs_dict:
-            with tables.open_file("{}\\{}-{}.h5".format(full_path_name, data_file_name, variable), mode='w') as ofstream:
-                length = self.m if not self.module.simulation_outputs_dict[variable].is_edge else self.m + 1
-
-                # Important - "data" must be used as the array name here, as pytables will use the string "data" 
-                # to name the attribute earray.data, which is then used to access the array
-                earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
-                earray.append(np.reshape(init_conditions[variable], (1, length)))
+        for layer_name, layer in self.module.layers.items():
+            for variable in layer.s_outputs:
+                with tables.open_file("{}\\{}-{}.h5".format(full_path_name, data_file_name, variable), mode='w') as ofstream:
+                    length = num_nodes[layer_name] 
+                    if layer.s_outputs[variable].is_edge:
+                        num_nodes[layer_name] += 1
+    
+                    # Important - "data" must be used as the array name here, as pytables will use the string "data" 
+                    # to name the attribute earray.data, which is then used to access the array
+                    earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
+                    earray.append(np.reshape(init_conditions[variable], (1, length)))
         
         ## Setup simulation plots and plot initial
         
@@ -2925,12 +2926,12 @@ class Notebook:
 
         try:
             self.module.simulate("{}\\{}".format(full_path_name,data_file_name), 
-                                   self.m, self.n, self.dt, temp_sim_dict, 
+                                   num_nodes, self.n, self.dt,
                                    self.sys_flag_dict, self.hmax, init_conditions)
             
         except FloatingPointError:
-            self.sim_warning_msg += ("Error: an unusual value occurred while simulating {}. "
-                                     "This file may have invalid parameters.\n".format(data_file_name))
+            self.sim_warning_msg.append("Error: an unusual value occurred while simulating {}. "
+                                        "This file may have invalid parameters.".format(data_file_name))
             for file in os.listdir(full_path_name):
                 tpath = full_path_name + "\\" + file
                 os.remove(tpath)
@@ -2938,7 +2939,7 @@ class Notebook:
             os.rmdir(full_path_name)
             return
         except Exception as oops:
-            self.sim_warning_msg += ("Error \"{}\" occurred while simulating {}\n".format(oops, data_file_name))
+            self.sim_warning_msg.append("Error \"{}\" occurred while simulating {}\n".format(oops, data_file_name))
             for file in os.listdir(full_path_name):
                 tpath = full_path_name + "\\" + file
                 os.remove(tpath)
@@ -2960,12 +2961,12 @@ class Notebook:
                                                 single_tstep=True)
                 self.update_sim_plots(self.n, do_clear_plots=False)
         except Exception:
-            self.sim_warning_msg += "Warning: unable to plot {}. Output data " \
-                                    "may not have been saved correctly.\n".format(data_file_name)
+            self.sim_warning_msg.append("Warning: unable to plot {}. Output data "
+                                        "may not have been saved correctly.\n".format(data_file_name))
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
-
+        return
         with open(full_path_name + "\\metadata.txt", "w+") as ofstream:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON {} AT {}\n".format(datetime.datetime.now().date(),datetime.datetime.now().time()))
             ofstream.write("System_class: {}\n".format(self.module.system_ID))

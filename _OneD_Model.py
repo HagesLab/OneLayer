@@ -5,7 +5,7 @@ Created on Wed May 12 18:01:25 2021
 @author: cfai2
 """
 import numpy as np
-from _helper_structs import Parameter, Output
+from helper_structs import Parameter, Output
 from utils import u_read, to_index, to_array, to_pos
 import tables
 
@@ -30,23 +30,11 @@ class OneD_Model:
     
     def __init__(self):
         # Unique identifier for module.
-        self.system_ID = "INSERT MODEL NAME HERE"
-        
+        self.system_ID = "INSERT MODEL NAME HERE"        
         self.layers = {}
-        # Space grid information.
-        #TODO: Remove basically all of these
-        self.total_length = -1
-        self.dx = -1
-        self.length_unit = "INSERT LENGTH UNIT HERE"
-        self.time_unit = "Insert time unit here"
-        self.grid_x_nodes = -1
-        self.grid_x_edges = -1
-        self.spacegrid_is_set = False
-        
         # Parameter list.
         self.param_dict = {}
-        self.param_count = len(self.param_dict)
-        
+
         # dict {"Flag's internal name":
         #       ("Flag's display name",whether Flag1 is toggleable, Flag1's default value)
         #      }
@@ -54,33 +42,22 @@ class OneD_Model:
         
         # dict {"Variable name":Output()} of all dependent variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"Output1":Output("y", units="[hamburgers/football field]", xlabel="a.u.", xvar="position", is_edge=False, yscale='log', yfactors=(1e-4,1e1))}
+        simulation_outputs = {"Output1":Output("y", units="[hamburgers/football field]", xlabel="a.u.", xvar="position", is_edge=False, layer="LAYER_NAME", yscale='log', yfactors=(1e-4,1e1))}
         
         # dict {"Variable name":Output()} of all secondary variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False)}
-        
-        self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
-        
-        self.simulation_outputs_count = len(self.simulation_outputs_dict)
-        self.calculated_outputs_count = len(self.calculated_outputs_dict)
-        self.total_outputs_count = self.simulation_outputs_count + self.calculated_outputs_count
-        
+        calculated_outputs = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, layer="LAYER_NAME")}
+
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
         # Each item in param_dict and outputs_dict must have an entry here, even if the conversion factor is one
-        self.convert_in_dict = {"Output1": ((1e-2) / (1e2)),               # [hamburgers/football field] to [centihamburgers/yard]
-                                "deltaN": ((1e-7) ** 3)                    # [cm^-3] to [nm^-3]
-                                }
+        convert_in = {"Output1": ((1e-2) / (1e2)),               # [hamburgers/football field] to [centihamburgers/yard]
+                      "deltaN": ((1e-7) ** 3)                    # [cm^-3] to [nm^-3]
+                      }
         
         # The integration tool uses whatever units self.dx is in.
         # Define the "integration_scale" entry to correct for any mismatches
         # between the integrand's and self.dx's length units.
-        self.convert_in_dict["integration_scale"] = 1
-        
-        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
-        self.convert_out_dict = {}
-        for param in self.convert_in_dict:
-            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
+        convert_in["integration_scale"] = 1
 
         return
     
@@ -214,6 +191,12 @@ class OneD_Model:
 
         param.value = new_param_value
         return
+    
+    def count_s_outputs(self):
+        count = 0
+        for layer_name, layer in self.layers.items():
+            count += layer.s_outputs_count
+        return count
     
     def DEBUG_print(self):
         """

@@ -6,7 +6,7 @@ Created on Wed May 12 18:01:07 2021
 """
 import numpy as np
 from scipy import integrate as intg
-from _helper_structs import Parameter, Output
+from helper_structs import Parameter, Output
 from utils import u_read, to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
