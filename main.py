@@ -4165,7 +4165,7 @@ class Notebook:
 
     def create_batch_init(self):
         """ Workhorse of batch init tool. Creates a batch of similar IC files based on the inputted parameter grid."""
-        warning_flag = 0
+        warning_mssg = ["The following occured while creating the batch:"]
         try:
             batch_values = {}
 
@@ -4198,8 +4198,8 @@ class Notebook:
         
         # Record the original values of the module, so we can restore them after the batch algo finishes
         original_param_values = {}
-        for param in self.module.param_dict:
-            original_param_values[param] = self.module.param_dict[param].value
+        for param_name, param in self.module.layers[self.current_layer_name].params.items():
+            original_param_values[param_name] = param.value
                 
         # This algorithm was shamelessly stolen from our bay.py script...                
         batch_combinations = get_all_combinations(batch_values)        
@@ -4214,29 +4214,30 @@ class Notebook:
                     self.enter(self.LGC_entryboxes_dict[param], str(batch_set[param]))
                     
                 else:
-                    self.module.param_dict[param].value = batch_set[param]
+                    self.module.layers[self.current_layer_name].params[param].value = batch_set[param]
 
                 
-            if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC: 
+            if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC[self.current_layer_name]: 
                 self.add_LGC()
                 
             try:
                 self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], 
                                                              batch_dir_name, filename))
-            except Exception:
-                print("Error: failed to create batch file {}".format(filename))
-                warning_flag += 1
+            except Exception as e:
+                warning_mssg.append("Error: failed to create batch file {}".format(filename))
+                warning_mssg.append(str(e))
                 
         # Restore the original values of module
-        for param in self.module.param_dict:
-            self.module.param_dict[param].value = original_param_values[param]
+        for param_name, param in self.module.layers[self.current_layer_name].params.items():
+            param.value = original_param_values[param_name]
         
-        if not warning_flag:
-            self.write(self.batch_status, 
-                       "Batch \"{}\" created successfully".format(batch_dir_name))
+        
+        if len(warning_mssg) > 1:
+            self.do_confirmation_popup("\n".join(warning_mssg), hide_cancel=True)
         else:
-            self.write(self.batch_status, 
-                       "Warning: failed to create some batch files - see console")
+            self.do_confirmation_popup("Batch {} created successfully".format(batch_dir_name), hide_cancel=True)
+            
+        self.root.wait_window(self.confirmation_popup)
         return
     
 
