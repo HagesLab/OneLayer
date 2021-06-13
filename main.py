@@ -1173,7 +1173,7 @@ class Notebook:
                                     "Power_Density":self.power_density_entry,
                                     "Max_Gen":self.max_gen_entry, 
                                     "Total_Gen":self.total_gen_entry}
-        
+        self.enter(self.LGC_entryboxes_dict["A0"], "1240")
         self.LGC_optionboxes = {"long_expfactor":self.check_calculate_init_material_expfactor, 
                                 "incidence":self.LGC_stim_mode,
                                 "power_mode":self.LGC_gen_power_mode}
@@ -1233,6 +1233,18 @@ class Notebook:
         self.write(self.ICtab_status, "Switched to layer:\n{}".format(self.current_layer_name))
         
         self.write(self.layer_statusbox, "On layer: {}".format(self.current_layer_name))
+        
+        if self.module.system_ID in self.LGC_eligible_modules:
+            if self.using_LGC[self.current_layer_name]:
+                for option, val in self.LGC_options[self.current_layer_name].items():
+                    self.LGC_optionboxes[option].set(val)
+                    
+                for param_name, box in self.LGC_entryboxes_dict.items():
+                    if param_name in self.LGC_values[self.current_layer_name]:
+                        self.enter(box, str(self.LGC_values[self.current_layer_name][param_name]))
+                    else:
+                        self.enter(box, "")
+                        
         
         return
 
@@ -1567,15 +1579,18 @@ class Notebook:
 
     def do_batch_popup(self):
         """ Open tool for making batches of similar initial condition files. """
-        try:
-            self.set_init_x()
-            assert self.module.spacegrid_is_set, "Error: could not set space grid"
-        
-        except Exception:
-            self.write(self.ICtab_status, "Error: missing space grid")
-            return
-
-        if not self.batch_popup_isopen: 
+        if not self.batch_popup_isopen:
+            
+            for layer_name, layer in self.module.layers.items():
+                try:
+                    assert layer.spacegrid_is_set
+                
+                except Exception:
+                    self.write(self.ICtab_status, 
+                               "Error: layer {} does not have params initialized yet".format(layer_name))
+                    
+                    return
+         
             max_batchable_params = 4
             self.batch_param = tk.StringVar()
 
@@ -1611,7 +1626,7 @@ class Notebook:
             self.batch_instruction3.grid(row=3,column=0)
 
             self.batch_param_label = tk.ttk.Label(self.batch_popup, 
-                                                  text="Select Batch Parameter:")
+                                                  text="Select Layer {} Batch Parameter:".format(self.current_layer_name))
             self.batch_param_label.grid(row=0,column=1)
             
             self.batch_entry_frame = tk.ttk.Frame(self.batch_popup)
@@ -1620,12 +1635,13 @@ class Notebook:
 
             # Contextually-dependent options for batchable params
             self.batchables_array = []
-            batchable_params = [param for param in self.module.param_dict 
-                                if not (self.module.system_ID in self.LGC_eligible_modules
-                                        and self.using_LGC 
+            mask_dN_and_dP = (self.module.system_ID in self.LGC_eligible_modules 
+                              and self.using_LGC[self.current_layer_name])
+            batchable_params = [param for param in self.module.layers[self.current_layer_name].params 
+                                if not (mask_dN_and_dP
                                         and (param == "delta_N" or param == "delta_P"))]
             
-            if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC:
+            if mask_dN_and_dP:
                 
                 self.LGC_instruction1 = tk.Message(self.batch_popup, 
                                                    text="Additional options for generating "
@@ -1637,7 +1653,7 @@ class Notebook:
                 
                 self.LGC_instruction2 = tk.Message(self.batch_popup, 
                                                    text="Please note that TEDs will "
-                                                   "use the values and settings on "
+                                                   "use the current values and settings on "
                                                    "the L.G.C. tool's tab "
                                                    "to complete the batches when one "
                                                    "or more of these options are selected.", 
@@ -1657,7 +1673,7 @@ class Notebook:
 
             for i in range(max_batchable_params):
                 batch_param_name = tk.StringVar()
-                if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC:
+                if mask_dN_and_dP:
                     optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, 
                                                    batch_param_name, "", "", 
                                                    *batchable_params, *LGC_params)
@@ -3734,6 +3750,7 @@ class Notebook:
         # If LGC profile successful, record all parameters used to generate
         self.LGC_options[self.current_layer_name] = {LGC_option: self.LGC_optionboxes[LGC_option].get() \
                                                      for LGC_option in self.LGC_optionboxes}
+        self.LGC_values[self.current_layer_name] = {}
         
         if (self.LGC_options[self.current_layer_name]["long_expfactor"]):
             self.LGC_values[self.current_layer_name]["A0"] = A0
