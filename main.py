@@ -690,14 +690,12 @@ class Notebook:
         count = 1
         rdim = np.floor(np.sqrt(self.module.total_outputs_count))
         cdim = np.ceil(self.module.total_outputs_count / rdim)
-        for output in self.module.simulation_outputs_dict:
-            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
-            count += 1
-            
-        for output in self.module.calculated_outputs_dict:
-            self.overview_subplots[output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
-            count += 1
-        
+        for layer_name in self.module.layers:
+            self.overview_subplots[layer_name] = {}
+            for output in self.module.layers[layer_name].outputs:
+                self.overview_subplots[layer_name][output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
+                count += 1
+                    
         tk.ttk.Button(master=self.tab_overview_analysis, 
                       text="Select Dataset", 
                       command=self.plot_overview_analysis).grid(row=0,column=0)
@@ -2466,10 +2464,10 @@ class Notebook:
                 elif (read_flag == 'g'):
                     line = line.strip('\n')
                     if line.startswith("Total_length"):
-                        total_length[layer_name] = float(line[line.rfind(' ') + 1:])
+                        param_values_dict[layer_name]["Total_length"] = float(line[line.rfind(' ') + 1:])
                         
                     elif line.startswith("Node_width"):
-                        dx[layer_name] = float(line[line.rfind(' ') + 1:])
+                        param_values_dict[layer_name]["Node_width"] = float(line[line.rfind(' ') + 1:])
                     
                 elif (read_flag == 'p'):
                     param = line[0:line.find(':')]
@@ -2492,7 +2490,7 @@ class Notebook:
 
         for layer_name, layer in param_values_dict.items():
             assert set(self.module.layers[layer_name].params.keys()).issubset(set(param_values_dict[layer_name].keys())), "Error: metadata is missing params"
-        return param_values_dict, total_length, dx, total_time, dt
+        return param_values_dict, flag_values_dict, total_time, dt
     
     def plot_overview_analysis(self):
         """ Plot dataset and calculations from OneD_Model.get_overview_analysis() 
@@ -2507,16 +2505,20 @@ class Notebook:
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
         
         try:
-            param_values_dict, total_length, dx, total_time, dt = self.fetch_metadata(data_filename)
+            param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
                  
             data_n = int(0.5 + total_time / dt)
             data_m = {}
             data_edge_x = {}
             data_node_x = {}
-            for layer_name in total_length:
-                data_m[layer_name] = int(0.5 + total_length[layer_name] / dx[layer_name])
-                data_edge_x[layer_name] = np.linspace(0,  total_length[layer_name],data_m[layer_name]+1)
-                data_node_x[layer_name] = np.linspace(dx[layer_name] / 2,  total_length[layer_name] -  dx[layer_name] / 2, data_m[layer_name])
+            for layer_name in param_values_dict:
+                data_m[layer_name] = int(0.5 + param_values_dict[layer_name]["Total_length"] / param_values_dict[layer_name]["Node_width"])
+                data_edge_x[layer_name] = np.linspace(0,  param_values_dict[layer_name]["Total_length"],
+                                                      data_m[layer_name]+1)
+                data_node_x[layer_name] = np.linspace(param_values_dict[layer_name]["Node_width"] / 2, 
+                                                      param_values_dict[layer_name]["Total_length"] - 
+                                                      param_values_dict[layer_name]["Node_width"] / 2, 
+                                                      data_m[layer_name])
             data_node_t = np.linspace(0, total_time, data_n + 1)
             tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
         except AssertionError as oops:
@@ -2529,57 +2531,61 @@ class Notebook:
             self.root.wait_window(self.confirmation_popup)
             return
         
-        for subplot in self.overview_subplots:
-            plot_obj = self.overview_subplots[subplot]
-            output_info_obj = self.module.outputs_dict[subplot]
-            plot_obj.cla()
-            plot_obj.set_yscale(output_info_obj.yscale)
-            plot_obj.set_xlabel(output_info_obj.xlabel)
-            plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
+        for layer_name in self.overview_subplots:
+            for subplot in self.overview_subplots[layer_name]:
+                plot_obj = self.overview_subplots[layer_name][subplot]
+                output_info_obj = self.module.layers[layer_name].outputs[subplot]
+                plot_obj.cla()
+                plot_obj.set_yscale(output_info_obj.yscale)
+                plot_obj.set_xlabel(output_info_obj.xlabel)
+                plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
             
             
-        data_dict = self.module.get_overview_analysis(param_values_dict, 
-                                                        tstep_list, data_dirname, 
-                                                        data_filename)
+        data_dict = self.module.get_overview_analysis(param_values_dict, flag_values_dict,
+                                                      total_time, dt,
+                                                      tstep_list, data_dirname, 
+                                                      data_filename)
         
-        warning_msg = ""
-        for output_name, output_info in self.module.outputs_dict.items():
-            try:
-                values = data_dict[output_name]
-                
-                if not isinstance(values, np.ndarray): 
-                    raise KeyError
-            except KeyError:
-                warning_msg += "Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.module.system_ID, output_name)
-                continue
-            
-            except Exception:
-                warning_msg += "Error: could not calculate {}".format(output_name)
-                continue
-
-            if output_info.xvar == "time":
-                grid_x = data_node_t
-                
-            elif output_info.xvar == "position":
-                grid_x = data_node_x if not output_info.is_edge else data_edge_x
-                
-            else:
-                warning_msg += "Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name)
-                continue
-            
-            if values.ndim == 2: # time/space variant outputs
-                for i in range(len(values)):
-                    self.overview_subplots[output_name].plot(grid_x, values[i], 
-                                                             label="{:.3f} ns".format(tstep_list[i] * param_values_dict["dt"]))
+        warning_msg = ["Error: the following occured while generating the overview"]
+        for layer_name, layer in self.module.layers.items():
+            for output_name, output_info in layer.outputs.items():
+                try:
+                    values = data_dict[layer_name][output_name]
                     
-            else: # Time variant only
-                self.overview_subplots[output_name].plot(grid_x, values)
+                    if not isinstance(values, np.ndarray): 
+                        raise KeyError
+                except KeyError:
+                    warning_msg.append("Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.module.system_ID, output_name))
+                    continue
+                
+                except Exception:
+                    warning_msg.append("Error: could not calculate {}".format(output_name))
+                    continue
+    
+                if output_info.xvar == "time":
+                    grid_x = data_node_t
+                    
+                elif output_info.xvar == "position":
+                    grid_x = data_node_x[layer_name] if not output_info.is_edge else data_edge_x[layer_name]
+                    
+                else:
+                    warning_msg.append("Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name))
+                    continue
+                
+                if values.ndim == 2: # time/space variant outputs
+                    for i in range(len(values)):
+                        self.overview_subplots[layer_name][output_name].plot(grid_x, values[i], 
+                                                                 label="{:.3f} ns".format(tstep_list[i] * dt))
+                        
+                else: # Time variant only
+                    self.overview_subplots[layer_name][output_name].plot(grid_x, values)
 
-        for output_name in self.module.simulation_outputs_dict:
-            self.overview_subplots[output_name].legend().set_draggable(True)
-            break
-        if warning_msg:
-            self.do_confirmation_popup(warning_msg, hide_cancel=True)
+        for layer_name, layer in self.module.layers.items():
+            for output_name in layer.s_outputs:
+                self.overview_subplots[layer_name][output_name].legend().set_draggable(True)
+                break
+        if len(warning_msg) > 1:
+            self.do_confirmation_popup("\n".join(warning_msg), hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
             
         self.analyze_overview_fig.tight_layout()

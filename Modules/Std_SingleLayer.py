@@ -132,7 +132,7 @@ class Std_SingleLayer(OneD_Model):
                      flags['check_do_ss'].value(), hmax_, True,
                      init_conditions["N"], init_conditions["P"])
     
-    def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
+    def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Calculates at a selection of sample times: N, P, (total carrier densities)
            delta_N, delta_P, (above-equilibrium carrier densities)
            internal electric field due to differences in N, P,
@@ -142,7 +142,7 @@ class Std_SingleLayer(OneD_Model):
            Integrates over nanowire length: PL due to radiative recombination, waveguiding, and carrier regeneration"""
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
         one_layer = self.layers["OneLayer"]
-        data_dict = {}
+        data_dict = {"OneLayer":{}}
         
         for raw_output_name in one_layer.s_outputs:
             data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
@@ -151,31 +151,32 @@ class Std_SingleLayer(OneD_Model):
             for tstep in tsteps:
                 data.append(u_read(data_filename, t0=tstep, single_tstep=True))
             
-            data_dict[raw_output_name] = np.array(data)
+            data_dict["OneLayer"][raw_output_name] = np.array(data)
                     
-        data_dict["E_field"] = E_field(data_dict, params)
-        data_dict["delta_N"] = delta_n(data_dict, params)
-        data_dict["delta_P"] = delta_p(data_dict, params)
-        data_dict["RR"] = radiative_recombination(data_dict, params)
-        data_dict["NRR"] = nonradiative_recombination(data_dict, params)
+        data_dict["OneLayer"]["E_field"] = E_field(data_dict["OneLayer"], params["OneLayer"])
+        data_dict["OneLayer"]["delta_N"] = delta_n(data_dict["OneLayer"], params["OneLayer"])
+        data_dict["OneLayer"]["delta_P"] = delta_p(data_dict["OneLayer"], params["OneLayer"])
+        data_dict["OneLayer"]["RR"] = radiative_recombination(data_dict["OneLayer"], params["OneLayer"])
+        data_dict["OneLayer"]["NRR"] = nonradiative_recombination(data_dict["OneLayer"], params["OneLayer"])
                 
         with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
-        temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, params)
-        PL_base = prep_PL(temp_RR, 0, to_index(params["Total_length"], 
-                                               params["Node_width"], 
-                                               params["Total_length"]), False, params)
-        data_dict["PL"] = new_integrate(PL_base, 0, params["Total_length"], 
-                                        params["Node_width"], params["Total_length"], 
+        temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, params["OneLayer"])
+        PL_base = prep_PL(temp_RR, 0, to_index(params["OneLayer"]["Total_length"], 
+                                               params["OneLayer"]["Node_width"], 
+                                               params["OneLayer"]["Total_length"]), 
+                          False, params["OneLayer"], flags["ignore_recycle"])
+        data_dict["OneLayer"]["PL"] = new_integrate(PL_base, 0, params["OneLayer"]["Total_length"], 
+                                        params["OneLayer"]["Node_width"], params["OneLayer"]["Total_length"], 
                                         False)
-        data_dict["tau_diff"] = tau_diff(data_dict["PL"], params["dt"])
+        data_dict["OneLayer"]["tau_diff"] = tau_diff(data_dict["OneLayer"]["PL"], dt)
         
-        for data in data_dict:
-            data_dict[data] *= one_layer.convert_out[data]
+        for data in data_dict["OneLayer"]:
+            data_dict["OneLayer"][data] *= one_layer.convert_out[data]
             
-        data_dict["PL"] *= one_layer.convert_out["integration_scale"]
+        data_dict["OneLayer"]["PL"] *= one_layer.convert_out["integration_scale"]
         
         return data_dict
     
@@ -579,7 +580,7 @@ def tau_diff(PL, dt):
     dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)
     return -(dln_PLdt ** -1)
 
-def prep_PL(rad_rec, i, j, need_extra_node, params):
+def prep_PL(rad_rec, i, j, need_extra_node, params, ignore_recycle):
     """
     Calculates PL(x,t) given radiative recombination data plus propogation contributions.
 
@@ -596,7 +597,8 @@ def prep_PL(rad_rec, i, j, need_extra_node, params):
         Most slices involving the index j should include j+1 too
     params : dict {"param name":float or 1D ndarray}
         Collection of parameters from metadata
-
+    ignore_recycle : int (1 or 0)
+        Whether to use th
     Returns
     -------
     PL_base : 2D ndarray
@@ -607,7 +609,7 @@ def prep_PL(rad_rec, i, j, need_extra_node, params):
     frac_emitted = params["frac_emitted"]
     alpha = params["alpha"]
     back_refl_frac = params["back_reflectivity"]
-    delta = 0 if params["ignore_recycle"] else params["delta"]
+    delta = 0 if ignore_recycle else params["delta"]
     dx = params["Node_width"]
     total_length = params["Total_length"]
 

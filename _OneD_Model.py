@@ -287,7 +287,7 @@ class OneD_Model:
 
         return
     
-    def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
+    def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """
         Perform and package all calculations to be displayed on TEDs OVerview Analysis tab.
 
@@ -295,6 +295,12 @@ class OneD_Model:
         ----------
         params : dict {"param name": 1D numpy array or float}
             Paramteres used in simulation and stored in metadata.
+        flags : dict {"flag name": int}
+            Flags used in simulation and stored in metadata.
+        total_time : float
+            Total time of simulation
+        dt : float
+            Timestep used in simulation
         tsteps : list, 1D numpy array
             Time step indices overview should sample over
         data_dirname : str
