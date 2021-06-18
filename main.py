@@ -2425,8 +2425,6 @@ class Notebook:
         with open(path, "r") as ifstream:
             param_values_dict = {}
             flag_values_dict = {}
-            total_length = {}
-            dx = {}
 
             read_flag = 0
         
@@ -2463,6 +2461,8 @@ class Notebook:
                                 
                 elif (read_flag == 'g'):
                     line = line.strip('\n')
+                    # Unlike an MSF here the space grid is static - 
+                    # and comparable to all other parameters which are static here too
                     if line.startswith("Total_length"):
                         param_values_dict[layer_name]["Total_length"] = float(line[line.rfind(' ') + 1:])
                         
@@ -2512,12 +2512,12 @@ class Notebook:
             data_edge_x = {}
             data_node_x = {}
             for layer_name in param_values_dict:
-                data_m[layer_name] = int(0.5 + param_values_dict[layer_name]["Total_length"] / param_values_dict[layer_name]["Node_width"])
-                data_edge_x[layer_name] = np.linspace(0,  param_values_dict[layer_name]["Total_length"],
+                total_length = param_values_dict[layer_name]["Total_length"]
+                dx = param_values_dict[layer_name]["Node_width"]
+                data_m[layer_name] = int(0.5 + total_length / dx)
+                data_edge_x[layer_name] = np.linspace(0,  total_length,
                                                       data_m[layer_name]+1)
-                data_node_x[layer_name] = np.linspace(param_values_dict[layer_name]["Node_width"] / 2, 
-                                                      param_values_dict[layer_name]["Total_length"] - 
-                                                      param_values_dict[layer_name]["Node_width"] / 2, 
+                data_node_x[layer_name] = np.linspace(dx / 2, total_length - dx / 2, 
                                                       data_m[layer_name])
             data_node_t = np.linspace(0, total_time, data_n + 1)
             tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
@@ -2531,9 +2531,9 @@ class Notebook:
             self.root.wait_window(self.confirmation_popup)
             return
         
-        for layer_name in self.overview_subplots:
-            for subplot in self.overview_subplots[layer_name]:
-                plot_obj = self.overview_subplots[layer_name][subplot]
+        for layer_name, layer in self.overview_subplots.items():
+            for subplot in layer:
+                plot_obj = layer[subplot]
                 output_info_obj = self.module.layers[layer_name].outputs[subplot]
                 plot_obj.cla()
                 plot_obj.set_yscale(output_info_obj.yscale)
@@ -2551,23 +2551,19 @@ class Notebook:
             for output_name, output_info in layer.outputs.items():
                 try:
                     values = data_dict[layer_name][output_name]
-                    
                     if not isinstance(values, np.ndarray): 
                         raise KeyError
                 except KeyError:
                     warning_msg.append("Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.module.system_ID, output_name))
                     continue
-                
                 except Exception:
                     warning_msg.append("Error: could not calculate {}".format(output_name))
                     continue
     
                 if output_info.xvar == "time":
                     grid_x = data_node_t
-                    
                 elif output_info.xvar == "position":
                     grid_x = data_node_x[layer_name] if not output_info.is_edge else data_edge_x[layer_name]
-                    
                 else:
                     warning_msg.append("Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name))
                     continue
@@ -2575,8 +2571,7 @@ class Notebook:
                 if values.ndim == 2: # time/space variant outputs
                     for i in range(len(values)):
                         self.overview_subplots[layer_name][output_name].plot(grid_x, values[i], 
-                                                                 label="{:.3f} ns".format(tstep_list[i] * dt))
-                        
+                                                                             label="{:.3f} ns".format(tstep_list[i] * dt))
                 else: # Time variant only
                     self.overview_subplots[layer_name][output_name].plot(grid_x, values)
 

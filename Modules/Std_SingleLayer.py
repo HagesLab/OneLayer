@@ -142,6 +142,9 @@ class Std_SingleLayer(OneD_Model):
            Integrates over nanowire length: PL due to radiative recombination, waveguiding, and carrier regeneration"""
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
         one_layer = self.layers["OneLayer"]
+        params = params["OneLayer"]
+        total_length = params["Total_length"]
+        dx = params["Node_width"]
         data_dict = {"OneLayer":{}}
         
         for raw_output_name in one_layer.s_outputs:
@@ -153,24 +156,21 @@ class Std_SingleLayer(OneD_Model):
             
             data_dict["OneLayer"][raw_output_name] = np.array(data)
                     
-        data_dict["OneLayer"]["E_field"] = E_field(data_dict["OneLayer"], params["OneLayer"])
-        data_dict["OneLayer"]["delta_N"] = delta_n(data_dict["OneLayer"], params["OneLayer"])
-        data_dict["OneLayer"]["delta_P"] = delta_p(data_dict["OneLayer"], params["OneLayer"])
-        data_dict["OneLayer"]["RR"] = radiative_recombination(data_dict["OneLayer"], params["OneLayer"])
-        data_dict["OneLayer"]["NRR"] = nonradiative_recombination(data_dict["OneLayer"], params["OneLayer"])
+        data_dict["OneLayer"]["E_field"] = E_field(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["delta_N"] = delta_n(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["delta_P"] = delta_p(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["RR"] = radiative_recombination(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["NRR"] = nonradiative_recombination(data_dict["OneLayer"], params)
                 
         with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
-        temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, params["OneLayer"])
-        PL_base = prep_PL(temp_RR, 0, to_index(params["OneLayer"]["Total_length"], 
-                                               params["OneLayer"]["Node_width"], 
-                                               params["OneLayer"]["Total_length"]), 
-                          False, params["OneLayer"], flags["ignore_recycle"])
-        data_dict["OneLayer"]["PL"] = new_integrate(PL_base, 0, params["OneLayer"]["Total_length"], 
-                                        params["OneLayer"]["Node_width"], params["OneLayer"]["Total_length"], 
-                                        False)
+        temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, params)
+        PL_base = prep_PL(temp_RR, 0, to_index(total_length, dx, total_length), 
+                          False, params, flags["ignore_recycle"])
+        data_dict["OneLayer"]["PL"] = new_integrate(PL_base, 0, total_length, 
+                                                    dx, total_length, False)
         data_dict["OneLayer"]["tau_diff"] = tau_diff(data_dict["OneLayer"]["PL"], dt)
         
         for data in data_dict["OneLayer"]:
