@@ -192,16 +192,17 @@ def get_all_combinations(value_dict):
 def extract_values(string, delimiter):
     """Converts a string with deliimiters into a list of float values"""
 	# E.g. "100,200,300" with "," delimiter becomes [100,200,300]
-    values = []
-    substring = string
+    # values = []
+    # substring = string
     
-    while (not substring.find(delimiter) == -1):
-        next_delimiter = substring.find(delimiter)
-        values.append(float(substring[0:next_delimiter]))
-        substring = substring[next_delimiter + 1:]
+    # while (not substring.find(delimiter) == -1):
+    #     next_delimiter = substring.find(delimiter)
+    #     values.append(float(substring[0:next_delimiter]))
+    #     substring = substring[next_delimiter + 1:]
 
-    values.append(float(substring))
-
+    # values.append(float(substring))
+    values = string.split(delimiter)
+    values = map(float, values)
     return values
 
 def check_valid_filename(file_name):
