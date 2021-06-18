@@ -1680,9 +1680,11 @@ class Notebook:
                          text="Select a data type", 
                          style="Header.TLabel").grid(row=0,column=0,columnspan=2)
 
+            all_outputs = []
+            for layer_name, layer in self.module.layers.items():
+                all_outputs += [output for output in layer.outputs if layer.outputs[output].analysis_plotable]
             tk.OptionMenu(self.plotter_popup, self.data_var, 
-                          *(output for output in self.module.outputs_dict 
-                          if self.module.outputs_dict[output].analysis_plotable)).grid(row=1,column=0)
+                          *all_outputs).grid(row=1,column=0)
 
             tk.Checkbutton(self.plotter_popup, 
                            text="Auto integrate all space and time steps?", 
@@ -2603,11 +2605,14 @@ class Notebook:
                 self.analyze_fig.canvas.draw()
                 return
 
+            where_layer = self.module.find_layer(active_datagroup.type)
+            convert_out = self.module.layers[where_layer].convert_out
+            
             if force_axis_update or not active_plot_data.do_freeze_axes:
                 active_plot_data.xlim = (0, active_plot_data.datagroup.get_max_x())
                 active_plot_data.xaxis_type = 'linear'
-                max_val = active_datagroup.get_maxval() * self.convert_out_dict[active_datagroup.type]
-                min_val = active_datagroup.get_minval() * self.convert_out_dict[active_datagroup.type]
+                max_val = active_datagroup.get_maxval() * convert_out[active_datagroup.type]
+                min_val = active_datagroup.get_minval() * convert_out[active_datagroup.type]
                 active_plot_data.ylim = (min_val * 0.9, max_val * 1.1)
                 active_plot_data.yaxis_type = autoscale(min_val=min_val, max_val=max_val)
 
@@ -2620,11 +2625,11 @@ class Notebook:
 
             # This data is in TEDs units since we just used it in a calculation - convert back to common units first
             for dataset in active_datagroup.datasets.values():
-                label = dataset.tag(for_matplotlib=True) + "*" if dataset.params_dict["symmetric_system"] else dataset.tag(for_matplotlib=True)
-                subplot.plot(dataset.grid_x, dataset.data * self.convert_out_dict[active_datagroup.type], label=label)
+                label = dataset.tag(for_matplotlib=True) + "*" if active_datagroup.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
+                subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
 
             subplot.set_xlabel("x {}".format(self.module.length_unit))
-            subplot.set_ylabel("{} {}".format(active_datagroup.type, self.module.outputs_dict[active_datagroup.type].units))
+            subplot.set_ylabel("{} {}".format(active_datagroup.type, self.module.layers[where_layer].outputs[active_datagroup.type].units))
             if active_plot_data.display_legend:
                 subplot.legend().set_draggable(True)
             subplot.set_title("Time: " 
@@ -2649,32 +2654,42 @@ class Notebook:
         datagroup = active_plot.datagroup
 
         try:
-            param_values_dict = self.fetch_metadata(data_filename)
+            param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
+            datagroup.flags = dict(flag_values_dict)
             if datagroup.size():
-                assert (datagroup.total_t == param_values_dict["Total-Time"]), "Error: time grid mismatch\n"
-                assert (datagroup.dt == param_values_dict["dt"]), "Error: time grid mismatch\n"
+                assert (datagroup.total_t == total_time), "Error: time grid mismatch"
+                assert (datagroup.dt == dt), "Error: time grid mismatch"
                 
-            data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
-            data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
-            data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
-
+            data_m = {}
+            data_edge_x = {}
+            data_node_x = {}
+            for layer_name in param_values_dict:
+                total_length = param_values_dict[layer_name]["Total_length"]
+                dx = param_values_dict[layer_name]["Node_width"]
+                data_m[layer_name] = int(0.5 + total_length / dx)
+                data_edge_x[layer_name] = np.linspace(0,  total_length,
+                                                      data_m[layer_name]+1)
+                data_node_x[layer_name] = np.linspace(dx / 2, total_length - dx / 2, 
+                                                      data_m[layer_name])
         except AssertionError as oops:
             return str(oops)
         except Exception:
-            return "Error: missing or has unusual metadata.txt\n"
+            return "Error: missing or has unusual metadata.txt"
 
 		# Now that we have the parameters from metadata, fetch the data itself
         sim_data = {}
-        for sim_datatype in self.module.simulation_outputs_dict:
-            path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                      self.module.system_ID, 
-                                                      data_filename, data_filename, 
-                                                      sim_datatype)
-            sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
-                                            single_tstep=True)
-        
+        for layer_name, layer in self.module.layers.items():
+            sim_data[layer_name] = {}
+            for sim_datatype in layer.s_outputs:
+                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
+                                                          self.module.system_ID, 
+                                                          data_filename, data_filename, 
+                                                          sim_datatype)
+                sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
+                                                            single_tstep=True)
+        where_layer = self.module.find_layer(datatype)
         try:
-            values = self.module.prep_dataset(datatype, sim_data, param_values_dict)
+            values = self.module.prep_dataset(datatype, sim_data, param_values_dict, flag_values_dict)
         except Exception as e:
             return "Error: Unable to calculate {} using prep_dataset\n{}".format(datatype, e)
         
@@ -2686,12 +2701,14 @@ class Notebook:
             return ("Error: Unable to calculate {} using prep_dataset\n"
                     "prep_dataset did not return a 1D array".format(datatype))
 
-        if self.module.outputs_dict[datatype].is_edge: 
-            return Raw_Data_Set(values, data_edge_x, data_node_x, 
+        if self.module.layers[where_layer].outputs[datatype].is_edge: 
+            return Raw_Data_Set(values, data_edge_x[where_layer], data_node_x[where_layer], 
+                                total_time, dt, 
                                 param_values_dict, datatype, data_filename, 
                                 active_plot.time_index)
         else:
-            return Raw_Data_Set(values, data_node_x, data_node_x, 
+            return Raw_Data_Set(values, data_node_x[where_layer], data_node_x[where_layer], 
+                                total_time, dt,
                                 param_values_dict, datatype, data_filename, 
                                 active_plot.time_index)
 
@@ -2708,19 +2725,19 @@ class Notebook:
 
         active_plot.time_index = 0
         active_plot.datagroup.clear()
-        err_msg = ""
+        err_msg = ["Error: the following data could not be plotted"]
         for i in range(0, len(active_plot.data_filenames)):
             data_filename = active_plot.data_filenames[i]
             short_filename = data_filename[data_filename.rfind('/') + 1:]
             new_data = self.make_rawdataset(short_filename, plot_ID, datatype)
 
             if isinstance(new_data, str):
-                err_msg += "{}: {}\n".format(short_filename, new_data)
+                err_msg.append("{}: {}".format(short_filename, new_data))
             else:
                 active_plot.datagroup.add(new_data, new_data.tag())
     
-        if err_msg:
-            self.do_confirmation_popup("Error: the following data could not be plotted\n" + err_msg, 
+        if len(err_msg) > 1:
+            self.do_confirmation_popup("\n".join(err_msg), 
                                        hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
         
@@ -2746,21 +2763,21 @@ class Notebook:
             return
 
         active_datagroup = active_plot.datagroup
-
         # Search data files for data at new time step
         for tag, dataset in active_datagroup.datasets.items():
             sim_data = {}
-            for sim_datatype in self.module.simulation_outputs_dict:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                          self.module.system_ID, 
-                                                          dataset.filename, 
-                                                          dataset.filename, 
-                                                          sim_datatype)
-                sim_data[sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
-                                                single_tstep=True)
+            for layer_name, layer in self.module.layers.items():
+                sim_data[layer_name] = {}
+                for sim_datatype in layer.s_outputs:
+                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
+                                                              self.module.system_ID, 
+                                                              dataset.filename, dataset.filename, 
+                                                              sim_datatype)
+                    sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
+                                                                single_tstep=True)
         
             dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
-                                                      dataset.params_dict)
+                                                      dataset.params_dict, active_datagroup.flags)
             dataset.show_index = active_plot.time_index
             
         self.plot_analyze(plot_ID, force_axis_update=False)

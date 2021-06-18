@@ -198,6 +198,10 @@ class OneD_Model:
             count += layer.s_outputs_count
         return count
     
+    def find_layer(self, output):
+        for layer_name, layer in self.layers.items():
+            if output in layer.outputs:
+                return layer_name
     def DEBUG_print(self):
         """
         Prepares a summary of the current state of all parameters.
@@ -322,7 +326,7 @@ class OneD_Model:
 
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
+    def prep_dataset(self, datatype, sim_data, params, flags, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
         """
         Use the raw data in sim_data to calculate quantities in self.outputs_dict.
         If datatype is in self.simulated_outputs dict this just needs to return the correct item from sim_data
@@ -335,6 +339,8 @@ class OneD_Model:
             Collection of raw data read from .h5 files. 1D if single time step or 2D if time and space range.
         params : dict {"param name": 1D numpy array}
             Collection of param values from metadata.txt.
+        flags : dict {"flag name": int}
+            Collection of flag values from metadata.txt.
         for_integrate : bool, optional
             Whether this function is being called by do_Integrate. Used for integration-specific procedures.
             All other optional arguments are needed only if for_integrate is True.

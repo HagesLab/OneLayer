@@ -180,13 +180,16 @@ class Std_SingleLayer(OneD_Model):
         
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, 
+    def prep_dataset(self, datatype, sim_data, params, flags, for_integrate=False, 
                      i=0, j=0, nen=False, extra_data = None):
         """ Provides delta_N, delta_P, electric field, recombination, 
             and spatial PL values on demand.
         """
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
         one_layer = self.layers["OneLayer"]
+        params = params["OneLayer"]
+        sim_data = sim_data["OneLayer"]
+        ignore_recycle = flags["ignore_recycle"]
         data = None
         if (datatype in one_layer.s_outputs):
             data = sim_data[datatype]
@@ -211,11 +214,11 @@ class Std_SingleLayer(OneD_Model):
     
                 if for_integrate:
                     rad_rec = radiative_recombination(extra_data, params)
-                    data = prep_PL(rad_rec, i, j, nen, params)
+                    data = prep_PL(rad_rec, i, j, nen, params, ignore_recycle)
                 else:
                     rad_rec = radiative_recombination(sim_data, params)
-                    data = prep_PL(rad_rec, 0, len(rad_rec)-1, need_extra_node=False, 
-                                   params=params).flatten()
+                    data = prep_PL(rad_rec, 0, len(rad_rec)-1, False, 
+                                   params, ignore_recycle).flatten()
             else:
                 raise ValueError
                 
@@ -598,7 +601,7 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, ignore_recycle):
     params : dict {"param name":float or 1D ndarray}
         Collection of parameters from metadata
     ignore_recycle : int (1 or 0)
-        Whether to use th
+        Whether to account for photon recycling
     Returns
     -------
     PL_base : 2D ndarray

@@ -202,7 +202,7 @@ def extract_values(string, delimiter):
 
     # values.append(float(substring))
     values = string.split(delimiter)
-    values = map(float, values)
+    values = np.array(values, dtype=float)
     return values
 
 def check_valid_filename(file_name):
