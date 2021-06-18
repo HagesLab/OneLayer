@@ -2426,32 +2426,73 @@ class Notebook:
         
         with open(path, "r") as ifstream:
             param_values_dict = {}
+            flag_values_dict = {}
+            total_length = {}
+            dx = {}
+
+            read_flag = 0
+        
+            if not ("$$ METADATA") in next(ifstream):
+                raise OSError("Error: metadata is not a valid TEDs file")
+        
+            system_class = next(ifstream).strip('\n')
+            system_class = system_class[system_class.find(' ') + 1:]
+            if not system_class == self.module.system_ID:
+                raise ValueError("Error: selected file is not a {}".format(self.module.system_ID))
+                        
+            # Extract parameters
             for line in ifstream:
-                if "$" in line: 
-                    continue
-
-                elif "#" in line: 
-                    continue
             
-                elif "System_class" in line:
-                    system_class = line[line.find(' ') + 1:].strip('\n')
-                    assert self.module.system_ID == system_class, "Error: File is not a {}".format(self.module.system_ID)
+                if ("#" in line) or not line.strip('\n'):
+                    continue
 
-                else:
+                elif "L$" in line:
+                    layer_name = line[line.find(":")+1:].strip(' \n')
+                    param_values_dict[layer_name] = {}
+                    continue
+                
+                elif "p$ Space Grid" in line:
+                    read_flag = 'g'
+                
+                elif "p$ System Parameters" in line:
+                    read_flag = 'p'
+                
+                elif "f$" in line:
+                    read_flag = 'f'
+                    
+                elif "t$" in line:
+                    read_flag = 't'
+                                
+                elif (read_flag == 'g'):
+                    line = line.strip('\n')
+                    if line.startswith("Total_length"):
+                        total_length[layer_name] = float(line[line.rfind(' ') + 1:])
+                        
+                    elif line.startswith("Node_width"):
+                        dx[layer_name] = float(line[line.rfind(' ') + 1:])
+                    
+                elif (read_flag == 'p'):
                     param = line[0:line.find(':')]
                     new_value = line[line.find(' ') + 1:].strip('\n')
-
                     if '\t' in new_value:
-                        param_values_dict[param] = np.array(extract_values(new_value, '\t'))
-                    else: param_values_dict[param] = float(new_value)
-                    
-        # Convert from cm, V, s to nm, V, ns
-        for param in param_values_dict:
-            if param in self.convert_in_dict:
-                param_values_dict[param] *= self.convert_in_dict[param]
-            
-        assert set(self.module.param_dict.keys()).issubset(set(param_values_dict.keys())), "Error: metadata is missing params"
-        return param_values_dict
+                        param_values_dict[layer_name][param] = np.array(extract_values(new_value, '\t'))
+                    else: 
+                        param_values_dict[layer_name][param] = float(new_value)
+    
+                elif (read_flag == 'f'):
+                    line = line.strip('\n')
+                    flag_values_dict[line[0:line.find(':')]] = int(line[line.rfind(' ') + 1:])
+
+                elif (read_flag == 't'):
+                    line = line.strip('\n')
+                    if line.startswith("Total-Time"):
+                        total_time = float(line[line.rfind(' ') + 1:])
+                    elif line.startswith("dt"):
+                        dt = float(line[line.rfind(' ') + 1:])
+
+        for layer_name, layer in param_values_dict.items():
+            assert set(self.module.layers[layer_name].params.keys()).issubset(set(param_values_dict[layer_name].keys())), "Error: metadata is missing params"
+        return param_values_dict, total_length, dx, total_time, dt
     
     def plot_overview_analysis(self):
         """ Plot dataset and calculations from OneD_Model.get_overview_analysis() 
@@ -2466,13 +2507,17 @@ class Notebook:
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
         
         try:
-            param_values_dict = self.fetch_metadata(data_filename)
+            param_values_dict, total_length, dx, total_time, dt = self.fetch_metadata(data_filename)
                  
-            data_n = int(0.5 + param_values_dict["Total-Time"] / param_values_dict["dt"])
-            data_m = int(0.5 + param_values_dict["Total_length"] / param_values_dict["Node_width"])
-            data_edge_x = np.linspace(0, param_values_dict["Total_length"],data_m+1)
-            data_node_x = np.linspace(param_values_dict["Node_width"] / 2, param_values_dict["Total_length"] - param_values_dict["Node_width"] / 2, data_m)
-            data_node_t = np.linspace(0, param_values_dict["Total-Time"], data_n + 1)
+            data_n = int(0.5 + total_time / dt)
+            data_m = {}
+            data_edge_x = {}
+            data_node_x = {}
+            for layer_name in total_length:
+                data_m[layer_name] = int(0.5 + total_length[layer_name] / dx[layer_name])
+                data_edge_x[layer_name] = np.linspace(0,  total_length[layer_name],data_m[layer_name]+1)
+                data_node_x[layer_name] = np.linspace(dx[layer_name] / 2,  total_length[layer_name] -  dx[layer_name] / 2, data_m[layer_name])
+            data_node_t = np.linspace(0, total_time, data_n + 1)
             tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
         except AssertionError as oops:
             self.do_confirmation_popup(str(oops), hide_cancel=True)
@@ -3555,7 +3600,7 @@ class Notebook:
         
         current_layer.params["delta_N"].value *= current_layer.convert_out["delta_N"]
         ## Assuming that the initial distributions of holes and electrons are identical
-        current_layer.params["delta_P"].value = current_layer.params["delta_N"].value
+        current_layer.params["delta_P"].value = np.array(current_layer.params["delta_N"].value)
 
         self.update_IC_plot(plot_ID="LGC")
         self.paramtoolkit_currentparam = "delta_N"
