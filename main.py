@@ -2966,30 +2966,39 @@ class Notebook:
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
-        return
         with open(full_path_name + "\\metadata.txt", "w+") as ofstream:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON {} AT {}\n".format(datetime.datetime.now().date(),datetime.datetime.now().time()))
             ofstream.write("System_class: {}\n".format(self.module.system_ID))
-            ofstream.write("Total_length: {}\n".format(self.module.total_length))
-            ofstream.write("Node_width: {}\n".format(self.module.dx))
             
-            for param in temp_sim_dict:
-                param_values = temp_sim_dict[param] * self.convert_out_dict[param]
-                if isinstance(param_values, np.ndarray):
-                    ofstream.write("{}: {:.8e}".format(param, param_values[0]))
-                    for value in param_values[1:]:
-                        ofstream.write("\t{:.8e}".format(value))
-                        
-                    ofstream.write('\n')
-                else:
-                    ofstream.write("{}: {}\n".format(param, param_values))
-
-            # The following params are exclusive to metadata files
-            ofstream.write("Total-Time: {}\n".format(self.simtime))
-            ofstream.write("dt: {}\n".format(self.dt))
+            ofstream.write("f$ System Flags:\n")
             for flag in self.sys_flag_dict:
                 ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
             
+            for layer_name, layer in self.module.layers.items():
+                ofstream.write("L$: {}\n".format(layer_name))
+                ofstream.write("p$ Space Grid:\n")
+                ofstream.write("Total_length: {}\n".format(layer.total_length))
+                ofstream.write("Node_width: {}\n".format(layer.dx))
+            
+                ofstream.write("p$ System Parameters:\n")
+            
+                # Saves occur as-is: any missing parameters are saved with whatever default value module gives them
+                for param in layer.params:
+                    param_values = layer.params[param].value
+                    if isinstance(param_values, np.ndarray):
+                        # Write the array in a more convenient format
+                        ofstream.write("{}: {:.8e}".format(param, param_values[0]))
+                        for value in param_values[1:]:
+                            ofstream.write("\t{:.8e}".format(value))
+                            
+                        ofstream.write('\n')
+                    else:
+                        # The param value is just a single constant
+                        ofstream.write("{}: {}\n".format(param, param_values))
+            # The following params are exclusive to metadata files
+            ofstream.write("t$ Time grid:\n")
+            ofstream.write("Total-Time: {}\n".format(self.simtime))
+            ofstream.write("dt: {}\n".format(self.dt))
         return
 
     def do_Integrate(self, bypass_inputs=False):
