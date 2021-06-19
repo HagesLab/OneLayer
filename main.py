@@ -136,10 +136,6 @@ class Notebook:
         # value of self.current_layer_selection
         
         # Flags and containers for IC arrays
-        
-        self.convert_in_dict = self.module.convert_in_dict
-        self.convert_out_dict = self.module.convert_out_dict
-
         self.active_paramrule_list = []
         self.paramtoolkit_currentparam = ""
         self.IC_file_list = None
@@ -684,8 +680,9 @@ class Notebook:
         self.analyze_overview_fig = Figure(figsize=(15,8))
         self.overview_subplots = {}
         count = 1
-        rdim = np.floor(np.sqrt(self.module.total_outputs_count))
-        cdim = np.ceil(self.module.total_outputs_count / rdim)
+        total_outputs_count = sum([self.module.layers[layer].outputs_count for layer in self.module.layers])
+        rdim = np.floor(np.sqrt(total_outputs_count))
+        cdim = np.ceil(total_outputs_count / rdim)
         for layer_name in self.module.layers:
             self.overview_subplots[layer_name] = {}
             for output in self.module.layers[layer_name].outputs:
@@ -1797,6 +1794,11 @@ class Notebook:
     def do_integration_getbounds_popup(self):
         """ Select spatial region to integrate through. """
         if not self.integration_getbounds_popup_isopen:
+            plot_ID = self.active_analysisplot_ID.get()
+            active_plot = self.analysis_plots[plot_ID]
+            datatype = active_plot.datagroup.type
+            where_layer = self.module.find_layer(datatype)
+            
             self.integration_getbounds_popup = tk.Toplevel(self.root)
 
             tk.ttk.Radiobutton(self.integration_getbounds_popup, 
@@ -1809,7 +1811,7 @@ class Notebook:
 
             tk.Label(self.integration_getbounds_popup, 
                      text="Enter bounds of integration " 
-                     + self.module.length_unit).grid(row=0,column=2,columnspan=4)
+                     + self.module.layers[where_layer].length_unit).grid(row=0,column=2,columnspan=4)
 
             tk.Label(self.integration_getbounds_popup, 
                      text="Lower bound: x=").grid(row=1,column=2)
@@ -1840,14 +1842,14 @@ class Notebook:
             tk.Label(self.integration_getbounds_popup, 
                      text="Enter space-separated "
                      "e.g. (100 200 300...) Centers "
-                     "{}: ".format(self.module.length_unit)).grid(row=5,column=2)
+                     "{}: ".format(self.module.layers[where_layer].length_unit)).grid(row=5,column=2)
 
             self.integration_center_entry = tk.Entry(self.integration_getbounds_popup, 
                                                      width=30)
             self.integration_center_entry.grid(row=5,column=3,columnspan=3)
 
             tk.Label(self.integration_getbounds_popup, 
-                     text="Width {}: +/- ".format(self.module.length_unit)).grid(row=6,column=2)
+                     text="Width {}: +/- ".format(self.module.layers[where_layer].length_unit)).grid(row=6,column=2)
 
             self.integration_width_entry = tk.Entry(self.integration_getbounds_popup, 
                                                     width=9)
@@ -1946,9 +1948,14 @@ class Notebook:
             tk.ttk.Label(self.PL_xaxis_popup, text="Select parameter for x axis", 
                          style="Header.TLabel").grid(row=0,column=0,columnspan=3)
 
+
+            plot_ID = self.active_analysisplot_ID.get()
+            active_plot = self.analysis_plots[plot_ID]
+            datatype = active_plot.datagroup.type
+            where_layer = self.module.find_layer(datatype)
             tk.OptionMenu(self.PL_xaxis_popup, 
                           self.xaxis_selection, 
-                          *[param for param in self.module.param_dict]).grid(row=1,column=1)
+                          *[param for param in self.module.layers[where_layer].params]).grid(row=1,column=1)
 
             tk.Button(self.PL_xaxis_popup, text="Continue", 
                       command=partial(self.on_PL_xaxis_popup_close, 
@@ -2544,7 +2551,7 @@ class Notebook:
                 label = dataset.tag(for_matplotlib=True) + "*" if active_datagroup.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
                 subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
 
-            subplot.set_xlabel("x {}".format(self.module.length_unit))
+            subplot.set_xlabel("x {}".format(self.module.layers[where_layer].length_unit))
             subplot.set_ylabel("{} {}".format(active_datagroup.type, self.module.layers[where_layer].outputs[active_datagroup.type].units))
             if active_plot_data.display_legend:
                 subplot.legend().set_draggable(True)
@@ -3179,9 +3186,6 @@ class Notebook:
         datagroup = self.integration_plots[ip_ID].datagroup
         subplot.cla()
         
-        #max = datagroup.get_maxval() * self.convert_out_dict[datagroup.type]
-        
-
         self.integration_plots[ip_ID].xaxis_type = 'linear'
 
         self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), 
@@ -4352,19 +4356,24 @@ class Notebook:
             plot_ID = self.active_integrationplot_ID.get()
             datagroup = self.integration_plots[plot_ID].datagroup
             plot_info = self.integration_plots[plot_ID]
-            if datagroup.size() == 0: 
+            if not datagroup.size(): 
                 return
             
+            where_layer = self.module.find_layer(datagroup.type)
             if plot_info.mode == "Current time step": 
-                paired_data = [[datagroup.datasets[key].grid_x, datagroup.datasets[key].data * self.convert_out_dict[datagroup.type]] 
+                paired_data = [[datagroup.datasets[key].grid_x, 
+                                datagroup.datasets[key].data * 
+                                self.module.layers[where_layer].convert_out[datagroup.type]] 
                                for key in datagroup.datasets]
 
                 header = "{} {}, {}".format(plot_info.x_param, 
-                                            self.module.param_dict[plot_info.x_param].units, 
+                                            self.module.layers[where_layer].params[plot_info.x_param].units, 
                                             datagroup.type)
 
             else: # if self.I_plot.mode == "All time steps"
-                raw_data = np.array([datagroup.datasets[key].data * self.convert_out_dict[datagroup.type] for key in datagroup.datasets])
+                raw_data = np.array([datagroup.datasets[key].data * 
+                                     self.module.layers[where_layer].convert_out[datagroup.type] 
+                                     for key in datagroup.datasets])
                 grid_x = np.reshape(plot_info.global_gridx, (1,len(plot_info.global_gridx)))
                 paired_data = np.concatenate((grid_x, raw_data), axis=0).T
                 header = "Time [ns],"
@@ -4373,12 +4382,15 @@ class Notebook:
 
         else:
             plot_ID = self.active_analysisplot_ID.get()
-            if self.analysis_plots[plot_ID].datagroup.size() == 0: 
+            if not self.analysis_plots[plot_ID].datagroup.size(): 
                 return
-            paired_data = self.analysis_plots[plot_ID].datagroup.build(self.convert_out_dict)
+            where_layer = self.module.find_layer(self.analysis_plots[plot_ID].datagroup.type)
+            paired_data = self.analysis_plots[plot_ID].datagroup.build(self.module.layers[where_layer].convert_out)
             # We need some fancy footwork using itertools to transpose a non-rectangular array
             paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
-            header = "".join(["x {},".format(self.module.length_unit) + self.analysis_plots[plot_ID].datagroup.datasets[key].filename + "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
+            header = "".join(["x {},".format(self.module.layers[where_layer].length_unit) + 
+                              self.analysis_plots[plot_ID].datagroup.datasets[key].filename + 
+                              "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
                                                           title="Save data", 
@@ -4395,85 +4407,6 @@ class Notebook:
             except PermissionError:
                 self.write(self.analysis_status, "Error: unable to access PL export destination")
         
-        return
-
-    def export_for_bayesim(self, ip_ID=0):
-        # Note: DO NOT convert_out any of these values - bayesim models are created in TEDs units.
-        datagroup = self.integration_plots[ip_ID].datagroup
-        plot_info = self.integration_plots[ip_ID]
-        if datagroup.size() == 0: 
-            self.write(self.analysis_status, "No datasets loaded for bayesim")
-            return
-            
-        if (plot_info.mode == "All time steps"):
-            if self.bay_mode.get() == "obs":
-                for key in datagroup.datasets:  # For each curve on the integration plot
-                    raw_data = datagroup.datasets[key].data
-                    grid_x = plot_info.global_gridx   # grid_x refers to what is on the x-axis, which in this case is technically 'time'
-                    unc = raw_data * 0.1
-                    full_data = np.vstack((grid_x, raw_data, unc)).T
-                    full_data = pd.DataFrame.from_records(data=full_data,columns=['time', datagroup.type, 'uncertainty'])
-                    
-            elif self.bay_mode.get() == "model":
-                active_bay_params = []
-                for param in self.check_bay_params:
-                    if self.check_bay_params[param].get(): active_bay_params.append(param)
-
-                is_first = True
-                for key in datagroup.datasets:
-                    raw_data = datagroup.datasets[key].data
-                    grid_x = plot_info.global_gridx
-                    paired_data = np.vstack((grid_x, raw_data))
-
-                    try:
-                        for param in active_bay_params:
-                            if not isinstance(datagroup.datasets[key].params_dict[param], (int, float)):
-                                raise ValueError
-                            param_column = np.ones((1,raw_data.__len__())) * datagroup.datasets[key].params_dict[param] * self.convert_out_dict[param]
-                            paired_data = np.concatenate((param_column, paired_data), axis=0)
-                    except ValueError:
-                        self.write(self.analysis_status, "WIP: Bayesim with space-dependent params not yet supported")
-                        return
-                    
-                    paired_data = paired_data.T
-
-                    if is_first:
-                        full_data = paired_data
-                        is_first = False
-
-                    else:
-                        full_data = np.concatenate((full_data, paired_data), axis=0)
-
-                panda_columns = []
-                for param in active_bay_params:
-                    panda_columns.insert(0,param)
-
-                panda_columns.append('time')
-                panda_columns.append(datagroup.type)
-
-                full_data = pd.DataFrame.from_records(data=full_data, columns=panda_columns)
-                
-            filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["PL"], title="Save Bayesim Model", filetypes=[("HDF5 Archive","*.h5")])
-            if not filename: 
-                self.write(self.analysis_status, "Bayesim export cancelled")
-                return
-
-            if not filename.endswith(".h5"): 
-                filename += ".h5"
-            print(filename)
-            try:
-                dd.save(filename, full_data)
-            except Exception as oops:
-                self.do_confirmation_popup("Error: {} occured while saving bayesim file".format(str(oops)), hide_cancel=True)
-                self.root.wait_window(self.confirmation_popup)
-                os.remove(filename)
-                return
-                
-        else:
-            print("WIP =(")
-
-        self.do_confirmation_popup("Bayesim export complete", hide_cancel=True)
-        self.root.wait_window(self.confirmation_popup)
         return
 
 if __name__ == "__main__":

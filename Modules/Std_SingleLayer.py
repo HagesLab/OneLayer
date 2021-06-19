@@ -87,21 +87,6 @@ class Std_SingleLayer(OneD_Model):
                                         "[nm]", convert_in),
                        }
 
-        # TODO: Remove main's dependence on thses        
-        self.convert_in_dict = self.layers["OneLayer"].convert_in
-        self.convert_out_dict = self.layers["OneLayer"].convert_out
-        self.param_dict = self.layers["OneLayer"].params
-        self.simulation_outputs_dict = self.layers["OneLayer"].s_outputs
-        self.calculated_outputs_dict = self.layers["OneLayer"].c_outputs
-        self.outputs_dict = self.layers["OneLayer"].outputs
-        self.length_unit = self.layers["OneLayer"].length_unit
-        self.total_length = self.layers["OneLayer"].total_length
-        self.dx = self.layers["OneLayer"].dx
-        self.spacegrid_is_set = self.layers["OneLayer"].spacegrid_is_set
-        self.simulation_outputs_count = self.layers["OneLayer"].s_outputs_count
-        self.calculated_outputs_count = self.layers["OneLayer"].c_outputs_count
-        self.total_outputs_count = self.layers["OneLayer"].outputs_count
-        self.param_count = self.layers["OneLayer"].param_count
         return
     
     def calc_inits(self):
@@ -125,7 +110,6 @@ class Std_SingleLayer(OneD_Model):
         for param_name, param in one_layer.params.items():
             param.value *= one_layer.convert_in[param_name]
 
-        ## TODO: replace self.dx with one_layer.dx when GUI is ready
         ode_nanowire(data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
                      not flags['ignore_recycle'].value(), 
                      flags['symmetric_system'].value(), 
