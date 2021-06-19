@@ -108,8 +108,10 @@ class Raw_Data_Set(Data_Set):
         return np.vstack((self.grid_x, self.data))
     
 class Integrated_Data_Set(Data_Set):
-    def __init__(self, data, grid_x, params_dict, type, filename):
+    def __init__(self, data, grid_x, total_time, dt, params_dict, type, filename):
         super().__init__(data, grid_x, params_dict, type, filename)
+        self.total_time = total_time
+        self.dt = dt
         return
     
 
@@ -118,6 +120,8 @@ class Data_Group:
         self.type = "None"
         self.datasets = {}
         self.flags = None
+        self.dt = -1
+        self.total_t = -1
         return
     
     def get_maxval(self):
@@ -136,8 +140,6 @@ class Data_Group:
 class Raw_Data_Group(Data_Group):
     def __init__(self):
         super().__init__()
-        self.dt = -1
-        self.total_t = -1
         return
 
     def add(self, data, tag):
@@ -183,6 +185,8 @@ class Integrated_Data_Group(Data_Group):
     def add(self, new_set):
         if not self.datasets: 
             # Allow the first set in to set the type restriction
+            self.dt = new_set.dt
+            self.total_t = new_set.total_time
             self.type = new_set.type
 
         # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong

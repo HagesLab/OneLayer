@@ -215,7 +215,7 @@ def check_valid_filename(file_name):
     return True
         
 def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, 
-           need_extra_node=False):
+           need_extra_node=False, force_1D=True):
     """Read a subset of a 2D array (from time t0 to t1 and position l to r) stored in an .h5 file"""
     if (t0 is not None) and single_tstep:
         t1 = t0 + 1
@@ -226,7 +226,7 @@ def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False,
     with tables.open_file(filename, mode='r') as ifstream:
         data = np.array(ifstream.root.data[t0:t1, l:r])
         
-        if np.ndim(data) == 2 and len(data) == 1:
+        if force_1D and np.ndim(data) == 2 and len(data) == 1:
             data = data.flatten()
         return data
     

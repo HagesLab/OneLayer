@@ -213,7 +213,7 @@ class Std_SingleLayer(OneD_Model):
             elif (datatype == "PL"):
     
                 if for_integrate:
-                    rad_rec = radiative_recombination(extra_data, params)
+                    rad_rec = radiative_recombination(extra_data["OneLayer"], params)
                     data = prep_PL(rad_rec, i, j, nen, params, ignore_recycle)
                 else:
                     rad_rec = radiative_recombination(sim_data, params)

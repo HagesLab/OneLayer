@@ -3122,18 +3122,18 @@ class Notebook:
         
         counter = 0
         
-        # Integrate for EACH dataset in chosen datagroup
         for tag in active_datagroup.datasets:
             data_filename = active_datagroup.datasets[tag].filename
             datatype = active_datagroup.datasets[tag].type
+            where_layer = self.module.find_layer(datatype)
             print("Now integrating {}".format(data_filename))
 
             # Unpack needed params from the dictionaries of params
-            dx = active_datagroup.datasets[tag].params_dict["Node_width"]
-            total_length = active_datagroup.datasets[tag].params_dict["Total_length"]
-            total_time = active_datagroup.datasets[tag].params_dict["Total-Time"]
-            dt = active_datagroup.datasets[tag].params_dict["dt"]
-            symmetric_flag = active_datagroup.datasets[tag].params_dict["symmetric_system"]
+            dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
+            total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
+            total_time = active_datagroup.total_t
+            dt = active_datagroup.dt
+            symmetric_flag = active_datagroup.flags["symmetric_system"]
 
             if self.PL_mode == "Current time step":
                 show_index = active_datagroup.datasets[tag].show_index
@@ -3183,42 +3183,56 @@ class Notebook:
                 if include_negative:
                     sim_data = {}
                     extra_data = {}
-                    
-                    for sim_datatype in self.module.simulation_outputs_dict:
-                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                        t0=show_index, l=0, r=i+1, 
-                                                        single_tstep=do_curr_t, need_extra_node=nen[0]) 
-                        extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                          t0=show_index, single_tstep=do_curr_t)
+                    for layer_name, layer in self.module.layers.items():
+                        sim_data[layer_name] = {}
+                        extra_data[layer_name] = {}
+                        for sim_datatype in layer.s_outputs:
+                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                        t0=show_index, l=0, r=i+1, 
+                                                                        single_tstep=do_curr_t, need_extra_node=nen[0], 
+                                                                        force_1D=False) 
+                            extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                          t0=show_index, single_tstep=do_curr_t, force_1D=False)
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
+                                                      active_datagroup.flags,
                                                       True, 0, i, nen[0], extra_data)
                     I_data = new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
                     sim_data = {}
                     
-                    for sim_datatype in self.module.simulation_outputs_dict:
-                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                        t0=show_index, l=0, r=j+1, 
-                                                        single_tstep=do_curr_t, need_extra_node=nen[1]) 
+                    for layer_name, layer in self.module.layers.items():
+                        sim_data[layer_name] = {}
+                        for sim_datatype in layer.s_outputs:
+                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                        t0=show_index, l=0, r=j+1, 
+                                                                        single_tstep=do_curr_t, need_extra_node=nen[1],
+                                                                        force_1D=False) 
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
+                                                      active_datagroup.flags,
                                                       True, 0, j, nen[1], extra_data)
                     I_data += new_integrate(data, 0, u_bound, dx, total_length, nen[1])
                     
                 else:
                     sim_data = {}
                     extra_data = {}
-                    for sim_datatype in self.module.simulation_outputs_dict:
-                        sim_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                        t0=show_index, l=i, r=j+1, 
-                                                        single_tstep=do_curr_t, need_extra_node=nen) 
-                        extra_data[sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                          t0=show_index, single_tstep=do_curr_t) 
+                    for layer_name, layer in self.module.layers.items():
+                        sim_data[layer_name] = {}
+                        extra_data[layer_name] = {}
+                        for sim_datatype in layer.s_outputs:
+                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                        t0=show_index, l=i, r=j+1, 
+                                                                        single_tstep=do_curr_t, need_extra_node=nen,
+                                                                        force_1D=False) 
+                            extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                          t0=show_index, single_tstep=do_curr_t,
+                                                                          force_1D=False) 
             
                     data = self.module.prep_dataset(datatype, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict, 
+                                                      active_datagroup.datasets[tag].params_dict,
+                                                      active_datagroup.flags,
                                                       True, i, j, nen, extra_data)
                     
                     I_data = new_integrate(data, l_bound, u_bound, dx, total_length, nen)
@@ -3226,7 +3240,8 @@ class Notebook:
                             
                 if self.PL_mode == "Current time step":
                     # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
-                    grid_xaxis = float(active_datagroup.datasets[tag].params_dict[self.xaxis_param] * self.convert_out_dict[self.xaxis_param])
+                    grid_xaxis = float(active_datagroup.datasets[tag].params_dict[where_layer][self.xaxis_param]
+                                       * self.module.layers[where_layer].convert_out[self.xaxis_param])
 
                     xaxis_label = self.xaxis_param + " [WIP]"
 
@@ -3235,8 +3250,8 @@ class Notebook:
                     grid_xaxis = -1 # A dummy value for the I_Set constructor
                     xaxis_label = "Time [ns]"
 
-                I_data *= self.module.convert_out_dict["integration_scale"]
-                self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, 
+                I_data *= self.module.layers[where_layer].convert_out["integration_scale"]
+                self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, total_time, dt,
                                                                                 active_datagroup.datasets[tag].params_dict, 
                                                                                 active_datagroup.datasets[tag].type, 
                                                                                 data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
@@ -3263,16 +3278,17 @@ class Notebook:
         subplot.set_ylabel(datagroup.type)
         subplot.set_title("Integrated {}".format(datagroup.type))
 
+        where_layer = self.module.find_layer(datagroup.type)
         for key in datagroup.datasets:
 
             if self.PL_mode == "Current time step":
                 subplot.scatter(datagroup.datasets[key].grid_x, 
-                                datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], 
+                                datagroup.datasets[key].data * self.module.layers[where_layer].convert_out[datagroup.type], 
                                 label=datagroup.datasets[key].tag(for_matplotlib=True))
 
             elif self.PL_mode == "All time steps":
                 subplot.plot(self.integration_plots[ip_ID].global_gridx, 
-                             datagroup.datasets[key].data * self.convert_out_dict[datagroup.type], 
+                             datagroup.datasets[key].data * self.module.layers[where_layer].convert_out[datagroup.type], 
                              label=datagroup.datasets[key].tag(for_matplotlib=True))
                 
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
@@ -3293,8 +3309,8 @@ class Notebook:
                 td = {}
                 
                 for tag, dataset in self.integration_plots[ip_ID].datagroup.datasets.items():
-                    total_time = dataset.params_dict["Total-Time"]
-                    dt = dataset.params_dict["dt"]
+                    total_time = self.integration_plots[ip_ID].datagroup.total_t
+                    dt = self.integration_plots[ip_ID].datagroup.dt
                     td_gridt[tag] = np.linspace(0, total_time, n + 1)
                     td[tag] = tau_diff(dataset.data, dt)
                     
@@ -3305,9 +3321,7 @@ class Notebook:
                 td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=td_popup)
                 td_plotwidget = td_canvas.get_tk_widget()
                 td_plotwidget.grid(row=0,column=0)
-                
-                
-                
+
                 td_subplot.set_ylabel("tau_diff [ns]")
                 td_subplot.set_xlabel("Time [ns]")
                 td_subplot.set_title("-(dln(PL)/dt)^(-1)")
