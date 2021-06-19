@@ -226,6 +226,9 @@ class Std_SingleLayer(OneD_Model):
     
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
         """ Set delta_N and delta_P of outgoing regenerated IC file."""
+        param_dict = param_dict["OneLayer"]
+        sim_data = sim_data["OneLayer"]
+        include_flags = include_flags["OneLayer"]
         param_dict["delta_N"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(len(grid_x))
                     
         param_dict["delta_P"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(len(grid_x))

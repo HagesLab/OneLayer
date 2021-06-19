@@ -153,15 +153,11 @@ class Notebook:
             self.LGC_values = {}
 
         self.carryover_include_flags = {}
-        for var in self.module.simulation_outputs_dict:
-            self.carryover_include_flags[var] = tk.IntVar()
+        for layer_name, layer in self.module.layers.items():
+            self.carryover_include_flags[layer_name] = {}
+            for var in layer.s_outputs:
+                self.carryover_include_flags[layer_name][var] = tk.IntVar()
             
-        self.check_bay_params = {}
-        for param in self.module.param_dict:
-            self.check_bay_params[param] = tk.IntVar()
-            
-        self.bay_mode = tk.StringVar(value="model")
-
         # Helpers, flags, and containers for analysis plots
         self.analysis_plots = [Analysis_Plot_State(), Analysis_Plot_State(), 
                                Analysis_Plot_State(), Analysis_Plot_State()]
@@ -2170,8 +2166,8 @@ class Notebook:
     def do_IC_carry_popup(self):
         """ Open a tool to regenerate IC files based on current state of analysis plots. """
         plot_ID = self.active_analysisplot_ID.get()
-        # Don't open if no data plotted
-        if self.analysis_plots[plot_ID].datagroup.size() == 0: 
+
+        if not self.analysis_plots[plot_ID].datagroup.size(): 
             return
 
         if not self.IC_carry_popup_isopen:
@@ -2183,12 +2179,14 @@ class Notebook:
             
             self.carry_checkbuttons = {}
             rcount = 1
-            for var in self.module.simulation_outputs_dict:
-                self.carry_checkbuttons[var] = tk.Checkbutton(self.IC_carry_popup, 
-                                                              text=var, 
-                                                              variable=self.carryover_include_flags[var])
-                self.carry_checkbuttons[var].grid(row=rcount, column=0)
-                rcount += 1
+            for layer_name, layer in self.module.layers.items():
+                self.carry_checkbuttons[layer_name] = {}
+                for var in layer.s_outputs:
+                    self.carry_checkbuttons[layer_name][var] = tk.Checkbutton(self.IC_carry_popup, 
+                                                                              text=var, 
+                                                                              variable=self.carryover_include_flags[layer_name][var])
+                    self.carry_checkbuttons[layer_name][var].grid(row=rcount, column=0)
+                    rcount += 1
 
             self.carry_IC_listbox = tk.Listbox(self.IC_carry_popup, width=30,height=10, 
                                                selectmode='extended')
@@ -2220,10 +2218,12 @@ class Notebook:
                     return
                 
                 include_flags = {}
-                for iflag in self.carryover_include_flags:
-                    include_flags[iflag] = self.carryover_include_flags[iflag].get()
+                for layer_name in self.module.layers:
+                    include_flags[layer_name] = {}
+                    for iflag in self.carryover_include_flags[layer_name]:
+                        include_flags[layer_name][iflag] = self.carryover_include_flags[layer_name][iflag].get()
                     
-                status_msg = "Files generated:\n"
+                status_msg = ["Files generated:"]
                 for key in datasets:
                     new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], 
                                                                    title="Save IC text file for {}".format(key), 
@@ -2236,54 +2236,58 @@ class Notebook:
                     
                     param_dict_copy = dict(active_sets[key].params_dict)
 
-                    node_x = active_sets[key].node_x
+                    grid_x = active_sets[key].grid_x
                     
                     filename = active_sets[key].filename
                     sim_data = {}
-                    for var in self.module.simulation_outputs_dict:
-                        path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                                  self.module.system_ID, 
-                                                                  filename, filename, var)
-                        sim_data[var] = u_read(path_name, t0=active_sets[key].show_index, 
-                                               single_tstep=True)
+                    for layer_name, layer in self.module.layers.items():
+                        sim_data[layer_name] = {}
+                        for var in layer.s_outputs:
+                            path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
+                                                                      self.module.system_ID, 
+                                                                      filename, filename, var)
+                            sim_data[layer_name][var] = u_read(path_name, t0=active_sets[key].show_index, 
+                                                               single_tstep=True)
 
                     self.module.get_IC_carry(sim_data, param_dict_copy, 
-                                               include_flags, node_x)
-
+                                               include_flags, grid_x)
+                    
                     with open(new_filename + ".txt", "w+") as ofstream:
                         ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " 
                                        + str(datetime.datetime.now().date()) 
                                        + " AT " + str(datetime.datetime.now().time()) 
                                        + "\n")
                         ofstream.write("System_class: {}\n".format(self.module.system_ID))
-                        ofstream.write("$ Space Grid:\n")
-                        ofstream.write("Total_length: {}\n".format(active_sets[key].params_dict["Total_length"]))
-                        ofstream.write("Node_width: {}\n".format(active_sets[key].params_dict["Node_width"]))
-                        ofstream.write("$ System Parameters:\n")
-                        for param in param_dict_copy:
-                            if not (param == "Total_length" or param == "Node_width" or param == "Total-Time" or param == "dt" or param == "steady_state_exc" or param in self.module.flags_dict): 
-                                param_values = param_dict_copy[param] * self.convert_out_dict[param]
-                                if isinstance(param_values, np.ndarray):
-                                    ofstream.write("{}: {:.8e}".format(param, param_values[0]))
-                                    for value in param_values[1:]:
-                                        ofstream.write("\t{:.8e}".format(value))
-                                        
-                                    ofstream.write('\n')
-                                else:
-                                    ofstream.write("{}: {}\n".format(param, param_values))
+                        ofstream.write("f$ System Flags:\n")
+                        for flag in self.module.flags_dict:
+                            ofstream.write("{}: {}\n".format(flag, self.analysis_plots[plot_ID].datagroup.flags[flag]))
+                        for layer_name, layer_params in param_dict_copy.items():
+                            ofstream.write("L$: {}\n".format(layer_name))
+                            ofstream.write("p$ Space Grid:\n")
+                            ofstream.write("Total_length: {}\n".format(layer_params["Total_length"]))
+                            ofstream.write("Node_width: {}\n".format(layer_params["Node_width"]))
+                            ofstream.write("p$ System Parameters:\n")
+                            
+                            for param in layer.params:
+                                if not (param == "Total_length" or param == "Node_width"):
+                                    param_values = layer_params[param]
+                                    if isinstance(param_values, np.ndarray):
+                                        # Write the array in a more convenient format
+                                        ofstream.write("{}: {:.8e}".format(param, param_values[0]))
+                                        for value in param_values[1:]:
+                                            ofstream.write("\t{:.8e}".format(value))
+                                            
+                                        ofstream.write('\n')
+                                    else:
+                                        # The param value is just a single constant
+                                        ofstream.write("{}: {}\n".format(param, param_values))
 
-                        ofstream.write("$ System Flags:\n")
-                        
-                        for param in param_dict_copy:
-                            if param in self.module.flags_dict: 
-                                ofstream.write("{}: {}\n".format(param, int(param_dict_copy[param])))
-
-                    status_msg += "{}-->{}\n".format(filename, new_filename)
+                    status_msg.append("{}-->{}".format(filename, new_filename))
                     
                 # If NO new files saved
-                if status_msg == "Files generated:\n": 
-                    status_msg += "(none)"
-                self.do_confirmation_popup(status_msg, hide_cancel=True)
+                if len(status_msg) == 1: 
+                    status_msg.append("(none)")
+                self.do_confirmation_popup("\n".join(status_msg), hide_cancel=True)
                 self.root.wait_window(self.confirmation_popup)
 
             self.IC_carry_popup.destroy()
@@ -2296,94 +2300,6 @@ class Notebook:
         except Exception:
             print("Error #511: Failed to close IC carry popup.")
 
-        return
-
-    def do_bayesim_popup(self, plot_ID=0):
-        if self.integration_plots[plot_ID].datagroup.size() == 0: 
-            return
-
-        if not self.bayesim_popup_isopen:
-
-            self.bay_popup = tk.Toplevel(self.root)
-
-            self.bay_title_label1 = tk.ttk.Label(self.bay_popup, text="Bayesim Tool", style="Header.TLabel")
-            self.bay_title_label1.grid(row=0,column=0)
-
-            self.bay_text1 = tk.Message(self.bay_popup, text=
-                                        "Select \"Observation\" to save each curve as an experimentally observed data set or " +
-                                        "Model to combine all curves into a single model set.", width=320)
-            self.bay_text1.grid(row=1,column=0)
-
-            self.bay_text2 = tk.Message(self.bay_popup, text=
-                                        "\"Observation\" data can be used to test Bayesim setups.", width=320)
-            self.bay_text2.grid(row=2,column=0)
-
-            self.bay_text3 = tk.Message(self.bay_popup, text=
-                                        "Select system parameters to be included in the model.", width=320)
-            self.bay_text3.grid(row=5,column=0)
-
-            self.bay_line_separator = tk.ttk.Separator(self.bay_popup, orient="vertical", style="Grey Bar.TSeparator")
-            self.bay_line_separator.grid(row=0,rowspan=30,column=1,padx=(6,6),sticky="ns")
-
-            self.bay_title_label2 = tk.ttk.Label(self.bay_popup, text="\"Observation\" or Model?", style="Header.TLabel")
-            self.bay_title_label2.grid(row=0,column=2,columnspan=4)
-
-            self.bay_obs_mode = tk.ttk.Radiobutton(self.bay_popup, variable=self.bay_mode, value="obs")
-            self.bay_obs_mode.grid(row=1,column=2)
-
-            self.bay_obs_header = tk.Label(self.bay_popup, text="\"Observation\"")
-            self.bay_obs_header.grid(row=1,column=3)
-
-            self.bay_mod_mode = tk.ttk.Radiobutton(self.bay_popup, variable=self.bay_mode, value="model")
-            self.bay_mod_mode.grid(row=2,column=2)
-
-            self.bay_mod_header = tk.Label(self.bay_popup, text="Model")
-            self.bay_mod_header.grid(row=2,column=3)
-
-            self.bay_title_label3 = tk.ttk.Label(self.bay_popup, text="Model Params", style="Header.TLabel")
-            self.bay_title_label3.grid(row=4,column=2,columnspan=4)
-            
-            self.check_frame = tk.ttk.Frame(self.bay_popup)
-            self.check_frame.grid(row=5,column=2,columnspan=4)
-            self.bay_checks = {}
-            rdim = 4
-            rcount = 0
-            ccount = 0
-            for param in self.module.param_dict:
-                self.bay_checks[param] = tk.ttk.Checkbutton(self.check_frame, text=param, variable=self.check_bay_params[param], onvalue=1,offvalue=0)
-                self.bay_checks[param].grid(row=rcount, column=ccount)
-                rcount += 1
-                if rcount == rdim:
-                    rcount = 0
-                    ccount += 1
-
-            self.bay_continue_button = tk.Button(self.bay_popup, text="Continue", command=partial(self.on_bayesim_popup_close, continue_=True))
-            self.bay_continue_button.grid(row=20,column=3)
-
-            self.bay_popup.protocol("WM_DELETE_WINDOW", partial(self.on_bayesim_popup_close, continue_=False))
-            self.bay_popup.grab_set()
-            self.bayesim_popup_isopen = True
-            return
-
-        else:
-            print("Error #600: Opened more than one Bayesim popup at a time")
-
-        return
-
-    def on_bayesim_popup_close(self, continue_=False):
-        try:
-            if continue_:
-                print("Mode: {}".format(self.bay_mode.get()))
-                for param in self.check_bay_params:
-                    print("{}: {}".format(param, self.check_bay_params[param].get()))
-
-                self.export_for_bayesim()
-
-            self.bay_popup.destroy()
-            self.bayesim_popup_isopen = False
-
-        except FloatingPointError:
-            print("Error #601: Failed to close Bayesim popup")
         return
 
     ## Plotter for simulation tab    
