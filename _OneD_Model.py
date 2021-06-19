@@ -30,10 +30,12 @@ class OneD_Model:
     
     def __init__(self):
         # Unique identifier for module.
-        self.system_ID = "INSERT MODEL NAME HERE"        
+        self.system_ID = "INSERT MODEL NAME HERE"  
+        
+        self.time_unit = "[ns]"
         self.layers = {}
         # Parameter list.
-        self.param_dict = {}
+        params = {}
 
         # dict {"Flag's internal name":
         #       ("Flag's display name",whether Flag1 is toggleable, Flag1's default value)
@@ -42,17 +44,15 @@ class OneD_Model:
         
         # dict {"Variable name":Output()} of all dependent variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        simulation_outputs = {"Output1":Output("y", units="[hamburgers/football field]", xlabel="a.u.", xvar="position", is_edge=False, layer="LAYER_NAME", yscale='log', yfactors=(1e-4,1e1))}
+        simulation_outputs = {}
         
         # dict {"Variable name":Output()} of all secondary variables calculated from those in simulation_outputs_dict
-        calculated_outputs = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False, layer="LAYER_NAME")}
+        calculated_outputs = {}
 
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
         # Each item in param_dict and outputs_dict must have an entry here, even if the conversion factor is one
-        convert_in = {"Output1": ((1e-2) / (1e2)),               # [hamburgers/football field] to [centihamburgers/yard]
-                      "deltaN": ((1e-7) ** 3)                    # [cm^-3] to [nm^-3]
-                      }
+        convert_in = {}
         
         # The integration tool uses whatever units self.dx is in.
         # Define the "integration_scale" entry to correct for any mismatches
