@@ -34,7 +34,7 @@ class MAPI_Rubrene(OneD_Model):
                       "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                       "Cn":Parameter(units="[cm^6 / s]", is_edge=False, valid_range=(0,np.inf)),
                       "Cp":Parameter(units="[cm^6 / s]", is_edge=False, valid_range=(0,np.inf)),
-                      "temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
+                      "MAPI_temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
                       "rel_permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
                       "delta_N":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                       "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
@@ -48,6 +48,7 @@ class MAPI_Rubrene(OneD_Model):
                           "tau_D":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
                           "k_fusion":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)),
                           "k_0":Parameter(units="[nm^3 s^-1]", is_edge=False, valid_range=(0,np.inf)),
+                          "Rubrene_temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
                           "delta_T":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                           "delta_S":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                           "delta_D":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
@@ -84,7 +85,7 @@ class MAPI_Rubrene(OneD_Model):
                       "tau_N": 1, "tau_P": 1,                                     # [ns]
                       "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
                       "Cn": 1e33, "Cp": 1e33,                                   # [cm^6 / s] to [nm^6 / ns]
-                      "temperature": 1, "rel_permitivity":1,
+                      "MAPI_temperature": 1, "rel_permitivity":1,
                       "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
                       "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
                       "E_field": 1, 
@@ -101,6 +102,7 @@ class MAPI_Rubrene(OneD_Model):
                               "tau_T": 1, "tau_S": 1, "tau_D": 1,               # [ns]
                               "k_fusion":1e12,                                  # [cm^3 / s] to [nm^3 / ns]
                               "k_0":1e-9,                                       # [nm^3 / s] to [nm^3 / ns]
+                              "Rubrene_temperature":1,
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21                   # [cm^-3] to [nm^-3]
                               }
@@ -151,11 +153,12 @@ class MAPI_Rubrene(OneD_Model):
         for param_name, param in ru.params.items():
             param.value *= ru.convert_in[param_name]
 
-        ode_nanowire(data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
-                     not flags['ignore_recycle'].value(), 
-                     flags['symmetric_system'].value(), 
+        ode_nanowire(data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
+                     n, dt, mapi.params, ru.params, flags['do_fret'],
                      flags['check_do_ss'].value(), hmax_, True,
-                     init_conditions["N"], init_conditions["P"])
+                     init_conditions["N"], init_conditions["P"],
+                     init_conditions["T"], init_conditions["S"],
+                     init_conditions["D"])
     
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Calculates at a selection of sample times: N, P, (total carrier densities)
@@ -263,8 +266,8 @@ class MAPI_Rubrene(OneD_Model):
 
 def dydt(t, y, m, f, dm, df, Cn, Cp, 
          tauN, tauP, tauT, tauS, tauD, 
-         mu_n, mu_p, mu_s, mu_t,
-         n0, p0, T0, Sf, Sb, B, k_fusion, k_0, temperature, 
+         mu_n, mu_p, mu_s, mu_T,
+         n0, p0, T0, Sf, Sb, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
          eps, weight1=0, weight2=0, do_Fret=False, do_ss=False, 
          init_N=0, init_P=0):
     """Derivative function for two-layer carrier model."""
@@ -273,109 +276,123 @@ def dydt(t, y, m, f, dm, df, Cn, Cp,
     # dn/dx and dp/dx are also node edge values
     Jn = np.zeros((m+1))
     Jp = np.zeros((m+1))
+    JT = np.zeros((f+1))
+    JS = np.zeros((f+1))
 
-    # These are calculated at node centers, of which there are m
-    # dE/dt, dn/dt, and dp/dt are also node center values
-    dJz = np.zeros((m))
-    rad_rec = np.zeros((m))
-    non_rad_rec = np.zeros((m))
-    G_array = np.zeros((m))
-
+    # Unpack simulated variables
     N = y[0:m]
     P = y[m:2*(m)]
-    E_field = y[2*(m):]
+    E_field = y[2*(m):3*(m)+1]
+    delta_T = y[3*(m)+1:3*(m)+1+f]
+    delta_S = y[3*(m)+1+f:3*(m)+1+2*(f)]
+    delta_D = y[3*(m)+1+2*(f):]
+    
     N_edges = (N[:-1] + np.roll(N, -1)[:-1]) / 2 # Excluding the boundaries; see the following FIXME
     P_edges = (P[:-1] + np.roll(P, -1)[:-1]) / 2
     
-    ## Do boundary conditions of Jn, Jp
-    # FIXME: Calculate N, P at boundaries?
+    # MAPI boundaries
     Sft = Sf * (N[0] * P[0] - n0[0] * p0[0]) / (N[0] + P[0])
     Sbt = Sb * (N[m-1] * P[m-1] - n0[m-1] * p0[m-1]) / (N[m-1] + P[m-1])
     Jn[0] = Sft
     Jn[m] = -Sbt
     Jp[0] = -Sft
     Jp[m] = Sbt
+    
+    # Rubrene boundaries
+    JT[0] = -Sbt
+    JT[f] = 0
+    JS[0] = 0
+    JS[f] = 0
 
-    ## Calculate Jn, Jp [nm^-2 ns^-1] over the space dimension, 
-    # Jn(t) ~ N(t) * E_field(t) + (dN/dt)
-    # np.roll(y,m) shifts the values of array y by m places, allowing for quick approximation of dy/dx ~ (y[m+1] - y[m-1] / 2*dx) over entire array y
-    Jn[1:-1] = (-mu_n[1:-1] * (N_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1]) 
-                + (mu_n[1:-1]*kB*T[1:-1]) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dx)))
+    ## Calculate Jn, Jp [nm^-2 ns^-1] for MAPI, 
+    Jn[1:-1] = (-mu_n[1:-1] * (N_edges) * (q * E_field[1:-1]) 
+                + (mu_n[1:-1]*kB*mapi_temperature[1:-1]) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dm)))
 
-    ## Changed sign
-    Jp[1:-1] = (-mu_p[1:-1] * (P_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEcdz[1:-1]) 
-                -(mu_p[1:-1]*kB*T[1:-1]) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dx)))
+    Jp[1:-1] = (-mu_p[1:-1] * (P_edges) * (q * E_field[1:-1]) 
+                - (mu_p[1:-1]*kB*mapi_temperature[1:-1]) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dm)))
 
+    dJn = (np.roll(Jn, -1)[:-1] - Jn[:-1]) / (dm)
+    dJp = (np.roll(Jp, -1)[:-1] - Jp[:-1]) / (dm)
         
     # [V nm^-1 ns^-1]
     dEdt = (Jn + Jp) * ((q_C) / (eps * eps0))
     
+    ## Rubrene J fluxes
+    JT[1:-1] = (mu_T[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(delta_T,-1)[:-1] - delta_T[:-1]) / (df))
+    JS[1:-1] = (mu_s[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(delta_S,-1)[:-1] - delta_S[:-1]) / (df))
+    dJT = (np.roll(JT, -1)[:-1] - JT[:-1]) / (df)
+    dJS = (np.roll(JS, -1)[:-1] - JS[:-1]) / (df)
+    
     ## Calculate recombination (consumption) terms
-    rad_rec = B * (N * P - n0 * p0)
-    non_rad_rec = (N * P - n0 * p0) / ((tauN * P) + (tauP * N))
+    # MAPI Auger + RR + SRH
+    n_rec = (Cn*N + Cp*P + B + (1 / ((tauN * P) + (tauP * N)))) * (N * P - n0 * p0)
+    p_rec = n_rec
         
-    ## Calculate generation term from photon recycling, if photon recycling is being considered
-    if recycle_photons:
-        G_array = (intg.trapz(rad_rec * combined_weight, dx=dx, axis=1) 
-                   + rad_rec * (0.5 * alpha * delta_frac)
-                   * (1
-                     - ((1 - frac_emitted) * np.exp(-2 * alpha * np.arange(0, m*dx, dx)))
-                     - (back_refl_frac * np.exp(-2 * alpha * (m*dx - np.arange(0, m*dx, dx))))
-                     )
-                  )
+    # Rubrene single- and bi-molecular decays
+    T_rec = delta_T / tauT
+    T_fusion = k_fusion * (delta_T) ** 2
+    S_Fret = delta_S / tauS
+    D_rec = delta_D / tauD
+    
+    ## Calculate D_Fretting
+    if do_Fret:
+        D_Fret1 = intg.trapz(weight1 * delta_D * k_0 / tauD, dx=df, axis=1)
+        D_Fret2 = (delta_D * k_0 / tauD) * weight2
+        
     else:
-        G_array = 0
-    ## Calculate dJn/dx
-    dJz = (np.roll(Jn, -1)[:-1] - Jn[:-1]) / (dx)
-
-    ## N(t) = N(t-1) + dt * (dN/dt)
-    #N_new = np.maximum(N_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
-    dNdt = ((1/q) * dJz - rad_rec - non_rad_rec + G_array)
+        D_Fret1 = 0
+        D_Fret2 = 0
+    
+    dNdt = ((1/q) * dJn - n_rec + D_Fret1)
     if do_ss: 
         dNdt += init_N
 
-    ## Calculate dJp/dx
-    dJz = (np.roll(Jp, -1)[:-1] - Jp[:-1]) / (dx)
-
-    ## P(t) = P(t-1) + dt * (dP/dt)
-    #P_new = np.maximum(P_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
-    dPdt = ((1/q) * -dJz - rad_rec - non_rad_rec + G_array)
+    dPdt = ((1/q) * -dJp - p_rec + D_Fret1)
     if do_ss: 
         dPdt += init_P
+        
+    dTdt = ((1/q) * dJT - T_fusion - T_rec)
+    dSdt = ((1/q) * dJS + T_fusion - S_Fret)
+    dDdt = S_Fret - D_Fret2 - D_rec
 
     ## Package results
-    dydt = np.concatenate([dNdt, dPdt, dEdt], axis=None)
+    dydt = np.concatenate([dNdt, dPdt, dEdt, dTdt, dSdt, dDdt], axis=None)
     return dydt
     
-def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, 
-                 symmetric=True, do_ss=False, hmax_=0, write_output=True, 
-                 init_N=0, init_P=0, init_E_field=0):
+def ode_nanowire(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params, 
+                 do_Fret=False, do_ss=False, hmax_=0, write_output=True, 
+                 init_N=0, init_P=0, init_T=0, init_S=0, init_D=0):
     """
-    Master function for Nanowire module simulation.
+    Master function for MAPI_Rubrene_DBP module simulation.
     Problem statement:
-    Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
-    Space step size is dx, time step is dt
-    Initial conditions: init_N, init_P, init_E_field
-    Optional photon recycle term
+    Create a discretized, time and space dependent solution (N(x,t), P(x,t), T(x,t), S(x,t), D(x,t))
+    of a MAPI-Rubrene:DBP carrier model with m, f space steps and n time steps
+    Space step size is dm, df; time step is dt
+    Initial conditions: init_N, init_P, init_T, init_S, init_D
+    Optional FRET integral term
 
     Parameters
     ----------
     data_path_name : str
         Output file location.
     m : int
-        Number of space nodes.
+        Number of MAPI layer space nodes.
+    dm : float
+        MAPI Space node width.
+    f : int
+        Number of Rubrene layer space nodes.
+    df : float
+        Rubrene Space node width.
     n : int
         Number of time steps.
-    dx : float
-        Space node width.
     dt : float
         Time step size.
-    params : dict {"str":Parameter}
-        Collection of parameter objects
-    recycle_photons : bool, optional
-        Whether carrier regeneration due to photons is considered. The default is True.
-    symmetric : bool, optional
-        Whether to consider the nanowire as having a symmetrical half with virtual nodes 0 to -m. The default is True.
+    mapi_params : dict {"str":Parameter}
+        Collection of parameter objects for MAPI layer
+    ru_params : dict {"str":Parameter}
+        Collection of parameter objects for Rubrene layer
+    do_Fret : bool, optional
+        Whether to include the FRET integral. The default is True.
     do_ss : bool, optional
         Whether to inject the initial conditions at every time step, creating a nonzero steady state situation. The default is False.
     hmax_ : float, optional
@@ -386,8 +403,6 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
         Initial excited electron distribution. The default is 0.
     init_P : 1D ndarray, optional
         Initial hole distribution. The default is 0.
-    init_E_field : 1D ndarray, optional
-        Initial electric field. The default is 0.
 
     Returns
     -------
@@ -399,38 +414,36 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     atom = tables.Float64Atom()
 
     ## Unpack params; typecast non-array params to arrays if needed
-    Sf = params["Sf"].value
-    Sb = params["Sb"].value
-    mu_n = to_array(params["mu_N"].value, m, True)
-    mu_p = to_array(params["mu_P"].value, m, True)
-    T = to_array(params["temperature"].value, m, True)
-    n0 = to_array(params["N0"].value, m, False)
-    p0 = to_array(params["P0"].value, m, False)
-    tauN = to_array(params["tau_N"].value, m, False)
-    tauP = to_array(params["tau_P"].value, m, False)
-    B = to_array(params["B"].value, m, False)
-    eps = to_array(params["rel_permitivity"].value, m, True)
-    E_field_ext = to_array(params["Ext_E-Field"].value, m, True)
-    alpha = to_array(params["alpha"].value, m, False)
-    back_refl_frac = params["back_reflectivity"].value
-    delta_frac = to_array(params["delta"].value, m, False) if recycle_photons else np.zeros(m)
-    frac_emitted = to_array(params["frac_emitted"].value, m, False)
-    init_Ec = to_array(params["Ec"].value, m, True)
-    init_Chi = to_array(params["electron_affinity"].value, m, True)
-           
-    ## Define constants
-    eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
-    q = 1.0 # [e]
-    q_C = 1.602e-19 # [C]
-    kB = 8.61773e-5  # [eV / K]
-    
+    Sf = mapi_params["Sf"].value
+    Sb = mapi_params["Sb"].value
+    mu_n = to_array(mapi_params["mu_N"].value, m, True)
+    mu_p = to_array(mapi_params["mu_P"].value, m, True)
+    mu_s = to_array(ru_params["mu_s"].value, f, True)
+    mu_T = to_array(ru_params["mu_T"].value, f, True)
+    mapi_temperature = to_array(mapi_params["MAPI_temperature"].value, m, True)
+    rubrene_temperature = to_array(ru_params["Rubrene_temperature"].value, f, True)
+    n0 = to_array(mapi_params["N0"].value, m, False)
+    p0 = to_array(mapi_params["P0"].value, m, False)
+    T0 = to_array(ru_params["T0"].value, f, False)
+    tauN = to_array(mapi_params["tau_N"].value, m, False)
+    tauP = to_array(mapi_params["tau_P"].value, m, False)
+    tauT = to_array(ru_params["tau_T"].value, f, False)
+    tauS = to_array(ru_params["tau_S"].value, f, False)
+    tauD = to_array(ru_params["tau_D"].value, f, False)
+    B = to_array(mapi_params["B"].value, m, False)
+    Cn = to_array(mapi_params["Cn"].value, m, False)
+    Cp = to_array(mapi_params["Cp"].value, m, False)
+    k_fusion = to_array(ru_params["k_fusion"].value, f, False)
+    k_0 = to_array(ru_params["k_0"].value, f, False)
+    eps = to_array(mapi_params["rel_permitivity"].value, m, True)
+   
     ## Package initial condition
     # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
     init_E_field = E_field({"N":init_N, "P":init_P}, 
-                           {"rel_permitivity":eps, "N0":n0, "P0":p0, "Node_width":dx})
+                           {"rel_permitivity":eps, "N0":n0, "P0":p0, "Node_width":dm})
     #init_E_field = np.zeros(m+1)
     
-    init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)
+    init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
 
     if do_ss:
         init_N_copy = init_N
@@ -441,57 +454,54 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
         init_P_copy = 0
 
     ## Generate a weight distribution needed for photon recycle term if photon recycle is being considered
-    if recycle_photons:
-        combined_weight = gen_weight_distribution(m, dx, alpha, delta_frac, 
-                                                  back_refl_frac, frac_emitted)
+    if do_Fret:
+        # TODO: These
+        weight1 = 0
+        weight2 = 0
     else:
-        combined_weight = np.zeros((m, m))
+        weight1 = 0
+        weight2 = 0
+    args=(m, f, dm, df, Cn, Cp, 
+            tauN, tauP, tauT, tauS, tauD, 
+            mu_n, mu_p, mu_s, mu_T,
+            n0, p0, T0, Sf, Sb, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
+            eps, weight1, weight2, do_Fret, do_ss, 
+            init_N_copy, init_P_copy)
 
-    ## Generate space derivative of Ec and Chi
-    # Note that for these two quantities the derivatives at node edges are being calculated by values at node edges
-    # This is not recommended for N, P (their derivatives are calculated from node centers) because N, P are used to model discrete chunks of nanowire over time,
-    # but it is okay to use Ec, Chi because these are invariant with time.
-
-    dEcdz = np.zeros(m+1)
-    dChidz = np.zeros(m+1)
-
-    dEcdz[1:-1] = (np.roll(init_Ec, -1)[1:-1] - np.roll(init_Ec, 1)[1:-1]) / (2 * dx)
-    dEcdz[0] = (init_Ec[1] - init_Ec[0]) / dx
-    dEcdz[m] = (init_Ec[m] - init_Ec[m-1]) / dx
-
-    dChidz[1:-1] = (np.roll(init_Chi, -1)[1:-1] - np.roll(init_Chi, 1)[1:-1]) / (2 * dx)
-    dChidz[0] = (init_Chi[1] - init_Chi[0]) / dx
-    dChidz[m] = (init_Chi[m] - init_Chi[m-1]) / dx
-
-    args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
-            tauN, tauP, B, eps, eps0, q, q_C, kB, 
-            recycle_photons, do_ss, alpha, back_refl_frac, 
-            delta_frac, frac_emitted, combined_weight, 
-            E_field_ext, dEcdz, dChidz, init_N_copy, 
-            init_P_copy)
     ## Do n time steps
     tSteps = np.linspace(0, n*dt, n+1)
     
-    sol = intg.solve_ivp(dydt2, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
+    sol = intg.solve_ivp(dydt, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
     data = sol.y.T
             
     if write_output:
         ## Prep output files
+        # TODO: Py 3.9 fremoves need for \
         with tables.open_file(data_path_name + "-N.h5", mode='a') as ofstream_N, \
-            tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P:
-            #tables.open_file(data_path_name + "-E_field.h5", mode='a') as ofstream_E_field:
+                tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P,\
+                tables.open_file(data_path_name + "-T.h5", mode='a') as ofstream_T,\
+                tables.open_file(data_path_name + "-S.h5", mode='a') as ofstream_S,\
+                tables.open_file(data_path_name + "-D.h5", mode='a') as ofstream_D:
             array_N = ofstream_N.root.data
             array_P = ofstream_P.root.data
-            #array_E_field = ofstream_E_field.root.data
+            array_T = ofstream_T.root.data
+            array_S = ofstream_S.root.data
+            array_D = ofstream_D.root.data
+            
             array_N.append(data[1:,0:m])
             array_P.append(data[1:,m:2*(m)])
-            #array_E_field.append(data[1:,2*(m):])
+            array_T.append(data[1:,3*(m)+1:3*(m)+1+f])
+            array_S.append(data[1:,3*(m)+1+f:3*(m)+1+2*(f)])
+            array_D.append(data[1:,3*(m)+1+2*(f):])
 
         return #error_data
 
     else:
         array_N = data[:,0:m]
         array_P = data[:,m:2*(m)]
+        array_T = data[1:,3*(m)+1:3*(m)+1+f]
+        array_S = data[1:,3*(m)+1+f:3*(m)+1+2*(f)]
+        array_D = data[1:,3*(m)+1+2*(f):]
 
         return #array_N, array_P, error_data
     
