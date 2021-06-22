@@ -37,7 +37,7 @@ from utils import to_index, to_pos, to_array, get_all_combinations, \
 from Modules.Nanowire import Nanowire, tau_diff
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
-
+from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
 ## AND HERE
 def mod_list():
     """
@@ -52,7 +52,8 @@ def mod_list():
     
     return {"Standard One-Layer":Std_SingleLayer,
             "Nanowire":Nanowire, 
-            "Neumann Bound Heatplate":HeatPlate}
+            "Neumann Bound Heatplate":HeatPlate, 
+            "MAPI-Rubrene//DBP":MAPI_Rubrene}
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
@@ -142,7 +143,7 @@ class Notebook:
         self.IC_file_name = ""
         
         # Add (e.g. for Nanowire) module-specific functionality
-        self.LGC_eligible_modules = ("Nanowire", "OneLayer")
+        self.LGC_eligible_modules = ("Nanowire", "OneLayer", "MAPI_Rubrene//DBP")
         if self.module.system_ID in self.LGC_eligible_modules:
             self.using_LGC = {}
             self.LGC_options = {}
@@ -328,7 +329,7 @@ class Notebook:
         
         first_layer = next(iter(self.module.layers))
 
-        var_dropdown_list = [str(param_name + param.units) 
+        var_dropdown_list = ["{} {}".format(param_name, param.units) 
                              for param_name, param in self.module.layers[first_layer].params.items()
                              if param.is_space_dependent]
         paramtoolkit_method_dropdown_list = ["POINT", "FILL", "LINE", "EXP"]
