@@ -77,6 +77,7 @@ class MAPI_Rubrene(OneD_Model):
                              "PL":Output("TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI"),
                              "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False)}
         
+        rubrene_calculated_outputs = {}
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
         mapi_convert_in = {"mu_N": ((1e7) ** 2) / (1e9), "mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
@@ -112,7 +113,7 @@ class MAPI_Rubrene(OneD_Model):
         
         self.layers = {"MAPI":Layer(mapi_params, mapi_simulation_outputs, mapi_calculated_outputs,
                                     "[nm]", mapi_convert_in),
-                       "Rubrene":Layer(rubrene_params, rubrene_simulation_outputs, {},
+                       "Rubrene":Layer(rubrene_params, rubrene_simulation_outputs, rubrene_calculated_outputs,
                                        "[nm]", rubrene_convert_in)
                        }
 
@@ -172,42 +173,49 @@ class MAPI_Rubrene(OneD_Model):
            
            Integrates over nanowire length: PL due to radiative recombination, waveguiding, and carrier regeneration"""
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
-        one_layer = self.layers["OneLayer"]
-        params = params["OneLayer"]
-        total_length = params["Total_length"]
-        dx = params["Node_width"]
-        data_dict = {"OneLayer":{}}
+        mapi = self.layers["MAPI"]
+        mapi_params = params["MAPI"]
+        mapi_length = mapi_params["Total_length"]
+        dm = mapi_params["Node_width"]
         
-        for raw_output_name in one_layer.s_outputs:
-            data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
-                                                 raw_output_name)
-            data = []
-            for tstep in tsteps:
-                data.append(u_read(data_filename, t0=tstep, single_tstep=True))
-            
-            data_dict["OneLayer"][raw_output_name] = np.array(data)
+        ru = self.layers["Rubrene"]
+        ru_params = params["Rubrene"]
+        ru_length = ru_params["Total_length"]
+        df = ru_params["Node_width"]
+        
+        data_dict = {"MAPI":{}, "Rubrene":{}}
+        
+        for layer_name, layer in self.layers.items():
+            for raw_output_name in layer.s_outputs:
+                data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
+                                                     raw_output_name)
+                data = []
+                for tstep in tsteps:
+                    data.append(u_read(data_filename, t0=tstep, single_tstep=True))
+                
+                data_dict[layer_name][raw_output_name] = np.array(data)
                     
-        data_dict["OneLayer"]["E_field"] = E_field(data_dict["OneLayer"], params)
-        data_dict["OneLayer"]["delta_N"] = delta_n(data_dict["OneLayer"], params)
-        data_dict["OneLayer"]["delta_P"] = delta_p(data_dict["OneLayer"], params)
-        data_dict["OneLayer"]["RR"] = radiative_recombination(data_dict["OneLayer"], params)
-        data_dict["OneLayer"]["NRR"] = nonradiative_recombination(data_dict["OneLayer"], params)
+        data_dict["MAPI"]["E_field"] = E_field(data_dict["MAPI"], mapi_params)
+        data_dict["MAPI"]["delta_N"] = delta_n(data_dict["MAPI"], mapi_params)
+        data_dict["MAPI"]["delta_P"] = delta_p(data_dict["MAPI"], mapi_params)
+        data_dict["MAPI"]["RR"] = radiative_recombination(data_dict["MAPI"], mapi_params)
+        data_dict["MAPI"]["NRR"] = nonradiative_recombination(data_dict["MAPI"], mapi_params)
                 
         with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
-        temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, params)
-        PL_base = prep_PL(temp_RR, 0, to_index(total_length, dx, total_length), 
-                          False, params, flags["ignore_recycle"])
-        data_dict["OneLayer"]["PL"] = new_integrate(PL_base, 0, total_length, 
-                                                    dx, total_length, False)
-        data_dict["OneLayer"]["tau_diff"] = tau_diff(data_dict["OneLayer"]["PL"], dt)
+        temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, mapi_params)
+        PL_base = prep_PL(temp_RR, 0, to_index(mapi_length, dm, mapi_length), 
+                          False, mapi_params, True)
+        data_dict["MAPI"]["PL"] = new_integrate(PL_base, 0, mapi_length, 
+                                                    dm, mapi_length, False)
+        data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["PL"], dt)
         
-        for data in data_dict["OneLayer"]:
-            data_dict["OneLayer"][data] *= one_layer.convert_out[data]
+        for data in data_dict["MAPI"]:
+            data_dict["MAPI"][data] *= mapi.convert_out[data]
             
-        data_dict["OneLayer"]["PL"] *= one_layer.convert_out["integration_scale"]
+        data_dict["MAPI"]["PL"] *= mapi.convert_out["integration_scale"]
         
         return data_dict
     
@@ -461,15 +469,14 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         init_N_copy = 0
         init_P_copy = 0
 
-    ## Generate a weight distribution needed for photon recycle term if photon recycle is being considered
+    ## Generate a weight distribution needed for FRET term
     if do_Fret:
-        # TODO: These
         init_m = np.linspace(dm / 2, m*dm - dm / 2, m)
         init_f = np.linspace(df / 2, f*df - df / 2, f)
         weight1 = np.array([1 / ((init_f + (m*dm - i)) ** 3) for i in init_m])
         weight2 = np.array([1 / ((i + (m*dm - init_m)) ** 3) for i in init_f])
-        # It turns out that weight_array2 contains ALL of the parts of the FRET integral that depend
-        # on the variable of integration, so we do that integral right away and use the result in dydt().
+        # It turns out that weight2 contains ALL of the parts of the FRET integral that depend
+        # on the variable of integration, so we do that integral right away.
         weight2 = intg.trapz(weight2, dx=dm, axis=1)
 
     else:
