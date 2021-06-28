@@ -143,7 +143,7 @@ class Notebook:
         self.IC_file_name = ""
         
         # Add (e.g. for Nanowire) module-specific functionality
-        self.LGC_eligible_modules = ("Nanowire", "OneLayer", "MAPI_Rubrene//DBP")
+        self.LGC_eligible_modules = ("Nanowire", "OneLayer", "MAPI_Rubrene")
         if self.module.system_ID in self.LGC_eligible_modules:
             self.using_LGC = {}
             self.LGC_options = {}
@@ -2530,10 +2530,11 @@ class Notebook:
                 return
 
             where_layer = self.module.find_layer(active_datagroup.type)
+            is_edge = self.module.layers[where_layer].outputs[active_datagroup.type].is_edge
             convert_out = self.module.layers[where_layer].convert_out
             
             if force_axis_update or not active_plot_data.do_freeze_axes:
-                active_plot_data.xlim = (0, active_plot_data.datagroup.get_max_x())
+                active_plot_data.xlim = (0, active_plot_data.datagroup.get_max_x(is_edge))
                 active_plot_data.xaxis_type = 'linear'
                 max_val = active_datagroup.get_maxval() * convert_out[active_datagroup.type]
                 min_val = active_datagroup.get_minval() * convert_out[active_datagroup.type]
@@ -2816,6 +2817,7 @@ class Notebook:
             self.do_Calculate()
             
         self.write(self.status, "Simulations complete")
+        self.load_ICfile()
 
         if len(self.sim_warning_msg) > 1:
             self.do_confirmation_popup("\n".join(self.sim_warning_msg), hide_cancel=True)
@@ -2969,18 +2971,15 @@ class Notebook:
             
                 ofstream.write("p$ System Parameters:\n")
             
-                # Saves occur as-is: any missing parameters are saved with whatever default value module gives them
                 for param in layer.params:
                     param_values = layer.params[param].value
                     if isinstance(param_values, np.ndarray):
-                        # Write the array in a more convenient format
                         ofstream.write("{}: {:.8e}".format(param, param_values[0]))
                         for value in param_values[1:]:
                             ofstream.write("\t{:.8e}".format(value))
                             
                         ofstream.write('\n')
                     else:
-                        # The param value is just a single constant
                         ofstream.write("{}: {}\n".format(param, param_values))
             # The following params are exclusive to metadata files
             ofstream.write("t$ Time grid:\n")
@@ -3032,7 +3031,9 @@ class Notebook:
             # A "default integration behavior": integrate the present data over all time and space steps
             self.PL_mode = "All time steps"
             self.integration_plots[ip_ID].x_param = "Time"
-            self.integration_bounds = [[0,active_datagroup.get_max_x()]]
+            where_layer = self.module.find_layer(active_datagroup.type)
+            is_edge = self.module.layers[where_layer].outputs[active_datagroup.type].is_edge
+            self.integration_bounds = [[0,active_datagroup.get_max_x(is_edge)]]
             
         # Clean up the I_plot and prepare to integrate given selections
         # A lot of the following is a data transfer between the 

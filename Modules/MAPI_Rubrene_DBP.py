@@ -64,8 +64,8 @@ class MAPI_Rubrene(OneD_Model):
                                   }
         
         rubrene_simulation_outputs = {"T":Output("T", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)), 
-                                      "S":Output("S", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
-                                      "D":Output("D", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
+                                      "delta_S":Output("delta_S", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
+                                      "delta_D":Output("delta_D", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
                                      }
         
         # List of all variables calculated from those in simulation_outputs_dict
@@ -121,9 +121,9 @@ class MAPI_Rubrene(OneD_Model):
         ru = self.layers["Rubrene"]
         init_N = (mapi.params["N0"].value + mapi.params["delta_N"].value) * mapi.convert_in["N"]
         init_P = (mapi.params["P0"].value + mapi.params["delta_P"].value) * mapi.convert_in["P"]
-        init_T = (ru.params["T0"].value + mapi.params["delta_T"].value) * ru.convert_in["T"]
-        init_S = (ru.params["delta_S"].value) * mapi.convert_in["S"]
-        init_D = (ru.params["delta_D"].value) * mapi.convert_in["D"]
+        init_T = (ru.params["T0"].value + ru.params["delta_T"].value) * ru.convert_in["T"]
+        init_S = (ru.params["delta_S"].value) * ru.convert_in["S"]
+        init_D = (ru.params["delta_D"].value) * ru.convert_in["D"]
         
         # "Typecast" single values to uniform arrays
         if not isinstance(init_N, np.ndarray):
@@ -141,7 +141,7 @@ class MAPI_Rubrene(OneD_Model):
         if not isinstance(init_D, np.ndarray):
             init_D = to_array(init_D, len(ru.grid_x_nodes), False)            
         
-        return {"N":init_N, "P":init_P, "T":init_T, "S":init_S, "D":init_D}
+        return {"N":init_N, "P":init_P, "T":init_T, "delta_S":init_S, "delta_D":init_D}
     
     def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
         """Calls ODEINT solver."""
@@ -153,12 +153,12 @@ class MAPI_Rubrene(OneD_Model):
         for param_name, param in ru.params.items():
             param.value *= ru.convert_in[param_name]
 
-        ode_nanowire(data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
-                     n, dt, mapi.params, ru.params, flags['do_fret'],
+        ode_twolayer(data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
+                     n, dt, mapi.params, ru.params, flags['do_fret'].value(),
                      flags['check_do_ss'].value(), hmax_, True,
                      init_conditions["N"], init_conditions["P"],
-                     init_conditions["T"], init_conditions["S"],
-                     init_conditions["D"])
+                     init_conditions["T"], init_conditions["delta_S"],
+                     init_conditions["delta_D"])
     
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Calculates at a selection of sample times: N, P, (total carrier densities)
@@ -214,39 +214,44 @@ class MAPI_Rubrene(OneD_Model):
             and spatial PL values on demand.
         """
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
-        one_layer = self.layers["OneLayer"]
-        params = params["OneLayer"]
-        sim_data = sim_data["OneLayer"]
-        ignore_recycle = flags["ignore_recycle"]
+        where_layer = self.find_layer(datatype)
+        
+        layer = self.layers[where_layer]
+        layer_params = params[where_layer]
+        layer_sim_data = sim_data[where_layer]
+        ignore_recycle = True
         data = None
-        if (datatype in one_layer.s_outputs):
-            data = sim_data[datatype]
+        if (datatype in layer.s_outputs):
+            data = layer_sim_data[datatype]
         
         else:
             if (datatype == "delta_N"):
-                data = delta_n(sim_data, params)
+                data = delta_n(layer_sim_data, layer_params)
                 
             elif (datatype == "delta_P"):
-                data = delta_p(sim_data, params)
+                data = delta_p(layer_sim_data, layer_params)
+                
+            elif (datatype == "delta_T"):
+                data = delta_T(layer_sim_data, layer_params)
                 
             elif (datatype == "RR"):
-                data = radiative_recombination(sim_data, params)
+                data = radiative_recombination(layer_sim_data, layer_params)
 
             elif (datatype == "NRR"):
-                data = nonradiative_recombination(sim_data, params)
+                data = nonradiative_recombination(layer_sim_data, layer_params)
                 
             elif (datatype == "E_field"):
-                data = E_field(sim_data, params)
+                data = E_field(layer_sim_data, layer_params)
 
             elif (datatype == "PL"):
     
                 if for_integrate:
-                    rad_rec = radiative_recombination(extra_data["OneLayer"], params)
-                    data = prep_PL(rad_rec, i, j, nen, params, ignore_recycle)
+                    rad_rec = radiative_recombination(extra_data[where_layer], layer_params)
+                    data = prep_PL(rad_rec, i, j, nen, layer_params, ignore_recycle)
                 else:
-                    rad_rec = radiative_recombination(sim_data, params)
+                    rad_rec = radiative_recombination(layer_sim_data, layer_params)
                     data = prep_PL(rad_rec, 0, len(rad_rec)-1, False, 
-                                   params, ignore_recycle).flatten()
+                                   layer_params, ignore_recycle).flatten()
             else:
                 raise ValueError
                 
@@ -359,7 +364,7 @@ def dydt(t, y, m, f, dm, df, Cn, Cp,
     dydt = np.concatenate([dNdt, dPdt, dEdt, dTdt, dSdt, dDdt], axis=None)
     return dydt
     
-def ode_nanowire(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params, 
+def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params, 
                  do_Fret=False, do_ss=False, hmax_=0, write_output=True, 
                  init_N=0, init_P=0, init_T=0, init_S=0, init_D=0):
     """
@@ -418,7 +423,7 @@ def ode_nanowire(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     Sb = mapi_params["Sb"].value
     mu_n = to_array(mapi_params["mu_N"].value, m, True)
     mu_p = to_array(mapi_params["mu_P"].value, m, True)
-    mu_s = to_array(ru_params["mu_s"].value, f, True)
+    mu_s = to_array(ru_params["mu_S"].value, f, True)
     mu_T = to_array(ru_params["mu_T"].value, f, True)
     mapi_temperature = to_array(mapi_params["MAPI_temperature"].value, m, True)
     rubrene_temperature = to_array(ru_params["Rubrene_temperature"].value, f, True)
@@ -476,12 +481,12 @@ def ode_nanowire(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
             
     if write_output:
         ## Prep output files
-        # TODO: Py 3.9 fremoves need for \
+        # TODO: Py 3.9 removes need for \
         with tables.open_file(data_path_name + "-N.h5", mode='a') as ofstream_N, \
                 tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P,\
                 tables.open_file(data_path_name + "-T.h5", mode='a') as ofstream_T,\
-                tables.open_file(data_path_name + "-S.h5", mode='a') as ofstream_S,\
-                tables.open_file(data_path_name + "-D.h5", mode='a') as ofstream_D:
+                tables.open_file(data_path_name + "-delta_S.h5", mode='a') as ofstream_S,\
+                tables.open_file(data_path_name + "-delta_D.h5", mode='a') as ofstream_D:
             array_N = ofstream_N.root.data
             array_P = ofstream_P.root.data
             array_T = ofstream_T.root.data
@@ -530,6 +535,10 @@ def delta_n(sim_outputs, params):
 def delta_p(sim_outputs, params):
     """Calculate above-equilibrium hole density from P, p0"""
     return sim_outputs["P"] - params["P0"]
+
+def delta_T(sim_outputs, params):
+    """Calculate above-equilibrium triplet density from T, T0"""
+    return sim_outputs["T"] - params["T0"]
 
 def radiative_recombination(sim_outputs, params):
     """Calculate radiative recombination"""
@@ -595,10 +604,6 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, ignore_recycle):
 
     """
     
-    frac_emitted = params["frac_emitted"]
-    alpha = params["alpha"]
-    back_refl_frac = params["back_reflectivity"]
-    delta = 0 if ignore_recycle else params["delta"]
     dx = params["Node_width"]
     total_length = params["Total_length"]
 
@@ -620,7 +625,6 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, ignore_recycle):
         if len(distance) > len(rad_rec[0]):
             distance = distance[:len(rad_rec[0])]
     
-    PL_base = frac_emitted * (rad_rec * ((1 - delta) + (0.5 * delta * np.exp(-alpha * distance))
-                              + (0.5 * delta * back_refl_frac * np.exp(-alpha * (total_length + distance)))))
+    PL_base = (rad_rec)
     
     return PL_base

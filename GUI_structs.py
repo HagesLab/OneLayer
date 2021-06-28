@@ -166,9 +166,13 @@ class Raw_Data_Group(Data_Group):
             result.append(self.datasets[key].data * convert_out_dict[self.type])
         return result
 
-    def get_max_x(self):
-        return np.amax([self.datasets[tag].grid_x[-1]
-                        for tag in self.datasets])
+    def get_max_x(self, is_edge):
+        if is_edge:
+            return np.amax([self.datasets[tag].grid_x[-1]
+                            for tag in self.datasets])
+        else:
+            return np.amax([2 * self.datasets[tag].grid_x[-1] - self.datasets[tag].grid_x[-2]
+                            for tag in self.datasets])
 
     def get_maxtime(self):
         return np.amax([self.datasets[tag].total_time
