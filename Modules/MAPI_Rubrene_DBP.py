@@ -97,6 +97,7 @@ class MAPI_Rubrene(OneD_Model):
         
         mapi_convert_in["integration_scale"] = 1e7 # cm to nm
         
+        
         rubrene_convert_in = {"mu_T": 1e5, "mu_S": 1e5,                         # [cm^2 / V s] to [nm^2 / V ns]
                               "T0": 1e-21,                                      # [cm^-3] to [nm^-3]
                               "tau_T": 1, "tau_S": 1, "tau_D": 1,               # [ns]
@@ -106,6 +107,8 @@ class MAPI_Rubrene(OneD_Model):
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21                   # [cm^-3] to [nm^-3]
                               }
+        
+        rubrene_convert_in["integration_scale"] = 1e7
         
         self.layers = {"MAPI":Layer(mapi_params, mapi_simulation_outputs, mapi_calculated_outputs,
                                     "[nm]", mapi_convert_in),
@@ -461,8 +464,14 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     ## Generate a weight distribution needed for photon recycle term if photon recycle is being considered
     if do_Fret:
         # TODO: These
-        weight1 = 0
-        weight2 = 0
+        init_m = np.linspace(dm / 2, m*dm - dm / 2, m)
+        init_f = np.linspace(df / 2, f*df - df / 2, f)
+        weight1 = np.array([1 / ((init_f + (m*dm - i)) ** 3) for i in init_m])
+        weight2 = np.array([1 / ((i + (m*dm - init_m)) ** 3) for i in init_f])
+        # It turns out that weight_array2 contains ALL of the parts of the FRET integral that depend
+        # on the variable of integration, so we do that integral right away and use the result in dydt().
+        weight2 = intg.trapz(weight2, dx=dm, axis=1)
+
     else:
         weight1 = 0
         weight2 = 0
