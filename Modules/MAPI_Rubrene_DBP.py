@@ -79,7 +79,8 @@ class MAPI_Rubrene(OneD_Model):
         
         rubrene_calculated_outputs = {"dbp_PL":Output("DBP TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
                                       "TTA":Output("TTA Rate", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
-                                      "T_form_eff":Output("Triplet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene")
+                                      "T_form_eff":Output("Triplet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
+                                      "S_form_eff":Output("Singlet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False)
                                       }
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
@@ -111,7 +112,7 @@ class MAPI_Rubrene(OneD_Model):
                               "Rubrene_temperature":1,
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21,                   # [cm^-3] to [nm^-3]
-                              "T_form_eff":1
+                              "T_form_eff":1, "S_form_eff":1
                               }
         rubrene_convert_in["dbp_PL"] = rubrene_convert_in["delta_D"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         rubrene_convert_in["TTA"] = rubrene_convert_in["k_fusion"] * rubrene_convert_in["delta_T"] ** 2
@@ -240,7 +241,32 @@ class MAPI_Rubrene(OneD_Model):
     
         data_dict["Rubrene"]["TTA"] = new_integrate(temp_TTA, 0, ru_length, 
                                                     df, ru_length, False)
+        ##################
         
+        #### Efficiencies ####
+        with tables.open_file(data_dirname + "\\" + file_name_base + "-N.h5", mode='r') as ifstream_N, \
+             tables.open_file(data_dirname + "\\" + file_name_base + "-P.h5", mode='r') as ifstream_P:
+            temp_N = np.array(ifstream_N.root.data[:,-1])
+            temp_init_N = np.array(ifstream_N.root.data[0,:])
+            temp_P = np.array(ifstream_P.root.data[:,-1])
+                
+            temp_init_N = intg.trapz(temp_init_N, dx=dm)
+            
+            
+        tail_n0 = mapi_params["N0"]
+        if isinstance(tail_n0, np.ndarray):
+            tail_n0 = tail_n0[-1]
+            
+        tail_p0 = mapi_params["P0"]
+        if isinstance(tail_p0, np.ndarray):
+            tail_p0 = tail_p0[-1]
+            
+        t_form = mapi_params["Sb"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+                                      / (temp_N + temp_P))
+        data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
+        
+        data_dict["Rubrene"]["S_form_eff"] = data_dict["Rubrene"]["TTA"] / t_form
+
         for data in data_dict["MAPI"]:
             data_dict["MAPI"][data] *= mapi.convert_out[data]
             
@@ -323,11 +349,52 @@ class MAPI_Rubrene(OneD_Model):
                 
         return data
     
-    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt):
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
         
         if datatype == "mapi_PL":
             return ("tau_diff", tau_diff(parent_data, dt))
         
+        elif datatype == "T":
+            with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N, \
+                tables.open_file(pathname + "-P.h5", mode='r') as ifstream_P:
+                temp_N = np.array(ifstream_N.root.data[:,-1])
+                temp_init_N = np.array(ifstream_N.root.data[0,:])
+                temp_P = np.array(ifstream_P.root.data[:,-1])
+                
+            temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
+            
+            
+            tail_n0 = params["MAPI"]["N0"]
+            if isinstance(tail_n0, np.ndarray):
+                tail_n0 = tail_n0[-1]
+                
+            tail_p0 = params["MAPI"]["P0"]
+            if isinstance(tail_p0, np.ndarray):
+                tail_p0 = tail_p0[-1]
+                
+            t_form = params["MAPI"]["Sb"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+                                            / (temp_N + temp_P))
+            t_form /= temp_init_N
+            return ("T_form_eff", t_form)
+        
+        elif datatype == "TTA":
+            with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N, \
+                tables.open_file(pathname + "-P.h5", mode='r') as ifstream_P:
+                temp_N = np.array(ifstream_N.root.data[:,-1])
+                temp_P = np.array(ifstream_P.root.data[:,-1])
+
+            tail_n0 = params["MAPI"]["N0"]
+            if isinstance(tail_n0, np.ndarray):
+                tail_n0 = tail_n0[-1]
+                
+            tail_p0 = params["MAPI"]["P0"]
+            if isinstance(tail_p0, np.ndarray):
+                tail_p0 = tail_p0[-1]
+                
+            t_form = params["MAPI"]["Sb"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+                                            / (temp_N + temp_P))
+            
+            return ("S_form_eff", parent_data / t_form)
         else:
             return
         
