@@ -78,6 +78,8 @@ class MAPI_Rubrene(OneD_Model):
                              "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False)}
         
         rubrene_calculated_outputs = {"dbp_PL":Output("DBP TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
+                                      "TTA":Output("TTA Rate", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
+                                      
                                       }
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
@@ -93,6 +95,7 @@ class MAPI_Rubrene(OneD_Model):
                       "E_field": 1, 
                       "tau_diff": 1}
         
+        # These really exist only for the convert_out - so outputs are displayed in cm and s instead of nm and ns
         mapi_convert_in["RR"] = mapi_convert_in["B"] * mapi_convert_in["N"] * mapi_convert_in["P"] # [cm^-3 s^-1] to [m^-3 ns^-1]
         mapi_convert_in["NRR"] = mapi_convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         mapi_convert_in["mapi_PL"] = mapi_convert_in["RR"]
@@ -109,7 +112,8 @@ class MAPI_Rubrene(OneD_Model):
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21                   # [cm^-3] to [nm^-3]
                               }
-        rubrene_convert_in["dbp_PL"] = rubrene_convert_in["delta_D"] / rubrene_convert_in["tau_D"]
+        rubrene_convert_in["dbp_PL"] = rubrene_convert_in["delta_D"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
+        rubrene_convert_in["TTA"] = rubrene_convert_in["k_fusion"] * rubrene_convert_in["delta_T"] ** 2
         rubrene_convert_in["integration_scale"] = 1e7
         
         self.layers = {"MAPI":Layer(mapi_params, mapi_simulation_outputs, mapi_calculated_outputs,
@@ -202,6 +206,7 @@ class MAPI_Rubrene(OneD_Model):
         data_dict["MAPI"]["RR"] = radiative_recombination(data_dict["MAPI"], mapi_params)
         data_dict["MAPI"]["NRR"] = nonradiative_recombination(data_dict["MAPI"], mapi_params)
                 
+        #### MAPI PL ####
         with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
@@ -212,7 +217,9 @@ class MAPI_Rubrene(OneD_Model):
         data_dict["MAPI"]["mapi_PL"] = new_integrate(PL_base, 0, mapi_length, 
                                                     dm, mapi_length, False)
         data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["mapi_PL"], dt)
+        #################
         
+        #### DBP PL ####
         with tables.open_file(data_dirname + "\\" + file_name_base + "-delta_D.h5", mode='r') as ifstream_D:
             temp_D = np.array(ifstream_D.root.data)
             
@@ -221,6 +228,18 @@ class MAPI_Rubrene(OneD_Model):
     
         data_dict["Rubrene"]["dbp_PL"] = new_integrate(temp_D, 0, ru_length, 
                                                        df, ru_length, False)
+        ################
+        
+        #### TTA Rate ####
+        with tables.open_file(data_dirname + "\\" + file_name_base + "-T.h5", mode='r') as ifstream_T:
+            temp_TTA = np.array(ifstream_T.root.data)
+            
+        temp_TTA = TTA(temp_TTA, 0, to_index(ru_length, df, ru_length), 
+                       False, ru_params)
+    
+        data_dict["Rubrene"]["TTA"] = new_integrate(temp_TTA, 0, ru_length, 
+                                                    df, ru_length, False)
+        
         for data in data_dict["MAPI"]:
             data_dict["MAPI"][data] *= mapi.convert_out[data]
             
@@ -229,6 +248,7 @@ class MAPI_Rubrene(OneD_Model):
             
         data_dict["MAPI"]["mapi_PL"] *= mapi.convert_out["integration_scale"]
         data_dict["Rubrene"]["dbp_PL"] *= ru.convert_out["integration_scale"]
+        data_dict["Rubrene"]["TTA"] *= ru.convert_out["integration_scale"]
         
         return data_dict
     
@@ -285,6 +305,16 @@ class MAPI_Rubrene(OneD_Model):
                     delta_D = layer_sim_data["delta_D"]
                     data = prep_PL(delta_D, 0, len(delta_D)-1, False, 
                                    layer_params, where_layer).flatten()
+                    
+            elif (datatype == "TTA"):
+    
+                if for_integrate:
+                    T = extra_data[where_layer]["T"]
+                    data = TTA(T, i, j, nen, layer_params)
+                else:
+                    T = layer_sim_data["T"]
+                    data = TTA(T, 0, len(T)-1, False, 
+                               layer_params).flatten()
                     
             
             else:
@@ -625,7 +655,7 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
     Parameters
     ----------
     radRec : 1D or 2D ndarray
-        Radiative Recombination(x,t) values.
+        Radiative Recombination(x,t) values. These can be MAPI carriers or DBP doublets.
     i : int
         Leftmost node index to calculate for.
     j : int
@@ -635,8 +665,8 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
         Most slices involving the index j should include j+1 too
     params : dict {"param name":float or 1D ndarray}
         Collection of parameters from metadata
-    ignore_recycle : int (1 or 0)
-        Whether to account for photon recycling
+    layer : str
+        Whether to calculate for layer MAPI or layer DBP.
     Returns
     -------
     PL_base : 2D ndarray
@@ -645,8 +675,7 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
     """
     
     dx = params["Node_width"]
-    total_length = params["Total_length"]
-
+    
     lbound = to_pos(i, dx)
     if need_extra_node:
         ubound = to_pos(j+1, dx)
@@ -661,8 +690,10 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
         else:
             rad_rec = rad_rec[:,i:j+1]
             
-        # Sometimes the need_extra_node and to_pos mess up and make the distance
-        # array one too long. Patch here and figure it out later.
+        # If the nodes are not equally sized, the need_extra_node and 
+        # to_pos mess up and make the distance array one too long. 
+        # The user is discouraged from creating such nodes but if they do anyway,
+        # Patch here and figure it out later.
         if len(distance) > len(rad_rec[0]):
             distance = distance[:len(rad_rec[0])]
             
@@ -673,3 +704,56 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
         PL_base = rad_rec / params["tau_D"]
     
     return PL_base
+
+def TTA(T, i, j, need_extra_node, params):
+    """
+    Calculates TTA rate(x,t) given T data.
+
+    Parameters
+    ----------
+    T : 1D or 2D ndarray
+        Triplet(x,t) values.
+    i : int
+        Leftmost node index to calculate for.
+    j : int
+        Rightmost node index to calculate for.
+    need_extra_node : bool
+        Whether the 'j+1'th node should be considered.
+        Most slices involving the index j should include j+1 too
+    params : dict {"param name":float or 1D ndarray}
+        Collection of parameters from metadata
+
+    Returns
+    -------
+    PL_base : 2D ndarray
+        PL(x,t)
+
+    """
+    
+    dx = params["Node_width"]
+    
+    lbound = to_pos(i, dx)
+    if need_extra_node:
+        ubound = to_pos(j+1, dx)
+    else:
+        ubound = to_pos(j, dx)
+        
+    distance = np.arange(lbound, ubound+dx, dx)
+    
+    if T.ndim == 2: # for integrals of partial thickness
+        if need_extra_node:
+            T = T[:,i:j+2]
+        else:
+            T = T[:,i:j+1]
+            
+        # If the nodes are not equally sized, the need_extra_node and 
+        # to_pos mess up and make the distance array one too long. 
+        # The user is discouraged from creating such nodes but if they do anyway,
+        # Patch here and figure it out later.
+        if len(distance) > len(T[0]):
+            distance = distance[:len(T[0])]
+            
+    dT = delta_T({"T":T}, params)
+    TTA_base = (params["k_fusion"] * dT ** 2)
+
+    return TTA_base
