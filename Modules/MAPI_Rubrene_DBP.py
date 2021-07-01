@@ -74,10 +74,11 @@ class MAPI_Rubrene(OneD_Model):
                              "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
                              "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, layer="MAPI"),
                              "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
-                             "PL":Output("TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI"),
+                             "mapi_PL":Output("MAPI TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI"),
                              "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False)}
         
-        rubrene_calculated_outputs = {}
+        rubrene_calculated_outputs = {"dbp_PL":Output("DBP TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
+                                      }
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
         mapi_convert_in = {"mu_N": ((1e7) ** 2) / (1e9), "mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
@@ -94,7 +95,7 @@ class MAPI_Rubrene(OneD_Model):
         
         mapi_convert_in["RR"] = mapi_convert_in["B"] * mapi_convert_in["N"] * mapi_convert_in["P"] # [cm^-3 s^-1] to [m^-3 ns^-1]
         mapi_convert_in["NRR"] = mapi_convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
-        mapi_convert_in["PL"] = mapi_convert_in["RR"]
+        mapi_convert_in["mapi_PL"] = mapi_convert_in["RR"]
         
         mapi_convert_in["integration_scale"] = 1e7 # cm to nm
         
@@ -108,7 +109,7 @@ class MAPI_Rubrene(OneD_Model):
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21                   # [cm^-3] to [nm^-3]
                               }
-        
+        rubrene_convert_in["dbp_PL"] = rubrene_convert_in["delta_D"] / rubrene_convert_in["tau_D"]
         rubrene_convert_in["integration_scale"] = 1e7
         
         self.layers = {"MAPI":Layer(mapi_params, mapi_simulation_outputs, mapi_calculated_outputs,
@@ -207,15 +208,27 @@ class MAPI_Rubrene(OneD_Model):
             temp_P = np.array(ifstream_P.root.data)
         temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, mapi_params)
         PL_base = prep_PL(temp_RR, 0, to_index(mapi_length, dm, mapi_length), 
-                          False, mapi_params, True)
-        data_dict["MAPI"]["PL"] = new_integrate(PL_base, 0, mapi_length, 
+                          False, mapi_params, "MAPI")
+        data_dict["MAPI"]["mapi_PL"] = new_integrate(PL_base, 0, mapi_length, 
                                                     dm, mapi_length, False)
-        data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["PL"], dt)
+        data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["mapi_PL"], dt)
         
+        with tables.open_file(data_dirname + "\\" + file_name_base + "-delta_D.h5", mode='r') as ifstream_D:
+            temp_D = np.array(ifstream_D.root.data)
+            
+        temp_D = prep_PL(temp_D, 0, to_index(ru_length, df, ru_length), 
+                          False, ru_params, "Rubrene")
+    
+        data_dict["Rubrene"]["dbp_PL"] = new_integrate(temp_D, 0, ru_length, 
+                                                       df, ru_length, False)
         for data in data_dict["MAPI"]:
             data_dict["MAPI"][data] *= mapi.convert_out[data]
             
-        data_dict["MAPI"]["PL"] *= mapi.convert_out["integration_scale"]
+        for data in data_dict["Rubrene"]:
+            data_dict["Rubrene"][data] *= ru.convert_out[data]
+            
+        data_dict["MAPI"]["mapi_PL"] *= mapi.convert_out["integration_scale"]
+        data_dict["Rubrene"]["dbp_PL"] *= ru.convert_out["integration_scale"]
         
         return data_dict
     
@@ -230,7 +243,6 @@ class MAPI_Rubrene(OneD_Model):
         layer = self.layers[where_layer]
         layer_params = params[where_layer]
         layer_sim_data = sim_data[where_layer]
-        ignore_recycle = True
         data = None
         if (datatype in layer.s_outputs):
             data = layer_sim_data[datatype]
@@ -254,15 +266,27 @@ class MAPI_Rubrene(OneD_Model):
             elif (datatype == "E_field"):
                 data = E_field(layer_sim_data, layer_params)
 
-            elif (datatype == "PL"):
+            elif (datatype == "mapi_PL"):
     
                 if for_integrate:
                     rad_rec = radiative_recombination(extra_data[where_layer], layer_params)
-                    data = prep_PL(rad_rec, i, j, nen, layer_params, ignore_recycle)
+                    data = prep_PL(rad_rec, i, j, nen, layer_params, where_layer)
                 else:
                     rad_rec = radiative_recombination(layer_sim_data, layer_params)
                     data = prep_PL(rad_rec, 0, len(rad_rec)-1, False, 
-                                   layer_params, ignore_recycle).flatten()
+                                   layer_params, where_layer).flatten()
+                    
+            elif (datatype == "dbp_PL"):
+    
+                if for_integrate:
+                    delta_D = extra_data[where_layer]["delta_D"]
+                    data = prep_PL(delta_D, i, j, nen, layer_params, where_layer)
+                else:
+                    delta_D = layer_sim_data["delta_D"]
+                    data = prep_PL(delta_D, 0, len(delta_D)-1, False, 
+                                   layer_params, where_layer).flatten()
+                    
+            
             else:
                 raise ValueError
                 
@@ -594,7 +618,7 @@ def tau_diff(PL, dt):
     dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)
     return -(dln_PLdt ** -1)
 
-def prep_PL(rad_rec, i, j, need_extra_node, params, ignore_recycle):
+def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
     """
     Calculates PL(x,t) given radiative recombination data plus propogation contributions.
 
@@ -630,6 +654,7 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, ignore_recycle):
         ubound = to_pos(j, dx)
         
     distance = np.arange(lbound, ubound+dx, dx)
+    
     if rad_rec.ndim == 2: # for integrals of partial thickness
         if need_extra_node:
             rad_rec = rad_rec[:,i:j+2]
@@ -640,7 +665,11 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, ignore_recycle):
         # array one too long. Patch here and figure it out later.
         if len(distance) > len(rad_rec[0]):
             distance = distance[:len(rad_rec[0])]
-    
-    PL_base = (rad_rec)
+            
+    if layer == "MAPI":
+        PL_base = (rad_rec)
+        
+    elif layer == "Rubrene":
+        PL_base = rad_rec / params["tau_D"]
     
     return PL_base
