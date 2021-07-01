@@ -826,9 +826,10 @@ class Notebook:
         self.LGC_layer = tk.StringVar()
         self.LGC_stim_mode = tk.StringVar()
         self.LGC_gen_power_mode = tk.StringVar()
+        self.LGC_direction = tk.StringVar()
         
         self.LGC_frame = tk.ttk.Frame(self.tab_generation_init)
-        self.LGC_frame.grid(row=0,column=0, padx=(330,0))
+        self.LGC_frame.grid(row=0,column=0, padx=(360,0))
 
         tk.ttk.Label(self.LGC_frame, 
                      text="Generation from Laser Excitation", 
@@ -1005,10 +1006,13 @@ class Notebook:
                                if "delta_N" in self.module.layers[layer_name].params
                                and "delta_P" in self.module.layers[layer_name].params]
         
+        for layer_name in self.module.layers:
+            self.using_LGC[layer_name] = False
+            
         for layer_name in LGC_eligible_layers:
             self.LGC_options[layer_name] = {}
             self.LGC_values[layer_name] = {}
-            self.using_LGC[layer_name] = False
+            
         
         self.LGC_layer_rbtns = {}
         self.LGC_layer_frame_title = tk.Label(self.LGC_layer_frame, text="Apply to layer: ")
@@ -1021,24 +1025,36 @@ class Notebook:
             layer_rbtn_label = tk.ttk.Label(self.LGC_layer_frame, text=layer_name)
             layer_rbtn_label.grid(row=i+1,column=1)
 
+        self.LGC_direction_frame = tk.Frame(self.LGC_frame)
+        self.LGC_direction_frame.grid(row=3,column=0,columnspan=3)
+        
+        tk.ttk.Radiobutton(self.LGC_direction_frame, variable=self.LGC_direction, 
+                           value="fwd").grid(row=0,column=0)
+        tk.Label(self.LGC_direction_frame, text="Forward").grid(row=0,column=1)
+        
+        tk.ttk.Radiobutton(self.LGC_direction_frame, variable=self.LGC_direction, 
+                           value="reverse").grid(row=1,column=0)
+        tk.Label(self.LGC_direction_frame, text="Reverse").grid(row=1,column=1)
+        
+        
         tk.ttk.Button(self.LGC_frame, 
                       text="Generate Initial Condition", 
-                      command=self.add_LGC).grid(row=3,column=0,columnspan=3)
+                      command=self.add_LGC).grid(row=4,column=0,columnspan=3)
 
         tk.Message(self.LGC_frame, 
                    text="The Laser Generation Condition "
                    "uses the above numerical parameters "
                    "to generate an initial carrier "
                    "distribution based on an applied "
-                   "laser excitation.", width=320).grid(row=4,column=0,columnspan=3)
+                   "laser excitation.", width=320).grid(row=5,column=0,columnspan=3)
         
         self.LGC_fig = Figure(figsize=(5,3.1))
         self.LGC_subplot = self.LGC_fig.add_subplot(111)
         self.LGC_canvas = tkagg.FigureCanvasTkAgg(self.LGC_fig, master=self.LGC_frame)
-        self.LGC_canvas.get_tk_widget().grid(row=5, column=0, columnspan=3)
+        self.LGC_canvas.get_tk_widget().grid(row=6, column=0, columnspan=3)
         
         self.LGC_toolbar_frame = tk.ttk.Frame(master=self.LGC_frame)
-        self.LGC_toolbar_frame.grid(row=6,column=0,columnspan=3)
+        self.LGC_toolbar_frame.grid(row=7,column=0,columnspan=3)
         tkagg.NavigationToolbar2Tk(self.LGC_canvas, 
                                    self.LGC_toolbar_frame)
         
@@ -1055,7 +1071,8 @@ class Notebook:
         self.enter(self.LGC_entryboxes_dict["A0"], "1240")
         self.LGC_optionboxes = {"long_expfactor":self.check_calculate_init_material_expfactor, 
                                 "incidence":self.LGC_stim_mode,
-                                "power_mode":self.LGC_gen_power_mode}
+                                "power_mode":self.LGC_gen_power_mode,
+                                "direction":self.LGC_direction}
         return
 
     def DEBUG(self):
@@ -1067,7 +1084,7 @@ class Notebook:
         print(self.LGC_values)
         return
     
-    def change_layer(self, clear=True):
+    def change_layer(self, clear=True, update_LGC_display=True):
         self.current_layer_name = self.current_layer_selection.get()
         
         current_layer = self.module.layers[self.current_layer_name]
@@ -1113,8 +1130,9 @@ class Notebook:
         
         self.write(self.layer_statusbox, "On layer: {}".format(self.current_layer_name))
         
-        if self.module.system_ID in self.LGC_eligible_modules:
-            if self.using_LGC[self.current_layer_name]:
+        if update_LGC_display:
+            if (self.module.system_ID in self.LGC_eligible_modules and 
+                self.using_LGC[self.current_layer_name]):
                 for option, val in self.LGC_options[self.current_layer_name].items():
                     self.LGC_optionboxes[option].set(val)
                     
@@ -3385,7 +3403,7 @@ class Notebook:
             
             # User shortcut - if no layers' spacegrids set yet, let the first LGC set a spacegrid
             any_layers_set =  any([layer.spacegrid_is_set for name, layer in self.module.layers.items()])
-            self.change_layer(clear=any_layers_set)
+            self.change_layer(clear=any_layers_set, update_LGC_display=False)
         current_layer = self.module.layers[self.current_layer_name]
         
         try:
@@ -3551,6 +3569,8 @@ class Notebook:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
         
+        if self.LGC_direction.get() == "reverse":
+            current_layer.params["delta_N"].value = current_layer.params["delta_N"].value[::-1]
         
         current_layer.params["delta_N"].value *= current_layer.convert_out["delta_N"]
         ## Assuming that the initial distributions of holes and electrons are identical
