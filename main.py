@@ -3258,23 +3258,26 @@ class Notebook:
         self.write(self.analysis_status, "Integration complete")
 
         if len(td_gridt):
-            td_popup = tk.Toplevel(self.root)
-            td_fig = Figure(figsize=(6,4))
-            td_subplot = td_fig.add_subplot(111)
             
-            td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=td_popup)
-            td_plotwidget = td_canvas.get_tk_widget()
-            td_plotwidget.grid(row=0,column=0)
-
-            name = td[next(iter(td))][0]
-            where_layer = self.module.find_layer(name)
-            td_subplot.set_ylabel(name + self.module.layers[where_layer].outputs[name].units)
-            td_subplot.set_xlabel("Time " + self.module.time_unit)
-            td_subplot.set_title("{}'s time series".format(active_datagroup.type))
-            for tag in td:
-                td_subplot.plot(td_gridt[tag], td[tag][1], label=tag.strip('_'))
-        
-            td_subplot.legend().set_draggable(True)
+            num_td_per_curve = len(td[next(iter(td))])
+            for i in range(num_td_per_curve):
+                td_popup = tk.Toplevel(self.root)
+                td_fig = Figure(figsize=(6,4))
+                td_subplot = td_fig.add_subplot(111)
+                
+                td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=td_popup)
+                td_plotwidget = td_canvas.get_tk_widget()
+                td_plotwidget.grid(row=0,column=0)
+    
+                name = td[next(iter(td))][i][0]
+                where_layer = self.module.find_layer(name)
+                td_subplot.set_ylabel(name + self.module.layers[where_layer].outputs[name].units)
+                td_subplot.set_xlabel("Time " + self.module.time_unit)
+                td_subplot.set_title("{}'s time series".format(active_datagroup.type))
+                for tag in td:
+                    td_subplot.plot(td_gridt[tag], td[tag][i][1], label=tag.strip('_'))
+            
+                td_subplot.legend().set_draggable(True)
         return
 
     ## Initial Condition Managers

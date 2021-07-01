@@ -373,7 +373,7 @@ class OneD_Model:
     def get_timeseries(self, pathname, datatype, parent_data, total_time, dt):
         
         if datatype == "PL":
-            return ("tau_diff", None)
+            return [("tau_diff", None)]
         
         else:
             return

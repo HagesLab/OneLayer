@@ -212,7 +212,7 @@ class Nanowire(OneD_Model):
     def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
         
         if datatype == "PL":
-            return ("tau_diff", tau_diff(parent_data, dt))
+            return [("tau_diff", tau_diff(parent_data, dt))]
         
         else:
             return

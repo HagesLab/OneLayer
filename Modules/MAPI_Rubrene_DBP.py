@@ -70,17 +70,20 @@ class MAPI_Rubrene(OneD_Model):
         
         # List of all variables calculated from those in simulation_outputs_dict
         mapi_calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True, layer="MAPI"),
-                             "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
-                             "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
-                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, layer="MAPI"),
-                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
-                             "mapi_PL":Output("MAPI TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI"),
-                             "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False)}
+                                 "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
+                                 "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
+                                 "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, layer="MAPI"),
+                                 "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
+                                 "mapi_PL":Output("MAPI TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI"),
+                                 "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False),
+                                 "eta_MAPI":Output("MAPI eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False)
+                                 }
         
         rubrene_calculated_outputs = {"dbp_PL":Output("DBP TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
                                       "TTA":Output("TTA Rate", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
                                       "T_form_eff":Output("Triplet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
-                                      "S_form_eff":Output("Singlet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False)
+                                      "S_form_eff":Output("Singlet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
+                                      "eta_UC":Output("DBP. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False)
                                       }
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
@@ -94,7 +97,7 @@ class MAPI_Rubrene(OneD_Model):
                       "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
                       "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
                       "E_field": 1, 
-                      "tau_diff": 1}
+                      "tau_diff": 1, "eta_MAPI":1}
         
         # These really exist only for the convert_out - so outputs are displayed in cm and s instead of nm and ns
         mapi_convert_in["RR"] = mapi_convert_in["B"] * mapi_convert_in["N"] * mapi_convert_in["P"] # [cm^-3 s^-1] to [m^-3 ns^-1]
@@ -112,7 +115,8 @@ class MAPI_Rubrene(OneD_Model):
                               "Rubrene_temperature":1,
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21,                   # [cm^-3] to [nm^-3]
-                              "T_form_eff":1, "S_form_eff":1
+                              "T_form_eff":1, "S_form_eff":1, 
+                              "eta_UC":1
                               }
         rubrene_convert_in["dbp_PL"] = rubrene_convert_in["delta_D"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         rubrene_convert_in["TTA"] = rubrene_convert_in["k_fusion"] * rubrene_convert_in["delta_T"] ** 2
@@ -266,6 +270,9 @@ class MAPI_Rubrene(OneD_Model):
         data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
         
         data_dict["Rubrene"]["S_form_eff"] = data_dict["Rubrene"]["TTA"] / t_form
+        
+        data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] / temp_init_N
+        data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] / temp_init_N
 
         for data in data_dict["MAPI"]:
             data_dict["MAPI"][data] *= mapi.convert_out[data]
@@ -352,7 +359,14 @@ class MAPI_Rubrene(OneD_Model):
     def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
         
         if datatype == "mapi_PL":
-            return ("tau_diff", tau_diff(parent_data, dt))
+            with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N:
+                temp_init_N = np.array(ifstream_N.root.data[0,:])
+                
+            temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
+            
+            return [("tau_diff", tau_diff(parent_data, dt)),
+                    ("eta_MAPI", parent_data / temp_init_N)]
+                    
         
         elif datatype == "T":
             with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N, \
@@ -375,7 +389,7 @@ class MAPI_Rubrene(OneD_Model):
             t_form = params["MAPI"]["Sb"] * ((temp_N * temp_P - tail_n0 * tail_p0)
                                             / (temp_N + temp_P))
             t_form /= temp_init_N
-            return ("T_form_eff", t_form)
+            return [("T_form_eff", t_form)]
         
         elif datatype == "TTA":
             with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N, \
@@ -394,7 +408,15 @@ class MAPI_Rubrene(OneD_Model):
             t_form = params["MAPI"]["Sb"] * ((temp_N * temp_P - tail_n0 * tail_p0)
                                             / (temp_N + temp_P))
             
-            return ("S_form_eff", parent_data / t_form)
+            return [("S_form_eff", parent_data / t_form)]
+        
+        elif datatype == "dbp_PL":
+            with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N:
+                temp_init_N = np.array(ifstream_N.root.data[0,:])
+                
+            temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
+            
+            return [("eta_UC", parent_data / temp_init_N)]
         else:
             return
         
