@@ -79,7 +79,7 @@ class MAPI_Rubrene(OneD_Model):
         
         rubrene_calculated_outputs = {"dbp_PL":Output("DBP TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
                                       "TTA":Output("TTA Rate", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
-                                      
+                                      "T_form_eff":Output("Triplet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene")
                                       }
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
@@ -110,7 +110,8 @@ class MAPI_Rubrene(OneD_Model):
                               "k_0":1e-9,                                       # [nm^3 / s] to [nm^3 / ns]
                               "Rubrene_temperature":1,
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
-                              "T":1e-21, "S":1e-21, "D":1e-21                   # [cm^-3] to [nm^-3]
+                              "T":1e-21, "S":1e-21, "D":1e-21,                   # [cm^-3] to [nm^-3]
+                              "T_form_eff":1
                               }
         rubrene_convert_in["dbp_PL"] = rubrene_convert_in["delta_D"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         rubrene_convert_in["TTA"] = rubrene_convert_in["k_fusion"] * rubrene_convert_in["delta_T"] ** 2
@@ -321,6 +322,15 @@ class MAPI_Rubrene(OneD_Model):
                 raise ValueError
                 
         return data
+    
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt):
+        
+        if datatype == "mapi_PL":
+            return ("tau_diff", tau_diff(parent_data, dt))
+        
+        else:
+            return
+        
     
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
         """ Set delta_N and delta_P of outgoing regenerated IC file."""

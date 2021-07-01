@@ -209,6 +209,14 @@ class Nanowire(OneD_Model):
                 
         return data
     
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt):
+        
+        if datatype == "PL":
+            return ("tau_diff", tau_diff(parent_data, dt))
+        
+        else:
+            return
+    
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
         """ Set delta_N and delta_P of outgoing regenerated IC file."""
         param_dict = param_dict["Nanowire"]

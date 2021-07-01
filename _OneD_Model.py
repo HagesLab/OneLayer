@@ -370,6 +370,14 @@ class OneD_Model:
                 
         return data
     
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt):
+        
+        if datatype == "PL":
+            return ("tau_diff", None)
+        
+        else:
+            return
+    
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
         """
         Overwrites param_dict with values from the current data analysis in preparation for generating

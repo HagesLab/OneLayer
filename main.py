@@ -3063,6 +3063,10 @@ class Notebook:
         
         n = active_datagroup.get_maxnumtsteps()
         
+        if self.PL_mode == "All time steps":
+            td_gridt = {}
+            td = {}
+        
         counter = 0
         
         for tag in active_datagroup.datasets:
@@ -3082,6 +3086,8 @@ class Notebook:
                 show_index = active_datagroup.datasets[tag].show_index
             else:
                 show_index = None
+                
+            
 
             # Clean up any bounds that extend past the confines of the system
             # The system usually exists from x=0 to x=total_length, 
@@ -3194,11 +3200,17 @@ class Notebook:
                     xaxis_label = "Time [ns]"
 
                 I_data *= self.module.layers[where_layer].convert_out["integration_scale"]
+                ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
                 self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, total_time, dt,
                                                                                 active_datagroup.datasets[tag].params_dict, 
                                                                                 active_datagroup.datasets[tag].type, 
-                                                                                data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)))
+                                                                                ext_tag))
             
+                if self.PL_mode == "All time steps":
+                    td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt)
+                    if td[ext_tag] is not None:
+                        td_gridt[ext_tag] = np.linspace(0, total_time, n + 1)
+                        
                 counter += 1
                 print("Integration: {} of {} complete".format(counter, active_datagroup.size() * len(self.integration_bounds)))
 
@@ -3241,34 +3253,24 @@ class Notebook:
         
         self.write(self.analysis_status, "Integration complete")
 
-        if (self.module.system_ID in self.LGC_eligible_modules
-            and self.PL_mode == "All time steps" and datatype == "PL"):
-            # Calculate tau_D
-            if self.integration_plots[ip_ID].datagroup.size(): # If has tau_diff data to plot
-                td_gridt = {}
-                td = {}
-                
-                for tag, dataset in self.integration_plots[ip_ID].datagroup.datasets.items():
-                    total_time = self.integration_plots[ip_ID].datagroup.total_t
-                    dt = self.integration_plots[ip_ID].datagroup.dt
-                    td_gridt[tag] = np.linspace(0, total_time, n + 1)
-                    td[tag] = tau_diff(dataset.data, dt)
-                    
-                td_popup = tk.Toplevel(self.root)
-                td_fig = Figure(figsize=(6,4))
-                td_subplot = td_fig.add_subplot(111)
-                
-                td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=td_popup)
-                td_plotwidget = td_canvas.get_tk_widget()
-                td_plotwidget.grid(row=0,column=0)
-
-                td_subplot.set_ylabel("tau_diff [ns]")
-                td_subplot.set_xlabel("Time [ns]")
-                td_subplot.set_title("-(dln(PL)/dt)^(-1)")
-                for tag in td:
-                    td_subplot.plot(td_gridt[tag], td[tag], label=tag.strip('_'))
+        if len(td_gridt):
+            td_popup = tk.Toplevel(self.root)
+            td_fig = Figure(figsize=(6,4))
+            td_subplot = td_fig.add_subplot(111)
             
-                td_subplot.legend().set_draggable(True)
+            td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=td_popup)
+            td_plotwidget = td_canvas.get_tk_widget()
+            td_plotwidget.grid(row=0,column=0)
+
+            name = td[next(iter(td))][0]
+            where_layer = self.module.find_layer(name)
+            td_subplot.set_ylabel(name + self.module.layers[where_layer].outputs[name].units)
+            td_subplot.set_xlabel("Time " + self.module.time_unit)
+            td_subplot.set_title("{}'s time series".format(active_datagroup.type))
+            for tag in td:
+                td_subplot.plot(td_gridt[tag], td[tag][1], label=tag.strip('_'))
+        
+            td_subplot.legend().set_draggable(True)
         return
 
     ## Initial Condition Managers
