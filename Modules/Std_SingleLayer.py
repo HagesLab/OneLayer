@@ -55,7 +55,7 @@ class Std_SingleLayer(OneD_Model):
                              "delta_P":Output("delta_P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
                              "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
                              "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
-                             "PL":Output("TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer"),
+                             "PL":Output("TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer"),
                              "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer", analysis_plotable=False)}
         
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
@@ -76,7 +76,7 @@ class Std_SingleLayer(OneD_Model):
                       "E_field": 1, 
                       "tau_diff": 1}
         
-        convert_in["RR"] = convert_in["B"] * convert_in["N"] * convert_in["P"] # [cm^-3 s^-1] to [m^-3 ns^-1]
+        convert_in["RR"] = convert_in["B"] * convert_in["N"] * convert_in["P"] # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["NRR"] = convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["PL"] = convert_in["RR"]
         

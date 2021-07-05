@@ -2482,7 +2482,10 @@ class Notebook:
                 plot_obj.cla()
                 plot_obj.set_yscale(output_info_obj.yscale)
                 plot_obj.set_xlabel(output_info_obj.xlabel)
-                plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
+                if output_info_obj.xvar == "time":
+                    plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.integrated_units))
+                else:
+                    plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
             
             
         data_dict = self.module.get_overview_analysis(param_values_dict, flag_values_dict,
@@ -3272,7 +3275,7 @@ class Notebook:
     
                 name = td[next(iter(td))][i][0]
                 where_layer = self.module.find_layer(name)
-                td_subplot.set_ylabel(name + self.module.layers[where_layer].outputs[name].units)
+                td_subplot.set_ylabel(name + " " + self.module.layers[where_layer].outputs[name].units)
                 td_subplot.set_xlabel("Time " + self.module.time_unit)
                 td_subplot.set_title("{}'s time series".format(active_datagroup.type))
                 for tag in td:

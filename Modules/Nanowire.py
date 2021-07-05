@@ -45,17 +45,17 @@ class Nanowire(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        simulation_outputs = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire", yscale='symlog', yfactors=(1e-4,1e1)), 
-                              "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="Nanowire", yscale='symlog', yfactors=(1e-4,1e1)),
+        simulation_outputs = {"N":Output("N", units="[carr / cm^3]", integrated_units="[carr / cm^2]",xlabel="nm", xvar="position", is_edge=False, layer="Nanowire", yscale='symlog', yfactors=(1e-4,1e1)), 
+                              "P":Output("P", units="[carr / cm^3]", integrated_units="[carr / cm^2]",xlabel="nm", xvar="position",is_edge=False, layer="Nanowire", yscale='symlog', yfactors=(1e-4,1e1)),
                              }
         
         # List of all variables calculated from those in simulation_outputs_dict
-        calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True, layer="Nanowire"),
-                            "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire"),
-                             "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire"),
-                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, layer="Nanowire"),
-                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire"),
-                             "PL":Output("TRPL", units="[phot / cm^3 s]", xlabel="ns", xvar="time", is_edge=False, layer="Nanowire"),
+        calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", integrated_units="[V]", xlabel="nm", xvar="position",is_edge=True, layer="Nanowire"),
+                            "delta_N":Output("delta_N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire"),
+                             "delta_P":Output("delta_P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire"),
+                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="Nanowire"),
+                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire"),
+                             "PL":Output("TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="Nanowire"),
                              "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="Nanowire", analysis_plotable=False)}
 
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
@@ -75,14 +75,16 @@ class Nanowire(OneD_Model):
                     "E_field": 1, 
                     "tau_diff": 1}
         
-        convert_in["RR"] = convert_in["B"] * convert_in["N"] * convert_in["P"]
+        convert_in["RR"] = convert_in["B"] * convert_in["N"] * convert_in["P"] # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["NRR"] = convert_in["N"] * 1e-9
         convert_in["PL"] = convert_in["RR"]
         
-        convert_in["integration_scale"] = 1e7 # cm to nm
+        iconvert_in = {"N":1e7, "P":1e7, "delta_N":1e7, "delta_P":1e7, # cm to nm
+                       "E_field":1, # nm to nm
+                       "RR": 1e7, "NRR": 1e7, "PL": 1e7}
 
         self.layers = {"Nanowire":Layer(params, simulation_outputs, calculated_outputs,
-                                        "[nm]", convert_in),
+                                        "[nm]", convert_in, iconvert_in),
                        }
 
         return
@@ -160,7 +162,7 @@ class Nanowire(OneD_Model):
         for data in data_dict["Nanowire"]:
             data_dict["Nanowire"][data] *= nanowire.convert_out[data]
             
-        data_dict["Nanowire"]["PL"] *= nanowire.convert_out["integration_scale"]
+        data_dict["Nanowire"]["PL"] *= nanowire.iconvert_out["PL"]
         
         return data_dict
     
