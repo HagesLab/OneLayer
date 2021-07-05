@@ -442,7 +442,7 @@ def dydt(t, y, m, f, dm, df, Cn, Cp,
          mu_n, mu_p, mu_s, mu_T,
          n0, p0, T0, Sf, Sb, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
          eps, weight1=0, weight2=0, do_Fret=False, do_ss=False, 
-         init_N=0, init_P=0):
+         init_dN=0, init_dP=0):
     """Derivative function for two-layer carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
     # These are calculated at node edges, of which there are m + 1
@@ -518,11 +518,11 @@ def dydt(t, y, m, f, dm, df, Cn, Cp,
     
     dNdt = ((1/q) * dJn - n_rec + D_Fret1)
     if do_ss: 
-        dNdt += init_N
+        dNdt += init_dN
 
     dPdt = ((1/q) * -dJp - p_rec + D_Fret1)
     if do_ss: 
-        dPdt += init_P
+        dPdt += init_dP
         
     dTdt = ((1/q) * dJT - T_fusion - T_rec)
     dSdt = ((1/q) * dJS + T_fusion - S_Fret)
@@ -619,12 +619,12 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
 
     if do_ss:
-        init_N_copy = init_N
-        init_P_copy = init_P
+        init_dN = init_N - n0
+        init_dP = init_P - p0
 
     else:
-        init_N_copy = 0
-        init_P_copy = 0
+        init_dN = 0
+        init_dP = 0
 
     ## Generate a weight distribution needed for FRET term
     if do_Fret:
@@ -644,7 +644,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
             mu_n, mu_p, mu_s, mu_T,
             n0, p0, T0, Sf, Sb, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
             eps, weight1, weight2, do_Fret, do_ss, 
-            init_N_copy, init_P_copy)
+            init_dN, init_dP)
 
     ## Do n time steps
     tSteps = np.linspace(0, n*dt, n+1)

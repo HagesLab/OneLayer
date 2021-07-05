@@ -277,7 +277,7 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1,
 def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, 
           eps, eps0, q, q_C, kB, recycle_photons=True, do_ss=False, 
           alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, 
-          combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_N=0, init_P=0):
+          combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_dN=0, init_dP=0):
     """Derivative function for drift-diffusion-decay carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
     # These are calculated at node edges, of which there are m + 1
@@ -338,7 +338,7 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     #N_new = np.maximum(N_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
     dNdt = ((1/q) * dJz - rad_rec - non_rad_rec + G_array)
     if do_ss: 
-        dNdt += init_N
+        dNdt += init_dN
 
     ## Calculate dJp/dx
     dJz = (np.roll(Jp, -1)[:-1] - Jp[:-1]) / (dx)
@@ -347,7 +347,7 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     #P_new = np.maximum(P_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
     dPdt = ((1/q) * -dJz - rad_rec - non_rad_rec + G_array)
     if do_ss: 
-        dPdt += init_P
+        dPdt += init_dP
 
     ## Package results
     dydt = np.concatenate([dNdt, dPdt, dEdt], axis=None)
@@ -439,12 +439,12 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)
 
     if do_ss:
-        init_N_copy = init_N
-        init_P_copy = init_P
+        init_dN = init_N - n0
+        init_dP = init_P - p0
 
     else:
-        init_N_copy = 0
-        init_P_copy = 0
+        init_dN = 0
+        init_dP = 0
 
     ## Generate a weight distribution needed for photon recycle term if photon recycle is being considered
     if recycle_photons:
@@ -475,8 +475,8 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
             tauN, tauP, B, eps, eps0, q, q_C, kB, 
             recycle_photons, do_ss, alphaCof, thetaCof, 
             delta_frac, fracEmitted, combined_weight, 
-            E_field_ext, dEcdz, dChidz, init_N_copy, 
-            init_P_copy)
+            E_field_ext, dEcdz, dChidz, init_dN, 
+            init_dP)
     
     tSteps = np.linspace(0, n*dt, n+1)
     sol = intg.solve_ivp(dydt2, [0,n*dt], init_condition, args=args, t_eval=tSteps,
