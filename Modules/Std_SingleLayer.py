@@ -45,17 +45,17 @@ class Std_SingleLayer(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        simulation_outputs = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)), 
-                              "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)),
+        simulation_outputs = {"N":Output("N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)), 
+                              "P":Output("P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)),
                              }
         
         # List of all variables calculated from those in simulation_outputs_dict
-        calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True, layer="OneLayer"),
-                             "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
-                             "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
-                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
-                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
-                             "PL":Output("TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer"),
+        calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", integrated_units="[V]", xlabel="nm", xvar="position",is_edge=True, layer="OneLayer"),
+                             "delta_N":Output("delta_N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
+                             "delta_P":Output("delta_P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
+                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
+                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
+                             "PL":Output("TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer"),
                              "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer", analysis_plotable=False)}
         
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
@@ -80,11 +80,14 @@ class Std_SingleLayer(OneD_Model):
         convert_in["NRR"] = convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["PL"] = convert_in["RR"]
         
-        convert_in["integration_scale"] = 1e7 # cm to nm
+        iconvert_in = {"N":1e7, "P":1e7, "delta_N":1e7, "delta_P":1e7, # cm to nm
+                       "E_field":1, # nm to nm
+                       "RR": 1e7, "NRR": 1e7, "PL": 1e7}
+
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
             
         self.layers = {"OneLayer":Layer(params, simulation_outputs, calculated_outputs,
-                                        "[nm]", convert_in),
+                                        "[nm]", convert_in, iconvert_in),
                        }
 
         return
@@ -159,7 +162,7 @@ class Std_SingleLayer(OneD_Model):
         for data in data_dict["OneLayer"]:
             data_dict["OneLayer"][data] *= one_layer.convert_out[data]
             
-        data_dict["OneLayer"]["PL"] *= one_layer.convert_out["integration_scale"]
+        data_dict["OneLayer"]["PL"] *= one_layer.iconvert_out["PL"]
         
         return data_dict
     

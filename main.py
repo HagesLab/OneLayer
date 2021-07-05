@@ -3223,28 +3223,29 @@ class Notebook:
         self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), 
                                                              max_val=datagroup.get_maxval())
         #self.integration_plots[ip_ID].ylim = max * 1e-12, max * 10
-
+        where_layer = self.module.find_layer(datagroup.type)
+        
         subplot.set_yscale(self.integration_plots[ip_ID].yaxis_type)
         #subplot.set_ylim(self.integration_plots[ip_ID].ylim)
         subplot.set_xlabel(xaxis_label)
-        subplot.set_ylabel(datagroup.type)
+        subplot.set_ylabel(datagroup.type +  " " + self.module.layers[where_layer].outputs[datagroup.type].integrated_units)
         subplot.set_title("Integrated {}".format(datagroup.type))
 
-        where_layer = self.module.find_layer(datagroup.type)
+        
         for key in datagroup.datasets:
 
             if self.PL_mode == "Current time step":
                 subplot.scatter(datagroup.datasets[key].grid_x, 
                                 datagroup.datasets[key].data * 
                                 self.module.layers[where_layer].convert_out[datagroup.type] *
-                                self.module.layers[where_layer].convert_out["integration_scale"], 
+                                self.module.layers[where_layer].iconvert_out[datagroup.type], 
                                 label=datagroup.datasets[key].tag(for_matplotlib=True))
 
             elif self.PL_mode == "All time steps":
                 subplot.plot(self.integration_plots[ip_ID].global_gridx, 
                              datagroup.datasets[key].data * 
                              self.module.layers[where_layer].convert_out[datagroup.type] *
-                             self.module.layers[where_layer].convert_out["integration_scale"], 
+                             self.module.layers[where_layer].iconvert_out[datagroup.type], 
                              label=datagroup.datasets[key].tag(for_matplotlib=True))
                 
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
@@ -4395,7 +4396,7 @@ class Notebook:
                 paired_data = [[datagroup.datasets[key].grid_x, 
                                 datagroup.datasets[key].data * 
                                 self.module.layers[where_layer].convert_out[datagroup.type] *
-                                self.module.layers[where_layer].convert_out["integration_scale"]] 
+                                self.module.layers[where_layer].iconvert_out[datagroup.type]] 
                                for key in datagroup.datasets]
 
                 header = "{} {}, {}".format(plot_info.x_param, 
@@ -4405,7 +4406,7 @@ class Notebook:
             else: # if self.I_plot.mode == "All time steps"
                 raw_data = np.array([datagroup.datasets[key].data * 
                                      self.module.layers[where_layer].convert_out[datagroup.type] *
-                                     self.module.layers[where_layer].convert_out["integration_scale"]
+                                     self.module.layers[where_layer].iconvert_out[datagroup.type]
                                      for key in datagroup.datasets])
                 grid_x = np.reshape(plot_info.global_gridx, (1,len(plot_info.global_gridx)))
                 paired_data = np.concatenate((grid_x, raw_data), axis=0).T

@@ -15,7 +15,7 @@ class Layer:
     may be characterized by different processes / equations / rules,
     and may interact with other layers.
     """
-    def __init__(self, params, s_outputs, c_outputs, length_unit, convert_in):
+    def __init__(self, params, s_outputs, c_outputs, length_unit, convert_in, iconvert_in):
         """
         Parameters
         ----------
@@ -38,6 +38,13 @@ class Layer:
         convert_in: dict {"variable name":float}
             Table of values to unit-convert from GUI inputs to internal values 
             for solver.
+            
+        iconvert_in: dict {"variable name":float}
+            Table of values to unit-convert from outputs to integrated outputs. 
+            Used by the Integrate feature.
+            E.g. N has units cm^-3 and should have units cm^-2 when integrated
+            but the space grid has units nm. Thus iconvert_in needs an entry of 1e7 cm to nm 
+            to temporarily convert the space grids to cm for the integration.
         """
         self.params = params
         self.param_count = len(params)
@@ -57,10 +64,15 @@ class Layer:
         self.spacegrid_is_set = False
         
         self.convert_in = convert_in
+        self.iconvert_in = iconvert_in
         
         self.convert_out = {}
+        self.iconvert_out = {}
         for param in self.convert_in:
             self.convert_out[param] = self.convert_in[param] ** -1
+            
+        for param in self.iconvert_in:
+            self.iconvert_out[param] = self.iconvert_in[param] ** -1
             
         assert isinstance(params, dict), "Layer did not receive a dict of params"
         for param in self.params:
@@ -137,7 +149,7 @@ class Parameter(Characteristic):
     
 class Output(Characteristic):
 
-    def __init__(self, display_name, units, xlabel, xvar, is_edge, layer, analysis_plotable=True, yscale='symlog', yfactors=(1,1)):
+    def __init__(self, display_name, units, xlabel, xvar, is_edge, layer, integrated_units=None, analysis_plotable=True, yscale='symlog', yfactors=(1,1)):
         """ Helper class for managing info about each of a Module's output values.
         
         Each Layer tracks a list of Outputs.
@@ -153,6 +165,10 @@ class Output(Characteristic):
             Used by GUI plot_overview_analysis to plot either with a time grid or a space grid.
         layer : str
             The name of the layer this output comes from. Used to match to the correct space grid.
+        integrated_units : str
+            The units of this output after integrating over space using the Integrate feature. Use
+            this in conjunction with the "integration_scale" conversion entry to correct for
+            discrepancies between the space grid and the parameter units.
         analysis_plotable : bool, optional
             Whether this value should be visible in the detailed analysis tab.
             Generally true except for some special calculations which don't follow the space grids.
@@ -174,6 +190,10 @@ class Output(Characteristic):
         self.xlabel = xlabel
         self.xvar = xvar
         self.layer = layer
+        if integrated_units:
+            self.integrated_units = integrated_units
+        else:
+            self.integrated_units = units
         self.analysis_plotable = analysis_plotable
         self.yscale = yscale
         self.yfactors = yfactors

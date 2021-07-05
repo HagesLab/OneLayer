@@ -363,7 +363,6 @@ class MAPI_Rubrene(OneD_Model):
                 temp_init_N = np.array(ifstream_N.root.data[0,:])
                 
             temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
-            
             return [("tau_diff", tau_diff(parent_data, dt)),
                     ("eta_MAPI", parent_data / temp_init_N)]
                     
