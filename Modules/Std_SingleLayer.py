@@ -105,14 +105,13 @@ class Std_SingleLayer(OneD_Model):
         return {"N":init_N, "P":init_P}
     
     def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
-        """Calls ODEINT solver."""
+        """Calls ODE solver."""
         one_layer = self.layers["OneLayer"]
         for param_name, param in one_layer.params.items():
             param.value *= one_layer.convert_in[param_name]
 
-        ode_nanowire(data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
+        ode_onelayer(data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
                      not flags['ignore_recycle'].value(), 
-                     flags['symmetric_system'].value(), 
                      flags['check_do_ss'].value(), hmax_, True,
                      init_conditions["N"], init_conditions["P"])
     
@@ -123,7 +122,7 @@ class Std_SingleLayer(OneD_Model):
            radiative recombination,
            non-radiative (SRH model) recombination,
            
-           Integrates over nanowire length: PL due to radiative recombination, waveguiding, and carrier regeneration"""
+           Integrates over nanowire length: PL due to radiative recombination"""
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
         one_layer = self.layers["OneLayer"]
         params = params["OneLayer"]
@@ -209,7 +208,7 @@ class Std_SingleLayer(OneD_Model):
         return data
     
     def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
-        
+        """ Calculates supplemental data - the effective lifetime - for integrated PL"""
         if datatype == "PL":
             return [("tau_diff", tau_diff(parent_data, dt))]
         
@@ -230,7 +229,7 @@ class Std_SingleLayer(OneD_Model):
 def gen_weight_distribution(m, dx, alpha=0, delta_frac=1, 
                             back_refl_frac=1, frac_emitted=0):
     """
-    Distance-dependent alpha weighting matrix for one-layer system regeneration term
+    Distance-dependent weighting matrix for one-layer carrier regeneration term
 
     Parameters
     ----------
@@ -307,7 +306,6 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     P_edges = (P[:-1] + np.roll(P, -1)[:-1]) / 2
     
     ## Do boundary conditions of Jn, Jp
-    # FIXME: Calculate N, P at boundaries?
     Sft = Sf * (N[0] * P[0] - n0[0] * p0[0]) / (N[0] + P[0])
     Sbt = Sb * (N[m-1] * P[m-1] - n0[m-1] * p0[m-1]) / (N[m-1] + P[m-1])
     Jn[0] = Sft
@@ -366,16 +364,16 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     dydt = np.concatenate([dNdt, dPdt, dEdt], axis=None)
     return dydt
     
-def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True, 
-                 symmetric=True, do_ss=False, hmax_=0, write_output=True, 
-                 init_N=0, init_P=0, init_E_field=0):
+def ode_onelayer(data_path_name, m, n, dx, dt, params, recycle_photons=True, 
+                 do_ss=False, hmax_=0, write_output=True, 
+                 init_N=0, init_P=0):
     """
-    Master function for Nanowire module simulation.
+    Master function for Onelayer module simulation.
     Problem statement:
     Create a discretized, time and space dependent solution (N(x,t) and P(x,t)) of the carrier model with m space steps and n time steps
     Space step size is dx, time step is dt
-    Initial conditions: init_N, init_P, init_E_field
-    Optional photon recycle term
+    Initial conditions: init_N, init_P
+    Optional carrier recycle term
 
     Parameters
     ----------
@@ -393,20 +391,16 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
         Collection of parameter objects
     recycle_photons : bool, optional
         Whether carrier regeneration due to photons is considered. The default is True.
-    symmetric : bool, optional
-        Whether to consider the nanowire as having a symmetrical half with virtual nodes 0 to -m. The default is True.
     do_ss : bool, optional
         Whether to inject the initial conditions at every time step, creating a nonzero steady state situation. The default is False.
     hmax_ : float, optional
-        Maximum internal step size to be taken by ODEINT. The default is 0.
+        Maximum internal step size to be taken by ODE solver. The default is 0.
     write_output : bool, optional
         Whether to write output files. TEDs always does this but other applications reusing this function might not. The default is True.
     init_N : 1D ndarray, optional
         Initial excited electron distribution. The default is 0.
     init_P : 1D ndarray, optional
         Initial hole distribution. The default is 0.
-    init_E_field : 1D ndarray, optional
-        Initial electric field. The default is 0.
 
     Returns
     -------
@@ -498,14 +492,11 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
         ## Prep output files
         with tables.open_file(data_path_name + "-N.h5", mode='a') as ofstream_N, \
             tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P:
-            #tables.open_file(data_path_name + "-E_field.h5", mode='a') as ofstream_E_field:
             array_N = ofstream_N.root.data
             array_P = ofstream_P.root.data
-            #array_E_field = ofstream_E_field.root.data
             array_N.append(data[1:,0:m])
             array_P.append(data[1:,m:2*(m)])
-            #array_E_field.append(data[1:,2*(m):])
-
+            
         return #error_data
 
     else:
@@ -552,7 +543,7 @@ def nonradiative_recombination(sim_outputs, params):
 
 def tau_diff(PL, dt):
     """
-    Calculates particle lifetime from TRPL.
+    Calculates effective particle lifetime from TRPL.
 
     Parameters
     ----------

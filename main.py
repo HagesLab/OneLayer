@@ -52,8 +52,8 @@ def mod_list():
     
     return {"Standard One-Layer":Std_SingleLayer,
             "Nanowire":Nanowire, 
-            "Neumann Bound Heatplate":HeatPlate, 
-            "MAPI-Rubrene//DBP":MAPI_Rubrene}
+            #"Neumann Bound Heatplate":HeatPlate, 
+            "MAPI-Rubrene/DBP":MAPI_Rubrene}
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
