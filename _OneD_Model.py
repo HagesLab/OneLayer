@@ -413,10 +413,5 @@ class OneD_Model:
                   "Automatically setting symmetric_system to FALSE")
             self.flags_dict["symmetric_system"] = ("Symmetric System", 0, 0)
         
-        for layer in self.layers:
-            if not "integration_scale" in self.layers[layer].convert_in:
-                print("Warning: no integration_scale correction defined for layer {}. "
-                      "Integration may have incorrect units.".format(layer))
-                self.layers[layer].convert_in["integration_scale"] = 1
-                self.layers[layer].convert_out["integration_scale"] = 1
+        ## TODO: Add more as needed
         return

@@ -141,7 +141,6 @@ class Parameter(Characteristic):
 
         self.value = 0
         assert isinstance(valid_range, tuple), "A tuple was expected for Parameter valid range"
-        # TODO: Implement value verification using this
         self.valid_range = valid_range # Min, max
         self.is_space_dependent = is_space_dependent
         self.param_rules = []

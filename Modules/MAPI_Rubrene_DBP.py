@@ -59,28 +59,28 @@ class MAPI_Rubrene(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        mapi_simulation_outputs = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI", yscale='symlog', yfactors=(1e-4,1e1)), 
-                                   "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="MAPI", yscale='symlog', yfactors=(1e-4,1e1)),
+        mapi_simulation_outputs = {"N":Output("N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI", yscale='symlog', yfactors=(1e-4,1e1)), 
+                                   "P":Output("P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="MAPI", yscale='symlog', yfactors=(1e-4,1e1)),
                                   }
         
-        rubrene_simulation_outputs = {"T":Output("T", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)), 
-                                      "delta_S":Output("delta_S", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
-                                      "delta_D":Output("delta_D", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
+        rubrene_simulation_outputs = {"T":Output("T", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)), 
+                                      "delta_S":Output("delta_S", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
+                                      "delta_D":Output("delta_D", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
                                      }
         
         # List of all variables calculated from those in simulation_outputs_dict
-        mapi_calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True, layer="MAPI"),
-                                 "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
-                                 "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
-                                 "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False, layer="MAPI"),
-                                 "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
-                                 "mapi_PL":Output("MAPI TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI"),
+        mapi_calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", integrated_units="[V]", xlabel="nm", xvar="position",is_edge=True, layer="MAPI"),
+                                 "delta_N":Output("delta_N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
+                                 "delta_P":Output("delta_P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
+                                 "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="MAPI"),
+                                 "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
+                                 "mapi_PL":Output("MAPI TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI"),
                                  "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False),
                                  "eta_MAPI":Output("MAPI eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False)
                                  }
         
-        rubrene_calculated_outputs = {"dbp_PL":Output("DBP TRPL", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
-                                      "TTA":Output("TTA Rate", units="[phot / cm^3 (cm^2 if int) s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
+        rubrene_calculated_outputs = {"dbp_PL":Output("DBP TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
+                                      "TTA":Output("TTA Rate", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
                                       "T_form_eff":Output("Triplet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
                                       "S_form_eff":Output("Singlet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
                                       "eta_UC":Output("DBP. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False)
@@ -103,8 +103,11 @@ class MAPI_Rubrene(OneD_Model):
         mapi_convert_in["RR"] = mapi_convert_in["B"] * mapi_convert_in["N"] * mapi_convert_in["P"] # [cm^-3 s^-1] to [m^-3 ns^-1]
         mapi_convert_in["NRR"] = mapi_convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         mapi_convert_in["mapi_PL"] = mapi_convert_in["RR"]
-        
-        mapi_convert_in["integration_scale"] = 1e7 # cm to nm
+
+        mapi_iconvert_in = {"N": 1e7, "P":1e7, "delta_N":1e7, "delta_P":1e7, # cm to nm
+                            "E_field":1, # nm to nm
+                            "RR": 1e7, "NRR": 1e7, "mapi_PL":1e7
+                            }
         
         
         rubrene_convert_in = {"mu_T": 1e5, "mu_S": 1e5,                         # [cm^2 / V s] to [nm^2 / V ns]
@@ -118,14 +121,16 @@ class MAPI_Rubrene(OneD_Model):
                               "T_form_eff":1, "S_form_eff":1, 
                               "eta_UC":1
                               }
+        
         rubrene_convert_in["dbp_PL"] = rubrene_convert_in["delta_D"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         rubrene_convert_in["TTA"] = rubrene_convert_in["k_fusion"] * rubrene_convert_in["delta_T"] ** 2
-        rubrene_convert_in["integration_scale"] = 1e7
-        
+
+        ru_iconvert_in = {"T": 1e7, "delta_S": 1e7, "delta_D":1e7, "dbp_PL":1e7, "TTA":1e7
+                         }
         self.layers = {"MAPI":Layer(mapi_params, mapi_simulation_outputs, mapi_calculated_outputs,
-                                    "[nm]", mapi_convert_in),
+                                    "[nm]", mapi_convert_in, mapi_iconvert_in),
                        "Rubrene":Layer(rubrene_params, rubrene_simulation_outputs, rubrene_calculated_outputs,
-                                       "[nm]", rubrene_convert_in)
+                                       "[nm]", rubrene_convert_in, ru_iconvert_in)
                        }
 
         return
@@ -280,9 +285,9 @@ class MAPI_Rubrene(OneD_Model):
         for data in data_dict["Rubrene"]:
             data_dict["Rubrene"][data] *= ru.convert_out[data]
             
-        data_dict["MAPI"]["mapi_PL"] *= mapi.convert_out["integration_scale"]
-        data_dict["Rubrene"]["dbp_PL"] *= ru.convert_out["integration_scale"]
-        data_dict["Rubrene"]["TTA"] *= ru.convert_out["integration_scale"]
+        data_dict["MAPI"]["mapi_PL"] *= mapi.iconvert_out["mapi_PL"]
+        data_dict["Rubrene"]["dbp_PL"] *= ru.iconvert_out["dbp_PL"]
+        data_dict["Rubrene"]["TTA"] *= ru.iconvert_out["TTA"]
         
         return data_dict
     
