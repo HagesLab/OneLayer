@@ -678,7 +678,7 @@ class Notebook:
         self.tab_overview_analysis = tk.ttk.Frame(self.tab_analyze)
         self.tab_detailed_analysis = tk.ttk.Frame(self.tab_analyze)
         
-        self.analyze_overview_fig = Figure(figsize=(15,8))
+        self.analyze_overview_fig = Figure(figsize=(21,8))
         self.overview_subplots = {}
         count = 1
         total_outputs_count = sum([self.module.layers[layer].outputs_count for layer in self.module.layers])
@@ -3209,8 +3209,13 @@ class Notebook:
                                                                                 ext_tag))
             
                 if self.PL_mode == "All time steps":
-                    td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
-                                                             active_datagroup.datasets[tag].params_dict)
+                    try:
+                        td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
+                                                                 active_datagroup.datasets[tag].params_dict)
+                    except Exception:
+                        print("Error: failed to calculate time series")
+                        td[ext_tag] = None
+                        
                     if td[ext_tag] is not None:
                         td_gridt[ext_tag] = np.linspace(0, total_time, n + 1)
                         
@@ -3261,7 +3266,7 @@ class Notebook:
         
         self.write(self.analysis_status, "Integration complete")
 
-        if len(td_gridt):
+        if self.PL_mode == "All time steps" and len(td_gridt):
             
             num_td_per_curve = len(td[next(iter(td))])
             for i in range(num_td_per_curve):
@@ -3275,6 +3280,7 @@ class Notebook:
     
                 name = td[next(iter(td))][i][0]
                 where_layer = self.module.find_layer(name)
+                td_subplot.set_yscale(autoscale(val_array=td[next(iter(td))][i][1]))
                 td_subplot.set_ylabel(name + " " + self.module.layers[where_layer].outputs[name].units)
                 td_subplot.set_xlabel("Time " + self.module.time_unit)
                 td_subplot.set_title("{}'s time series".format(active_datagroup.type))
@@ -3282,6 +3288,7 @@ class Notebook:
                     td_subplot.plot(td_gridt[tag], td[tag][i][1], label=tag.strip('_'))
             
                 td_subplot.legend().set_draggable(True)
+                td_fig.tight_layout()
         return
 
     ## Initial Condition Managers

@@ -48,6 +48,7 @@ class MAPI_Rubrene(OneD_Model):
                           "tau_D":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
                           "k_fusion":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)),
                           "k_0":Parameter(units="[nm^3 s^-1]", is_edge=False, valid_range=(0,np.inf)),
+                          "St":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                           "Rubrene_temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
                           "delta_T":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                           "delta_S":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
@@ -82,7 +83,8 @@ class MAPI_Rubrene(OneD_Model):
         rubrene_calculated_outputs = {"dbp_PL":Output("DBP TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
                                       "TTA":Output("TTA Rate", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
                                       "T_form_eff":Output("Triplet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
-                                      "S_form_eff":Output("Singlet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
+                                      "T_anni_eff":Output("Triplet anni. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
+                                      "S_up_eff":Output("Singlet upc. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
                                       "eta_UC":Output("DBP. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False)
                                       }
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
@@ -116,9 +118,10 @@ class MAPI_Rubrene(OneD_Model):
                               "k_fusion":1e12,                                  # [cm^3 / s] to [nm^3 / ns]
                               "k_0":1e-9,                                       # [nm^3 / s] to [nm^3 / ns]
                               "Rubrene_temperature":1,
+                              "St": (1e7) / (1e9),                              # [cm/s] to [nm/ns]
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21,                   # [cm^-3] to [nm^-3]
-                              "T_form_eff":1, "S_form_eff":1, 
+                              "T_form_eff":1, "T_anni_eff":1, "S_up_eff":1,
                               "eta_UC":1
                               }
         
@@ -227,7 +230,11 @@ class MAPI_Rubrene(OneD_Model):
                           False, mapi_params, "MAPI")
         data_dict["MAPI"]["mapi_PL"] = new_integrate(PL_base, 0, mapi_length, 
                                                     dm, mapi_length, False)
-        data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["mapi_PL"], dt)
+        try:
+            data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["mapi_PL"], dt)
+        except Exception:
+            print("Error: failed to calculate tau_diff")
+            data_dict["MAPI"]["tau_diff"] = 0
         #################
         
         #### DBP PL ####
@@ -242,6 +249,7 @@ class MAPI_Rubrene(OneD_Model):
         ################
         
         #### TTA Rate ####
+        # "Triplet-Triplet Annihilation"
         with tables.open_file(data_dirname + "\\" + file_name_base + "-T.h5", mode='r') as ifstream_T:
             temp_TTA = np.array(ifstream_T.root.data)
             
@@ -270,11 +278,13 @@ class MAPI_Rubrene(OneD_Model):
         if isinstance(tail_p0, np.ndarray):
             tail_p0 = tail_p0[-1]
             
-        t_form = mapi_params["Sb"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+        t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
                                       / (temp_N + temp_P))
         data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
         
-        data_dict["Rubrene"]["S_form_eff"] = data_dict["Rubrene"]["TTA"] / t_form
+        data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] / t_form
+        
+        data_dict["Rubrene"]["S_up_eff"] = data_dict["Rubrene"]["T_anni_eff"] * data_dict["Rubrene"]["T_form_eff"]
         
         data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] / temp_init_N
         data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] / temp_init_N
@@ -364,6 +374,8 @@ class MAPI_Rubrene(OneD_Model):
     def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
         
         if datatype == "mapi_PL":
+            # photons emitted per photon absorbed
+            # generally this is meaningful in ss mode - thus units are [phot/nm^2 ns] per [carr/nm^2 ns]
             with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N:
                 temp_init_N = np.array(ifstream_N.root.data[0,:])
                 
@@ -372,7 +384,7 @@ class MAPI_Rubrene(OneD_Model):
                     ("eta_MAPI", parent_data / temp_init_N)]
                     
         
-        elif datatype == "T":
+        elif datatype == "TTA":
             with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N, \
                 tables.open_file(pathname + "-P.h5", mode='r') as ifstream_P:
                 temp_N = np.array(ifstream_N.root.data[:,-1])
@@ -380,26 +392,6 @@ class MAPI_Rubrene(OneD_Model):
                 temp_P = np.array(ifstream_P.root.data[:,-1])
                 
             temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
-            
-            
-            tail_n0 = params["MAPI"]["N0"]
-            if isinstance(tail_n0, np.ndarray):
-                tail_n0 = tail_n0[-1]
-                
-            tail_p0 = params["MAPI"]["P0"]
-            if isinstance(tail_p0, np.ndarray):
-                tail_p0 = tail_p0[-1]
-                
-            t_form = params["MAPI"]["Sb"] * ((temp_N * temp_P - tail_n0 * tail_p0)
-                                            / (temp_N + temp_P))
-            t_form /= temp_init_N
-            return [("T_form_eff", t_form)]
-        
-        elif datatype == "TTA":
-            with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N, \
-                tables.open_file(pathname + "-P.h5", mode='r') as ifstream_P:
-                temp_N = np.array(ifstream_N.root.data[:,-1])
-                temp_P = np.array(ifstream_P.root.data[:,-1])
 
             tail_n0 = params["MAPI"]["N0"]
             if isinstance(tail_n0, np.ndarray):
@@ -409,10 +401,16 @@ class MAPI_Rubrene(OneD_Model):
             if isinstance(tail_p0, np.ndarray):
                 tail_p0 = tail_p0[-1]
                 
-            t_form = params["MAPI"]["Sb"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+            t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
                                             / (temp_N + temp_P))
             
-            return [("S_form_eff", parent_data / t_form)]
+            # In order:
+            # Triplets formed per photon absorbed
+            # Singlets formed per triplet formed
+            # Singlets formed per photon absorbed
+            return [("T_form_eff", t_form / temp_init_N),
+                    ("T_anni_eff", parent_data / t_form),
+                    ("S_up_eff", parent_data / temp_init_N)]
         
         elif datatype == "dbp_PL":
             with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N:
@@ -420,6 +418,7 @@ class MAPI_Rubrene(OneD_Model):
                 
             temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
             
+            # DBP photons emitted per photon absorbed
             return [("eta_UC", parent_data / temp_init_N)]
         else:
             return
@@ -427,9 +426,9 @@ class MAPI_Rubrene(OneD_Model):
     
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
         """ Set delta_N and delta_P of outgoing regenerated IC file."""
-        param_dict = param_dict["OneLayer"]
-        sim_data = sim_data["OneLayer"]
-        include_flags = include_flags["OneLayer"]
+        param_dict = param_dict["MAPI"]
+        sim_data = sim_data["MAPI"]
+        include_flags = include_flags["MAPI"]
         param_dict["delta_N"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(len(grid_x))
                     
         param_dict["delta_P"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(len(grid_x))
@@ -440,7 +439,7 @@ class MAPI_Rubrene(OneD_Model):
 def dydt(t, y, m, f, dm, df, Cn, Cp, 
          tauN, tauP, tauT, tauS, tauD, 
          mu_n, mu_p, mu_s, mu_T,
-         n0, p0, T0, Sf, Sb, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
+         n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
          eps, weight1=0, weight2=0, do_Fret=False, do_ss=False, 
          init_dN=0, init_dP=0):
     """Derivative function for two-layer carrier model."""
@@ -466,13 +465,14 @@ def dydt(t, y, m, f, dm, df, Cn, Cp,
     # MAPI boundaries
     Sft = Sf * (N[0] * P[0] - n0[0] * p0[0]) / (N[0] + P[0])
     Sbt = Sb * (N[m-1] * P[m-1] - n0[m-1] * p0[m-1]) / (N[m-1] + P[m-1])
+    Stt = St * (N[m-1] * P[m-1] - n0[m-1] * p0[m-1]) / (N[m-1] + P[m-1])
     Jn[0] = Sft
-    Jn[m] = -Sbt
+    Jn[m] = -(Sbt+Stt)
     Jp[0] = -Sft
-    Jp[m] = Sbt
+    Jp[m] = (Sbt+Stt)
     
     # Rubrene boundaries
-    JT[0] = -Sbt
+    JT[0] = -Stt
     JT[f] = 0
     JS[0] = 0
     JS[f] = 0
@@ -589,6 +589,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     ## Unpack params; typecast non-array params to arrays if needed
     Sf = mapi_params["Sf"].value
     Sb = mapi_params["Sb"].value
+    St = ru_params["St"].value
     mu_n = to_array(mapi_params["mu_N"].value, m, True)
     mu_p = to_array(mapi_params["mu_P"].value, m, True)
     mu_s = to_array(ru_params["mu_S"].value, f, True)
@@ -642,7 +643,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     args=(m, f, dm, df, Cn, Cp, 
             tauN, tauP, tauT, tauS, tauD, 
             mu_n, mu_p, mu_s, mu_T,
-            n0, p0, T0, Sf, Sb, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
+            n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
             eps, weight1, weight2, do_Fret, do_ss, 
             init_dN, init_dP)
 
