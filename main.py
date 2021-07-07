@@ -165,6 +165,9 @@ class Notebook:
         self.yaxis_type = tk.StringVar()
         self.xaxis_type = tk.StringVar()
 
+        # Track which timeseries popups are open
+        self.active_timeseries = {}
+        
         # Add menu bars
         self.menu_bar = tk.Menu(self.notebook)
 
@@ -2328,6 +2331,52 @@ class Notebook:
 
         return
 
+    def do_timeseries_popup(self, ts_ID, td_gridt, td):
+        ts_popup = tk.Toplevel(self.root)
+        
+        # Determine a nonconflicting identifier by counting how many timeseries popups are open
+        tspopup_ID = 0
+        while tspopup_ID in self.active_timeseries:
+            tspopup_ID += 1
+        ts_popup.title("Timeseries({})".format(tspopup_ID))
+        td_fig = Figure(figsize=(6,4))
+        td_subplot = td_fig.add_subplot(111)
+        
+        td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=ts_popup)
+        td_plotwidget = td_canvas.get_tk_widget()
+        td_plotwidget.grid(row=0,column=0)
+
+        name = td[next(iter(td))][ts_ID][0]
+        where_layer = self.module.find_layer(name)
+        td_subplot.set_yscale(autoscale(val_array=td[next(iter(td))][ts_ID][1]))
+        td_subplot.set_ylabel(name + " " + self.module.layers[where_layer].outputs[name].units)
+        td_subplot.set_xlabel("Time " + self.module.time_unit)
+        td_subplot.set_title("Timeseries({})".format(tspopup_ID))
+        
+        assert tspopup_ID not in self.active_timeseries, "Error: a timeseries was overwritten"
+        self.active_timeseries[tspopup_ID] = []
+        for tag in td:
+            td_subplot.plot(td_gridt[tag], td[tag][ts_ID][1], label=tag.strip('_'))
+            self.active_timeseries[tspopup_ID].append((td_gridt[tag], td[tag][ts_ID][1]))
+    
+        td_subplot.legend().set_draggable(True)
+        td_fig.tight_layout()
+        
+        tk.ttk.Button(ts_popup, text="Export", command=partial(self.export_timeseries, tspopup_ID)).grid(row=1,column=0)
+        ts_popup.protocol("WM_DELETE_WINDOW", partial(self.on_timeseries_popup_close, ts_popup,
+                                                 tspopup_ID))
+        
+        return
+    
+    def on_timeseries_popup_close(self, ts_popup, tspopup_ID):
+        try:
+            del self.active_timeseries[tspopup_ID]
+        except Exception as e:
+            print("Failed to clear time series")
+            print(e)
+        ts_popup.destroy()
+        return
+    
     ## Plotter for simulation tab    
     def update_sim_plots(self, index, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
@@ -3270,25 +3319,7 @@ class Notebook:
             
             num_td_per_curve = len(td[next(iter(td))])
             for i in range(num_td_per_curve):
-                td_popup = tk.Toplevel(self.root)
-                td_fig = Figure(figsize=(6,4))
-                td_subplot = td_fig.add_subplot(111)
-                
-                td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=td_popup)
-                td_plotwidget = td_canvas.get_tk_widget()
-                td_plotwidget.grid(row=0,column=0)
-    
-                name = td[next(iter(td))][i][0]
-                where_layer = self.module.find_layer(name)
-                td_subplot.set_yscale(autoscale(val_array=td[next(iter(td))][i][1]))
-                td_subplot.set_ylabel(name + " " + self.module.layers[where_layer].outputs[name].units)
-                td_subplot.set_xlabel("Time " + self.module.time_unit)
-                td_subplot.set_title("{}'s time series".format(active_datagroup.type))
-                for tag in td:
-                    td_subplot.plot(td_gridt[tag], td[tag][i][1], label=tag.strip('_'))
-            
-                td_subplot.legend().set_draggable(True)
-                td_fig.tight_layout()
+                self.do_timeseries_popup(i, td_gridt, td)
         return
 
     ## Initial Condition Managers
@@ -4430,8 +4461,10 @@ class Notebook:
                 return
             where_layer = self.module.find_layer(self.analysis_plots[plot_ID].datagroup.type)
             paired_data = self.analysis_plots[plot_ID].datagroup.build(self.module.layers[where_layer].convert_out)
-            # We need some fancy footwork using itertools to transpose a non-rectangular array
+            
+            # Transpose a list of arrays
             paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
+            
             header = "".join(["x {},".format(self.module.layers[where_layer].length_unit) + 
                               self.analysis_plots[plot_ID].datagroup.datasets[key].filename + 
                               "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
@@ -4446,12 +4479,40 @@ class Notebook:
                 if export_filename.endswith(".csv"): 
                     export_filename = export_filename[:-4]
                 np.savetxt("{}.csv".format(export_filename), paired_data, 
-                           fmt='%.4e', delimiter=',', header=header)
+                           delimiter=',', header=header)
                 self.write(self.analysis_status, "Export complete")
             except PermissionError:
                 self.write(self.analysis_status, "Error: unable to access PL export destination")
         
         return
+    
+    def export_timeseries(self, tspopup_ID):
+        paired_data = self.active_timeseries[tspopup_ID]
+        # Unpack list of array tuples into list of arrays
+        while isinstance(paired_data[0], tuple):
+            paired_data.append(paired_data[0][0])
+            paired_data.append(paired_data[0][1])
+            paired_data.pop(0)
+            
+        paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
+        
+        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
+                                                          title="Save data", 
+                                                          filetypes=[("csv (comma-separated-values)","*.csv")])
+        # Export to .csv
+        if export_filename:
+            try:
+                if export_filename.endswith(".csv"): 
+                    export_filename = export_filename[:-4]
+                np.savetxt("{}.csv".format(export_filename), paired_data, 
+                           delimiter=',')
+                self.write(self.analysis_status, "Timeseries export complete")
+            except PermissionError:
+                self.write(self.analysis_status, "Error: unable to access PL export destination")
+        
+        return
+            
+        
 
 if __name__ == "__main__":
     nb = Notebook("ted")
