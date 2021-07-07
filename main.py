@@ -687,40 +687,52 @@ class Notebook:
         total_outputs_count = sum([self.module.layers[layer].outputs_count for layer in self.module.layers])
         rdim = np.floor(np.sqrt(total_outputs_count))
         cdim = np.ceil(total_outputs_count / rdim)
+        
+        all_outputs = []
         for layer_name in self.module.layers:
             self.overview_subplots[layer_name] = {}
             for output in self.module.layers[layer_name].outputs:
                 self.overview_subplots[layer_name][output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
+                all_outputs.append("{}: {}".format(layer_name, output))
                 count += 1
                     
-        tk.ttk.Label(self.tab_overview_analysis, text="No. samples").grid(row=0,column=0)
+        self.overview_setup_frame = tk.Frame(self.tab_overview_analysis)
+        self.overview_setup_frame.grid(row=0,column=0, padx=(20,20))
         
-        self.overview_samplect_entry = tk.ttk.Entry(self.tab_overview_analysis, width=8)
+        tk.Label(self.overview_setup_frame, text="No. samples").grid(row=0,column=0)
+        
+        self.overview_samplect_entry = tk.ttk.Entry(self.overview_setup_frame, width=8)
         self.overview_samplect_entry.grid(row=1,column=0)
+        self.enter(self.overview_samplect_entry, "6")
         
         self.overview_sample_mode = tk.StringVar()
         self.overview_sample_mode.set("Log")
-        tk.ttk.Radiobutton(self.tab_overview_analysis, variable=self.overview_sample_mode,
+        tk.ttk.Radiobutton(self.overview_setup_frame, variable=self.overview_sample_mode,
                            value="Linear").grid(row=0,column=1)
-        tk.ttk.Label(self.tab_overview_analysis, text="Linear").grid(row=0,column=2)
+        tk.Label(self.overview_setup_frame, text="Linear").grid(row=0,column=2)
         
-        tk.ttk.Radiobutton(self.tab_overview_analysis, variable=self.overview_sample_mode,
+        tk.ttk.Radiobutton(self.overview_setup_frame, variable=self.overview_sample_mode,
                            value="Log").grid(row=1,column=1)
-        tk.ttk.Label(self.tab_overview_analysis, text="Log").grid(row=1,column=2)
+        tk.Label(self.overview_setup_frame, text="Log").grid(row=1,column=2)
         
-        
-        tk.ttk.Button(master=self.tab_overview_analysis, 
-                      text="Select Dataset", 
+        tk.Button(master=self.overview_setup_frame, text="Select Dataset", 
                       command=self.plot_overview_analysis).grid(row=0,rowspan=2,column=3)
         
+        self.overview_var_selection = tk.StringVar()
+        
+        tk.ttk.OptionMenu(self.tab_overview_analysis, self.overview_var_selection, 
+                          all_outputs[0], *all_outputs).grid(row=0,column=1)
+        
+        tk.ttk.Button(master=self.tab_overview_analysis, text="Export", 
+                      command=self.export_overview).grid(row=0,column=2)
         
         
         self.analyze_overview_canvas = tkagg.FigureCanvasTkAgg(self.analyze_overview_fig, 
                                                                master=self.tab_overview_analysis)
-        self.analyze_overview_canvas.get_tk_widget().grid(row=2,column=0,columnspan=99)
+        self.analyze_overview_canvas.get_tk_widget().grid(row=1,column=0,columnspan=99)
 
         self.overview_toolbar_frame = tk.ttk.Frame(self.tab_overview_analysis)
-        self.overview_toolbar_frame.grid(row=3,column=0,columnspan=99)
+        self.overview_toolbar_frame.grid(row=2,column=0,columnspan=99)
         
         tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, 
                                    self.overview_toolbar_frame).grid(row=0,column=0)
@@ -2518,6 +2530,7 @@ class Notebook:
         
         try:
             sample_ct = int(self.overview_samplect_entry.get())
+            assert sample_ct > 0
         except Exception:
             sample_ct = 5
         
@@ -4541,6 +4554,40 @@ class Notebook:
         
         return
             
+    def export_overview(self):
+        try:
+            self.overview_values
+        except AttributeError:
+            return
+        
+        output_name = self.overview_var_selection.get()
+        
+        layer_name, output_name = output_name.split(": ")
+        paired_data = self.overview_values[layer_name][output_name]
+
+        if not isinstance(paired_data, np.ndarray):
+            print("No data found for export")
+            return
+        
+        # Grab x axis from matplotlib by force
+        grid_x = self.overview_subplots[layer_name][output_name].lines[0]._xorig
+        paired_data = np.vstack((grid_x, paired_data)).T
+        
+        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
+                                                          title="Save data", 
+                                                          filetypes=[("csv (comma-separated-values)","*.csv")])
+        # Export to .csv
+        if export_filename:
+            try:
+                if export_filename.endswith(".csv"): 
+                    export_filename = export_filename[:-4]
+                np.savetxt("{}.csv".format(export_filename), paired_data, 
+                           delimiter=',')
+                print("Export from overview complete")
+            except PermissionError:
+                print("Error: unable to access export destination")
+        
+        return
         
 
 if __name__ == "__main__":
