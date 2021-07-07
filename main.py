@@ -693,16 +693,35 @@ class Notebook:
                 self.overview_subplots[layer_name][output] = self.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
                 count += 1
                     
+        tk.ttk.Label(self.tab_overview_analysis, text="No. samples").grid(row=0,column=0)
+        
+        self.overview_samplect_entry = tk.ttk.Entry(self.tab_overview_analysis, width=8)
+        self.overview_samplect_entry.grid(row=1,column=0)
+        
+        self.overview_sample_mode = tk.StringVar()
+        self.overview_sample_mode.set("Log")
+        tk.ttk.Radiobutton(self.tab_overview_analysis, variable=self.overview_sample_mode,
+                           value="Linear").grid(row=0,column=1)
+        tk.ttk.Label(self.tab_overview_analysis, text="Linear").grid(row=0,column=2)
+        
+        tk.ttk.Radiobutton(self.tab_overview_analysis, variable=self.overview_sample_mode,
+                           value="Log").grid(row=1,column=1)
+        tk.ttk.Label(self.tab_overview_analysis, text="Log").grid(row=1,column=2)
+        
+        
         tk.ttk.Button(master=self.tab_overview_analysis, 
                       text="Select Dataset", 
-                      command=self.plot_overview_analysis).grid(row=0,column=0)
+                      command=self.plot_overview_analysis).grid(row=0,rowspan=2,column=3)
+        
+        
         
         self.analyze_overview_canvas = tkagg.FigureCanvasTkAgg(self.analyze_overview_fig, 
                                                                master=self.tab_overview_analysis)
-        self.analyze_overview_canvas.get_tk_widget().grid(row=1,column=0)
+        self.analyze_overview_canvas.get_tk_widget().grid(row=2,column=0,columnspan=99)
 
         self.overview_toolbar_frame = tk.ttk.Frame(self.tab_overview_analysis)
-        self.overview_toolbar_frame.grid(row=2,column=0)
+        self.overview_toolbar_frame.grid(row=3,column=0,columnspan=99)
+        
         tkagg.NavigationToolbar2Tk(self.analyze_overview_canvas, 
                                    self.overview_toolbar_frame).grid(row=0,column=0)
         
@@ -2498,6 +2517,11 @@ class Notebook:
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
         
         try:
+            sample_ct = int(self.overview_samplect_entry.get())
+        except Exception:
+            sample_ct = 5
+        
+        try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
                  
             data_n = int(0.5 + total_time / dt)
@@ -2513,7 +2537,12 @@ class Notebook:
                 data_node_x[layer_name] = np.linspace(dx / 2, total_length - dx / 2, 
                                                       data_m[layer_name])
             data_node_t = np.linspace(0, total_time, data_n + 1)
-            tstep_list = np.append([0], np.geomspace(1, data_n, num=5, dtype=int))
+            
+            if self.overview_sample_mode.get() == 'Log':
+                tstep_list = np.append([0], np.geomspace(1, data_n, num=sample_ct-1, dtype=int))
+            else:
+                tstep_list = np.linspace(0, data_n, num=sample_ct)
+                
         except AssertionError as oops:
             self.do_confirmation_popup(str(oops), hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
@@ -2537,7 +2566,7 @@ class Notebook:
                     plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
             
             
-        data_dict = self.module.get_overview_analysis(param_values_dict, flag_values_dict,
+        self.overview_values = self.module.get_overview_analysis(param_values_dict, flag_values_dict,
                                                       total_time, dt,
                                                       tstep_list, data_dirname, 
                                                       data_filename)
@@ -2546,7 +2575,7 @@ class Notebook:
         for layer_name, layer in self.module.layers.items():
             for output_name, output_info in layer.outputs.items():
                 try:
-                    values = data_dict[layer_name][output_name]
+                    values = self.overview_values[layer_name][output_name]
                     if not isinstance(values, np.ndarray): 
                         raise KeyError
                 except KeyError:
