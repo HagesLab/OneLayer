@@ -2379,6 +2379,7 @@ class Notebook:
 
         name = td[next(iter(td))][ts_ID][0]
         where_layer = self.module.find_layer(name)
+        scale_f = self.module.layers[where_layer].convert_out[name]
         td_subplot.set_yscale(autoscale(val_array=td[next(iter(td))][ts_ID][1]))
         td_subplot.set_ylabel(name + " " + self.module.layers[where_layer].outputs[name].units)
         td_subplot.set_xlabel("Time " + self.module.time_unit)
@@ -2387,8 +2388,8 @@ class Notebook:
         assert tspopup_ID not in self.active_timeseries, "Error: a timeseries was overwritten"
         self.active_timeseries[tspopup_ID] = []
         for tag in td:
-            td_subplot.plot(td_gridt[tag], td[tag][ts_ID][1], label=tag.strip('_'))
-            self.active_timeseries[tspopup_ID].append((tag, td_gridt[tag], td[tag][ts_ID][1]))
+            td_subplot.plot(td_gridt[tag], td[tag][ts_ID][1] * scale_f, label=tag.strip('_'))
+            self.active_timeseries[tspopup_ID].append((tag, td_gridt[tag], td[tag][ts_ID][1] * scale_f))
     
         td_subplot.legend().set_draggable(True)
         td_fig.tight_layout()
@@ -4573,6 +4574,7 @@ class Notebook:
             
     def export_overview(self):
         try:
+            # Has an overview been calculated?
             self.overview_values
         except AttributeError:
             return

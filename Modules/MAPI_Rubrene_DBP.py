@@ -77,6 +77,7 @@ class MAPI_Rubrene(OneD_Model):
                                  "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position", is_edge=False, layer="MAPI"),
                                  "mapi_PL":Output("MAPI TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI"),
                                  "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False),
+                                 "avg_delta_N":Output("avg_delta_N", units="[carr / cm^3]", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False),
                                  "eta_MAPI":Output("MAPI eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False)
                                  }
         
@@ -97,6 +98,7 @@ class MAPI_Rubrene(OneD_Model):
                       "Cn": 1e33, "Cp": 1e33,                                   # [cm^6 / s] to [nm^6 / ns]
                       "MAPI_temperature": 1, "rel_permitivity":1,
                       "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
+                      "avg_delta_N": ((1e-7) ** 3),
                       "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
                       "E_field": 1, 
                       "tau_diff": 1, "eta_MAPI":1}
@@ -230,6 +232,12 @@ class MAPI_Rubrene(OneD_Model):
                           False, mapi_params, "MAPI")
         data_dict["MAPI"]["mapi_PL"] = new_integrate(PL_base, 0, mapi_length, 
                                                     dm, mapi_length, False)
+        
+        temp_dN = delta_n({"N":temp_N}, mapi_params)
+        temp_dN = intg.trapz(temp_dN, dx=dm, axis=1)
+        temp_dN /= mapi_length
+        data_dict["MAPI"]["avg_delta_N"] = temp_dN
+        
         try:
             data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["mapi_PL"], dt)
         except Exception:
@@ -372,6 +380,10 @@ class MAPI_Rubrene(OneD_Model):
         return data
     
     def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
+        
+        if datatype == "delta_N":
+            temp_dN = parent_data / params["MAPI"]["Total_length"]
+            return [("avg_delta_N", temp_dN)]
         
         if datatype == "mapi_PL":
             # photons emitted per photon absorbed
