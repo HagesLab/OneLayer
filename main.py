@@ -2388,7 +2388,7 @@ class Notebook:
         self.active_timeseries[tspopup_ID] = []
         for tag in td:
             td_subplot.plot(td_gridt[tag], td[tag][ts_ID][1], label=tag.strip('_'))
-            self.active_timeseries[tspopup_ID].append((td_gridt[tag], td[tag][ts_ID][1]))
+            self.active_timeseries[tspopup_ID].append((tag, td_gridt[tag], td[tag][ts_ID][1]))
     
         td_subplot.legend().set_draggable(True)
         td_fig.tight_layout()
@@ -4533,13 +4533,27 @@ class Notebook:
     
     def export_timeseries(self, tspopup_ID):
         paired_data = self.active_timeseries[tspopup_ID]
+        
+        # paired_data = [(tag, tgrid, values), (...,...,...), ...]
         # Unpack list of array tuples into list of arrays
+        
+        # TODO WHEN FLEXIBILE TGRID COMPLETE: 
+        # currently assumes all t grids are identical
+        # should save all t arrays rather than the common one
+        first = True
+        header = ["Time [ns]"]
         while isinstance(paired_data[0], tuple):
-            paired_data.append(paired_data[0][0])
-            paired_data.append(paired_data[0][1])
+            
+            header.append(paired_data[0][0])
+            # unpack
+            if first:
+                paired_data.append(paired_data[0][1])
+                first = False
+            paired_data.append(paired_data[0][2])
             paired_data.pop(0)
             
         paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
+        
         
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
                                                           title="Save data", 
@@ -4550,7 +4564,7 @@ class Notebook:
                 if export_filename.endswith(".csv"): 
                     export_filename = export_filename[:-4]
                 np.savetxt("{}.csv".format(export_filename), paired_data, 
-                           delimiter=',')
+                           delimiter=',', header=",".join(header))
                 self.write(self.analysis_status, "Timeseries export complete")
             except PermissionError:
                 self.write(self.analysis_status, "Error: unable to access PL export destination")
