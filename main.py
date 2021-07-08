@@ -3361,7 +3361,10 @@ class Notebook:
             
             num_td_per_curve = len(td[next(iter(td))])
             for i in range(num_td_per_curve):
-                self.do_timeseries_popup(i, td_gridt, td)
+                try:
+                    self.do_timeseries_popup(i, td_gridt, td)
+                except Exception:
+                    continue
         return
 
     ## Initial Condition Managers

@@ -380,7 +380,13 @@ class MAPI_Rubrene(OneD_Model):
                 temp_init_N = np.array(ifstream_N.root.data[0,:])
                 
             temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
-            return [("tau_diff", tau_diff(parent_data, dt)),
+            try:
+                tdiff = tau_diff(parent_data, dt)
+            except FloatingPointError:
+                print("Error: failed to calculate tau_diff - effective lifetime is near infinite")
+                tdiff = np.zeros_like(np.linspace(0, total_time, int(total_time/dt) + 1))
+                
+            return [("tau_diff", tdiff),
                     ("eta_MAPI", parent_data / temp_init_N)]
                     
         
