@@ -2375,8 +2375,8 @@ class Notebook:
         
         td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=ts_popup)
         td_plotwidget = td_canvas.get_tk_widget()
-        td_plotwidget.grid(row=0,column=0)
-
+        td_plotwidget.grid(row=0,column=0, columnspan=2)
+        #tkagg.NavigationToolbar2Tk(td_canvas, ts_popup).grid(row=1,column=0,columnspan=2)
         name = td[next(iter(td))][ts_ID][0]
         where_layer = self.module.find_layer(name)
         scale_f = self.module.layers[where_layer].convert_out[name]
@@ -2393,8 +2393,10 @@ class Notebook:
     
         td_subplot.legend().set_draggable(True)
         td_fig.tight_layout()
+        td_fig.canvas.draw()
         
-        tk.ttk.Button(ts_popup, text="Export", command=partial(self.export_timeseries, tspopup_ID)).grid(row=1,column=0)
+        tk.ttk.Button(ts_popup, text="Export All", command=partial(self.export_timeseries, tspopup_ID, tail=False)).grid(row=2,column=0, padx=(10,10))
+        tk.ttk.Button(ts_popup, text="Export Tail", command=partial(self.export_timeseries, tspopup_ID, tail=True)).grid(row=2,column=1, padx=(10,10))
         ts_popup.protocol("WM_DELETE_WINDOW", partial(self.on_timeseries_popup_close, ts_popup,
                                                  tspopup_ID))
         
@@ -4532,7 +4534,7 @@ class Notebook:
         
         return
     
-    def export_timeseries(self, tspopup_ID):
+    def export_timeseries(self, tspopup_ID, tail=False):
         paired_data = self.active_timeseries[tspopup_ID]
         
         # paired_data = [(tag, tgrid, values), (...,...,...), ...]
@@ -4554,7 +4556,8 @@ class Notebook:
             paired_data.pop(0)
             
         paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
-        
+        if tail:
+            paired_data = paired_data[-10:]
         
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
                                                           title="Save data", 
