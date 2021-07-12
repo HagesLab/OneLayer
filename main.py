@@ -2446,7 +2446,7 @@ class Notebook:
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
         """ Read and store parameters from a metadata.txt file """
-        path = self.default_dirs["Data"] + "\\" + self.module.system_ID + "\\" + data_filename + "\\" + "metadata.txt"
+        path = "{}\\{}\\{}\\metadata.txt".format(self.default_dirs["Data"], self.module.system_ID, data_filename)
         assert os.path.exists(path), "Error: Missing metadata for {}".format(self.module.system_ID)
         
         with open(path, "r") as ifstream:
@@ -2978,28 +2978,28 @@ class Notebook:
     
         try:
             print("Attempting to create {} data folder".format(data_file_name))
-            full_path_name = "{}\\{}\\{}".format(self.default_dirs["Data"], 
+            dirname = "{}\\{}\\{}".format(self.default_dirs["Data"], 
                                                  self.module.system_ID, 
                                                  data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
-            assert "Data" in full_path_name
-            assert self.module.system_ID in full_path_name
-            if os.path.isdir(full_path_name):
+            assert "Data" in dirname
+            assert self.module.system_ID in dirname
+            if os.path.isdir(dirname):
                 print("{} folder already exists; trying alternate name".format(data_file_name))
                 append = 1
-                while (os.path.isdir("{}({})".format(full_path_name, append))):
+                while (os.path.isdir("{}({})".format(dirname, append))):
                     append += 1
 
-                full_path_name = "{}({})".format(full_path_name, append)
+                dirname = "{}({})".format(dirname, append)
                 
                 
                 self.sim_warning_msg.append("Overwrite warning - {} already exists "
-                                            "in Data directory\nSaving as {} instead".format(data_file_name, full_path_name))
+                                            "in Data directory\nSaving as {} instead".format(data_file_name, dirname))
                 
                 data_file_name = "{}({})".format(data_file_name, append)
                 
-            os.mkdir("{}".format(full_path_name))
+            os.mkdir("{}".format(dirname))
 
         except Exception:
             self.sim_warning_msg.append("Error: unable to create directory for results "
@@ -3013,7 +3013,8 @@ class Notebook:
         ## Create data files
         for layer_name, layer in self.module.layers.items():
             for variable in layer.s_outputs:
-                with tables.open_file("{}\\{}-{}.h5".format(full_path_name, data_file_name, variable), mode='w') as ofstream:
+                path = "{}\\{}-{}.h5".format(dirname, data_file_name, variable)
+                with tables.open_file(path, mode='w') as ofstream:
                     length = num_nodes[layer_name] 
                     if layer.s_outputs[variable].is_edge:
                         num_nodes[layer_name] += 1
@@ -3029,26 +3030,26 @@ class Notebook:
         self.update_sim_plots(0)
 
         try:
-            self.module.simulate("{}\\{}".format(full_path_name,data_file_name), 
+            self.module.simulate("{}\\{}".format(dirname,data_file_name), 
                                    num_nodes, self.n, self.dt,
                                    self.sys_flag_dict, self.hmax, init_conditions)
             
         except FloatingPointError:
             self.sim_warning_msg.append("Error: an unusual value occurred while simulating {}. "
                                         "This file may have invalid parameters.".format(data_file_name))
-            for file in os.listdir(full_path_name):
-                tpath = full_path_name + "\\" + file
+            for file in os.listdir(dirname):
+                tpath = dirname + "\\" + file
                 os.remove(tpath)
                 
-            os.rmdir(full_path_name)
+            os.rmdir(dirname)
             return
         except Exception as oops:
             self.sim_warning_msg.append("Error \"{}\" occurred while simulating {}\n".format(oops, data_file_name))
-            for file in os.listdir(full_path_name):
-                tpath = full_path_name + "\\" + file
+            for file in os.listdir(dirname):
+                tpath = dirname + "\\" + file
                 os.remove(tpath)
                 
-            os.rmdir(full_path_name)
+            os.rmdir(dirname)
             
             return
 
@@ -3057,10 +3058,7 @@ class Notebook:
         try:
             for i in range(1,6):
                 for var in self.sim_data:
-                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                              self.module.system_ID, 
-                                                              data_file_name, 
-                                                              data_file_name, var)
+                    path_name = "{}\\{}-{}.h5".format(dirname, data_file_name, var)
                     self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
                                                 single_tstep=True)
                 self.update_sim_plots(self.n, do_clear_plots=False)
@@ -3070,7 +3068,7 @@ class Notebook:
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
-        with open(full_path_name + "\\metadata.txt", "w+") as ofstream:
+        with open(dirname + "\\metadata.txt", "w+") as ofstream:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON {} AT {}\n".format(datetime.datetime.now().date(),datetime.datetime.now().time()))
             ofstream.write("System_class: {}\n".format(self.module.system_ID))
             
