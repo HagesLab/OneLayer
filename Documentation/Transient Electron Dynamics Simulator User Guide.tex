@@ -17,7 +17,8 @@
 			{\huge \@title}
 			\begin{large}
 				\par User Manual
-				\par v 1.1.
+				\par v 1.2.
+				\par "Layers"
 			\end{large}
 		\end{center}
 		\makeatother
@@ -27,7 +28,7 @@
 	\newpage
 	\section{Introduction}
 		\par
-		The Transient Electron Dynamics Simulator (TEDs) was originally designed to model a collection of time-dependent behaviors undergone by excited charge carriers within a nanowire with specified properties. Using SciPy odeint() methods, themselves based on the LSODA methods of the ODEPACK FORTRAN77 library, to evolve initial carrier distributions forward in time, the systems of differential equations can be solved numerically with a relatively simple Python solver.
+		The Transient Electron Dynamics Simulator (TEDs) was originally designed to model a collection of time-dependent behaviors undergone by excited charge carriers within a nanowire with specified properties. Using a solver library like Scipy Integrate to evolve initial carrier distributions forward in time, the systems of differential equations can be solved numerically with a relatively simple Python script.
 		
 		\par
 		Not so simple, however, is adapting a single Python solver for many nanosystem variants. Editing parameters directly in source code requires relaunching the solver repeatedly. Manually constructing initial distributions is tedious. Any solver can get the job done, but a solver operating underneath the hood of a graphical interface opens many opportunities for utility features to the solver and restores some user friendliness by minimizing the need to interact directly with source code.
@@ -36,7 +37,7 @@
 		With that in mind, the goals of TEDs are to streamline how initial conditions and parameters are fed into the solver and offer more options for how to package the output of the solver. This we refer to as the initial state-simulation-data analysis workflow - a common pattern for many time-resolved finite-element problems.
 		
 		\par
-		TEDs has since expanded beyond the singular problem it was originally designed for. To maximize re-usability of TEDs, any problem is defined as a standalone module file, a recipe detailing the parameters TEDs needs to apply, the outputs TEDs needs to calculate, and any special instructions TEDs needs to observe. New and existing module files may be swapped in and out as needed.
+		TEDs has since expanded beyond the single problem it was originally designed for. To maximize re-usability of TEDs, any problem is defined as a standalone module file, a recipe detailing the parameters TEDs needs to apply, the distinct physical layers TEDs should track, the outputs TEDs needs to calculate, and any special instructions TEDs needs to observe. New and existing module files may be swapped in and out as needed.
 		
 	\newpage
 	\section{Getting Started}
@@ -47,11 +48,11 @@
 			\label{fig:mod_select}
 			\centering
 			\includegraphics[scale=1]{"mod_select"}
-			\caption{Three modules are available by default: a general-purpose one-layer material, a nanowire with axial rather than surface emission, and a "toy" one-dimensional heat transfer problem.}
+			\caption{Three modules are available by default: a general-purpose one-layer material, a nanowire with axial rather than surface emission, and a specialized MAPI + Rubrene/DBP two-layer material.}
 		\end{figure}
 	
 		\par
-		TEDs scans the Modules directory for available module files and lists them in the Module Selection window. After selecting a module, TEDs performs some verifications to ensure that the basic features of the module are correctly implemented, with all issues printed to console. This verification step does \textit{not} check the accuracy of or detect problems in more advanced features, such as custom module functions, but TEDS will report any issues with these features at the time they are invoked. After verification, TEDs then checks for the presence of a set of working directories – “Initial”, “Data”, and “Analysis” – and automatically creates these in the same directory as the source code if they are missing. TEDs also checks for and creates a subdirectory within “Data” for the specific module being loaded.
+		TEDs scans the Modules directory for available module files and lists them in the Module Selection window. After selecting a module, TEDs performs some verification to ensure that the basic features of the module are correctly implemented, with all issues printed to console. This verification step does \textit{not} check the accuracy of or detect problems in more advanced features, such as custom module functions, but TEDS will report any issues with these features at the time they are invoked. After verification, TEDs then checks for the presence of a set of working directories – “Initial”, “Data”, and “Analysis” – and automatically creates these in the same directory as the source code if they are missing. TEDs also checks for and creates a subdirectory within “Data” for the specific module being loaded.
 	
 		\par
 		It is \textit{highly recommended} that all files created by TEDs remain in these directories – they are the only places TEDs will search for files, and TEDs may not be able to locate files stored elsewhere.
@@ -84,20 +85,20 @@
 	\section{The Inputs Tab - Defining the Model System}
 		\subsection{Overview}
 		    \par
-		    One of the most powerful features of TEDS is the ability to construct spatial distributions of \textit{system parameters} in addition to \textit{initial conditions}, allowing models whose properties differ positionally to be simulated like any other. The first step of creating a model is to define a space grid - wherein TEDs partitions the model length into equally sized nodes of specified width. Each node center and node width may then take on its own set of values independent of the others. These collections of values are then saved as model state files and later read by the simulator.
+		    One of the most powerful features of TEDS is the ability to construct spatial distributions of \textit{system parameters} in addition to \textit{initial conditions}, allowing models whose properties differ positionally to be simulated with no more difficulty than homogeneous models. The first step of creating a model is to define a space grid - wherein TEDs partitions the model length into equally sized nodes of specified width. Each node center and node edge may then take on its own set of values independent of the others. These collections of values are then saved as model state files and later read by the simulator.
 			\par
 			The Inputs Tab contains the following major components:
 			
 			\begin{figure}[H]
 				\label{fig:labeled_main_interface}
 				\centering
-				\includegraphics[scale=1]{"labeled_main_interface"}
+				\includegraphics[scale=0.4]{"labeled_main_interface"}
 				\caption{Key parts of Inputs Tab.}
 			\end{figure}
 		
 			\begin{enumerate}
 				\item Initial Condition Subtabs 
-				\par The Inputs Tab itself contains three subtabs – Laser Generation Condition (formerly Analytical Initial Condition), Parameter Toolkit, and Parameter List Upload. While initial condition and parameter distributions are zero by default, these three subtabs correspond to three methods available to modify them. A choice of subtab here affects the layout presented in [8].
+				\par The Inputs Tab itself contains three subtabs – Laser Generation Condition, Parameter Toolkit, and Parameter List Upload. While initial condition and parameter distributions are zero by default, these three subtabs correspond to three methods available to modify them. A choice of subtab here affects the layout presented in [9].
 				
 				\item Save, Load, and Reset Buttons
 				\par The Save and Load buttons are used to import and export model state files, discussed further in the sections \textit{Importing Model State Files} and \textit{Exporting Model State Files.}
@@ -133,16 +134,18 @@
 					\label{fig:flags}
 					\centering
 					\includegraphics[scale=1.5]{"flags"}
-					\caption{Flags for one-layer module.}
+					\caption{Flags for the One-Layer module.}
 				\end{figure}
 				
-				\par Module-specific flags can be toggled here. By default, two flags are available to the one-layer and nanowire modules.
+				\par Module-specific flags can be toggled here. By default, each of the three included modules has two flags.
 				
-				\par The "Ignore Photon Recycle" flag deactivates carrier regeneration and photon propagation effects within the simulation. If these effects are known to be minor, neglecting these terms can speed up the simulation.
+				\par The "Ignore Photon Recycle" flag deactivates carrier regeneration and photon recycling effects within the simulation. If these effects are known to be minor, neglecting these terms can speed up the simulation.
 				
-				\par The "Steady State Input" flag alters how the initial carrier densities $\Delta N$ and $\Delta P$ are treated. When active, TEDs assumes that continuously, $\Delta N$ and $\Delta P$ carriers per $ nm^{-3}$ are added to the model per $ ns $. This also alters how the Laser Generation Condition works - the LGC calculates a carrier density rate rather than an initial carrier density distribution (as from a single laser pulse)
+				\par The "Include FRET" flag determines whether fretting is active in the MAPI-Rubrene/DBP simulation. As with the "Ignore Photon Recycle" flag, this can be deactivated for a speedup if fretting is negligible.
 				
-				\par Furthermore, both the one-layer and nanowire modules define a hidden “symmetric system” flag – always active for the nanowire and inactive for the one-layer as according to their experimental setups (i.e. the nanowire is excited at its center whereas the one-layer is excited at its surface). Any module which includes this flag will, when this flag is activated for a model of length $L$, calculate a mirror model over the range 0 to $-L$ by copying the values from the actual model spanning 0 to $L$. This primarily affects whether photon recycle effects from the mirror space are included and whether integration into the mirror space is allowed.
+				\par The "Steady State Input" flag alters how the initial carrier densities $\Delta N$ and $\Delta P$ are treated. When active, TEDs assumes that continuously, $\Delta N$ and $\Delta P$ carriers per $ nm^{-3}$ are added to the model per $ ns $. This also alters how the Laser Generation Condition works - the LGC calculates a carrier injection rate $ (\frac{carriers}{nm^{3} ns})$ rather than an initial carrier density distribution $(\frac{carriers}{nm^{3}})$ as from a single laser pulse.
+				
+				\par Furthermore, the Nanowire module defines an always-active hidden “symmetric system” flag – as according to its experimental setup (i.e. the Nanowire is excited at its center whereas the one-layer is excited at its surface). Any module, (including user-made ones) which includes this flag will, when this flag is activated for a model of length $L$, calculate a mirror model over the range 0 to $-L$ by copying the values from the actual model spanning 0 to $L$. This primarily affects whether photon recycle effects from the mirror space are included and whether integration into the mirror space is allowed.
 				
 				\item Status Box
 				\par
@@ -151,14 +154,18 @@
 				\item Model Summary Buttons
 				\par These buttons can be used to view a list or plots of the current parameter values and can be used to verify a model state before saving to a file.
 				
+				\item Layer Selection Window
+				\par This area is used to swap between a module's layers. Following their namesakes, the OneLayer and Nanowire modules feature one layer while the MAPI-Rubrene/DBP module features one each for MAPI and Rubrene/DBP.
+				
+				\par Each layer maintains its own space grid and set of parameters. Check which layer is currently active in the status box to ensure that changes are being made to the correct layer.
+				
 				\item Parameter Distribution Generation Suite
 				\par The layout of this area and options available changes depending on which tab of [1] is selected. Details regarding how each of the generation suites operate are available in the subsections \textit{Laser Generation Conditions, Parameter Toolkit,} and \textit{Parameter List Upload}.
 				
 				\item Plots
-				\par Each of these two plots present a visualization of certain parameters of the initial state – a user-selected “snapshot” in the left plot, and the most recently changed parameter in the right plot.
+				\par Each plot appearing in this area presents a visualization of recently updated parameters of the initial state.
 				
-				\item Plot Options
-				\par These toolbars offer resizing and scaling of the Initial State Plots [9] as well as options to export images of the plots.
+				\par Toolbars below offer resizing and scaling of the Initial State Plots as well as options to export images of the plots.
 				
 			\end{enumerate}
 		
@@ -166,15 +173,15 @@
 			\begin{figure}[H]
 				\label{fig:LGC_blank}
 				\centering
-				\includegraphics[scale=0.6]{"LGC_blank"}
+				\includegraphics[scale=0.5]{"LGC_blank"}
 				\caption{Laser Generation Condition Tab.}
 			\end{figure}
 		
 			\par For select modules, the Laser Generation Condition can be used to generate $\Delta N$ and $\Delta P$ according to a series of laser pulse excitation equations.
 			
-			\par Using the parameters shown above, this mode assigns values to $\Delta N$ and $\Delta P$ at each node using the following equations:
+			\par Using the laser parameters shown above, this mode assigns values to $\Delta N$ and $\Delta P$ at each node for the selected layer using the following equations:
 	
-			\par First, the material parameter $\alpha$ may be calculated from the below or entered directly.
+			\par First, the absorption coefficient $\alpha$ may be calculated from the below or entered directly.
 			
 			\begin{equation}
 				\label{eq:LGC_absorption}
@@ -244,7 +251,7 @@
 			\label{fig:ptoolkit_point_plot}
 			\centering
 			\includegraphics[scale=1]{"ptoolkit_point_plot"}
-			\caption{In this example with the nanowire module, the symmetric system flag is active - note the mirrored half of the system represented in the plot.}
+			\caption{In this example with the Nanowire module, the symmetric system flag is active - note the mirrored half of the system represented in the plot.}
 		\end{figure}
 	
 		\par The FILL method fills every space point from the Left Bound Coordinate to the Right Bound Coordinate with the Left Bound Value. This method is useful for specifying regions with constant values and is a special case of the LINE method.
@@ -427,22 +434,24 @@
 	\section{Analyzing and Integrating Simulation Data}
 		\par The Analyze tab contains two subtabs – Overview and Detailed Analysis.
 		
-		\par The Overview tab plots a snapshot of various outputs over time for a selected data folder. For the one-layer and nanowire modules, these are, in addition to $\Delta N$ and $\Delta P$: the internal electric field, nonradiative and radiative combination, TRPL over full thickness, and effective lifetime $\tau_{diff}$
+		\par The Overview tab plots a snapshot of various outputs over time for a selected data folder. For the One-Layer and Nanowire modules, these are, in addition to $\Delta N$ and $\Delta P$: the internal electric field, nonradiative and radiative combination, TRPL over full thickness, and effective lifetime $\tau_{diff}$
 		
 		\begin{figure}[H]
 			\label{fig:overview_blank}
 			\centering
-			\includegraphics[scale=0.8]{"overview_blank"}
+			\includegraphics[scale=0.36]{"overview_blank"}
 			\caption{The Overview subtab when first opened. Click "Select Dataset" to choose a data set.}
 		\end{figure}
 	
 		\begin{figure}[H]
 			\label{fig:overview_example}
 			\centering
-			\includegraphics[scale=0.4]{"overview_example"}
-			\caption{An example overview of a One-Layer data set.}
+			\includegraphics[scale=0.36]{"overview_example"}
+			\caption{An example overview of a MAPI/Rubrene-DBP data set.}
 		\end{figure}
 	
+		\par Two types of plots are displayed - plots which display selected timesteps over the space grid and plots which display values calculated over the time grid. The "No. Samples" box and adjacent log/linear selector determine which timesteps are selected.
+		
 		\par To view other timesteps or TRPL over other ranges, for example, the Detailed Analysis tab should be used.
 		
 		\par The Detailed Analysis tab contains four smaller plots – for navigating through the time steps of selected data sets, and one larger plot – for showing results from integrating data sets from the smaller plots.
@@ -453,7 +462,7 @@
 			\label{fig:detailed_example}
 			\centering
 			\includegraphics[scale=1]{"detailed_example"}
-			\caption{An example of the Detailed Analysis tab in use. Here the PL data of three datasets is compared.}
+			\caption{An example of the Detailed Analysis tab in use. Here the TRPL data of three datasets is compared.}
 		\end{figure}
 		
 		\begin{figure}[H]
@@ -485,7 +494,7 @@
 			\caption{PL data from the previously selected data sets. All data when first plotted show their initial t=0 values.}
 		\end{figure}
 	
-		\par One major limitation, as demonstrated above by the fact that only four of the seven selected datasets have been plotted, is that the plotter can only plot datasets together if they have the same total time and time step size. If datasets with different total time or time step size should be compared, plotting each on a different plot is recommended.
+		\par One limitation, as demonstrated above by the fact that only four of the seven selected datasets have been plotted, is that the plotter can only plot datasets together if they have the same total time and time step size. If datasets with different total time or time step size should be compared, plotting each on a different plot is recommended.
 		
 		\par Datasets with different space grids and identical time grids, however, are compatible with one another.
 		
@@ -546,9 +555,14 @@
 		
 		\par TEDs supports two integration modes – “Over Time”, which integrates the plotted variable over a specified space interval at all time steps and generates a plot of how the integrated variable evolves over time, and “Current Time Step”, which integrates over the space interval at only the currently displayed time step. Because time is not displayed on the horizontal axis in the “Current Time Step” mode, the user is free to assign any variable to this axis. Combined with the Batch Initial Condition Tool, the “Current Time Step” mode is useful for sensitivity analyses over single parameters.
 		
-		\par For example, we may want to examine how the carrier density near the front of a nanowire is affected by the negative charge carrier mobility $\mu N$, but a plot of the spatial distributions can be quite chaotic.
-		
-		\par Upon clicking “Integrate”, the following popup appears for selecting the integration mode.
+		\par For example, we may want to examine how the carrier density near the front of a Nanowire is affected by the negative charge carrier mobility $\mu_N$, but a plot of the spatial distributions can be quite chaotic.
+		\begin{figure}[H]
+			\label{fig:mubatch_example}
+			\centering
+			\includegraphics{"mun"}
+		\end{figure}
+	
+		\par An integral may summarize the differences more clearly. Upon clicking “Integrate”, the following popup appears for selecting the integration mode.
 		
 		\begin{figure}[H]
 			\label{fig:integration_mode_example}
@@ -576,6 +590,16 @@
 		
 		\par For systems with the “symmetric system” flag active during a simulation, the integration can pass into the symmetric “other half” – for example, Fig. ~\ref{fig:integration_getbounds_example} will instead span over [-500, 500], [500,1500], and [1500,2500].
 		
+		\par For simplicity we will examine a single integral by modifying the inputs from the example above. Note that the "Multiple Integrals" feature allows for single integrals too.
+		
+		\begin{figure}[H]
+			\label{fig:integration_getbounds_example2}
+			\centering
+			\includegraphics[scale=0.77]{"integration_getbounds_example2"}
+			\caption{In this example, one integral over [500,1500] nm will be performed.}
+			
+		\end{figure}
+	
 		\par If the “Current Time Step” mode is selected, a third popup will appear for selecting the variable to be plotted on the horizontal axis.
 		
 		\begin{figure}[H]
@@ -597,13 +621,45 @@
 			\label{fig:integration_result_adj}
 			\centering
 			\includegraphics{"integration_result_adj"}
-			\caption{Integration results before and after adjusting using Axis Settings.}
+			\caption{Integration results before and after adjusting using Axis Settings. As expected, high mobility allows negative charge carriers to reach this region of the Nanowire faster, but this effect is only visible when mobility is sufficient to put the diffusion timescale near 2 ns.}
+		\end{figure}
+	
+		\subsection{Time Series - Extracting Additional Information from Integrated Data}
+		
+		\par When certain integrals are computed, TEDs will use the freshly integrated data to make additional calculations. TEDs calls these "Time Series" and displays the results in pop-up windows after the integration is complete.
+		
+		\begin{figure}[H]
+			\label{fig:timeseries_example}
+			\centering
+			\includegraphics[scale=0.38]{"timeseries"}
+			\caption{For example, when the TRPL over the MAPI layer of a MAPI-Rubrene/DBP dataset is computed, TEDs also computes the effective carrier lifetime and PL efficiency.}
+		\end{figure}
+	
+		\par The following table summarizes the Time Series available for each module. Integrate the quantity in the left column to obtain the values in the right column.
+		
+		\begin{figure}[H]
+			\label{fig:timeseries_table}
+			\centering
+			\includegraphics[scale=0.6]{"timeseries_table"}
 		\end{figure}
 	
 	\newpage
-	\section{Adding a Custom Module}
+	\section{Adding a Custom Module - Python Familiarity Recommended}
 	
-		\par By extending the OneD\_Model template class in the file \_OneD\_Model.py, custom modules can be created and simulated with TEDs. A complete module .py file must implement the following functions with the exact arguments specified in the template:
+		\subsection{The Module Object Hierarchy}
+	
+		\begin{figure}[H]
+			\label{fig:py_hierarchy}
+			\centering
+			\includegraphics[scale=0.4]{py_object_hierarchy.png}
+			\caption{Multilayer structure of TEDs modules.}
+		\end{figure}
+	
+		\par The \textit{Layer} is the fundamental building block of a TEDs module, representing a self-contained physical system with defined parameters, inputs, and outputs. Parameters and outputs are themselves objects which track internal information such as their names, values, and whether they exist on node edges or centers. Layers manage these objects and may interact with other layers according to the functions packaged in the module.
+		
+		\subsection{Filling Out the Module Template}
+		
+		\par By extending the OneD\_Model template class in the file \_OneD\_Model.py, custom modules can be created and simulated with TEDs. A complete module.py file must implement the following functions with the exact arguments specified in the template:
 		
 		\begin{itemize}
 			\item \_\_init\_\_()
@@ -611,10 +667,11 @@
 			\item simulate()
 			\item get\_overview\_analysis()
 			\item prep\_dataset()
+			\item get\_timeseries()
 			\item get\_IC\_carry()
 		\end{itemize}
 	
-		\par Additionally, any functions used by a module for calculating values should be defined within that module file. It is highly recommended that these employ numpy vectorization or similar for compatibility with both 1D and 2D inputs.
+		\par Additionally, any functions used by a module for calculating values should be defined within that module file. It is highly recommended that these employ Numpy vectorization or similar for compatibility with both 1D and 2D inputs.
 	
 		\par Once complete, the module.py file must be placed into the Modules directory and imported into main.py. An entry must also be added into mod\_list() in main.py. The new module can then be selected when TEDs is started.
 		
@@ -624,48 +681,86 @@
 			\includegraphics[scale=0.9]{"modules_here"}
 		\end{figure}
 	
-		\par The One-Layer module is the recommended starting point for semiconductor materials, while the HeatPlate module is provided as a proof-of-concept for TEDs's re-usability.
+		\par The One-Layer module is the recommended starting point for semiconductor materials, while other modules demonstrate how more advanced behaviors may be incorporated.
 		
-		\subsection{\textunderscore\textunderscore init \textunderscore\textunderscore()}
+		\subsubsection{\textunderscore\textunderscore init \textunderscore\textunderscore()}
 		
-		\par This function sets up all informational variables associated with the module and informs TEDs of what parameters or outputs need to be tracked. The following attributes must be implemented:
+		\par This function sets up all informational variables associated with the module and informs TEDs of what parameters or outputs need to be tracked for each layer. For the overall  \textbf{Module}, the following attributes must be implemented:
 		
 		\begin{itemize}
 			\item system\_ID
-			\par This is a string specifying the unique identifier of the module. Any string is acceptable, but it is recommended that the system\_ID reflect the name of the problem the module is intended to represent. For example, the standard one-layer's system\_ID is "OneLayer".
+			\par This is a string specifying the unique identifier of the module. Any string is acceptable, but it is recommended that the system\_ID reflect the name of the problem the module is intended to represent. For example, the standard One-Layer's system\_ID is "OneLayer".
 			
-			\item length\_unit and time\_unit
-			\par These are strings specifying the length unit (e.g. nm, m, km) the space grid is calculated in and the time unit (e.g. ns) the time grid is calculated in. These fields are for display purposes only (i.e. not explicitly used in calculations). However, the space and time grids are assumed to take on the same units as the parameters (e.g. these are in nm and ns for the One-Layer).
-			
-			\item param\_dict
-			\par This is a dictionary \{“parameter name”:Parameter()\} that stores an informational Parameter() object for each parameter. The Parameter() object contains information regarding the displayed units of the parameter, whether it should be calculated at a space node center or node edge, and the working values of the parameters.
+			\item time\_unit
+			\par This is a string specifying the time unit (e.g. "ns") the time grid is calculated in. This field is for plotting display purposes only (i.e. not explicitly used in calculations) but should match the internal time unit used by the module. For example, the time grid actually operates in units of ns for the three provided modules. User-created modules which describe slower physical phenomena may wish to design their solvers on the basis of larger time units.
 			
 			\item flags\_dict
-			\par This dictionary  \{“internal name”:”displayed name”\} can be used to define custom system flags, their default values, and whether these values should be toggleable. Examples of these are the "Steady State Input" and "Symmetric System" flags described in the Initial Tab Overview section.
+			\par This dictionary can be used to define custom system flags, whether these values should be toggleable, and their default values. Examples of these are the "Steady State Input" and "Ignore Photon Recycle" flags described in the Initial Tab Overview section.
 			
-			\item simulation\_outputs\_dict
-			\par This dictionary specifies which outputs are returned directly when TEDs simulates a system created from the module and uses Output() objects to store display information and operational flags regarding these outputs. For example, the One-Layer module simulates carrier densities; therefore the simulation outputs are $\Delta N$ and $\Delta P$. The display information is used to populate plot fields.
+			\item layers
+			\par This dictionary lists the Layer objects that a module is composed of. As discussed in the upcoming section, Layers control their own lists of parameters and outputs.
 			
-			\item calculated\_outputs\_dict
-			\par This dictionary specifies which outputs are calculated from those listed in simulation\_outputs\_dict but not simulated directly. For example, TRPL is not calculated during a simulation, but rather from $\Delta N$ and $\Delta P$ after the fact.
+		\end{itemize}
+	
+		\subsubsection{Defining Layers}
+		\par Layers are initialized with the following values:
+		
+		\begin{itemize}
+			\item length\_unit
+			\par This is a string specifying the length unit (e.g. "nm") the space grid for this layer is calculated in. Like the Module time\_unit, This field is for plotting display purposes only (i.e. not explicitly used in calculations) but should match the internal length unit used by the layer. For example, the space grid operates in units of nm for all layers in the three provided modules. Since the internal time unit is ns, this means all incoming parameters for these modules must be converted to the nm-ns unit system and all raw outputs will come out with these units. See the convert\_in and iconvert\_in sections for additional details.
 			
-			\par simulation\_ and calculated\_outputs\_dict are also combined into a outputs\_dict for convenience.
+			\item params
+			\par This is a dictionary of Parameter objects corresponding to the parameters which exist in this layer. For example, in the MAPI-Rubrene/DBP module, the MAPI Layer contains parameter objects for N and P mobilities while the Rubrene Layer contains similar objects for T, S, and D mobilities. Both material properties, such as mobilities, and initial conditions, such as $\Delta N(t=0)$, should be defined here.
 			
-			\item convert\_in\_dict
-			\par This dictionary specifies conversion factors that should be used to change from the values entered into the interface to the actual values used by calculation functions. Generally, this dictionary should be used to correct mismatches between common length and time units (such as inputting $cm^{-3}$ for carrier densities) and the length and time scale used by the module (i.e. the space grid is in nm rather than cm). One conversion factor must be defined for each input in param\_dict and each output in simulation\_ and calculated\_outputs\_dict.
+			\item simulation\_outputs
+			\par This dictionary specifies outputs which are returned directly when TEDs simulates a system created from the module and uses Output() objects to store information regarding these outputs. For example, the One-Layer module simulates carrier densities; therefore the simulation outputs are $N(x,t)$ and $P(x,t)$. The display information is used to populate plot fields.
+			
+			\par Any output here should have a corresponding Parameter from which initial values may be calculated. For example, the Output $N$ has Parameters $\Delta N(t=0)$ and $N_0$ which together calculate $N(t=0)$.
+			
+			\item calculated\_outputs
+			\par This dictionary specifies outputs which are calculated from those listed in simulation\_outputs but not simulated directly. For example, TRPL is not calculated during a simulation, but rather from $\Delta N$ and $\Delta P$ after the fact.
+			
+			\par simulation\_ and calculated\_outputs are also combined into a single outputs dictionary for convenience.
+			
+			\item convert\_in
+			\par This dictionary specifies conversion factors that should be used to change from the units entered into the interface to the internal solver units. Generally, this dictionary should be used to correct mismatches between common length and time units (such as inputting $cm^{-3}$ for carrier densities) and the length and time scale used by the module (i.e. the space grid is in $nm$ and works with $N$ in units of $nm^{-3}$ rather than their $cm$ counterparts). One conversion factor must be defined for each Parameter and Output. Quantities which do not need conversions should be assigned a conversion factor of 1.
+			
+			\item iconvert\_in
+			\par This dictionary specifies conversion factors that should be applied in addition to \textit{convert\_in} when integrals are calculated. For example, $N$ needs a \textit{convert\_in} entry to switch between $cm^{-3}$ and $nm^{-3}$, but when integrated over length, $N$ switches between $cm^{-2}$ and $nm^{-2}$ instead. The \textit{iconvert\_in} entry addresses the difference between $length^{-2}$ to $length^{-3}$. One conversion factor must be defined for each Output. Quantities which do not need conversions should be assigned a conversion factor of 1.
+		\end{itemize}
+	
+		\subsubsection{Defining Parameters}
+		\par Parameters are initialized with the following values:
+		
+		\begin{itemize}
+			\item units
+			\par This is a string specifying the units to be displayed with this parameter. Use this field to indicate the units this parameter should be entered and the conversion dictionaries to convert into internal solver units.
+			
+			\item is\_edge
+			\par Whether this parameter should be assigned to space node centers or space node edges.
+			
+			\item valid\_range
+			\par A tuple [a,b] used to restrict the allowed values for this parameter. Inputting values smaller than a or larger than b will raise an error. For example, only positive (a=0, b=infinity) mobility values are allowed. This is useful for screening out nonsense inputs.
+			
+			\item is\_space\_dependent
+			\par Setting this flag to False will exclude this parameter from all input methods except for the Fast Parameter Entry Tool, effectively allowing only single values to be assigned to this parameter. Surface parameters, such as the front and back surface recombination velocities, should have this flag deactivated.
+				
 		\end{itemize}
 	
 		\subsection{calc\textunderscore inits()}
-		\par This function is used by TEDs to obtain all initial conditions needed by the solver and must return a dictionary \{“param name”:np.ndarray\} containing one 1D array with the initial value of each space node per output in simulation\_outputs\_dict. Use of the module’s param\_dict to access material parameter values, convert\_in\_dict for unit conversions, and grid\_x\_nodes, and/or grid\_x\_edges to access the space grid is highly recommended.
+		\par This function is used by TEDs to obtain all initial conditions needed by the solver and must return a dictionary \{“param name”:np.ndarray\} containing one 1D array with the initial value of each space node per output in simulation\_outputs. Use of the module’s parameter dictionaries to access material parameter values, convert\_in for unit conversions, and grid\_x\_nodes, and/or grid\_x\_edges to access the space grids is highly recommended.
 		
 		\subsection{simulate()}
 		\par This function is used by TEDs to call the function(s) responsible for (1) preprocessing inputs, (2) simulating the data, and (3) writing the data to output files. It is not required to use all of simulate()’s arguments, and any implementation which completes the three mentioned items is acceptable. For the One-Layer, all three of these tasks are completed by the driver function ode\_nanowire().
 		
 		\subsection{get\_overview\_analysis()}
-		\par Like calc\_inits(), this function must return a dictionary \{“param name”:np.ndarray\} containing one array per output in simulation\_ and calculated\_outputs\_dict. The u\_read() helper function is recommended for reading in a section of data over a specified time and space range.
+		\par Like calc\_inits(), this function must return a dictionary \{“param name”:np.ndarray\} containing one array per output in simulation\_ and calculated\_outputs. The u\_read() helper function is recommended for reading in a section of data over a specified time and space range.
 		
 		\subsection{prep\_dataset()}
-		\par This function is used to do preprocessing of data prior to plotting and must return a 1D array of data (a single time step) to be plotted or a 2D array (time and space) to be integrated. For instance, the TRPL requires multiplying the radiative recombination by a weighting function prior to plotting. For most outputs preprocessing is simply reading the appropriate entry of sim\_data or calling the appropriate calculation function.
+		\par This function is used to do preprocessing of data prior to plotting and must return a 1D array of data (a single time step) to be plotted or a 2D array (time and space) to be integrated. For instance, in some modules the TRPL requires multiplying the radiative recombination by a weighting function to account for photon recycling prior to plotting. For most outputs preprocessing is simply reading the appropriate entry of sim\_data or calling an appropriate calculation function.
+		
+		\subsection{get\_timeseries()}
+		\par This function is used to calculate the time series associated with specific outputs. A list of tuples should be returned - one tuple per time series. Each tuple contains two values - first value the name of the time series and second value a 1D np.ndarray containing the time series values. 
 		
 		\subsection{get\_IC\_carry()}
 		\par This function is used to assign current data values to param\_dict for regenerating MSF files using the carryover feature. This function must write into the appropriate entry of param\_dict using include\_flags to determine how to respond to which items are selected in the carryover feature.
