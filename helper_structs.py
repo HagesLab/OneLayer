@@ -122,6 +122,11 @@ class Parameter(Characteristic):
 
         Parameters
         ----------
+        valid_range : tuple
+            The range of allowed values for this parameter. For example, 
+            some parameters are always positive.
+            (valid range = (0, inf)) 
+        
         is_space_dependent : bool, optional
             Whether the GUI should allow assigning a space-dependent distribution
             (i.e. an array of node values) to this parameter.

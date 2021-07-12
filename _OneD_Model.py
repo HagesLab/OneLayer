@@ -5,7 +5,7 @@ Created on Wed May 12 18:01:25 2021
 @author: cfai2
 """
 import numpy as np
-from helper_structs import Parameter, Output
+from helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos
 import tables
 
@@ -17,14 +17,12 @@ class OneD_Model:
     This class stores information regarding a module's 
     Layers, Parameters, Outputs, and Flags.
     
-    Also stores information used to build the initial state of a model system,
-    such as space grids and parameter rules/distributions.
-    
-    All child modules must populate __init__'s dicts and implement:
+    All child modules must populate __init__'s fields and implement:
         calc_inits()
         simulate()
         get_overview_analysis()
         prep_dataset()
+        get_timeseries()
         get_IC_carry()
     """
     
@@ -32,32 +30,34 @@ class OneD_Model:
         # Unique identifier for module.
         self.system_ID = "INSERT MODEL NAME HERE"  
         
+        # Internal time unit for this module's solvers.
+        
         self.time_unit = "[ns]"
+        
+        # List of layers in this module.
         self.layers = {}
-        # Parameter list.
-        params = {}
+
+        params = {"Example Parameter": Parameter(units="[cm / s]", is_edge=False, valid_range=(0,np.inf))}
 
         # dict {"Flag's internal name":
         #       ("Flag's display name",whether Flag1 is toggleable, Flag1's default value)
         #      }
         self.flags_dict = {"Flag1":("Flag1's name",1, 0)}
         
-        # dict {"Variable name":Output()} of all dependent variables active during the finite difference simulating        
-        # calc_inits() must return values for each of these or an error will be raised!
-        simulation_outputs = {}
-        
-        # dict {"Variable name":Output()} of all secondary variables calculated from those in simulation_outputs_dict
-        calculated_outputs = {}
 
-        ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
-        # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
-        # Each item in param_dict and outputs_dict must have an entry here, even if the conversion factor is one
-        convert_in = {}
+        simulation_outputs = {"Example Output":Output("Output name", units="[cm^-3]", integrated_units="[cm^-2]",
+                                                      xlabel="cm", xvar="position", is_edge=False, 
+                                                      layer="Example Layer", yscale='symlog', yfactors=(1e-4,1e1))}
+        calculated_outputs = {}
+        convert_in = {"Example Parameter": 1e-2, # [cm / s] to [nm / ns]
+                      "Example Output": 1e-21, # [cm^-3] to [nm^-3]
+                      }
+        iconvert_in = {"Example Output": 1e7 # [cm] to [nm]
+                       }
         
-        # The integration tool uses whatever units self.dx is in.
-        # Define the "integration_scale" entry to correct for any mismatches
-        # between the integrand's and self.dx's length units.
-        convert_in["integration_scale"] = 1
+        self.layers["Example Layer"] = Layer(params, simulation_outputs, calculated_outputs, 
+                                             "[nm]", convert_in, iconvert_in)
+
 
         return
     
@@ -215,7 +215,6 @@ class OneD_Model:
 
         """
         
-        
         mssg = []
         for layer in self.layers:
             mssg.append("LAYER: {}".format(layer))
@@ -243,7 +242,7 @@ class OneD_Model:
         """
         Uses the self.param_dict to calculate initial conditions for ODEINT.
         
-        In many cases this is just returning the appropriate parameter from self.param_dict.
+        In many cases this is just returning the appropriate parameter from layer's param dict.
 
         Returns
         -------
@@ -254,7 +253,7 @@ class OneD_Model:
         
         return {}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
         """
         Uses the provided args to call a numerical solver and write results to .h5 files.
         
@@ -272,12 +271,8 @@ class OneD_Model:
             Number of time steps.
         dt : float
             Time step size.
-        params : dict {"param name": 1D numpy array} or dict {"param name": float}
-            Collection of parameter values.
         flags : dict {"Flag internal name": Flag()}
             Collection of flag instances.
-        do_ss : bool
-            Special steady state injection flag.
         hmax_ : float
             Maximum time stepsize to be taken by ODEINT().
         init_conditions : dict {"param name": 1D numpy array}
@@ -371,9 +366,38 @@ class OneD_Model:
         return data
     
     def get_timeseries(self, pathname, datatype, parent_data, total_time, dt):
+        """
+        Calculate all time series associated with datatype after integrating.
+
+        Parameters
+        ----------
+        pathname : str
+            Path to simulated data .h5 files, excluding the datatype identifier.
+            Use a string such as pathname + "-N.h5" to access the simulated data.
+        datatype : str
+            Data type that was just integrated. Use this value to associate different
+            time series with related data types.
+        parent_data : np.ndarray
+            Values that were just integrated. Often the time series can be calculated
+            directly from this if a good choice of datatype-time series
+            association is made.
+        total_time : float
+            Final time value the simulated data go up to.
+        dt : float
+            Time step size.
+
+        Returns
+        -------
+        list
+            DESCRIPTION.
+
+        """
         
         if datatype == "PL":
             return [("tau_diff", None)]
+        
+        elif datatype == "Another data type":
+            return [("a different time series", None)]
         
         else:
             return
