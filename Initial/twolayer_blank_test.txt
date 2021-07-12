@@ -1,0 +1,44 @@
+$$ INITIAL CONDITION FILE CREATED ON 2021-07-06 AT 14:57:37.036587
+System_class: MAPI_Rubrene
+f$ System Flags:
+do_fret: 0
+check_do_ss: 0
+symmetric_system: 0
+L$: MAPI
+p$ Space Grid:
+Total_length: 500.0
+Node_width: 5.0
+p$ System Parameters:
+mu_N: 0.0
+mu_P: 0.0
+N0: 100000000.0
+P0: 1000000000000000.0
+B: 0.0
+tau_N: 1e+20
+tau_P: 1e+20
+Sf: 0.0
+Sb: 0.0
+Cn: 0.0
+Cp: 0.0
+MAPI_temperature: 300.0
+rel_permitivity: 10.0
+delta_N: 1e+18
+delta_P: 1e+18
+L$: Rubrene
+p$ Space Grid:
+Total_length: 100.0
+Node_width: 2.0
+p$ System Parameters:
+mu_T: 0.0
+mu_S: 0.0
+T0: 0.0
+tau_T: 1e+20
+tau_S: 1e+20
+tau_D: 1e+20
+k_fusion: 0.0
+k_0: 0.0
+St: 0.0
+Rubrene_temperature: 300.0
+delta_T: 0.0
+delta_S: 0.0
+delta_D: 0.0
