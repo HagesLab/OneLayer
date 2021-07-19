@@ -1731,25 +1731,31 @@ class Notebook:
                 all_outputs += [output for output in layer.outputs if layer.outputs[output].analysis_plotable]
             tk.OptionMenu(self.plotter_popup, self.data_var, 
                           *all_outputs).grid(row=1,column=0)
-
-            tk.Checkbutton(self.plotter_popup, 
-                           text="Auto integrate all space and time steps?", 
-                           variable=self.check_autointegrate, 
-                           onvalue=1, offvalue=0).grid(row=1,column=1)
             
-            tk.Button(self.plotter_popup, 
-                      text="Continue", 
-                      command=partial(self.on_plotter_popup_close, 
-                                      plot_ID, continue_=True)).grid(row=2,column=1)
-
-            self.data_listbox = tk.Listbox(self.plotter_popup, width=20, 
+            self.data_listbox_frame = tk.Frame(self.plotter_popup)
+            self.data_listbox_frame.grid(row=2,column=0, rowspan=99)
+            self.data_listbox = tk.Listbox(self.data_listbox_frame, width=30, 
                                            height=20, 
                                            selectmode="extended")
-            self.data_listbox.grid(row=2,rowspan=13,column=0)
+            self.data_listbox.grid(row=0,column=0)
             self.data_listbox.delete(0,tk.END)
             self.data_list = [file for file in os.listdir(self.default_dirs["Data"] + "\\" + self.module.system_ID) 
                               if not file.endswith(".txt")]
             self.data_listbox.insert(0,*(self.data_list))
+
+            self.data_listbox_scrollbar = tk.ttk.Scrollbar(self.data_listbox_frame, orient="vertical",
+                                                           command=self.data_listbox.yview)
+            self.data_listbox_scrollbar.grid(row=0,column=1, sticky='ns')
+            
+            self.data_listbox.config(yscrollcommand=self.data_listbox_scrollbar.set)
+
+            tk.Checkbutton(self.plotter_popup, text="Auto-integrate", 
+                           variable=self.check_autointegrate, 
+                           onvalue=1, offvalue=0).grid(row=1,column=1)
+            
+            tk.Button(self.plotter_popup, text="Continue", 
+                      command=partial(self.on_plotter_popup_close, 
+                                      plot_ID, continue_=True)).grid(row=2,column=1)
 
             self.plotter_status = tk.Text(self.plotter_popup, width=24,height=2)
             self.plotter_status.grid(row=3,rowspan=2,column=1)
