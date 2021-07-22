@@ -90,7 +90,7 @@ class Data_Set:
         
 class Raw_Data_Set(Data_Set):
     """Object containing all the metadata required to plot and integrate saved data sets"""
-    def __init__(self, data, grid_x, node_x, params_dict, type, filename, show_index):
+    def __init__(self, data, grid_x, node_x, total_time, dt, params_dict, type, filename, show_index):
         super().__init__(data, grid_x, params_dict, type, filename)
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
 
@@ -98,8 +98,9 @@ class Raw_Data_Set(Data_Set):
         # There's a little optimization that can be made here because grid_x will either be identical to node_x or not, but that makes the code harder to follow
 
         self.show_index = show_index # Time step number data belongs to
-
-        self.num_tsteps = int(0.5 + self.params_dict["Total-Time"] / self.params_dict["dt"])
+        self.total_time = total_time
+        self.dt = dt
+        self.num_tsteps = int(0.5 + total_time / dt)
         return
 
     def build(self):
@@ -107,8 +108,10 @@ class Raw_Data_Set(Data_Set):
         return np.vstack((self.grid_x, self.data))
     
 class Integrated_Data_Set(Data_Set):
-    def __init__(self, data, grid_x, params_dict, type, filename):
+    def __init__(self, data, grid_x, total_time, dt, params_dict, type, filename):
         super().__init__(data, grid_x, params_dict, type, filename)
+        self.total_time = total_time
+        self.dt = dt
         return
     
 
@@ -116,6 +119,9 @@ class Data_Group:
     def __init__(self):
         self.type = "None"
         self.datasets = {}
+        self.flags = None
+        self.dt = -1
+        self.total_t = -1
         return
     
     def get_maxval(self):
@@ -134,20 +140,18 @@ class Data_Group:
 class Raw_Data_Group(Data_Group):
     def __init__(self):
         super().__init__()
-        self.dt = -1
-        self.total_t = -1
         return
 
     def add(self, data, tag):
         
         if not self.datasets: 
             # Allow the first set in to set the dt and t restrictions
-            self.dt = data.params_dict["dt"]
-            self.total_t = data.params_dict["Total-Time"]
+            self.dt = data.dt
+            self.total_t = data.total_time
             self.type = data.type
 
         # Only allow datasets with identical time step size and total time
-        if (self.dt == data.params_dict["dt"] and self.total_t == data.params_dict["Total-Time"] and self.type == data.type):
+        if (self.dt == data.dt and self.total_t == data.total_time and self.type == data.type):
             self.datasets[tag] = data
 
         else:
@@ -162,12 +166,16 @@ class Raw_Data_Group(Data_Group):
             result.append(self.datasets[key].data * convert_out_dict[self.type])
         return result
 
-    def get_max_x(self):
-        return np.amax([self.datasets[tag].params_dict["Total_length"] 
-                        for tag in self.datasets])
+    def get_max_x(self, is_edge):
+        if is_edge:
+            return np.amax([self.datasets[tag].grid_x[-1]
+                            for tag in self.datasets])
+        else:
+            return np.amax([2 * self.datasets[tag].grid_x[-1] - self.datasets[tag].grid_x[-2]
+                            for tag in self.datasets])
 
     def get_maxtime(self):
-        return np.amax([self.datasets[tag].params_dict["Total-Time"] 
+        return np.amax([self.datasets[tag].total_time
                         for tag in self.datasets])
 
     def get_maxnumtsteps(self):
@@ -181,6 +189,8 @@ class Integrated_Data_Group(Data_Group):
     def add(self, new_set):
         if not self.datasets: 
             # Allow the first set in to set the type restriction
+            self.dt = new_set.dt
+            self.total_t = new_set.total_time
             self.type = new_set.type
 
         # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong

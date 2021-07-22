@@ -5,88 +5,71 @@ Created on Wed May 12 18:01:25 2021
 @author: cfai2
 """
 import numpy as np
-from _helper_structs import Parameter, Output
+from helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos
 import tables
 
 class OneD_Model:
-    """
-    Template class for modules.
+    """ Template class for modules.
     
-    Stores information regarding a module's parameters, outputs, and flags.
+    Modules act as blueprints used to create simulated models.
     
-    Also stores information used to build the initial state of a model system,
-    such as space grid and parameter rules/distributions.
+    This class stores information regarding a module's 
+    Layers, Parameters, Outputs, and Flags.
     
-    All child classes must populate __init__'s dicts and implement:
+    All child modules must populate __init__'s fields and implement:
         calc_inits()
         simulate()
         get_overview_analysis()
         prep_dataset()
+        get_timeseries()
         get_IC_carry()
     """
     
     def __init__(self):
         # Unique identifier for module.
-        self.system_ID = "INSERT MODEL NAME HERE"
+        self.system_ID = "INSERT MODEL NAME HERE"  
         
-        # Space grid information.
-        self.total_length = -1
-        self.dx = -1
-        self.length_unit = "INSERT LENGTH UNIT HERE"
-        self.time_unit = "Insert time unit here"
-        self.grid_x_nodes = -1
-        self.grid_x_edges = -1
-        self.spacegrid_is_set = False
+        # Internal time unit for this module's solvers.
         
-        # Parameter list.
-        self.param_dict = {}
-        self.param_count = len(self.param_dict)
+        self.time_unit = "[ns]"
         
+        # List of layers in this module.
+        self.layers = {}
+
+        params = {"Example Parameter": Parameter(units="[cm / s]", is_edge=False, valid_range=(0,np.inf))}
+
         # dict {"Flag's internal name":
         #       ("Flag's display name",whether Flag1 is toggleable, Flag1's default value)
         #      }
         self.flags_dict = {"Flag1":("Flag1's name",1, 0)}
         
-        # dict {"Variable name":Output()} of all dependent variables active during the finite difference simulating        
-        # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"Output1":Output("y", units="[hamburgers/football field]", xlabel="a.u.", xvar="position", is_edge=False, yscale='log', yfactors=(1e-4,1e1))}
+
+        simulation_outputs = {"Example Output":Output("Output name", units="[cm^-3]", integrated_units="[cm^-2]",
+                                                      xlabel="cm", xvar="position", is_edge=False, 
+                                                      layer="Example Layer", yscale='symlog', yfactors=(1e-4,1e1))}
+        calculated_outputs = {}
+        convert_in = {"Example Parameter": 1e-2, # [cm / s] to [nm / ns]
+                      "Example Output": 1e-21, # [cm^-3] to [nm^-3]
+                      }
+        iconvert_in = {"Example Output": 1e7 # [cm] to [nm]
+                       }
         
-        # dict {"Variable name":Output()} of all secondary variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"deltaN":Output("delta_N", units="[cm^-3]", xlabel="nm", xvar="position", is_edge=False)}
-        
-        self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
-        
-        self.simulation_outputs_count = len(self.simulation_outputs_dict)
-        self.calculated_outputs_count = len(self.calculated_outputs_dict)
-        self.total_outputs_count = self.simulation_outputs_count + self.calculated_outputs_count
-        
-        ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
-        # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
-        # Each item in param_dict and outputs_dict must have an entry here, even if the conversion factor is one
-        self.convert_in_dict = {"Output1": ((1e-2) / (1e2)),               # [hamburgers/football field] to [centihamburgers/yard]
-                                "deltaN": ((1e-7) ** 3)                    # [cm^-3] to [nm^-3]
-                                }
-        
-        # The integration tool uses whatever units self.dx is in.
-        # Define the "integration_scale" entry to correct for any mismatches
-        # between the integrand's and self.dx's length units.
-        self.convert_in_dict["integration_scale"] = 1
-        
-        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
-        self.convert_out_dict = {}
-        for param in self.convert_in_dict:
-            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
+        self.layers["Example Layer"] = Layer(params, simulation_outputs, calculated_outputs, 
+                                             "[nm]", convert_in, iconvert_in)
+
 
         return
     
-    def add_param_rule(self, param_name, new_rule):
+    def add_param_rule(self, layer, param_name, new_rule):
         """
 
         Parameters
         ----------
+        layer : str
+            Layer from which param should be selected.
         param_name : str
-            Name of a parameter from self.param_dict.
+            Name of a parameter from a layers' params dict.
         new_rule : helper_structs.Parameter()
             New Parameter() instance created from TEDs.add_paramrule()
 
@@ -95,17 +78,19 @@ class OneD_Model:
         None.
 
         """
-        self.param_dict[param_name].param_rules.append(new_rule)
-        self.update_param_toarray(param_name)
+        self.layers[layer].params[param_name].param_rules.append(new_rule)
+        self.update_param_toarray(layer, param_name)
         return
 
-    def swap_param_rules(self, param_name, i):
+    def swap_param_rules(self, layer, param_name, i):
         """
 
         Parameters
         ----------
+        layer : str
+            Layer from which param should be selected.
         param_name : str
-            Name of a parameter from self.param_dict
+            Name of a parameter from a layer's param dict
         i : int
             Index of parameter rule to be swapped with i-1
 
@@ -114,17 +99,20 @@ class OneD_Model:
         None.
 
         """
-        self.param_dict[param_name].param_rules[i], self.param_dict[param_name].param_rules[i-1] = self.param_dict[param_name].param_rules[i-1], self.param_dict[param_name].param_rules[i]
-        self.update_param_toarray(param_name)
+        param = self.layers[layer].params[param_name]
+        param.param_rules[i], param.param_rules[i-1] = param.param_rules[i-1], param.param_rules[i]
+        self.update_param_toarray(layer, param_name)
         return
 
-    def remove_param_rule(self, param_name, i):
+    def remove_param_rule(self, layer, param_name, i):
         """
 
         Parameters
         ----------
+        layer : str
+            Layer from which param should be selected.
         param_name : str
-            Name of parameter from self.param_dict
+            Name of a parameter from a layer's param dict
         i : int
             Index of parameter rule to be deleted
 
@@ -133,63 +121,67 @@ class OneD_Model:
         None.
 
         """
-        self.param_dict[param_name].param_rules.pop(i)
-        self.update_param_toarray(param_name)
+        self.layers[layer].params[param_name].param_rules.pop(i)
+        self.update_param_toarray(layer, param_name)
         return
     
-    def removeall_param_rules(self, param_name):
+    def removeall_param_rules(self, layer, param_name):
         """
         Deletes all parameter rules and resets stored distribution for a given parameter
 
         Parameters
         ----------
+        layer : str
+            Layer from which param should be selected.
         param_name : str
-            Name of parameter from self.param_dict
+            Name of a parameter from a layer's param dict
 
         Returns
         -------
         None.
 
         """
-        self.param_dict[param_name].param_rules = []
-        self.param_dict[param_name].value = 0
+        self.layers[layer].params[param_name].param_rules = []
+        self.layers[layer].params[param_name].value = 0
         return
     
-    def update_param_toarray(self, param_name):
+    def update_param_toarray(self, layer, param_name):
         """ Recalculate a Parameter from its Param_Rules"""
         # This should be done every time the Param_Rules are changed
-        # All params are stored as array, even if the param is space invariant
-        param = self.param_dict[param_name]
+        # All params calculated in this fashion are stored as array, 
+        # even if the param is space invariant
+        param = self.layers[layer].params[param_name]
 
         if param.is_edge:
-            new_param_value = np.zeros(len(self.grid_x_edges))
+            new_param_value = np.zeros(len(self.layers[layer].grid_x_edges))
         else:
-            new_param_value = np.zeros(len(self.grid_x_nodes))
+            new_param_value = np.zeros(len(self.layers[layer].grid_x_nodes))
 
         for condition in param.param_rules:
-            i = to_index(condition.l_bound, self.dx, self.total_length, param.is_edge)
+            i = to_index(condition.l_bound, self.layers[layer].dx, 
+                         self.layers[layer].total_length, param.is_edge)
             
             # If the left bound coordinate exceeds the width of the node toIndex() (which always rounds down) 
             # assigned, it should actually be mapped to the next node
-            if (condition.l_bound - to_pos(i, self.dx, param.is_edge) > self.dx / 2): 
+            if (condition.l_bound - to_pos(i, self.layers[layer].dx, param.is_edge) > self.layers[layer].dx / 2): 
                 i += 1
 
             if (condition.type == "POINT"):
                 new_param_value[i] = condition.l_boundval
 
             elif (condition.type == "FILL"):
-                j = to_index(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                j = to_index(condition.r_bound, self.layers[layer].dx, self.layers[layer].total_length, param.is_edge)
                 new_param_value[i:j+1] = condition.l_boundval
 
             elif (condition.type == "LINE"):
                 slope = (condition.r_boundval - condition.l_boundval) / (condition.r_bound - condition.l_bound)
-                j = to_index(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                j = to_index(condition.r_bound, self.layers[layer].dx, self.layers[layer].total_length, param.is_edge)
 
-                ndx = np.linspace(0, self.dx * (j - i), j - i + 1)
+                ndx = np.linspace(0, self.layers[layer].dx * (j - i), j - i + 1)
                 new_param_value[i:j+1] = condition.l_boundval + ndx * slope
 
             elif (condition.type == "EXP"):
-                j = to_index(condition.r_bound, self.dx, self.total_length, param.is_edge)
+                j = to_index(condition.r_bound, self.layers[layer].dx, self.layers[layer].total_length, param.is_edge)
 
                 ndx = np.linspace(0, j - i, j - i + 1)
                 try:
@@ -200,6 +192,16 @@ class OneD_Model:
         param.value = new_param_value
         return
     
+    def count_s_outputs(self):
+        count = 0
+        for layer_name, layer in self.layers.items():
+            count += layer.s_outputs_count
+        return count
+    
+    def find_layer(self, output):
+        for layer_name, layer in self.layers.items():
+            if output in layer.outputs:
+                return layer_name
     def DEBUG_print(self):
         """
         Prepares a summary of the current state of all parameters.
@@ -213,24 +215,34 @@ class OneD_Model:
 
         """
         
-        mssg = ""
-        if self.spacegrid_is_set:
-            mssg += ("Space Grid is set\n")
-            mssg += ("Nodes: {}\n".format(self.grid_x_nodes))
-            mssg += ("Edges: {}\n".format(self.grid_x_edges))
-        else:
-            mssg += ("Grid is not set\n")
-
-        for param in self.param_dict:
-            mssg += ("{} {}: {}\n".format(param, self.param_dict[param].units, self.param_dict[param].value))
-
-        return mssg
+        mssg = []
+        for layer in self.layers:
+            mssg.append("LAYER: {}".format(layer))
+            if self.layers[layer].spacegrid_is_set:
+                mssg.append("Space Grid is set")
+                if len(self.layers[layer].grid_x_nodes) > 20:
+                    mssg.append("Nodes: [{}...{}]".format(", ".join(map(str,self.layers[layer].grid_x_nodes[0:3])),
+                                                        ", ".join(map(str,self.layers[layer].grid_x_nodes[-3:]))))
+                    mssg.append("Edges: [{}...{}]".format(", ".join(map(str,self.layers[layer].grid_x_edges[0:3])),
+                                                        ", ".join(map(str,self.layers[layer].grid_x_edges[-3:]))))
+                    
+                else:
+                    mssg.append("Nodes: {}".format(self.layers[layer].grid_x_nodes))
+                    mssg.append("Edges: {}".format(self.layers[layer].grid_x_edges))
+            else:
+                mssg.append("Grid is not set")
+    
+            for param in self.layers[layer].params:
+                mssg.append("{} {}: {}".format(param, self.layers[layer].params[param].units,
+                                               self.layers[layer].params[param].value))
+            mssg.append("#########")
+        return "\n".join(mssg)
     
     def calc_inits(self):
         """
         Uses the self.param_dict to calculate initial conditions for ODEINT.
         
-        In many cases this is just returning the appropriate parameter from self.param_dict.
+        In many cases this is just returning the appropriate parameter from layer's param dict.
 
         Returns
         -------
@@ -241,7 +253,7 @@ class OneD_Model:
         
         return {}
     
-    def simulate(self, data_path, m, n, dt, params, flags, do_ss, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
         """
         Uses the provided args to call a numerical solver and write results to .h5 files.
         
@@ -259,12 +271,8 @@ class OneD_Model:
             Number of time steps.
         dt : float
             Time step size.
-        params : dict {"param name": 1D numpy array} or dict {"param name": float}
-            Collection of parameter values.
         flags : dict {"Flag internal name": Flag()}
             Collection of flag instances.
-        do_ss : bool
-            Special steady state injection flag.
         hmax_ : float
             Maximum time stepsize to be taken by ODEINT().
         init_conditions : dict {"param name": 1D numpy array}
@@ -278,7 +286,7 @@ class OneD_Model:
 
         return
     
-    def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
+    def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """
         Perform and package all calculations to be displayed on TEDs OVerview Analysis tab.
 
@@ -286,6 +294,12 @@ class OneD_Model:
         ----------
         params : dict {"param name": 1D numpy array or float}
             Paramteres used in simulation and stored in metadata.
+        flags : dict {"flag name": int}
+            Flags used in simulation and stored in metadata.
+        total_time : float
+            Total time of simulation
+        dt : float
+            Timestep used in simulation
         tsteps : list, 1D numpy array
             Time step indices overview should sample over
         data_dirname : str
@@ -307,7 +321,7 @@ class OneD_Model:
 
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
+    def prep_dataset(self, datatype, sim_data, params, flags, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
         """
         Use the raw data in sim_data to calculate quantities in self.outputs_dict.
         If datatype is in self.simulated_outputs dict this just needs to return the correct item from sim_data
@@ -320,6 +334,8 @@ class OneD_Model:
             Collection of raw data read from .h5 files. 1D if single time step or 2D if time and space range.
         params : dict {"param name": 1D numpy array}
             Collection of param values from metadata.txt.
+        flags : dict {"flag name": int}
+            Collection of flag values from metadata.txt.
         for_integrate : bool, optional
             Whether this function is being called by do_Integrate. Used for integration-specific procedures.
             All other optional arguments are needed only if for_integrate is True.
@@ -349,6 +365,43 @@ class OneD_Model:
                 
         return data
     
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt):
+        """
+        Calculate all time series associated with datatype after integrating.
+
+        Parameters
+        ----------
+        pathname : str
+            Path to simulated data .h5 files, excluding the datatype identifier.
+            Use a string such as pathname + "-N.h5" to access the simulated data.
+        datatype : str
+            Data type that was just integrated. Use this value to associate different
+            time series with related data types.
+        parent_data : np.ndarray
+            Values that were just integrated. Often the time series can be calculated
+            directly from this if a good choice of datatype-time series
+            association is made.
+        total_time : float
+            Final time value the simulated data go up to.
+        dt : float
+            Time step size.
+
+        Returns
+        -------
+        list
+            DESCRIPTION.
+
+        """
+        
+        if datatype == "PL":
+            return [("tau_diff", None)]
+        
+        elif datatype == "Another data type":
+            return [("a different time series", None)]
+        
+        else:
+            return
+    
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
         """
         Overwrites param_dict with values from the current data analysis in preparation for generating
@@ -377,26 +430,12 @@ class OneD_Model:
     def verify(self):
         """Performs basic syntactical checks on module's attributes."""
         print("Verifying selected module...")
-        for param in self.param_dict:
-            assert isinstance(param, str), "Error: invalid name {} in param dict. Param names must be strings".format(param)
-            assert isinstance(self.param_dict[param], Parameter), "Error: param dict {} is not a Parameter() object".format(param)
-
-        for output in self.outputs_dict:
-            assert isinstance(output, str), "Error: invalid name {} in outputs dict. Output names must be strings".format(output)
-            assert isinstance(self.outputs_dict[output], Output), "Error: output dict {} is not an Output() object".format(output)
         
-        params = set(self.param_dict.keys()).union(set(self.outputs_dict.keys()))
-        params_in_cdict = set(self.convert_in_dict.keys())
-        assert (params.issubset(params_in_cdict)), "Error: conversion_dict is missing entries {}".format(params.difference(params_in_cdict))
         
         if not "symmetric_system" in self.flags_dict:
             print("Warning: no symmetric_system flag defined."
                   "Automatically setting symmetric_system to FALSE")
             self.flags_dict["symmetric_system"] = ("Symmetric System", 0, 0)
         
-        if not "integration_scale" in self.convert_in_dict:
-            print("Warning: no integration_scale correction defined. "
-                  "Integration may have incorrect units.")
-            self.convert_in_dict["integration_scale"] = 1
-            self.convert_out_dict["integration_scale"] = 1
+        ## TODO: Add more as needed
         return

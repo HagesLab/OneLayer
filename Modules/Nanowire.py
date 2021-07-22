@@ -6,7 +6,7 @@ Created on Wed May 12 18:01:07 2021
 """
 import numpy as np
 from scipy import integrate as intg
-from _helper_structs import Parameter, Output
+from helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
@@ -17,108 +17,106 @@ class Nanowire(OneD_Model):
     def __init__(self):
         super().__init__()
         self.system_ID = "Nanowire"
-        self.length_unit = "[nm]"
         self.time_unit = "[ns]"
-        self.param_dict = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
-                           "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
-                            "N0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                            "P0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                            "B":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)), 
-                            "Tau_N":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
-                            "Tau_P":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
-                            "Sf":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
-                            "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
-                            "Temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
-                            "Rel-Permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
-                            "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
-                            "Theta":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
-                            "Alpha":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
-                            "Delta":Parameter(units="", is_edge=False, valid_range=(0,1)), 
-                            "Frac-Emitted":Parameter(units="", is_edge=False, valid_range=(0,1)),
-                            "delta_N":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                            "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                            "Ec":Parameter(units="[eV]", is_edge=True), 
-                            "electron_affinity":Parameter(units="[eV]", is_edge=True)}
-        
+        params = {"Mu_N":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
+                 "Mu_P":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
+                 "N0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                 "P0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                 "B":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)), 
+                 "Tau_N":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
+                 "Tau_P":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
+                 "Sf":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
+                 "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
+                 "Temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
+                 "Rel-Permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
+                 "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
+                 "Theta":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
+                 "Alpha":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
+                 "Delta":Parameter(units="", is_edge=False, valid_range=(0,1)), 
+                 "Frac-Emitted":Parameter(units="", is_edge=False, valid_range=(0,1)),
+                 "delta_N":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                 "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                 "Ec":Parameter(units="[eV]", is_edge=True), 
+                 "electron_affinity":Parameter(units="[eV]", is_edge=True)}
 
-        self.param_count = len(self.param_dict)
-        
         self.flags_dict = {"ignore_alpha":("Ignore Photon Recycle",1, 1),
                            "symmetric_system":("Symmetric System",0, 1),
                            "check_do_ss":("Steady State Input",1, 0)}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        self.simulation_outputs_dict = {"N":Output("N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)), 
-                                        "P":Output("P", units="[carr / cm^3]", xlabel="nm", xvar="position",is_edge=False, yscale='symlog', yfactors=(1e-4,1e1)),
-                                        }
+        simulation_outputs = {"N":Output("N", units="[carr / cm^3]", integrated_units="[carr / cm^2]",xlabel="nm", xvar="position", is_edge=False, layer="Nanowire", yscale='symlog', yfactors=(1e-4,1e1)), 
+                              "P":Output("P", units="[carr / cm^3]", integrated_units="[carr / cm^2]",xlabel="nm", xvar="position",is_edge=False, layer="Nanowire", yscale='symlog', yfactors=(1e-4,1e1)),
+                             }
         
         # List of all variables calculated from those in simulation_outputs_dict
-        self.calculated_outputs_dict = {"E_field":Output("Electric Field", units="[V/nm]", xlabel="nm", xvar="position",is_edge=True),
-                                        "delta_N":Output("delta_N", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
-                                         "delta_P":Output("delta_P", units="[carr / cm^3]", xlabel="nm", xvar="position", is_edge=False),
-                                         "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position",is_edge=False),
-                                         "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", xlabel="nm", xvar="position", is_edge=False),
-                                         "PL":Output("TRPL", units="[phot / cm^3 s]", xlabel="ns", xvar="time", is_edge=False),
-                                         "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, analysis_plotable=False)}
-        
-        self.outputs_dict = {**self.simulation_outputs_dict, **self.calculated_outputs_dict}
-        
-        self.simulation_outputs_count = len(self.simulation_outputs_dict)
-        self.calculated_outputs_count = len(self.calculated_outputs_dict)
-        self.total_outputs_count = self.simulation_outputs_count + self.calculated_outputs_count
+        calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", integrated_units="[V]", xlabel="nm", xvar="position",is_edge=True, layer="Nanowire"),
+                            "delta_N":Output("delta_N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire"),
+                             "delta_P":Output("delta_P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire"),
+                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="Nanowire"),
+                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position", is_edge=False, layer="Nanowire"),
+                             "PL":Output("TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="Nanowire"),
+                             "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="Nanowire", analysis_plotable=False)}
+
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
-        self.convert_in_dict = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
-                                "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
-                                "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
-                                "Tau_N": 1, "Tau_P": 1,                                     # [ns]
-                                "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
-                                "Temperature": 1, "Rel-Permitivity": 1, 
-                                "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
-                                "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
-                                "Delta": 1, "Frac-Emitted": 1,
-                                "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
-                                "Ec": 1, "electron_affinity": 1,
-                                "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
-                                "E_field": 1, 
-                                "tau_diff": 1}
+        convert_in = {"Mu_N": ((1e7) ** 2) / (1e9), "Mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
+                    "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
+                    "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
+                    "Tau_N": 1, "Tau_P": 1,                                     # [ns]
+                    "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
+                    "Temperature": 1, "Rel-Permitivity": 1, 
+                    "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
+                    "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
+                    "Delta": 1, "Frac-Emitted": 1,
+                    "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
+                    "Ec": 1, "electron_affinity": 1,
+                    "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
+                    "E_field": 1, 
+                    "tau_diff": 1}
         
-        self.convert_in_dict["RR"] = self.convert_in_dict["B"] * self.convert_in_dict["N"] * self.convert_in_dict["P"]
-        self.convert_in_dict["NRR"] = self.convert_in_dict["N"] * 1e-9
-        self.convert_in_dict["PL"] = self.convert_in_dict["RR"]
+        convert_in["RR"] = convert_in["B"] * convert_in["N"] * convert_in["P"] # [cm^-3 s^-1] to [nm^-3 ns^-1]
+        convert_in["NRR"] = convert_in["N"] * 1e-9
+        convert_in["PL"] = convert_in["RR"]
         
-        self.convert_in_dict["integration_scale"] = 1e7 # cm to nm
-        # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
-        self.convert_out_dict = {}
-        for param in self.convert_in_dict:
-            self.convert_out_dict[param] = self.convert_in_dict[param] ** -1
+        iconvert_in = {"N":1e7, "P":1e7, "delta_N":1e7, "delta_P":1e7, # cm to nm
+                       "E_field":1, # nm to nm
+                       "RR": 1e7, "NRR": 1e7, "PL": 1e7}
+
+        self.layers = {"Nanowire":Layer(params, simulation_outputs, calculated_outputs,
+                                        "[nm]", convert_in, iconvert_in),
+                       }
 
         return
     
     def calc_inits(self):
         """Calculate initial electron and hole density distribution"""
-        init_N = (self.param_dict["N0"].value + self.param_dict["delta_N"].value) * self.convert_in_dict["N"]
-        init_P = (self.param_dict["P0"].value + self.param_dict["delta_P"].value) * self.convert_in_dict["P"]
+        nanowire = self.layers["Nanowire"]
+        init_N = (nanowire.params["N0"].value + nanowire.params["delta_N"].value) * nanowire.convert_in["N"]
+        init_P = (nanowire.params["P0"].value + nanowire.params["delta_P"].value) * nanowire.convert_in["P"]
         # "Typecast" single values to uniform arrays
         if not isinstance(init_N, np.ndarray):
-            init_N = np.ones(len(self.grid_x_nodes)) * init_N
+            init_N = np.ones(len(nanowire.grid_x_nodes)) * init_N
             
         if not isinstance(init_P, np.ndarray):
-            init_P = np.ones(len(self.grid_x_nodes)) * init_P
+            init_P = np.ones(len(nanowire.grid_x_nodes)) * init_P
             
         
         return {"N":init_N, "P":init_P}
     
-    def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
         """Calls ODEINT solver."""
-        ode_nanowire(data_path, m, n, self.dx, dt, params,
+        nanowire = self.layers["Nanowire"]
+        for param_name, param in nanowire.params.items():
+            param.value *= nanowire.convert_in[param_name]
+            
+        ode_nanowire(data_path, m["Nanowire"], n, nanowire.dx, dt, nanowire.params,
                      not flags['ignore_alpha'].value(), 
                      flags['symmetric_system'].value(), 
                      flags['check_do_ss'].value(), hmax_, True,
                      init_conditions["N"], init_conditions["P"])
     
-    def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
+    def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Calculates at a selection of sample times: N, P, (total carrier densities)
            delta_N, delta_P, (above-equilibrium carrier densities)
            internal electric field due to differences in N, P,
@@ -127,23 +125,27 @@ class Nanowire(OneD_Model):
            
            Integrates over nanowire length: PL due to radiative recombination, waveguiding, and carrier regeneration"""
         # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
-        data_dict = {}
+        nanowire = self.layers["Nanowire"]
+        params = params["Nanowire"]
+        total_length = params["Total_length"]
+        dx = params["Node_width"]
+        data_dict = {"Nanowire":{}}
         
-        for raw_output_name in self.simulation_outputs_dict:
+        for raw_output_name in nanowire.s_outputs:
             data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
                                                  raw_output_name)
             data = []
             for tstep in tsteps:
                 data.append(u_read(data_filename, t0=tstep, single_tstep=True))
             
-            data_dict[raw_output_name] = np.array(data)
+            data_dict["Nanowire"][raw_output_name] = np.array(data)
             
             
-        data_dict["E_field"] = E_field(data_dict, params)
-        data_dict["delta_N"] = delta_n(data_dict, params)
-        data_dict["delta_P"] = delta_p(data_dict, params)
-        data_dict["RR"] = radiative_recombination(data_dict, params)
-        data_dict["NRR"] = nonradiative_recombination(data_dict, params)
+        data_dict["Nanowire"]["E_field"] = E_field(data_dict["Nanowire"], params)
+        data_dict["Nanowire"]["delta_N"] = delta_n(data_dict["Nanowire"], params)
+        data_dict["Nanowire"]["delta_P"] = delta_p(data_dict["Nanowire"], params)
+        data_dict["Nanowire"]["RR"] = radiative_recombination(data_dict["Nanowire"], params)
+        data_dict["Nanowire"]["NRR"] = nonradiative_recombination(data_dict["Nanowire"], params)
                 
         with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
             tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
@@ -151,29 +153,32 @@ class Nanowire(OneD_Model):
             temp_P = np.array(ifstream_P.root.data)
             
         temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, params)
-        PL_base = prep_PL(temp_RR, 0, to_index(params["Total_length"], 
-                                               params["Node_width"], 
-                                               params["Total_length"]), False, params)
-        data_dict["PL"] = new_integrate(PL_base, 0, params["Total_length"], 
-                                        params["Node_width"], params["Total_length"], 
-                                        False)
-        data_dict["tau_diff"] = tau_diff(data_dict["PL"], params["dt"])
+        PL_base = prep_PL(temp_RR, 0, to_index(total_length, dx, total_length),
+                          False, params, flags["ignore_alpha"])
+        data_dict["Nanowire"]["PL"] = new_integrate(PL_base, 0, total_length, 
+                                                    dx, total_length, False)
+        data_dict["Nanowire"]["tau_diff"] = tau_diff(data_dict["Nanowire"]["PL"], dt)
         
-        for data in data_dict:
-            data_dict[data] *= self.convert_out_dict[data]
+        for data in data_dict["Nanowire"]:
+            data_dict["Nanowire"][data] *= nanowire.convert_out[data]
             
-        data_dict["PL"] *= self.convert_out_dict["integration_scale"]
+        data_dict["Nanowire"]["PL"] *= nanowire.iconvert_out["PL"]
         
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, 
-                     i=0, j=0, nen=False, extra_data = None):
+    def prep_dataset(self, datatype, sim_data, params, flags, for_integrate=False, 
+                     i=0, j=0, nen=False, extra_data=None):
         """ Provides delta_N, delta_P, electric field, recombination, 
             and spatial PL values on demand.
         """
         # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
+        nanowire = self.layers["Nanowire"]
+        params = params["Nanowire"]
+        sim_data = sim_data["Nanowire"]
+        ignore_alpha = flags["ignore_alpha"]
+        
         data = None
-        if (datatype in self.simulation_outputs_dict):
+        if (datatype in nanowire.s_outputs):
             data = sim_data[datatype]
         
         else:
@@ -195,19 +200,30 @@ class Nanowire(OneD_Model):
             elif (datatype == "PL"):
     
                 if for_integrate:
-                    rad_rec = radiative_recombination(extra_data, params)
-                    data = prep_PL(rad_rec, i, j, nen, params)
+                    rad_rec = radiative_recombination(extra_data["Nanowire"], params)
+                    data = prep_PL(rad_rec, i, j, nen, params, ignore_alpha)
                 else:
                     rad_rec = radiative_recombination(sim_data, params)
-                    data = prep_PL(rad_rec, 0, len(rad_rec), need_extra_node=False, 
-                                   params=params).flatten()
+                    data = prep_PL(rad_rec, 0, len(rad_rec), False, 
+                                   params, ignore_alpha).flatten()
             else:
                 raise ValueError
                 
         return data
     
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
+        
+        if datatype == "PL":
+            return [("tau_diff", tau_diff(parent_data, dt))]
+        
+        else:
+            return
+    
     def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
         """ Set delta_N and delta_P of outgoing regenerated IC file."""
+        param_dict = param_dict["Nanowire"]
+        sim_data = sim_data["Nanowire"]
+        include_flags = include_flags["Nanowire"]
         param_dict["delta_N"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(len(grid_x))
                     
         param_dict["delta_P"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(len(grid_x))
@@ -261,7 +277,7 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1,
 def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, 
           eps, eps0, q, q_C, kB, recycle_photons=True, do_ss=False, 
           alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, 
-          combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_N=0, init_P=0):
+          combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_dN=0, init_dP=0):
     """Derivative function for drift-diffusion-decay carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
     # These are calculated at node edges, of which there are m + 1
@@ -322,7 +338,7 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     #N_new = np.maximum(N_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
     dNdt = ((1/q) * dJz - rad_rec - non_rad_rec + G_array)
     if do_ss: 
-        dNdt += init_N
+        dNdt += init_dN
 
     ## Calculate dJp/dx
     dJz = (np.roll(Jp, -1)[:-1] - Jp[:-1]) / (dx)
@@ -331,7 +347,7 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     #P_new = np.maximum(P_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
     dPdt = ((1/q) * -dJz - rad_rec - non_rad_rec + G_array)
     if do_ss: 
-        dPdt += init_P
+        dPdt += init_dP
 
     ## Package results
     dydt = np.concatenate([dNdt, dPdt, dEdt], axis=None)
@@ -389,24 +405,24 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     atom = tables.Float64Atom()
 
     ## Unpack params; typecast non-array params to arrays if needed
-    Sf = params["Sf"]
-    Sb = params["Sb"]
-    mu_n = to_array(params["Mu_N"], m, True)
-    mu_p = to_array(params["Mu_P"], m, True)
-    T = to_array(params["Temperature"], m, True)
-    n0 = to_array(params["N0"], m, False)
-    p0 = to_array(params["P0"], m, False)
-    tauN = to_array(params["Tau_N"], m, False)
-    tauP = to_array(params["Tau_P"], m, False)
-    B = to_array(params["B"], m, False)
-    eps = to_array(params["Rel-Permitivity"], m, True)
-    E_field_ext = to_array(params["Ext_E-Field"], m, True)
-    alphaCof = to_array(params["Alpha"], m, False) if recycle_photons else np.zeros(m)
-    thetaCof = to_array(params["Theta"], m, False)
-    delta_frac = to_array(params["Delta"], m, False)
-    fracEmitted = to_array(params["Frac-Emitted"], m, False)
-    init_Ec = to_array(params["Ec"], m, True)
-    init_Chi = to_array(params["electron_affinity"], m, True)
+    Sf = params["Sf"].value
+    Sb = params["Sb"].value
+    mu_n = to_array(params["Mu_N"].value, m, True)
+    mu_p = to_array(params["Mu_P"].value, m, True)
+    T = to_array(params["Temperature"].value, m, True)
+    n0 = to_array(params["N0"].value, m, False)
+    p0 = to_array(params["P0"].value, m, False)
+    tauN = to_array(params["Tau_N"].value, m, False)
+    tauP = to_array(params["Tau_P"].value, m, False)
+    B = to_array(params["B"].value, m, False)
+    eps = to_array(params["Rel-Permitivity"].value, m, True)
+    E_field_ext = to_array(params["Ext_E-Field"].value, m, True)
+    alphaCof = to_array(params["Alpha"].value, m, False) if recycle_photons else np.zeros(m)
+    thetaCof = to_array(params["Theta"].value, m, False)
+    delta_frac = to_array(params["Delta"].value, m, False)
+    fracEmitted = to_array(params["Frac-Emitted"].value, m, False)
+    init_Ec = to_array(params["Ec"].value, m, True)
+    init_Chi = to_array(params["electron_affinity"].value, m, True)
            
     ## Define constants
     eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
@@ -423,12 +439,12 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)
 
     if do_ss:
-        init_N_copy = init_N
-        init_P_copy = init_P
+        init_dN = init_N - n0
+        init_dP = init_P - p0
 
     else:
-        init_N_copy = 0
-        init_P_copy = 0
+        init_dN = 0
+        init_dP = 0
 
     ## Generate a weight distribution needed for photon recycle term if photon recycle is being considered
     if recycle_photons:
@@ -455,31 +471,18 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
 
 
     ## Do n time steps
+    args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
+            tauN, tauP, B, eps, eps0, q, q_C, kB, 
+            recycle_photons, do_ss, alphaCof, thetaCof, 
+            delta_frac, fracEmitted, combined_weight, 
+            E_field_ext, dEcdz, dChidz, init_dN, 
+            init_dP)
+    
     tSteps = np.linspace(0, n*dt, n+1)
-    data, error_data = intg.odeint(dydt2, init_condition, tSteps, 
-                                   args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
-                                         tauN, tauP, B, eps, eps0, q, q_C, kB, 
-                                         recycle_photons, do_ss, alphaCof, thetaCof, 
-                                         delta_frac, fracEmitted, combined_weight, 
-                                         E_field_ext, dEcdz, dChidz, init_N_copy, 
-                                         init_P_copy),
-                                   tfirst=True, full_output=True, hmax=hmax_)
+    sol = intg.solve_ivp(dydt2, [0,n*dt], init_condition, args=args, t_eval=tSteps,
+                         method='BDF', max_step=hmax_)
         
-    if (data[1:, 0:2*m] < 0).any():
-        h = np.geomspace(2**2, 2**-6, 9)
-        for hmax in h:
-            print("Simulation is not converging well, retrying with hmax={}".format(hmax))
-            data, error_data = intg.odeint(dydt2, init_condition, tSteps, 
-                                           args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
-                                                 tauN, tauP, B, eps, eps0, q, q_C, kB, 
-                                                 recycle_photons, do_ss, alphaCof, thetaCof, 
-                                                 delta_frac, fracEmitted, combined_weight, 
-                                                 E_field_ext, dEcdz, dChidz, init_N_copy, 
-                                                 init_P_copy),
-                                           tfirst=True, full_output=True, hmax=hmax)
-                
-            if not (data[1:, 0:2*m] < 0).any():
-                break
+    data = sol.y.T
             
     if write_output:
         ## Prep output files
@@ -493,13 +496,13 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
             array_P.append(data[1:,m:2*(m)])
             #array_E_field.append(data[1:,2*(m):])
 
-        return error_data
+        return #error_data
 
     else:
         array_N = data[:,0:m]
         array_P = data[:,m:2*(m)]
 
-        return array_N, array_P, error_data
+        return #array_N, array_P, error_data
     
 def E_field(sim_outputs, params):
     """Calculate electric field from N, P"""
@@ -612,7 +615,7 @@ def PL_weight_distribution(m, dx, total_length, i, j, alpha, theta, delta,
         
     return (1 - frac_emitted) * 0.5 * theta * (delta * weight + (1 - delta) * weight2)
 
-def prep_PL(radRec, i, j, need_extra_node, params):
+def prep_PL(radRec, i, j, need_extra_node, params, ignore_alpha):
     """
     Calculates PL(x,t) given radiative recombination data plus propogation contributions.
 
@@ -628,6 +631,8 @@ def prep_PL(radRec, i, j, need_extra_node, params):
         Whether the 'j+1'th node should be considered
     params : dict {"param name":float or 1D ndarray}
         Collection of parameters from metadata
+    ignore_alpha : int (1 or 0)
+        Whether to account for photon recycling
 
     Returns
     -------
@@ -637,13 +642,14 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     """
     
     frac_emitted = params["Frac-Emitted"]
-    alpha = 0 if params["ignore_alpha"] else params["Alpha"]
+    alpha = 0 if ignore_alpha else params["Alpha"]
     theta = params["Theta"]
     delta = params["Delta"]
     dx = params["Node_width"]
     total_length = params["Total_length"]
     #m = int(total_length / dx)
     
+    # Unlike Std_SingleLayer the weight func means we always need 2D arrays
     if np.ndim(radRec) == 1:
         radRec = radRec[None]
             
@@ -656,7 +662,7 @@ def prep_PL(radRec, i, j, need_extra_node, params):
     
     combined_weight = PL_weight_distribution(m, dx, total_length, i, j, alpha, 
                                              theta, delta, frac_emitted, need_extra_node, 
-                                             params["symmetric_system"])
+                                             True)
 
     for p in range(len(PL_base[0])):
         PL_base[:,p] += intg.trapz(combined_weight[p] * radRec, dx=dx, axis=1).T \
