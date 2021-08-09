@@ -5,6 +5,7 @@ Created on Wed May 12 18:01:07 2021
 @author: cfai2
 """
 import numpy as np
+import os
 from scipy import integrate as intg
 from helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos, new_integrate
@@ -148,8 +149,8 @@ class Std_SingleLayer(OneD_Model):
         data_dict["OneLayer"]["RR"] = radiative_recombination(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["NRR"] = nonradiative_recombination(data_dict["OneLayer"], params)
                 
-        with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
-            tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
+        with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
+            tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
         temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, params)

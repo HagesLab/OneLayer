@@ -258,7 +258,7 @@ class Notebook:
         print("Checking whether the current system class ({}) "
               "has a dedicated data subdirectory...".format(self.module.system_ID))
         try:
-            os.mkdir(self.default_dirs["Data"] + "\\" + self.module.system_ID)
+            os.mkdir(os.path.join(self.default_dirs["Data"], self.module.system_ID))
             print("No such subdirectory detected; automatically creating...")
         except FileExistsError:
             print("Subdirectory detected")
@@ -1739,7 +1739,7 @@ class Notebook:
                                            selectmode="extended")
             self.data_listbox.grid(row=0,column=0)
             self.data_listbox.delete(0,tk.END)
-            self.data_list = [file for file in os.listdir(self.default_dirs["Data"] + "\\" + self.module.system_ID) 
+            self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
                               if not file.endswith(".txt")]
             self.data_listbox.insert(0,*(self.data_list))
 
@@ -2309,9 +2309,10 @@ class Notebook:
                     for layer_name, layer in self.module.layers.items():
                         sim_data[layer_name] = {}
                         for var in layer.s_outputs:
-                            path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                                      self.module.system_ID, 
-                                                                      filename, filename, var)
+                            path_name = os.path.join(self.default_dirs["Data"], 
+                                                        self.module.system_ID,
+                                                        filename,
+                                                        "{}-{}.h5".format(filename, var))
                             sim_data[layer_name][var] = u_read(path_name, t0=active_sets[key].show_index, 
                                                                single_tstep=True)
 
@@ -2452,7 +2453,7 @@ class Notebook:
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
         """ Read and store parameters from a metadata.txt file """
-        path = "{}\\{}\\{}\\metadata.txt".format(self.default_dirs["Data"], self.module.system_ID, data_filename)
+        path = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, "metadata.txt")
         assert os.path.exists(path), "Error: Missing metadata for {}".format(self.module.system_ID)
         
         with open(path, "r") as ifstream:
@@ -2727,10 +2728,10 @@ class Notebook:
         for layer_name, layer in self.module.layers.items():
             sim_data[layer_name] = {}
             for sim_datatype in layer.s_outputs:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                          self.module.system_ID, 
-                                                          data_filename, data_filename, 
-                                                          sim_datatype)
+                path_name = os.path.join(self.default_dirs["Data"], 
+                                            self.module.system_ID,
+                                            data_filename,
+                                            "{}-{}.h5".format(data_filename, sim_datatype))
                 sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
                                                             single_tstep=True)
         where_layer = self.module.find_layer(datatype)
@@ -2815,10 +2816,10 @@ class Notebook:
             for layer_name, layer in self.module.layers.items():
                 sim_data[layer_name] = {}
                 for sim_datatype in layer.s_outputs:
-                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                              self.module.system_ID, 
-                                                              dataset.filename, dataset.filename, 
-                                                              sim_datatype)
+                    path_name = os.path.join(self.default_dirs["Data"], 
+                                                self.module.system_ID,
+                                                dataset.filename,
+                                                "{}-{}.h5".format(dataset.filename, sim_datatype))
                     sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
                                                                 single_tstep=True)
         
@@ -2984,9 +2985,9 @@ class Notebook:
     
         try:
             print("Attempting to create {} data folder".format(data_file_name))
-            dirname = "{}\\{}\\{}".format(self.default_dirs["Data"], 
-                                                 self.module.system_ID, 
-                                                 data_file_name)
+            dirname = os.path.join(self.default_dirs["Data"], 
+                                    self.module.system_ID,
+                                    data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
             assert "Data" in dirname
@@ -3019,7 +3020,7 @@ class Notebook:
         ## Create data files
         for layer_name, layer in self.module.layers.items():
             for variable in layer.s_outputs:
-                path = "{}\\{}-{}.h5".format(dirname, data_file_name, variable)
+                path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
                 with tables.open_file(path, mode='w') as ofstream:
                     length = num_nodes[layer_name] 
                     if layer.s_outputs[variable].is_edge:
@@ -3036,7 +3037,7 @@ class Notebook:
         self.update_sim_plots(0)
 
         try:
-            self.module.simulate("{}\\{}".format(dirname,data_file_name), 
+            self.module.simulate(os.path.join(dirname, data_file_name), 
                                    num_nodes, self.n, self.dt,
                                    self.sys_flag_dict, self.hmax, init_conditions)
             
@@ -3044,7 +3045,7 @@ class Notebook:
             self.sim_warning_msg.append("Error: an unusual value occurred while simulating {}. "
                                         "This file may have invalid parameters.".format(data_file_name))
             for file in os.listdir(dirname):
-                tpath = dirname + "\\" + file
+                tpath = os.path.join(dirname, file)
                 os.remove(tpath)
                 
             os.rmdir(dirname)
@@ -3054,7 +3055,7 @@ class Notebook:
             print("### Aborting {} ###".format(data_file_name))
             self.sim_warning_msg += ("Abort signal received while simulating {}\n".format(data_file_name))
             for file in os.listdir(full_path_name):
-                tpath = full_path_name + "\\" + file
+                tpath = os.path.join(full_path_name, file)
                 os.remove(tpath)
                 
             os.rmdir(full_path_name)
@@ -3063,7 +3064,7 @@ class Notebook:
         except Exception as oops:
             self.sim_warning_msg.append("Error \"{}\" occurred while simulating {}\n".format(oops, data_file_name))
             for file in os.listdir(dirname):
-                tpath = dirname + "\\" + file
+                tpath = os.path.join(dirname, file)
                 os.remove(tpath)
                 
             os.rmdir(dirname)
@@ -3075,7 +3076,7 @@ class Notebook:
         try:
             for i in range(1,6):
                 for var in self.sim_data:
-                    path_name = "{}\\{}-{}.h5".format(dirname, data_file_name, var)
+                    path_name = os.path.join(dirname, "{}-{}.h5".format(data_file_name, var))
                     self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
                                                 single_tstep=True)
                 self.update_sim_plots(self.n, do_clear_plots=False)
@@ -3085,7 +3086,7 @@ class Notebook:
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
-        with open(dirname + "\\metadata.txt", "w+") as ofstream:
+        with open(os.path.join(dirname, "metadata.txt"), "w+") as ofstream:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON {} AT {}\n".format(datetime.datetime.now().date(),datetime.datetime.now().time()))
             ofstream.write("System_class: {}\n".format(self.module.system_ID))
             
@@ -3239,7 +3240,7 @@ class Notebook:
 
                 do_curr_t = self.PL_mode == "Current time step"
                 
-                pathname = self.default_dirs["Data"] + "\\" + self.module.system_ID + "\\" + data_filename + "\\" + data_filename
+                pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
                 
                 if include_negative:
                     sim_data = {}
@@ -4140,7 +4141,7 @@ class Notebook:
             return
 
         try:
-            os.mkdir("{}\\{}".format(self.default_dirs["Initial"], batch_dir_name))
+            os.mkdir(os.path.join(self.default_dirs["Initial"], batch_dir_name))
         except FileExistsError:
             self.write(self.batch_status, 
                        "Error: {} folder already exists".format(batch_dir_name))
@@ -4171,8 +4172,9 @@ class Notebook:
                 self.add_LGC()
                 
             try:
-                self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], 
-                                                             batch_dir_name, filename))
+                self.write_init_file(os.path.join(self.default_dirs["Initial"], 
+                                                    batch_dir_name,
+                                                    "{}.txt".format(filename)))
             except Exception as e:
                 warning_mssg.append("Error: failed to create batch file {}".format(filename))
                 warning_mssg.append(str(e))
