@@ -148,8 +148,8 @@ class Nanowire(OneD_Model):
         data_dict["Nanowire"]["RR"] = radiative_recombination(data_dict["Nanowire"], params)
         data_dict["Nanowire"]["NRR"] = nonradiative_recombination(data_dict["Nanowire"], params)
                 
-        with tables.open_file(os.path.join(data_dirname, file_name_base + "-n.h5"), mode='r') as ifstream_N, \
-            tables.open_file(os.path.join(data_dirname, file_name_base + "-p.h5"), mode='r') as ifstream_P:
+        with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
+            tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
             

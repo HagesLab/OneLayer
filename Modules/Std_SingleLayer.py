@@ -149,8 +149,8 @@ class Std_SingleLayer(OneD_Model):
         data_dict["OneLayer"]["RR"] = radiative_recombination(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["NRR"] = nonradiative_recombination(data_dict["OneLayer"], params)
                 
-        with tables.open_file(os.path.join(data_dirname, file_name_base + "-n.h5"), mode='r') as ifstream_N, \
-            tables.open_file(os.path.join(data_dirname, file_name_base + "-p.h5"), mode='r') as ifstream_P:
+        with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
+            tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
         temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, params)
