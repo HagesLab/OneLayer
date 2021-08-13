@@ -57,7 +57,8 @@ class MAPI_Rubrene(OneD_Model):
                           }
                 
         self.flags_dict = {"do_fret":("Include Fret",1, 0),
-                           "check_do_ss":("Steady State Input",1, 0)}
+                           "check_do_ss":("Steady State Input",1, 0),
+                           "no_upconverter":("Deactivate Upconverter", 1, 0)}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
@@ -181,7 +182,7 @@ class MAPI_Rubrene(OneD_Model):
 
         ode_twolayer(data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
                      n, dt, mapi.params, ru.params, flags['do_fret'].value(),
-                     flags['check_do_ss'].value(), hmax_, True,
+                     flags['check_do_ss'].value(), flags['no_upconverter'].value(), hmax_, True,
                      init_conditions["N"], init_conditions["P"],
                      init_conditions["T"], init_conditions["delta_S"],
                      init_conditions["delta_D"])
@@ -287,7 +288,11 @@ class MAPI_Rubrene(OneD_Model):
         if isinstance(tail_p0, np.ndarray):
             tail_p0 = tail_p0[-1]
             
-        t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+        if "no_upconverter" in flags and flags["no_upconverter"]:
+            t_form = temp_N * 0
+            
+        else:
+            t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
                                       / (temp_N + temp_P))
         
         try:
@@ -394,7 +399,7 @@ class MAPI_Rubrene(OneD_Model):
                 
         return data
     
-    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params, flags):
         
         if datatype == "delta_N":
             temp_dN = parent_data / params["MAPI"]["Total_length"]
@@ -434,8 +439,11 @@ class MAPI_Rubrene(OneD_Model):
             if isinstance(tail_p0, np.ndarray):
                 tail_p0 = tail_p0[-1]
                 
-            t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
-                                            / (temp_N + temp_P))
+            if flags["no_upconverter"]:
+                t_form = 0 * temp_N
+            else:
+                t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+                                                / (temp_N + temp_P))
             
             # In order:
             # Triplets formed per photon absorbed
@@ -575,7 +583,7 @@ def dydt(t, y, m, f, dm, df, Cn, Cp,
     return dydt
     
 def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params, 
-                 do_Fret=False, do_ss=False, hmax_=0, write_output=True, 
+                 do_Fret=False, do_ss=False, no_upconverter=False, hmax_=0, write_output=True, 
                  init_N=0, init_P=0, init_T=0, init_S=0, init_D=0):
     """
     Master function for MAPI_Rubrene_DBP module simulation.
@@ -610,6 +618,9 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         Whether to include the FRET integral. The default is True.
     do_ss : bool, optional
         Whether to inject the initial conditions at every time step, creating a nonzero steady state situation. The default is False.
+    no_upconverter : bool, optional
+        Whether to block new triplets from being formed at the MAPI/Rubrene interface, which effectively deactivates the latter upconverter layer.
+        The default is False.
     hmax_ : float, optional
         Maximum internal step size to be taken by ODEINT. The default is 0.
     write_output : bool, optional
@@ -631,7 +642,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     ## Unpack params; typecast non-array params to arrays if needed
     Sf = mapi_params["Sf"].value
     Sb = mapi_params["Sb"].value
-    St = ru_params["St"].value
+    St = 0 if no_upconverter else ru_params["St"].value
     mu_n = to_array(mapi_params["mu_N"].value, m, True)
     mu_p = to_array(mapi_params["mu_P"].value, m, True)
     mu_s = to_array(ru_params["mu_S"].value, f, True)

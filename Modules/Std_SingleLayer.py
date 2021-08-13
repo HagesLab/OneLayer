@@ -211,7 +211,7 @@ class Std_SingleLayer(OneD_Model):
                 
         return data
     
-    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params, flags):
         """ Calculates supplemental data - the effective lifetime - for integrated PL"""
         if datatype == "PL":
             return [("tau_diff", tau_diff(parent_data, dt))]

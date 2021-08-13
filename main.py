@@ -3321,7 +3321,7 @@ class Notebook:
                 if self.PL_mode == "All time steps":
                     try:
                         td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
-                                                                 active_datagroup.datasets[tag].params_dict)
+                                                                 active_datagroup.datasets[tag].params_dict, active_datagroup.flags)
                     except Exception:
                         print("Error: failed to calculate time series")
                         td[ext_tag] = None
