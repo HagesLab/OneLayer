@@ -3053,12 +3053,12 @@ class Notebook:
         
         except KeyboardInterrupt:
             print("### Aborting {} ###".format(data_file_name))
-            self.sim_warning_msg += ("Abort signal received while simulating {}\n".format(data_file_name))
-            for file in os.listdir(full_path_name):
-                tpath = os.path.join(full_path_name, file)
+            self.sim_warning_msg.append("Abort signal received while simulating {}\n".format(data_file_name))
+            for file in os.listdir(dirname):
+                tpath = os.path.join(dirname, file)
                 os.remove(tpath)
                 
-            os.rmdir(full_path_name)
+            os.rmdir(dirname)
             return
         
         except Exception as oops:
