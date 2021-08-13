@@ -289,15 +289,29 @@ class MAPI_Rubrene(OneD_Model):
             
         t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
                                       / (temp_N + temp_P))
-        data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
         
-        data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] / t_form
-        
+        try:
+            data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
+        except FloatingPointError:
+            data_dict["Rubrene"]["T_form_eff"] =  t_form * 0
+        try:
+            data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] / t_form
+        except FloatingPointError:
+            data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] * 0
+            
+            
         data_dict["Rubrene"]["S_up_eff"] = data_dict["Rubrene"]["T_anni_eff"] * data_dict["Rubrene"]["T_form_eff"]
         
-        data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] / temp_init_N
-        data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] / temp_init_N
-
+        try:
+            data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] / temp_init_N
+        except FloatingPointError:
+            data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] * 0
+            
+        try:
+            data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] / temp_init_N
+        except FloatingPointError:
+            data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] * 0
+            
         for data in data_dict["MAPI"]:
             data_dict["MAPI"][data] *= mapi.convert_out[data]
             
@@ -425,11 +439,20 @@ class MAPI_Rubrene(OneD_Model):
             
             # In order:
             # Triplets formed per photon absorbed
+            try:
+                t_form_eff = t_form / temp_init_N
+            except FloatingPointError:
+                t_form_eff = t_form * 0
             # Singlets formed per triplet formed
+            try:
+                t_anni_eff = parent_data / t_form
+            except FloatingPointError:
+                t_anni_eff = parent_data * 0
             # Singlets formed per photon absorbed
-            return [("T_form_eff", t_form / temp_init_N),
-                    ("T_anni_eff", parent_data / t_form),
-                    ("S_up_eff", parent_data / temp_init_N)]
+            s_up_eff = t_form_eff * t_anni_eff
+            return [("T_form_eff", t_form_eff),
+                    ("T_anni_eff", t_anni_eff),
+                    ("S_up_eff", s_up_eff)]
         
         elif datatype == "dbp_PL":
             with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N:
