@@ -439,7 +439,7 @@ class MAPI_Rubrene(OneD_Model):
             if isinstance(tail_p0, np.ndarray):
                 tail_p0 = tail_p0[-1]
                 
-            if flags["no_upconverter"]:
+            if "no_upconverter" in flags and flags["no_upconverter"]:
                 t_form = 0 * temp_N
             else:
                 t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)

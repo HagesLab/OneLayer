@@ -2327,7 +2327,7 @@ class Notebook:
                         ofstream.write("System_class: {}\n".format(self.module.system_ID))
                         ofstream.write("f$ System Flags:\n")
                         for flag in self.module.flags_dict:
-                            ofstream.write("{}: {}\n".format(flag, self.analysis_plots[plot_ID].datagroup.flags[flag]))
+                            ofstream.write("{}: {}\n".format(flag, active_sets[key].flags[flag]))
                         for layer_name, layer_params in param_dict_copy.items():
                             ofstream.write("L$: {}\n".format(layer_name))
                             ofstream.write("p$ Space Grid:\n")
@@ -2672,7 +2672,7 @@ class Notebook:
 
             # This data is in TEDs units since we just used it in a calculation - convert back to common units first
             for dataset in active_datagroup.datasets.values():
-                label = dataset.tag(for_matplotlib=True) + "*" if active_datagroup.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
+                label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
                 subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
 
             subplot.set_xlabel("x {}".format(self.module.layers[where_layer].length_unit))
@@ -2702,7 +2702,6 @@ class Notebook:
 
         try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
-            datagroup.flags = dict(flag_values_dict)
             if datagroup.size():
                 assert (datagroup.total_t == total_time), "Error: time grid mismatch"
                 assert (datagroup.dt == dt), "Error: time grid mismatch"
@@ -2751,12 +2750,12 @@ class Notebook:
         if self.module.layers[where_layer].outputs[datatype].is_edge: 
             return Raw_Data_Set(values, data_edge_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt, 
-                                param_values_dict, datatype, data_filename, 
+                                param_values_dict, flag_values_dict, datatype, data_filename, 
                                 active_plot.time_index)
         else:
             return Raw_Data_Set(values, data_node_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt,
-                                param_values_dict, datatype, data_filename, 
+                                param_values_dict, flag_values_dict, datatype, data_filename, 
                                 active_plot.time_index)
 
     def load_datasets(self):
@@ -2824,7 +2823,7 @@ class Notebook:
                                                                 single_tstep=True)
         
             dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
-                                                      dataset.params_dict, active_datagroup.flags)
+                                                      dataset.params_dict, dataset.flags)
             dataset.show_index = active_plot.time_index
             
         self.plot_analyze(plot_ID, force_axis_update=False)
@@ -3193,7 +3192,7 @@ class Notebook:
             total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
             total_time = active_datagroup.total_t
             dt = active_datagroup.dt
-            symmetric_flag = active_datagroup.flags["symmetric_system"]
+            symmetric_flag = active_datagroup.datasets[tag].flags["symmetric_system"]
 
             if self.PL_mode == "Current time step":
                 show_index = active_datagroup.datasets[tag].show_index
@@ -3258,7 +3257,7 @@ class Notebook:
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.flags,
+                                                      active_datagroup.datasets[tag].flags,
                                                       True, 0, i, nen[0], extra_data)
                     I_data = new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
                     sim_data = {}
@@ -3273,7 +3272,7 @@ class Notebook:
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.flags,
+                                                      active_datagroup.datasets[tag].flags,
                                                       True, 0, j, nen[1], extra_data)
                     I_data += new_integrate(data, 0, u_bound, dx, total_length, nen[1])
                     
@@ -3294,7 +3293,7 @@ class Notebook:
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict,
-                                                      active_datagroup.flags,
+                                                      active_datagroup.datasets[tag].flags,
                                                       True, i, j, nen, extra_data)
                     
                     I_data = new_integrate(data, l_bound, u_bound, dx, total_length, nen)
@@ -3315,13 +3314,14 @@ class Notebook:
                 ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
                 self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, total_time, dt,
                                                                                 active_datagroup.datasets[tag].params_dict, 
+                                                                                active_datagroup.datasets[tag].flags,
                                                                                 active_datagroup.datasets[tag].type, 
                                                                                 ext_tag))
             
                 if self.PL_mode == "All time steps":
                     try:
                         td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
-                                                                 active_datagroup.datasets[tag].params_dict, active_datagroup.flags)
+                                                                 active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].flags)
                     except Exception:
                         print("Error: failed to calculate time series")
                         td[ext_tag] = None
