@@ -72,10 +72,11 @@ class Batchable:
         return
     
 class Data_Set:
-    def __init__(self, data, grid_x, params_dict, type, filename):
+    def __init__(self, data, grid_x, params_dict, flags, type, filename):
         self.data = data
         self.grid_x = grid_x
         self.params_dict = dict(params_dict)
+        self.flags = dict(flags)
         self.type = type
         self.filename = filename
         return
@@ -90,8 +91,8 @@ class Data_Set:
         
 class Raw_Data_Set(Data_Set):
     """Object containing all the metadata required to plot and integrate saved data sets"""
-    def __init__(self, data, grid_x, node_x, total_time, dt, params_dict, type, filename, show_index):
-        super().__init__(data, grid_x, params_dict, type, filename)
+    def __init__(self, data, grid_x, node_x, total_time, dt, params_dict, flags, type, filename, show_index):
+        super().__init__(data, grid_x, params_dict, flags, type, filename)
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
 
         # node_x and grid_x will usually be identical, unless the data is a type (like E-field) that exists on edges
@@ -108,8 +109,8 @@ class Raw_Data_Set(Data_Set):
         return np.vstack((self.grid_x, self.data))
     
 class Integrated_Data_Set(Data_Set):
-    def __init__(self, data, grid_x, total_time, dt, params_dict, type, filename):
-        super().__init__(data, grid_x, params_dict, type, filename)
+    def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type, filename):
+        super().__init__(data, grid_x, params_dict, flags, type, filename)
         self.total_time = total_time
         self.dt = dt
         return
@@ -119,7 +120,6 @@ class Data_Group:
     def __init__(self):
         self.type = "None"
         self.datasets = {}
-        self.flags = None
         self.dt = -1
         self.total_t = -1
         return

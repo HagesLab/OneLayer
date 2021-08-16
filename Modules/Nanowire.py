@@ -5,6 +5,7 @@ Created on Wed May 12 18:01:07 2021
 @author: cfai2
 """
 import numpy as np
+import os
 from scipy import integrate as intg
 from helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos, new_integrate
@@ -147,8 +148,8 @@ class Nanowire(OneD_Model):
         data_dict["Nanowire"]["RR"] = radiative_recombination(data_dict["Nanowire"], params)
         data_dict["Nanowire"]["NRR"] = nonradiative_recombination(data_dict["Nanowire"], params)
                 
-        with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
-            tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
+        with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
+            tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
             
@@ -211,7 +212,7 @@ class Nanowire(OneD_Model):
                 
         return data
     
-    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params, flags):
         
         if datatype == "PL":
             return [("tau_diff", tau_diff(parent_data, dt))]

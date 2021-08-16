@@ -258,7 +258,7 @@ class Notebook:
         print("Checking whether the current system class ({}) "
               "has a dedicated data subdirectory...".format(self.module.system_ID))
         try:
-            os.mkdir(self.default_dirs["Data"] + "\\" + self.module.system_ID)
+            os.mkdir(os.path.join(self.default_dirs["Data"], self.module.system_ID))
             print("No such subdirectory detected; automatically creating...")
         except FileExistsError:
             print("Subdirectory detected")
@@ -1739,7 +1739,7 @@ class Notebook:
                                            selectmode="extended")
             self.data_listbox.grid(row=0,column=0)
             self.data_listbox.delete(0,tk.END)
-            self.data_list = [file for file in os.listdir(self.default_dirs["Data"] + "\\" + self.module.system_ID) 
+            self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
                               if not file.endswith(".txt")]
             self.data_listbox.insert(0,*(self.data_list))
 
@@ -2309,9 +2309,10 @@ class Notebook:
                     for layer_name, layer in self.module.layers.items():
                         sim_data[layer_name] = {}
                         for var in layer.s_outputs:
-                            path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                                      self.module.system_ID, 
-                                                                      filename, filename, var)
+                            path_name = os.path.join(self.default_dirs["Data"], 
+                                                        self.module.system_ID,
+                                                        filename,
+                                                        "{}-{}.h5".format(filename, var))
                             sim_data[layer_name][var] = u_read(path_name, t0=active_sets[key].show_index, 
                                                                single_tstep=True)
 
@@ -2326,7 +2327,7 @@ class Notebook:
                         ofstream.write("System_class: {}\n".format(self.module.system_ID))
                         ofstream.write("f$ System Flags:\n")
                         for flag in self.module.flags_dict:
-                            ofstream.write("{}: {}\n".format(flag, self.analysis_plots[plot_ID].datagroup.flags[flag]))
+                            ofstream.write("{}: {}\n".format(flag, active_sets[key].flags[flag]))
                         for layer_name, layer_params in param_dict_copy.items():
                             ofstream.write("L$: {}\n".format(layer_name))
                             ofstream.write("p$ Space Grid:\n")
@@ -2452,7 +2453,7 @@ class Notebook:
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
         """ Read and store parameters from a metadata.txt file """
-        path = "{}\\{}\\{}\\metadata.txt".format(self.default_dirs["Data"], self.module.system_ID, data_filename)
+        path = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, "metadata.txt")
         assert os.path.exists(path), "Error: Missing metadata for {}".format(self.module.system_ID)
         
         with open(path, "r") as ifstream:
@@ -2671,7 +2672,7 @@ class Notebook:
 
             # This data is in TEDs units since we just used it in a calculation - convert back to common units first
             for dataset in active_datagroup.datasets.values():
-                label = dataset.tag(for_matplotlib=True) + "*" if active_datagroup.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
+                label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
                 subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
 
             subplot.set_xlabel("x {}".format(self.module.layers[where_layer].length_unit))
@@ -2701,7 +2702,6 @@ class Notebook:
 
         try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
-            datagroup.flags = dict(flag_values_dict)
             if datagroup.size():
                 assert (datagroup.total_t == total_time), "Error: time grid mismatch"
                 assert (datagroup.dt == dt), "Error: time grid mismatch"
@@ -2727,10 +2727,10 @@ class Notebook:
         for layer_name, layer in self.module.layers.items():
             sim_data[layer_name] = {}
             for sim_datatype in layer.s_outputs:
-                path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                          self.module.system_ID, 
-                                                          data_filename, data_filename, 
-                                                          sim_datatype)
+                path_name = os.path.join(self.default_dirs["Data"], 
+                                            self.module.system_ID,
+                                            data_filename,
+                                            "{}-{}.h5".format(data_filename, sim_datatype))
                 sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
                                                             single_tstep=True)
         where_layer = self.module.find_layer(datatype)
@@ -2750,12 +2750,12 @@ class Notebook:
         if self.module.layers[where_layer].outputs[datatype].is_edge: 
             return Raw_Data_Set(values, data_edge_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt, 
-                                param_values_dict, datatype, data_filename, 
+                                param_values_dict, flag_values_dict, datatype, data_filename, 
                                 active_plot.time_index)
         else:
             return Raw_Data_Set(values, data_node_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt,
-                                param_values_dict, datatype, data_filename, 
+                                param_values_dict, flag_values_dict, datatype, data_filename, 
                                 active_plot.time_index)
 
     def load_datasets(self):
@@ -2815,15 +2815,15 @@ class Notebook:
             for layer_name, layer in self.module.layers.items():
                 sim_data[layer_name] = {}
                 for sim_datatype in layer.s_outputs:
-                    path_name = "{}\\{}\\{}\\{}-{}.h5".format(self.default_dirs["Data"], 
-                                                              self.module.system_ID, 
-                                                              dataset.filename, dataset.filename, 
-                                                              sim_datatype)
+                    path_name = os.path.join(self.default_dirs["Data"], 
+                                                self.module.system_ID,
+                                                dataset.filename,
+                                                "{}-{}.h5".format(dataset.filename, sim_datatype))
                     sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
                                                                 single_tstep=True)
         
             dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
-                                                      dataset.params_dict, active_datagroup.flags)
+                                                      dataset.params_dict, dataset.flags)
             dataset.show_index = active_plot.time_index
             
         self.plot_analyze(plot_ID, force_axis_update=False)
@@ -2984,9 +2984,9 @@ class Notebook:
     
         try:
             print("Attempting to create {} data folder".format(data_file_name))
-            dirname = "{}\\{}\\{}".format(self.default_dirs["Data"], 
-                                                 self.module.system_ID, 
-                                                 data_file_name)
+            dirname = os.path.join(self.default_dirs["Data"], 
+                                    self.module.system_ID,
+                                    data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
             assert "Data" in dirname
@@ -3019,7 +3019,7 @@ class Notebook:
         ## Create data files
         for layer_name, layer in self.module.layers.items():
             for variable in layer.s_outputs:
-                path = "{}\\{}-{}.h5".format(dirname, data_file_name, variable)
+                path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
                 with tables.open_file(path, mode='w') as ofstream:
                     length = num_nodes[layer_name] 
                     if layer.s_outputs[variable].is_edge:
@@ -3036,7 +3036,7 @@ class Notebook:
         self.update_sim_plots(0)
 
         try:
-            self.module.simulate("{}\\{}".format(dirname,data_file_name), 
+            self.module.simulate(os.path.join(dirname, data_file_name), 
                                    num_nodes, self.n, self.dt,
                                    self.sys_flag_dict, self.hmax, init_conditions)
             
@@ -3044,7 +3044,7 @@ class Notebook:
             self.sim_warning_msg.append("Error: an unusual value occurred while simulating {}. "
                                         "This file may have invalid parameters.".format(data_file_name))
             for file in os.listdir(dirname):
-                tpath = dirname + "\\" + file
+                tpath = os.path.join(dirname, file)
                 os.remove(tpath)
                 
             os.rmdir(dirname)
@@ -3052,18 +3052,18 @@ class Notebook:
         
         except KeyboardInterrupt:
             print("### Aborting {} ###".format(data_file_name))
-            self.sim_warning_msg += ("Abort signal received while simulating {}\n".format(data_file_name))
-            for file in os.listdir(full_path_name):
-                tpath = full_path_name + "\\" + file
+            self.sim_warning_msg.append("Abort signal received while simulating {}\n".format(data_file_name))
+            for file in os.listdir(dirname):
+                tpath = os.path.join(dirname, file)
                 os.remove(tpath)
                 
-            os.rmdir(full_path_name)
+            os.rmdir(dirname)
             return
         
         except Exception as oops:
             self.sim_warning_msg.append("Error \"{}\" occurred while simulating {}\n".format(oops, data_file_name))
             for file in os.listdir(dirname):
-                tpath = dirname + "\\" + file
+                tpath = os.path.join(dirname, file)
                 os.remove(tpath)
                 
             os.rmdir(dirname)
@@ -3075,7 +3075,7 @@ class Notebook:
         try:
             for i in range(1,6):
                 for var in self.sim_data:
-                    path_name = "{}\\{}-{}.h5".format(dirname, data_file_name, var)
+                    path_name = os.path.join(dirname, "{}-{}.h5".format(data_file_name, var))
                     self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
                                                 single_tstep=True)
                 self.update_sim_plots(self.n, do_clear_plots=False)
@@ -3085,7 +3085,7 @@ class Notebook:
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
-        with open(dirname + "\\metadata.txt", "w+") as ofstream:
+        with open(os.path.join(dirname, "metadata.txt"), "w+") as ofstream:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON {} AT {}\n".format(datetime.datetime.now().date(),datetime.datetime.now().time()))
             ofstream.write("System_class: {}\n".format(self.module.system_ID))
             
@@ -3192,7 +3192,7 @@ class Notebook:
             total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
             total_time = active_datagroup.total_t
             dt = active_datagroup.dt
-            symmetric_flag = active_datagroup.flags["symmetric_system"]
+            symmetric_flag = active_datagroup.datasets[tag].flags["symmetric_system"]
 
             if self.PL_mode == "Current time step":
                 show_index = active_datagroup.datasets[tag].show_index
@@ -3239,7 +3239,7 @@ class Notebook:
 
                 do_curr_t = self.PL_mode == "Current time step"
                 
-                pathname = self.default_dirs["Data"] + "\\" + self.module.system_ID + "\\" + data_filename + "\\" + data_filename
+                pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
                 
                 if include_negative:
                     sim_data = {}
@@ -3257,7 +3257,7 @@ class Notebook:
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.flags,
+                                                      active_datagroup.datasets[tag].flags,
                                                       True, 0, i, nen[0], extra_data)
                     I_data = new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
                     sim_data = {}
@@ -3272,7 +3272,7 @@ class Notebook:
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.flags,
+                                                      active_datagroup.datasets[tag].flags,
                                                       True, 0, j, nen[1], extra_data)
                     I_data += new_integrate(data, 0, u_bound, dx, total_length, nen[1])
                     
@@ -3293,7 +3293,7 @@ class Notebook:
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict,
-                                                      active_datagroup.flags,
+                                                      active_datagroup.datasets[tag].flags,
                                                       True, i, j, nen, extra_data)
                     
                     I_data = new_integrate(data, l_bound, u_bound, dx, total_length, nen)
@@ -3314,13 +3314,14 @@ class Notebook:
                 ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
                 self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, total_time, dt,
                                                                                 active_datagroup.datasets[tag].params_dict, 
+                                                                                active_datagroup.datasets[tag].flags,
                                                                                 active_datagroup.datasets[tag].type, 
                                                                                 ext_tag))
             
                 if self.PL_mode == "All time steps":
                     try:
                         td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
-                                                                 active_datagroup.datasets[tag].params_dict)
+                                                                 active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].flags)
                     except Exception:
                         print("Error: failed to calculate time series")
                         td[ext_tag] = None
@@ -4140,7 +4141,7 @@ class Notebook:
             return
 
         try:
-            os.mkdir("{}\\{}".format(self.default_dirs["Initial"], batch_dir_name))
+            os.mkdir(os.path.join(self.default_dirs["Initial"], batch_dir_name))
         except FileExistsError:
             self.write(self.batch_status, 
                        "Error: {} folder already exists".format(batch_dir_name))
@@ -4171,8 +4172,9 @@ class Notebook:
                 self.add_LGC()
                 
             try:
-                self.write_init_file("{}\\{}\\{}.txt".format(self.default_dirs["Initial"], 
-                                                             batch_dir_name, filename))
+                self.write_init_file(os.path.join(self.default_dirs["Initial"], 
+                                                    batch_dir_name,
+                                                    "{}.txt".format(filename)))
             except Exception as e:
                 warning_mssg.append("Error: failed to create batch file {}".format(filename))
                 warning_mssg.append(str(e))

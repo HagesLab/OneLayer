@@ -5,6 +5,7 @@ Created on Wed May 12 18:01:07 2021
 @author: cfai2
 """
 import numpy as np
+import os
 from scipy import integrate as intg
 from helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos, new_integrate
@@ -56,7 +57,8 @@ class MAPI_Rubrene(OneD_Model):
                           }
                 
         self.flags_dict = {"do_fret":("Include Fret",1, 0),
-                           "check_do_ss":("Steady State Input",1, 0)}
+                           "check_do_ss":("Steady State Input",1, 0),
+                           "no_upconverter":("Deactivate Upconverter", 1, 0)}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
@@ -180,7 +182,7 @@ class MAPI_Rubrene(OneD_Model):
 
         ode_twolayer(data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
                      n, dt, mapi.params, ru.params, flags['do_fret'].value(),
-                     flags['check_do_ss'].value(), hmax_, True,
+                     flags['check_do_ss'].value(), flags['no_upconverter'].value(), hmax_, True,
                      init_conditions["N"], init_conditions["P"],
                      init_conditions["T"], init_conditions["delta_S"],
                      init_conditions["delta_D"])
@@ -223,8 +225,8 @@ class MAPI_Rubrene(OneD_Model):
         data_dict["MAPI"]["NRR"] = nonradiative_recombination(data_dict["MAPI"], mapi_params)
                 
         #### MAPI PL ####
-        with tables.open_file(data_dirname + "\\" + file_name_base + "-n.h5", mode='r') as ifstream_N, \
-            tables.open_file(data_dirname + "\\" + file_name_base + "-p.h5", mode='r') as ifstream_P:
+        with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
+            tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data)
             temp_P = np.array(ifstream_P.root.data)
         temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, mapi_params)
@@ -246,7 +248,7 @@ class MAPI_Rubrene(OneD_Model):
         #################
         
         #### DBP PL ####
-        with tables.open_file(data_dirname + "\\" + file_name_base + "-delta_D.h5", mode='r') as ifstream_D:
+        with tables.open_file(os.path.join(data_dirname, file_name_base + "-delta_D.h5"), mode='r') as ifstream_D:
             temp_D = np.array(ifstream_D.root.data)
             
         temp_D = prep_PL(temp_D, 0, to_index(ru_length, df, ru_length), 
@@ -258,7 +260,7 @@ class MAPI_Rubrene(OneD_Model):
         
         #### TTA Rate ####
         # "Triplet-Triplet Annihilation"
-        with tables.open_file(data_dirname + "\\" + file_name_base + "-T.h5", mode='r') as ifstream_T:
+        with tables.open_file(os.path.join(data_dirname, file_name_base + "-T.h5"), mode='r') as ifstream_T:
             temp_TTA = np.array(ifstream_T.root.data)
             
         temp_TTA = TTA(temp_TTA, 0, to_index(ru_length, df, ru_length), 
@@ -269,8 +271,8 @@ class MAPI_Rubrene(OneD_Model):
         ##################
         
         #### Efficiencies ####
-        with tables.open_file(data_dirname + "\\" + file_name_base + "-N.h5", mode='r') as ifstream_N, \
-             tables.open_file(data_dirname + "\\" + file_name_base + "-P.h5", mode='r') as ifstream_P:
+        with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
+             tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
             temp_N = np.array(ifstream_N.root.data[:,-1])
             temp_init_N = np.array(ifstream_N.root.data[0,:])
             temp_P = np.array(ifstream_P.root.data[:,-1])
@@ -286,17 +288,35 @@ class MAPI_Rubrene(OneD_Model):
         if isinstance(tail_p0, np.ndarray):
             tail_p0 = tail_p0[-1]
             
-        t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+        if "no_upconverter" in flags and flags["no_upconverter"]:
+            t_form = temp_N * 0
+            
+        else:
+            t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
                                       / (temp_N + temp_P))
-        data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
         
-        data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] / t_form
-        
+        try:
+            data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
+        except FloatingPointError:
+            data_dict["Rubrene"]["T_form_eff"] =  t_form * 0
+        try:
+            data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] / t_form
+        except FloatingPointError:
+            data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] * 0
+            
+            
         data_dict["Rubrene"]["S_up_eff"] = data_dict["Rubrene"]["T_anni_eff"] * data_dict["Rubrene"]["T_form_eff"]
         
-        data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] / temp_init_N
-        data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] / temp_init_N
-
+        try:
+            data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] / temp_init_N
+        except FloatingPointError:
+            data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] * 0
+            
+        try:
+            data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] / temp_init_N
+        except FloatingPointError:
+            data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] * 0
+            
         for data in data_dict["MAPI"]:
             data_dict["MAPI"][data] *= mapi.convert_out[data]
             
@@ -379,7 +399,7 @@ class MAPI_Rubrene(OneD_Model):
                 
         return data
     
-    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params):
+    def get_timeseries(self, pathname, datatype, parent_data, total_time, dt, params, flags):
         
         if datatype == "delta_N":
             temp_dN = parent_data / params["MAPI"]["Total_length"]
@@ -419,16 +439,28 @@ class MAPI_Rubrene(OneD_Model):
             if isinstance(tail_p0, np.ndarray):
                 tail_p0 = tail_p0[-1]
                 
-            t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
-                                            / (temp_N + temp_P))
+            if "no_upconverter" in flags and flags["no_upconverter"]:
+                t_form = 0 * temp_N
+            else:
+                t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+                                                / (temp_N + temp_P))
             
             # In order:
             # Triplets formed per photon absorbed
+            try:
+                t_form_eff = t_form / temp_init_N
+            except FloatingPointError:
+                t_form_eff = t_form * 0
             # Singlets formed per triplet formed
+            try:
+                t_anni_eff = parent_data / t_form
+            except FloatingPointError:
+                t_anni_eff = parent_data * 0
             # Singlets formed per photon absorbed
-            return [("T_form_eff", t_form / temp_init_N),
-                    ("T_anni_eff", parent_data / t_form),
-                    ("S_up_eff", parent_data / temp_init_N)]
+            s_up_eff = t_form_eff * t_anni_eff
+            return [("T_form_eff", t_form_eff),
+                    ("T_anni_eff", t_anni_eff),
+                    ("S_up_eff", s_up_eff)]
         
         elif datatype == "dbp_PL":
             with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N:
@@ -551,7 +583,7 @@ def dydt(t, y, m, f, dm, df, Cn, Cp,
     return dydt
     
 def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params, 
-                 do_Fret=False, do_ss=False, hmax_=0, write_output=True, 
+                 do_Fret=False, do_ss=False, no_upconverter=False, hmax_=0, write_output=True, 
                  init_N=0, init_P=0, init_T=0, init_S=0, init_D=0):
     """
     Master function for MAPI_Rubrene_DBP module simulation.
@@ -586,6 +618,9 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         Whether to include the FRET integral. The default is True.
     do_ss : bool, optional
         Whether to inject the initial conditions at every time step, creating a nonzero steady state situation. The default is False.
+    no_upconverter : bool, optional
+        Whether to block new triplets from being formed at the MAPI/Rubrene interface, which effectively deactivates the latter upconverter layer.
+        The default is False.
     hmax_ : float, optional
         Maximum internal step size to be taken by ODEINT. The default is 0.
     write_output : bool, optional
@@ -607,7 +642,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     ## Unpack params; typecast non-array params to arrays if needed
     Sf = mapi_params["Sf"].value
     Sb = mapi_params["Sb"].value
-    St = ru_params["St"].value
+    St = 0 if no_upconverter else ru_params["St"].value
     mu_n = to_array(mapi_params["mu_N"].value, m, True)
     mu_p = to_array(mapi_params["mu_P"].value, m, True)
     mu_s = to_array(ru_params["mu_S"].value, f, True)
