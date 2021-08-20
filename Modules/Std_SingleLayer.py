@@ -108,16 +108,27 @@ class Std_SingleLayer(OneD_Model):
         
         return {"N":init_N, "P":init_P}
     
-    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions,pool=None):
         """Calls ODE solver."""
         one_layer = self.layers["OneLayer"]
         for param_name, param in one_layer.params.items():
             param.value *= one_layer.convert_in[param_name]
 
-        ode_onelayer(data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
-                     not flags['ignore_recycle'].value(), 
-                     flags['check_do_ss'].value(), hmax_, True,
-                     init_conditions["N"], init_conditions["P"])
+        if pool:
+            # pool.apply_async can send processeses at different times, not waiting for the result
+            pool.apply_async(
+                ode_onelayer,args=
+                    (data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
+                    not flags['ignore_recycle'].value(), 
+                    flags['check_do_ss'].value(), hmax_, True,
+                    init_conditions["N"], init_conditions["P"])
+            )
+        else:   # if no pool, just call the function normally
+            ode_onelayer(
+                data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
+                not flags['ignore_recycle'].value(), 
+                flags['check_do_ss'].value(), hmax_, True,
+                init_conditions["N"], init_conditions["P"])
     
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Calculates at a selection of sample times: N, P, (total carrier densities)
