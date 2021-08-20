@@ -24,6 +24,7 @@ import tables
 import itertools
 # This lets us pass params to functions called by tkinter buttons
 from functools import partial 
+import multiprocessing as mp
 
 import carrier_excitations
 from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, \
@@ -2927,16 +2928,34 @@ class Notebook:
             return
 
         batch_num = 0
+        batch_total = len(IC_files)
         self.sim_warning_msg = ["The following occured while simulating:"]
+
+        if batch_total < mp.cpu_count():
+            # we need as many processors as simulations to process
+            number_of_processors = batch_total
+        else: # but the the upper limit of processors is a hardaware limit
+            number_of_processors = mp.cpu_count()
+
+        print(">>> Initializing a multiprocessing pool with {} parallel processes for {} simulations..."
+                .format(number_of_processors, batch_total))
+        self.pool = mp.Pool(number_of_processors) # start the multiprocessing pool
+        ts = time.time()
         for IC in IC_files:
             batch_num += 1
             self.IC_file_name = IC
             self.load_ICfile()
             self.write(self.status, 
                        "Now calculating {} : ({} of {})".format(self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")], 
-                                                                str(batch_num), str(len(IC_files))))
+                                                                str(batch_num), str(batch_total)))
             self.do_Calculate()
-            
+        
+        print(">>> Waiting for all processes to finish...")
+        # wait for the end of all the async processes in the pool
+        self.pool.close()
+        self.pool.join()
+        print(">>> All processes finished in {} seconds".format(time.time()-ts))
+
         self.write(self.status, "Simulations complete")
         self.load_ICfile()
 
@@ -3038,7 +3057,7 @@ class Notebook:
         try:
             self.module.simulate(os.path.join(dirname, data_file_name), 
                                    num_nodes, self.n, self.dt,
-                                   self.sys_flag_dict, self.hmax, init_conditions)
+                                   self.sys_flag_dict, self.hmax, init_conditions, self.pool)
             
         except FloatingPointError:
             self.sim_warning_msg.append("Error: an unusual value occurred while simulating {}. "
