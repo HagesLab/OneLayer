@@ -56,9 +56,13 @@ class HeatPlate(OneD_Model):
         init_T = to_array(init_T, len(self.grid_x_nodes), False)
         return {"T":init_T}
     
-    def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, params, flags, hmax_, init_conditions,pool=None):
         # No strict rules on how simulate() needs to look - as long as it calls the appropriate ode() from py with the correct args
-        return ode_heatplate(data_path, m, n, self.dx, dt, params)
+        if pool:
+            # pool.apply_async can send processeses at different times, not waiting for the result
+            pool.apply_async(ode_heatplate, args=(data_path, m, n, self.dx, dt, params))
+        else:  # if no pool, just call the function normally
+            ode_heatplate(data_path, m, n, self.dx, dt, params)
     
     def get_overview_analysis(self, params, tsteps, data_dirname, file_name_base):
         """Calculate temperature and heat flux at various sample times"""

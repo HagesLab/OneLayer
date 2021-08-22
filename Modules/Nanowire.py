@@ -105,17 +105,30 @@ class Nanowire(OneD_Model):
         
         return {"N":init_N, "P":init_P}
     
-    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions, pool=None):
         """Calls ODEINT solver."""
         nanowire = self.layers["Nanowire"]
         for param_name, param in nanowire.params.items():
             param.value *= nanowire.convert_in[param_name]
             
-        ode_nanowire(data_path, m["Nanowire"], n, nanowire.dx, dt, nanowire.params,
-                     not flags['ignore_alpha'].value(), 
-                     flags['symmetric_system'].value(), 
-                     flags['check_do_ss'].value(), hmax_, True,
-                     init_conditions["N"], init_conditions["P"])
+        
+        if pool:
+            # pool.apply_async can send processeses at different times, not waiting for the result
+            pool.apply_async( 
+                ode_nanowire, args=
+                (data_path, m["Nanowire"], n, nanowire.dx, dt, nanowire.params,
+                not flags['ignore_alpha'].value(), 
+                flags['symmetric_system'].value(), 
+                flags['check_do_ss'].value(), hmax_, True,
+                init_conditions["N"], init_conditions["P"])
+            )
+        else: # if no pool, just call the function normally
+            ode_nanowire(
+                data_path, m["Nanowire"], n, nanowire.dx, dt, nanowire.params,
+                not flags['ignore_alpha'].value(), 
+                flags['symmetric_system'].value(), 
+                flags['check_do_ss'].value(), hmax_, True,
+                init_conditions["N"], init_conditions["P"])
     
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Calculates at a selection of sample times: N, P, (total carrier densities)

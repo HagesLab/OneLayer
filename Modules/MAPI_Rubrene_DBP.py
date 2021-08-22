@@ -170,7 +170,7 @@ class MAPI_Rubrene(OneD_Model):
         
         return {"N":init_N, "P":init_P, "T":init_T, "delta_S":init_S, "delta_D":init_D}
     
-    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions, pool=None):
         """Calls ODEINT solver."""
         mapi = self.layers["MAPI"]
         ru = self.layers["Rubrene"]
@@ -180,13 +180,26 @@ class MAPI_Rubrene(OneD_Model):
         for param_name, param in ru.params.items():
             param.value *= ru.convert_in[param_name]
 
-        ode_twolayer(data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
-                     n, dt, mapi.params, ru.params, flags['do_fret'].value(),
-                     flags['check_do_ss'].value(), flags['no_upconverter'].value(), hmax_, True,
-                     init_conditions["N"], init_conditions["P"],
-                     init_conditions["T"], init_conditions["delta_S"],
-                     init_conditions["delta_D"])
-    
+        if pool:
+            # pool.apply_async can send processeses at different times, not waiting for the result
+            pool.apply_async( 
+                ode_twolayer,args=
+                    (data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
+                    n, dt, mapi.params, ru.params, flags['do_fret'].value(),
+                    flags['check_do_ss'].value(), flags['no_upconverter'].value(), hmax_, True,
+                    init_conditions["N"], init_conditions["P"],
+                    init_conditions["T"], init_conditions["delta_S"],
+                    init_conditions["delta_D"])
+            )
+        else: # if no pool, just call the function normally
+            ode_twolayer(
+                data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
+                n, dt, mapi.params, ru.params, flags['do_fret'].value(),
+                flags['check_do_ss'].value(), flags['no_upconverter'].value(), hmax_, True,
+                init_conditions["N"], init_conditions["P"],
+                init_conditions["T"], init_conditions["delta_S"],
+                init_conditions["delta_D"])
+
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Calculates at a selection of sample times: N, P, (total carrier densities)
            delta_N, delta_P, (above-equilibrium carrier densities)
@@ -635,6 +648,8 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     None
         TEDs does not do anything with the return value. Other applications might find this useful however.
     """
+
+    print(">>> Starting simulation on: ", data_path_name)
     
     ## Set data type of array files
     atom = tables.Float64Atom()
@@ -705,6 +720,9 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     
     sol = intg.solve_ivp(dydt, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
     data = sol.y.T
+
+    print(">>> Writing results from simulation on: ", data_path_name)
+    
             
     if write_output:
         ## Prep output files
@@ -726,8 +744,6 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
             array_S.append(data[1:,3*(m)+1+f:3*(m)+1+2*(f)])
             array_D.append(data[1:,3*(m)+1+2*(f):])
 
-        return #error_data
-
     else:
         array_N = data[:,0:m]
         array_P = data[:,m:2*(m)]
@@ -735,7 +751,8 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         array_S = data[1:,3*(m)+1+f:3*(m)+1+2*(f)]
         array_D = data[1:,3*(m)+1+2*(f):]
 
-        return #array_N, array_P, error_data
+    print(">>> Finished simulation and writing on: ", data_path_name)
+    return #array_N, array_P, error_data
     
 def E_field(sim_outputs, params):
     """Calculate electric field from N, P"""
