@@ -24,7 +24,10 @@ import tables
 import itertools
 # This lets us pass params to functions called by tkinter buttons
 from functools import partial 
+
 import multiprocessing as mp
+import psutil
+NUMBER_OF_PROCESSORS = 4
 
 import carrier_excitations
 from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, \
@@ -67,8 +70,11 @@ class Notebook:
         self.root.attributes('-fullscreen', False)
         self.root.title(title)
         
-        self.do_module_popup()
-        self.root.wait_window(self.select_module_popup)
+        # self.do_module_popup()
+        # self.root.wait_window(self.select_module_popup)
+        self.module = mod_list()[list(mod_list().keys())[2]]() # always MAPI_Rubrene , hack for development
+        self.module.verify()
+        self.verified=True
         if self.module is None: 
             return
         if not self.verified: 
@@ -2931,12 +2937,15 @@ class Notebook:
         batch_total = len(IC_files)
         self.sim_warning_msg = ["The following occured while simulating:"]
 
-        if batch_total < mp.cpu_count():
-            # we need as many processors as simulations to process
-            number_of_processors = batch_total
-        else: # but the the upper limit of processors is a hardaware limit
-            number_of_processors = mp.cpu_count()
+        ## we are leaving this hardcoded for now as it doesnt seem to be optimized.
+        number_of_processors = NUMBER_OF_PROCESSORS
+        # if batch_total < mp.cpu_count():
+        #     # we need as many processors as simulations to process
+        #     number_of_processors = batch_total
+        # else: # but the the upper limit of processors is a hardaware limit
+        #     number_of_processors = mp.cpu_count()
 
+        print(">>> Processor offers {} processors, hyperthreaded to {} processors".format(psutil.cpu_count(False),psutil.cpu_count(True)))
         print(">>> Initializing a multiprocessing pool with {} parallel processes for {} simulations..."
                 .format(number_of_processors, batch_total))
         self.pool = mp.Pool(number_of_processors) # start the multiprocessing pool
