@@ -2860,7 +2860,7 @@ class Notebook:
             
 
         elif (tab_text == "Analyze"):
-            print("Analzye tab selected")
+            print("Analyze tab selected")
 
         return
 
