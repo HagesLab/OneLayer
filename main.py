@@ -1482,6 +1482,9 @@ class Notebook:
                                                hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
                     
+                if "delta_N" in changed_params or "delta_P" in changed_params:
+                    self.using_LGC[self.current_layer_name] = False
+                    
                 if len(err_msg) > 1:
                     self.do_confirmation_popup("\n".join(err_msg), hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
