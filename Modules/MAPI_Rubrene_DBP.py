@@ -7,6 +7,7 @@ Created on Wed May 12 18:01:07 2021
 import numpy as np
 import os
 from scipy import integrate as intg
+from scipy import optimize
 from helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos, new_integrate
 import tables
@@ -58,7 +59,8 @@ class MAPI_Rubrene(OneD_Model):
                 
         self.flags_dict = {"do_fret":("Include Fret",1, 0),
                            "check_do_ss":("Steady State Input",1, 0),
-                           "no_upconverter":("Deactivate Upconverter", 1, 0)}
+                           "no_upconverter":("Deactivate Upconverter", 1, 0),
+                           "predict_sst":("Predict S.S. Triplet Density", 1, 0)}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
@@ -182,7 +184,8 @@ class MAPI_Rubrene(OneD_Model):
 
         ode_twolayer(data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
                      n, dt, mapi.params, ru.params, flags['do_fret'].value(),
-                     flags['check_do_ss'].value(), flags['no_upconverter'].value(), hmax_, True,
+                     flags['check_do_ss'].value(), flags['no_upconverter'].value(), 
+                     flags['predict_sst'].value(), hmax_, True,
                      init_conditions["N"], init_conditions["P"],
                      init_conditions["T"], init_conditions["delta_S"],
                      init_conditions["delta_D"])
@@ -583,7 +586,8 @@ def dydt(t, y, m, f, dm, df, Cn, Cp,
     return dydt
     
 def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params, 
-                 do_Fret=False, do_ss=False, no_upconverter=False, hmax_=0, write_output=True, 
+                 do_Fret=False, do_ss=False, no_upconverter=False, predict_sstriplets=False,
+                 hmax_=0, write_output=True, 
                  init_N=0, init_P=0, init_T=0, init_S=0, init_D=0):
     """
     Master function for MAPI_Rubrene_DBP module simulation.
@@ -620,6 +624,11 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         Whether to inject the initial conditions at every time step, creating a nonzero steady state situation. The default is False.
     no_upconverter : bool, optional
         Whether to block new triplets from being formed at the MAPI/Rubrene interface, which effectively deactivates the latter upconverter layer.
+        The default is False.
+    predict_sstriplets : bool, optional
+        Whether to start the triplet density at a predicted steady state value rather than zero.
+        This reduces the simulation time needed to reach steady state.
+        This only works if do_ss is also active.
         The default is False.
     hmax_ : float, optional
         Maximum internal step size to be taken by ODEINT. The default is 0.
@@ -670,15 +679,25 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
                            {"rel_permitivity":eps, "N0":n0, "P0":p0, "Node_width":dm})
     #init_E_field = np.zeros(m+1)
     
-    init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
-
     if do_ss:
         init_dN = init_N - n0
         init_dP = init_P - p0
-
+        
     else:
         init_dN = 0
         init_dP = 0
+        
+    if do_ss and predict_sstriplets:
+        print("Overriding init_T")
+        try:
+            np.testing.assert_almost_equal(init_dN, init_dP)
+        except AssertionError:
+            print("Warning: ss triplet prediction assumes equal excitation of holes and electrons. Unequal excitation is WIP.")
+        init_T = SST(tauN[-1], tauP[-1], n0[-1], p0[-1], B[-1], St, k_fusion, tauT, f*df, init_dN[-1])
+    
+    init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
+
+    
 
     ## Generate a weight distribution needed for FRET term
     if do_Fret:
@@ -736,6 +755,20 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         array_D = data[1:,3*(m)+1+2*(f):]
 
         return #array_N, array_P, error_data
+    
+def SST(tauN, tauP, n0, p0, B, St, k_fusion, tauT, ru_thickness, gen_rate):
+    # TODO
+    n_bal = lambda n, src, tn, tp, n0, p0, B: src - (n**2 - n0*p0) * (B + 1/(n * (tn+tp)))
+    
+    ss_n = optimize.root(n_bal, gen_rate, args=(gen_rate, tauN, tauP, n0, p0, B))
+    
+    ss_n = ss_n.x # [nm^-3]
+    
+    T_gen_per_bin = St * (ss_n**2 - n0*p0) / (ss_n + ss_n) / ru_thickness # [nm^-3 ns^-1]
+    
+    ss_t = (-(1/tauT) + np.sqrt(tauT**-2 + 4*k_fusion*T_gen_per_bin)) / (2*k_fusion)
+
+    return ss_t
     
 def E_field(sim_outputs, params):
     """Calculate electric field from N, P"""
