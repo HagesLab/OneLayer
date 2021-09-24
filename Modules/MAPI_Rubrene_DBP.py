@@ -679,6 +679,20 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
                            {"rel_permitivity":eps, "N0":n0, "P0":p0, "Node_width":dm})
     #init_E_field = np.zeros(m+1)
     
+    ## Generate a weight distribution needed for FRET term
+    if do_Fret:
+        init_m = np.linspace(dm / 2, m*dm - dm / 2, m)
+        init_f = np.linspace(df / 2, f*df - df / 2, f)
+        weight1 = np.array([1 / ((init_f + (m*dm - i)) ** 3) for i in init_m])
+        weight2 = np.array([1 / ((i + (m*dm - init_m)) ** 3) for i in init_f])
+        # It turns out that weight2 contains ALL of the parts of the FRET integral that depend
+        # on the variable of integration, so we do that integral right away.
+        weight2 = intg.trapz(weight2, dx=dm, axis=1)
+
+    else:
+        weight1 = 0
+        weight2 = 0
+    
     if do_ss:
         init_dN = init_N - n0
         init_dP = init_P - p0
@@ -693,25 +707,19 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
             np.testing.assert_almost_equal(init_dN, init_dP)
         except AssertionError:
             print("Warning: ss triplet prediction assumes equal excitation of holes and electrons. Unequal excitation is WIP.")
-        init_T = SST(tauN[-1], tauP[-1], n0[-1], p0[-1], B[-1], St, k_fusion, tauT, f*df, np.mean(init_dN))
+            
+        if do_Fret:
+            tauD_eff = (k_0*weight2/tauD) + (1/tauD)
+        else:
+            tauD_eff = 1 / tauD
+        init_T, init_S, init_D = SST(tauN[-1], tauP[-1], n0[-1], p0[-1], B[-1], 
+                                     St, k_fusion, tauT, tauS, tauD_eff, f*df, np.mean(init_dN))
     
     init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
 
     
 
-    ## Generate a weight distribution needed for FRET term
-    if do_Fret:
-        init_m = np.linspace(dm / 2, m*dm - dm / 2, m)
-        init_f = np.linspace(df / 2, f*df - df / 2, f)
-        weight1 = np.array([1 / ((init_f + (m*dm - i)) ** 3) for i in init_m])
-        weight2 = np.array([1 / ((i + (m*dm - init_m)) ** 3) for i in init_f])
-        # It turns out that weight2 contains ALL of the parts of the FRET integral that depend
-        # on the variable of integration, so we do that integral right away.
-        weight2 = intg.trapz(weight2, dx=dm, axis=1)
-
-    else:
-        weight1 = 0
-        weight2 = 0
+    
     args=(m, f, dm, df, Cn, Cp, 
             tauN, tauP, tauT, tauS, tauD, 
             mu_n, mu_p, mu_s, mu_T,
@@ -756,7 +764,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
 
         return #array_N, array_P, error_data
     
-def SST(tauN, tauP, n0, p0, B, St, k_fusion, tauT, ru_thickness, gen_rate):
+def SST(tauN, tauP, n0, p0, B, St, k_fusion, tauT, tauS, tauD_eff, ru_thickness, gen_rate):
     # TODO
     n_bal = lambda n, src, tn, tp, n0, p0, B: src - (n**2 - n0*p0) * (B + 1/(n * (tn+tp)))
     
@@ -766,9 +774,12 @@ def SST(tauN, tauP, n0, p0, B, St, k_fusion, tauT, ru_thickness, gen_rate):
     
     T_gen_per_bin = St * (ss_n**2 - n0*p0) / (ss_n + ss_n) / ru_thickness # [nm^-3 ns^-1]
     
-    ss_t = (-(1/tauT) + np.sqrt(tauT**-2 + 4*k_fusion*T_gen_per_bin)) / (2*k_fusion)
-
-    return ss_t
+    ss_t = 1.05*(-(1/tauT) + np.sqrt(tauT**-2 + 4*k_fusion*T_gen_per_bin)) / (2*k_fusion)
+    
+    ss_s = k_fusion * tauS * ss_t**2
+    ss_d = ss_s * tauD_eff / tauS
+    
+    return ss_t, ss_s, ss_d
     
 def E_field(sim_outputs, params):
     """Calculate electric field from N, P"""
