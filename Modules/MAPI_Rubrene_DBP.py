@@ -693,7 +693,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
             np.testing.assert_almost_equal(init_dN, init_dP)
         except AssertionError:
             print("Warning: ss triplet prediction assumes equal excitation of holes and electrons. Unequal excitation is WIP.")
-        init_T = SST(tauN[-1], tauP[-1], n0[-1], p0[-1], B[-1], St, k_fusion, tauT, f*df, init_dN[-1])
+        init_T = SST(tauN[-1], tauP[-1], n0[-1], p0[-1], B[-1], St, k_fusion, tauT, f*df, np.mean(init_dN))
     
     init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
 
