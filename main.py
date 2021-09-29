@@ -1482,6 +1482,9 @@ class Notebook:
                                                hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
                     
+                if "delta_N" in changed_params or "delta_P" in changed_params:
+                    self.using_LGC[self.current_layer_name] = False
+                    
                 if len(err_msg) > 1:
                     self.do_confirmation_popup("\n".join(err_msg), hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
@@ -1507,7 +1510,6 @@ class Notebook:
                 except Exception:
                     self.write(self.ICtab_status, 
                                "Error: layer {} does not have params initialized yet".format(layer_name))
-                    
                     return
          
             max_batchable_params = 4
@@ -1548,13 +1550,21 @@ class Notebook:
            
             # Contextually-dependent options for batchable params
             self.batchables_array = []
-            mask_dN_and_dP = (self.module.system_ID in self.LGC_eligible_modules 
-                              and self.using_LGC[self.current_layer_name])
-            batchable_params = [param for param in self.module.layers[self.current_layer_name].params 
-                                if not (mask_dN_and_dP
-                                        and (param == "delta_N" or param == "delta_P"))]
+            LGC_active = []
+            batchable_params = []
+            for layer in self.module.layers:
+                LGC_active.append(self.module.system_ID in self.LGC_eligible_modules 
+                                      and self.using_LGC[layer])
+                for param in self.module.layers[layer].params:
+                    
+                    if not (LGC_active[-1] and (param == "delta_N" or param == "delta_P")):
+                        batchable_params.append("{}-{}".format(layer, param))
+                        
+                if LGC_active[-1]:
+                    for param in self.LGC_values[layer]:
+                        batchable_params.append("{}-{}".format(layer, param))
             
-            if mask_dN_and_dP:
+            if any(LGC_active):
                 
                 self.LGC_instruction1 = tk.Message(self.batch_popup, 
                                                    text="Additional options for generating "
@@ -1575,25 +1585,20 @@ class Notebook:
                 
                 # Boolean logic is fun
                 # The main idea is to hide certain parameters based on which options were used to construct the LGC
-                LGC_params = [key for key in self.LGC_entryboxes_dict.keys() if not (
-                            (self.check_calculate_init_material_expfactor.get() and (key == "LGC_absorption_cof")) or
-                            (not self.check_calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
-                            (self.LGC_gen_power_mode.get() == "power-spot" and (key == "Power_Density" or key == "Max_Gen" or key == "Total_Gen")) or
-                            (self.LGC_gen_power_mode.get() == "density" and (key == "Power" or key == "Spotsize" or key == "Max_Gen" or key == "Total_Gen")) or
-                            (self.LGC_gen_power_mode.get() == "max-gen" and (key == "Power" or key == "Spotsize" or key == "Power_Density" or key == "Total_Gen")) or
-                            (self.LGC_gen_power_mode.get() == "total-gen" and (key == "Power_Density" or key == "Power" or key == "Spotsize" or key == "Max_Gen"))
-                            )]
+                # LGC_params = [key for key in self.LGC_entryboxes_dict.keys() if not (
+                #             (self.check_calculate_init_material_expfactor.get() and (key == "LGC_absorption_cof")) or
+                #             (not self.check_calculate_init_material_expfactor.get() and (key == "A0" or key == "Eg")) or
+                #             (self.LGC_gen_power_mode.get() == "power-spot" and (key == "Power_Density" or key == "Max_Gen" or key == "Total_Gen")) or
+                #             (self.LGC_gen_power_mode.get() == "density" and (key == "Power" or key == "Spotsize" or key == "Max_Gen" or key == "Total_Gen")) or
+                #             (self.LGC_gen_power_mode.get() == "max-gen" and (key == "Power" or key == "Spotsize" or key == "Power_Density" or key == "Total_Gen")) or
+                #             (self.LGC_gen_power_mode.get() == "total-gen" and (key == "Power_Density" or key == "Power" or key == "Spotsize" or key == "Max_Gen"))
+                #             )]
 
             for i in range(max_batchable_params):
                 batch_param_name = tk.StringVar()
-                if mask_dN_and_dP:
-                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, 
-                                                   batch_param_name, "", "", 
-                                                   *batchable_params, *LGC_params)
-                else:
-                    optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, 
-                                                   batch_param_name, "", "", 
-                                                   *batchable_params)
+                optionmenu = tk.ttk.OptionMenu(self.batch_entry_frame, 
+                                               batch_param_name, "", "", 
+                                               *batchable_params)
                 
                 optionmenu.grid(row=i,column=0,padx=(20,20))
                 batch_param_entry = tk.ttk.Entry(self.batch_entry_frame, width=80)
@@ -2860,7 +2865,7 @@ class Notebook:
             
 
         elif (tab_text == "Analyze"):
-            print("Analzye tab selected")
+            print("Analyze tab selected")
 
         return
 
@@ -4149,8 +4154,10 @@ class Notebook:
         
         # Record the original values of the module, so we can restore them after the batch algo finishes
         original_param_values = {}
-        for param_name, param in self.module.layers[self.current_layer_name].params.items():
-            original_param_values[param_name] = param.value
+        for layer in self.module.layers:
+            original_param_values[layer] = {}
+            for param_name, param in self.module.layers[layer].params.items():
+                original_param_values[layer][param_name] = param.value
                 
         # This algorithm was shamelessly stolen from our bay.py script...                
         batch_combinations = get_all_combinations(batch_values)        
@@ -4158,17 +4165,21 @@ class Notebook:
         # Apply each combination to module, going through LGC if necessary
         for batch_set in batch_combinations:
             filename = ""
-            for param in batch_set:
-                filename += str("__{}_{:.4e}".format(param, batch_set[param]))
+            for b in batch_set:
+                layer, param = b.split('-')
+                filename += str("__{}_{:.4e}".format(b, batch_set[b]))
                 
-                if self.module.system_ID in self.LGC_eligible_modules and (param in self.LGC_entryboxes_dict):
-                    self.enter(self.LGC_entryboxes_dict[param], str(batch_set[param]))
+                if (self.module.system_ID in self.LGC_eligible_modules 
+                    and layer in self.LGC_values
+                    and param in self.LGC_values[layer]):
+                    self.enter(self.LGC_entryboxes_dict[param], str(batch_set[b]))
                     
                 else:
-                    self.module.layers[self.current_layer_name].params[param].value = batch_set[param]
+                    self.module.layers[layer].params[param].value = batch_set[b]
 
                 
-            if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC[self.current_layer_name]: 
+            if (self.module.system_ID in self.LGC_eligible_modules
+                and any(self.using_LGC.values())): 
                 self.add_LGC()
                 
             try:
@@ -4180,8 +4191,9 @@ class Notebook:
                 warning_mssg.append(str(e))
                 
         # Restore the original values of module
-        for param_name, param in self.module.layers[self.current_layer_name].params.items():
-            param.value = original_param_values[param_name]
+        for layer in self.module.layers:
+            for param_name, param in self.module.layers[layer].params.items():
+                param.value = original_param_values[layer][param_name]
         
         
         if len(warning_mssg) > 1:

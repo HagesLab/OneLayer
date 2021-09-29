@@ -30,7 +30,7 @@ class Std_SingleLayer(OneD_Model):
                   "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                   "temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
                   "rel_permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
-                  "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
+                  "Ext_E_Field":Parameter(units="[V/um]", is_edge=True),
                   "back_reflectivity":Parameter(units="", is_edge=False, is_space_dependent=False, valid_range=(0,1)), 
                   "alpha":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
                   "delta":Parameter(units="", is_edge=False, valid_range=(0,1)), 
@@ -67,7 +67,7 @@ class Std_SingleLayer(OneD_Model):
                       "tau_N": 1, "tau_P": 1,                                     # [ns]
                       "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
                       "temperature": 1, "rel_permitivity": 1, 
-                      "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
+                      "Ext_E_Field": 1e-3,                                        # [V/um] to [V/nm]
                       "alpha": 1e-7,                               # [cm^-1] to [nm^-1]
                       "delta": 1, "frac_emitted": 1,
                       "back_reflectivity": 1,
@@ -427,7 +427,7 @@ def ode_onelayer(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     tauP = to_array(params["tau_P"].value, m, False)
     B = to_array(params["B"].value, m, False)
     eps = to_array(params["rel_permitivity"].value, m, True)
-    E_field_ext = to_array(params["Ext_E-Field"].value, m, True)
+    E_field_ext = to_array(params["Ext_E_Field"].value, m, True)
     alpha = to_array(params["alpha"].value, m, False)
     back_refl_frac = params["back_reflectivity"].value
     delta_frac = to_array(params["delta"].value, m, False) if recycle_photons else np.zeros(m)

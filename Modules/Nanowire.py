@@ -29,12 +29,12 @@ class Nanowire(OneD_Model):
                  "Sf":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                  "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                  "Temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
-                 "Rel-Permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
-                 "Ext_E-Field":Parameter(units="[V/um]", is_edge=True),
+                 "Rel_Permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
+                 "Ext_E_Field":Parameter(units="[V/um]", is_edge=True),
                  "Theta":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
                  "Alpha":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
                  "Delta":Parameter(units="", is_edge=False, valid_range=(0,1)), 
-                 "Frac-Emitted":Parameter(units="", is_edge=False, valid_range=(0,1)),
+                 "Frac_Emitted":Parameter(units="", is_edge=False, valid_range=(0,1)),
                  "delta_N":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                  "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                  "Ec":Parameter(units="[eV]", is_edge=True), 
@@ -66,10 +66,10 @@ class Nanowire(OneD_Model):
                     "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
                     "Tau_N": 1, "Tau_P": 1,                                     # [ns]
                     "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
-                    "Temperature": 1, "Rel-Permitivity": 1, 
-                    "Ext_E-Field": 1e-3,                                        # [V/um] to [V/nm]
+                    "Temperature": 1, "Rel_Permitivity": 1, 
+                    "Ext_E_Field": 1e-3,                                        # [V/um] to [V/nm]
                     "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
-                    "Delta": 1, "Frac-Emitted": 1,
+                    "Delta": 1, "Frac_Emitted": 1,
                     "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
                     "Ec": 1, "electron_affinity": 1,
                     "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
@@ -416,12 +416,12 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     tauN = to_array(params["Tau_N"].value, m, False)
     tauP = to_array(params["Tau_P"].value, m, False)
     B = to_array(params["B"].value, m, False)
-    eps = to_array(params["Rel-Permitivity"].value, m, True)
-    E_field_ext = to_array(params["Ext_E-Field"].value, m, True)
+    eps = to_array(params["Rel_Permitivity"].value, m, True)
+    E_field_ext = to_array(params["Ext_E_Field"].value, m, True)
     alphaCof = to_array(params["Alpha"].value, m, False) if recycle_photons else np.zeros(m)
     thetaCof = to_array(params["Theta"].value, m, False)
     delta_frac = to_array(params["Delta"].value, m, False)
-    fracEmitted = to_array(params["Frac-Emitted"].value, m, False)
+    fracEmitted = to_array(params["Frac_Emitted"].value, m, False)
     init_Ec = to_array(params["Ec"].value, m, True)
     init_Chi = to_array(params["electron_affinity"].value, m, True)
            
@@ -509,10 +509,10 @@ def E_field(sim_outputs, params):
     """Calculate electric field from N, P"""
     eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
     q_C = 1.602e-19 # [C per carrier]
-    if isinstance(params["Rel-Permitivity"], np.ndarray):
-        averaged_rel_permitivity = (params["Rel-Permitivity"][:-1] + np.roll(params["Rel-Permitivity"], -1)[:-1]) / 2
+    if isinstance(params["Rel_Permitivity"], np.ndarray):
+        averaged_rel_permitivity = (params["Rel_Permitivity"][:-1] + np.roll(params["Rel_Permitivity"], -1)[:-1]) / 2
     else:
-        averaged_rel_permitivity = params["Rel-Permitivity"]
+        averaged_rel_permitivity = params["Rel_Permitivity"]
     
     dEdx = q_C * (delta_p(sim_outputs, params) - delta_n(sim_outputs, params)) / (eps0 * averaged_rel_permitivity)
     if dEdx.ndim == 1:
@@ -642,7 +642,7 @@ def prep_PL(radRec, i, j, need_extra_node, params, ignore_alpha):
 
     """
     
-    frac_emitted = params["Frac-Emitted"]
+    frac_emitted = params["Frac_Emitted"]
     alpha = 0 if ignore_alpha else params["Alpha"]
     theta = params["Theta"]
     delta = params["Delta"]

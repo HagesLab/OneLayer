@@ -431,11 +431,20 @@ class OneD_Model:
         """Performs basic syntactical checks on module's attributes."""
         print("Verifying selected module...")
         
-        
+        errors = ["{} verification error:".format(self.system_ID)]
         if not "symmetric_system" in self.flags_dict:
             print("Warning: no symmetric_system flag defined."
                   "Automatically setting symmetric_system to FALSE")
             self.flags_dict["symmetric_system"] = ("Symmetric System", 0, 0)
         
         ## TODO: Add more as needed
+        for layer in self.layers:
+            for param in self.layers[layer].params:
+                if '-' in param:
+                    errors.append("'-' not allowed in param names")
+                    break
+                
+        if len(errors) > 1:
+            print("\n".join(errors))
+            raise NotImplementedError
         return
