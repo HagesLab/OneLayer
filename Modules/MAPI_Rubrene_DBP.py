@@ -12,6 +12,7 @@ from helper_structs import Parameter, Output, Layer
 from utils import u_read, to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
+from Modules.dydt_sct import dydt_sct
 
 q = 1.0                     #[e]
 q_C = 1.602e-19             #[C]
@@ -715,11 +716,11 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         init_T, init_S, init_D = SST(tauN[-1], tauP[-1], n0[-1], p0[-1], B[-1], 
                                      St, k_fusion, tauT, tauS, tauD_eff, f*df, np.mean(init_dN))
     
-    init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
+    #init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
+    init_Q = init_T * 0 # same length, all zeros.
+    init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D, init_Q], axis=None)
 
-    
 
-    
     args=(m, f, dm, df, Cn, Cp, 
             tauN, tauP, tauT, tauS, tauD, 
             mu_n, mu_p, mu_s, mu_T,
@@ -730,7 +731,8 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     ## Do n time steps
     tSteps = np.linspace(0, n*dt, n+1)
     
-    sol = intg.solve_ivp(dydt, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
+    #sol = intg.solve_ivp(dydt, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
+    sol = intg.solve_ivp(dydt_sct, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
     data = sol.y.T
             
     if write_output:
@@ -751,7 +753,8 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
             array_P.append(data[1:,m:2*(m)])
             array_T.append(data[1:,3*(m)+1:3*(m)+1+f])
             array_S.append(data[1:,3*(m)+1+f:3*(m)+1+2*(f)])
-            array_D.append(data[1:,3*(m)+1+2*(f):])
+            # array_D.append(data[1:,3*(m)+1+2*(f):])
+            array_D.append(data[1:,3*(m)+1+2*(f):3*(m)+1+3*(f)])
 
         return #error_data
 
@@ -760,7 +763,8 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         array_P = data[:,m:2*(m)]
         array_T = data[1:,3*(m)+1:3*(m)+1+f]
         array_S = data[1:,3*(m)+1+f:3*(m)+1+2*(f)]
-        array_D = data[1:,3*(m)+1+2*(f):]
+        # array_D = data[1:,3*(m)+1+2*(f):]
+        array_D = data[1:,3*(m)+1+2*(f):3*(m)+1+3*(f)]
 
         return #array_N, array_P, error_data
     
