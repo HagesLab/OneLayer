@@ -17,15 +17,17 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
          tauN, tauP, tauT, tauS, tauD, 
          mu_n, mu_p, mu_s, mu_T,
          n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
-         eps, weight1=0, weight2=0, do_Fret=False, do_ss=False, 
+         eps, 
+         mu_n_up, mu_q, Ssct, Sn, Sp, W_CB, W_VB, 
+         weight1=0, weight2=0, do_Fret=False, do_ss=False, 
          init_dN=0, init_dP=0):
 
-    W_VB = 0.1                  #[eV]
-    Ssct = 100*(1e12)           #St=100 #nm/s
-    Sp = 5 * 1e-2          # cm to nm,  STn = 5.3·10 cm s-1
-    mu_q = 2 * (1e5)           # cm2/Vs to nm2/Vs
+    # W_VB = 0.1                  #[eV]
+    # Ssct = 100*(1e14)           #St=100 #nm/s
+    # Sp = 5 * 1e3 * 1e7          # cm to nm,  STn = 5.3·10 cm s-1
+    # mu_q = 2 * (1e14)           # cm2/Vs to nm2/Vs
 
-    mu_q = mu_T * 0 + mu_q      # transforming into array, for some reason mu are arrays
+    # mu_q = mu_T * 0 + mu_q      # transforming into array, for some reason mu are arrays
     
     """Derivative function for two-layer carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
