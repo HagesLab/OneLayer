@@ -43,7 +43,9 @@ class MAPI_Rubrene(OneD_Model):
                       "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                       }
         
-        rubrene_params = {"mu_T":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
+        rubrene_params = {"mu_N_up":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
+                          "mu_P_up":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)),
+                          "mu_T":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
                           "mu_S":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)),
                           "T0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                           "tau_T":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
@@ -51,7 +53,12 @@ class MAPI_Rubrene(OneD_Model):
                           "tau_D":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
                           "k_fusion":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)),
                           "k_0":Parameter(units="[nm^3 s^-1]", is_edge=False, valid_range=(0,np.inf)),
+                          "Ssct":Parameter(units="[cm^3 / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
+                          "Sn":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
+                          "Sp":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                           "St":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
+                          "W_CB":Parameter(units="[eV]", is_edge=False, is_space_dependent=False), 
+                          "W_VB":Parameter(units="[eV]", is_edge=False, is_space_dependent=False), 
                           "Rubrene_temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
                           "delta_T":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                           "delta_S":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
@@ -61,7 +68,8 @@ class MAPI_Rubrene(OneD_Model):
         self.flags_dict = {"do_fret":("Include Fret",1, 0),
                            "check_do_ss":("Steady State Input",1, 0),
                            "no_upconverter":("Deactivate Upconverter", 1, 0),
-                           "predict_sst":("Predict S.S. Triplet Density", 1, 0)}
+                           "predict_sst":("Predict S.S. Triplet Density", 1, 0),
+                           "do_sct":("Sequential Charge Transfer", 1, 0)}
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
@@ -69,7 +77,9 @@ class MAPI_Rubrene(OneD_Model):
                                    "P":Output("P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="MAPI", yscale='symlog', yfactors=(1e-4,1e1)),
                                   }
         
-        rubrene_simulation_outputs = {"T":Output("T", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)), 
+        rubrene_simulation_outputs = {"N_up":Output("N_up", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)), 
+                                      "P_up":Output("P_up", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
+                                      "T":Output("T", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)), 
                                       "delta_S":Output("delta_S", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
                                       "delta_D":Output("delta_D", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
                                      }
@@ -119,13 +129,18 @@ class MAPI_Rubrene(OneD_Model):
                             }
         
         
-        rubrene_convert_in = {"mu_T": 1e5, "mu_S": 1e5,                         # [cm^2 / V s] to [nm^2 / V ns]
+        rubrene_convert_in = {"mu_N_up":1e14, "mu_P_up":1e14, #FIXME: Change to 1e5
+                              "mu_T": 1e5, "mu_S": 1e5,                         # [cm^2 / V s] to [nm^2 / V ns]
                               "T0": 1e-21,                                      # [cm^-3] to [nm^-3]
                               "tau_T": 1, "tau_S": 1, "tau_D": 1,               # [ns]
                               "k_fusion":1e12,                                  # [cm^3 / s] to [nm^3 / ns]
                               "k_0":1e-9,                                       # [nm^3 / s] to [nm^3 / ns]
                               "Rubrene_temperature":1,
+                              "Ssct":1e14, #FIXME: Change to 1e12
                               "St": (1e7) / (1e9),                              # [cm/s] to [nm/ns]
+                              "Sn":1e10, "Sp":1e10, #FIXME: Change to 1e-2
+                              "W_VB":1, "W_CB":1,
+                              "N_up":1e-21, "P_up":1e-21,
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21,                   # [cm^-3] to [nm^-3]
                               "T_form_eff":1, "T_anni_eff":1, "S_up_eff":1,
@@ -135,7 +150,7 @@ class MAPI_Rubrene(OneD_Model):
         rubrene_convert_in["dbp_PL"] = rubrene_convert_in["delta_D"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         rubrene_convert_in["TTA"] = rubrene_convert_in["k_fusion"] * rubrene_convert_in["delta_T"] ** 2
 
-        ru_iconvert_in = {"T": 1e7, "delta_S": 1e7, "delta_D":1e7, "dbp_PL":1e7, "TTA":1e7
+        ru_iconvert_in = {"N_up":1e7, "P_up":1e7,"T": 1e7, "delta_S": 1e7, "delta_D":1e7, "dbp_PL":1e7, "TTA":1e7
                          }
         self.layers = {"MAPI":Layer(mapi_params, mapi_simulation_outputs, mapi_calculated_outputs,
                                     "[nm]", mapi_convert_in, mapi_iconvert_in),
@@ -154,6 +169,8 @@ class MAPI_Rubrene(OneD_Model):
         init_T = (ru.params["T0"].value + ru.params["delta_T"].value) * ru.convert_in["T"]
         init_S = (ru.params["delta_S"].value) * ru.convert_in["S"]
         init_D = (ru.params["delta_D"].value) * ru.convert_in["D"]
+        init_N_up = 0
+        init_P_up = 0
         
         # "Typecast" single values to uniform arrays
         if not isinstance(init_N, np.ndarray):
@@ -169,9 +186,16 @@ class MAPI_Rubrene(OneD_Model):
             init_S = to_array(init_S, len(ru.grid_x_nodes), False)
             
         if not isinstance(init_D, np.ndarray):
-            init_D = to_array(init_D, len(ru.grid_x_nodes), False)            
+            init_D = to_array(init_D, len(ru.grid_x_nodes), False)     
+            
+        if not isinstance(init_N_up, np.ndarray):
+            init_N_up = to_array(init_N_up, len(ru.grid_x_nodes), False)   
+            
+        if not isinstance(init_P_up, np.ndarray):
+            init_P_up = to_array(init_P_up, len(ru.grid_x_nodes), False)   
         
-        return {"N":init_N, "P":init_P, "T":init_T, "delta_S":init_S, "delta_D":init_D}
+        return {"N":init_N, "P":init_P, "T":init_T, "delta_S":init_S, "delta_D":init_D,
+                "N_up":init_N_up, "P_up":init_P_up}
     
     def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
         """Calls ODEINT solver."""
@@ -186,10 +210,11 @@ class MAPI_Rubrene(OneD_Model):
         ode_twolayer(data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx, 
                      n, dt, mapi.params, ru.params, flags['do_fret'].value(),
                      flags['check_do_ss'].value(), flags['no_upconverter'].value(), 
-                     flags['predict_sst'].value(), hmax_, True,
+                     flags['predict_sst'].value(), flags["do_sct"].value(),
+                     hmax_, True,
                      init_conditions["N"], init_conditions["P"],
                      init_conditions["T"], init_conditions["delta_S"],
-                     init_conditions["delta_D"])
+                     init_conditions["delta_D"], init_conditions["P_up"])
     
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Calculates at a selection of sample times: N, P, (total carrier densities)
@@ -588,8 +613,9 @@ def dydt(t, y, m, f, dm, df, Cn, Cp,
     
 def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params, 
                  do_Fret=False, do_ss=False, no_upconverter=False, predict_sstriplets=False,
+                 do_seq_charge_transfer=False,
                  hmax_=0, write_output=True, 
-                 init_N=0, init_P=0, init_T=0, init_S=0, init_D=0):
+                 init_N=0, init_P=0, init_T=0, init_S=0, init_D=0, init_P_up=0):
     """
     Master function for MAPI_Rubrene_DBP module simulation.
     Problem statement:
@@ -652,7 +678,26 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     ## Unpack params; typecast non-array params to arrays if needed
     Sf = mapi_params["Sf"].value
     Sb = mapi_params["Sb"].value
-    St = 0 if no_upconverter else ru_params["St"].value
+    if do_seq_charge_transfer:
+        # Unpack additional params for this physics model
+        St = 0
+        Ssct = ru_params["Ssct"].value
+        Sp = ru_params["Sp"].value
+        Sn = ru_params["Sp"].value
+        w_vb = ru_params["W_VB"].value
+        w_cb = ru_params["W_CB"].value
+        mu_p_up = to_array(ru_params["mu_P_up"].value, f, True)
+        mu_n_up = to_array(ru_params["mu_N_up"].value, f, True)
+    else:
+        St = 0 if no_upconverter else ru_params["St"].value
+        Ssct = 0
+        Sp = 0
+        Sn = 0
+        w_vb = 0
+        w_cb = 0
+        mu_p_up = 0
+        mu_n_up = 0
+
     mu_n = to_array(mapi_params["mu_N"].value, m, True)
     mu_p = to_array(mapi_params["mu_P"].value, m, True)
     mu_s = to_array(ru_params["mu_S"].value, f, True)
@@ -716,23 +761,37 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         init_T, init_S, init_D = SST(tauN[-1], tauP[-1], n0[-1], p0[-1], B[-1], 
                                      St, k_fusion, tauT, tauS, tauD_eff, f*df, np.mean(init_dN))
     
-    #init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
-    init_Q = init_T * 0 # same length, all zeros.
-    init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D, init_Q], axis=None)
+    
+    if do_seq_charge_transfer:
+        init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D, init_P_up], axis=None)
+    else:
+        init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
 
-
-    args=(m, f, dm, df, Cn, Cp, 
-            tauN, tauP, tauT, tauS, tauD, 
-            mu_n, mu_p, mu_s, mu_T,
-            n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
-            eps, weight1, weight2, do_Fret, do_ss, 
-            init_dN, init_dP)
+    
 
     ## Do n time steps
     tSteps = np.linspace(0, n*dt, n+1)
     
-    #sol = intg.solve_ivp(dydt, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
-    sol = intg.solve_ivp(dydt_sct, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
+    
+    if do_seq_charge_transfer:
+        args=(m, f, dm, df, Cn, Cp, 
+                tauN, tauP, tauT, tauS, tauD, 
+                mu_n, mu_p, mu_s, mu_T,
+                n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
+                eps, 
+                mu_n_up, mu_p_up, Ssct, Sn, Sp, w_cb, w_vb, 
+                weight1, weight2, do_Fret, do_ss, 
+                init_dN, init_dP)
+        sol = intg.solve_ivp(dydt_sct, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
+    else:
+        args=(m, f, dm, df, Cn, Cp, 
+                tauN, tauP, tauT, tauS, tauD, 
+                mu_n, mu_p, mu_s, mu_T,
+                n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
+                eps, weight1, weight2, do_Fret, do_ss, 
+                init_dN, init_dP)
+        sol = intg.solve_ivp(dydt, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
+    
     data = sol.y.T
             
     if write_output:
@@ -742,12 +801,16 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
                 tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P,\
                 tables.open_file(data_path_name + "-T.h5", mode='a') as ofstream_T,\
                 tables.open_file(data_path_name + "-delta_S.h5", mode='a') as ofstream_S,\
-                tables.open_file(data_path_name + "-delta_D.h5", mode='a') as ofstream_D:
+                tables.open_file(data_path_name + "-delta_D.h5", mode='a') as ofstream_D,\
+                tables.open_file(data_path_name + "-N_up.h5", mode='a') as ofstream_N_up, \
+                tables.open_file(data_path_name + "-P_up.h5", mode='a') as ofstream_P_up:
             array_N = ofstream_N.root.data
             array_P = ofstream_P.root.data
             array_T = ofstream_T.root.data
             array_S = ofstream_S.root.data
             array_D = ofstream_D.root.data
+            array_N_up = ofstream_N_up.root.data
+            array_P_up = ofstream_P_up.root.data
             
             array_N.append(data[1:,0:m])
             array_P.append(data[1:,m:2*(m)])
@@ -755,6 +818,14 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
             array_S.append(data[1:,3*(m)+1+f:3*(m)+1+2*(f)])
             # array_D.append(data[1:,3*(m)+1+2*(f):])
             array_D.append(data[1:,3*(m)+1+2*(f):3*(m)+1+3*(f)])
+            if do_seq_charge_transfer:
+                array_P_up.append(data[1:, 3*(m)+1+3*(f):])
+            else:
+                # No hole transfer - Insert dummy zeros
+                array_P_up.append(np.zeros_like(data[1:,3*(m)+1:3*(m)+1+f]))
+                
+            # Electron transfer not implemented yet - insert dummy zeros
+            array_N_up.append(np.zeros_like(data[1:,3*(m)+1:3*(m)+1+f]))
 
         return #error_data
 
