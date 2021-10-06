@@ -138,7 +138,7 @@ class MAPI_Rubrene(OneD_Model):
                               "Rubrene_temperature":1,
                               "Ssct":1e12,
                               "St": (1e7) / (1e9),                              # [cm/s] to [nm/ns]
-                              "Sn":1e2, "Sp":1e2,
+                              "Sn":1e-2, "Sp":1e-2,
                               "W_VB":1, "W_CB":1,
                               "N_up":1e-21, "P_up":1e-21,
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
