@@ -21,9 +21,9 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
          init_dN=0, init_dP=0):
 
     W_VB = 0.1                  #[eV]
-    Ssct = 100*(1e14)           #St=100 #nm/s
-    Sp = 5 * 1e3 * 1e7          # cm to nm,  STn = 5.3·10 cm s-1
-    mu_q = 2 * (1e14)           # cm2/Vs to nm2/Vs
+    Ssct = 100*(1e12)           #St=100 #nm/s
+    Sp = 5 * 1e-2          # cm to nm,  STn = 5.3·10 cm s-1
+    mu_q = 2 * (1e5)           # cm2/Vs to nm2/Vs
 
     mu_q = mu_T * 0 + mu_q      # transforming into array, for some reason mu are arrays
     
