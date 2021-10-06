@@ -129,16 +129,16 @@ class MAPI_Rubrene(OneD_Model):
                             }
         
         
-        rubrene_convert_in = {"mu_N_up":1e14, "mu_P_up":1e14, #FIXME: Change to 1e5
+        rubrene_convert_in = {"mu_N_up":1e5, "mu_P_up":1e5,
                               "mu_T": 1e5, "mu_S": 1e5,                         # [cm^2 / V s] to [nm^2 / V ns]
                               "T0": 1e-21,                                      # [cm^-3] to [nm^-3]
                               "tau_T": 1, "tau_S": 1, "tau_D": 1,               # [ns]
                               "k_fusion":1e12,                                  # [cm^3 / s] to [nm^3 / ns]
                               "k_0":1e-9,                                       # [nm^3 / s] to [nm^3 / ns]
                               "Rubrene_temperature":1,
-                              "Ssct":1e14, #FIXME: Change to 1e12
+                              "Ssct":1e12,
                               "St": (1e7) / (1e9),                              # [cm/s] to [nm/ns]
-                              "Sn":1e10, "Sp":1e10, #FIXME: Change to 1e-2
+                              "Sn":1e2, "Sp":1e2,
                               "W_VB":1, "W_CB":1,
                               "N_up":1e-21, "P_up":1e-21,
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
