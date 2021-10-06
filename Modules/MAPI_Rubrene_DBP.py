@@ -681,7 +681,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     if do_seq_charge_transfer:
         # Unpack additional params for this physics model
         St = 0
-        Ssct = ru_params["Ssct"].value
+        Ssct = 0 if no_upconverter else ru_params["Ssct"].value
         Sp = ru_params["Sp"].value
         Sn = ru_params["Sp"].value
         w_vb = ru_params["W_VB"].value
@@ -840,7 +840,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         return #array_N, array_P, error_data
     
 def SST(tauN, tauP, n0, p0, B, St, k_fusion, tauT, tauS, tauD_eff, ru_thickness, gen_rate):
-    # TODO
+    # FIXME: This doesn't work with sequential charge transfer yet
     n_bal = lambda n, src, tn, tp, n0, p0, B: src - (n**2 - n0*p0) * (B + 1/(n * (tn+tp)))
     
     ss_n = optimize.root(n_bal, gen_rate, args=(gen_rate, tauN, tauP, n0, p0, B))
