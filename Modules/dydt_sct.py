@@ -68,7 +68,7 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
     Jn[0] = Sft                                                             # electron current front
     Jn[m] = -(Sbt+Stt)                                                      # electron current back (interface)
     Jp[0] = -Sft                                                            # hole current front
-    # Jp[m] = (Sbt+Stt)                                                       # hole current back (interface)
+    #Jp[m] = (Sbt+Spt)                                                       # hole current back (interface)
     Jp[m] = (Sbt+Stt+Spt)                                                       # hole current back (interface)
     
     # Rubrene boundaries
@@ -76,7 +76,8 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
     JT[f] = 0
     JS[0] = 0
     JS[f] = 0
-    Jq[0] = -Spt+Stt
+    #Jq[0] = -Spt+Stt
+    Jq[0] = Spt-Stt
 
     Jn[1:-1] = (-mu_n[1:-1] * (N_edges) * (q * E_field[1:-1]) 
                 + (mu_n[1:-1]*kB*mapi_temperature[1:-1]) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dm)))
@@ -94,7 +95,7 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
     JS[1:-1] = (mu_s[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(delta_S,-1)[:-1] - delta_S[:-1]) / (df))
     ## Rubrene Jq flux (q = holes in rubrene vs p = holes in MAPI)
     ## Not account E_field
-    Jq[1:-1] = (mu_q[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(Q,-1)[:-1] - Q[:-1]) / (df))
+    Jq[1:-1] = -(mu_q[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(Q,-1)[:-1] - Q[:-1]) / (df))
 
     dJT = (np.roll(JT, -1)[:-1] - JT[:-1]) / (df)
     dJS = (np.roll(JS, -1)[:-1] - JS[:-1]) / (df)
@@ -135,7 +136,7 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
     dTdt = ((1/q) * dJT - T_fusion - T_rec)
     dSdt = ((1/q) * dJS + T_fusion - S_Fret)
     dDdt = S_Fret - D_Fret2 - D_rec
-    dQdt = ((1/q) * dJq) # - T_TCA
+    dQdt = ((1/q) * -dJq) # - T_TCA
 
 
     ## Package results
