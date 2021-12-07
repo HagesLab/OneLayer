@@ -517,10 +517,10 @@ def E_field(sim_outputs, params):
     dEdx = q_C * (delta_p(sim_outputs, params) - delta_n(sim_outputs, params)) / (eps0 * averaged_rel_permitivity)
     if dEdx.ndim == 1:
         E_field = np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
-        E_field[-1] = 0
+        #E_field[-1] = 0
     else:
         E_field = np.concatenate((np.zeros(len(dEdx)).reshape((len(dEdx), 1)), np.cumsum(dEdx, axis=1) * params["Node_width"]), axis=1) #[V/nm]
-        E_field[:,-1] = 0
+        #E_field[:,-1] = 0
     return E_field
     
 def delta_n(sim_outputs, params):
