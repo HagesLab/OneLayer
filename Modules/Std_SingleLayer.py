@@ -52,6 +52,8 @@ class Std_SingleLayer(OneD_Model):
         
         # List of all variables calculated from those in simulation_outputs_dict
         calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", integrated_units="[V]", xlabel="nm", xvar="position",is_edge=True, layer="OneLayer"),
+                              "dP-dN":Output("Net Charge Density", units="[cm^-3]", integrated_units="[cm^-2]", xlabel='nm', xvar='position', is_edge=False, layer="Onelayer"),
+                              "Jp-Jn":Output("Jp - Jn", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer"),
                              "delta_N":Output("delta_N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
                              "delta_P":Output("delta_P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
                              "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
@@ -75,7 +77,9 @@ class Std_SingleLayer(OneD_Model):
                       "Ec": 1, "electron_affinity": 1,
                       "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
                       "E_field": 1, 
-                      "tau_diff": 1}
+                      "tau_diff": 1,
+                      "dP-dN":(1e-7)**3,
+                      "Jp-Jn":(1e-7)**2 * 1e-9}
         
         convert_in["RR"] = convert_in["B"] * convert_in["N"] * convert_in["P"] # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["NRR"] = convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
@@ -83,7 +87,7 @@ class Std_SingleLayer(OneD_Model):
         
         iconvert_in = {"N":1e7, "P":1e7, "delta_N":1e7, "delta_P":1e7, # cm to nm
                        "E_field":1, # nm to nm
-                       "RR": 1e7, "NRR": 1e7, "PL": 1e7}
+                       "RR": 1e7, "NRR": 1e7, "PL": 1e7, "dP-dN":1e7, "Jp-Jn":1e7}
 
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
             
@@ -148,6 +152,8 @@ class Std_SingleLayer(OneD_Model):
         data_dict["OneLayer"]["delta_P"] = delta_p(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["RR"] = radiative_recombination(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["NRR"] = nonradiative_recombination(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["dP-dN"] = carrier_diff(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["Jp-Jn"] = Jp_Jn(data_dict["OneLayer"], params)
                 
         with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
             tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
@@ -193,6 +199,12 @@ class Std_SingleLayer(OneD_Model):
 
             elif (datatype == "NRR"):
                 data = nonradiative_recombination(sim_data, params)
+                
+            elif (datatype == "dP-dN"):
+                data = carrier_diff(sim_data, params)
+                
+            elif (datatype == "Jp-Jn"):
+                data = Jp_Jn(sim_data, params)
                 
             elif (datatype == "E_field"):
                 data = E_field(sim_data, params)
@@ -526,6 +538,50 @@ def E_field(sim_outputs, params):
         E_field = np.concatenate((np.zeros(len(dEdx)).reshape((len(dEdx), 1)), np.cumsum(dEdx, axis=1) * params["Node_width"]), axis=1) #[V/nm]
         E_field[:,-1] = 0
     return E_field
+
+def Jp_Jn(sim_outputs, params):
+    m = int(0.5 + params["Total_length"] / params['Node_width'])
+    Jn = np.zeros((m+1))
+    Jp = np.zeros((m+1))
+
+    # These are calculated at node centers, of which there are m
+    # dE/dt, dn/dt, and dp/dt are also node center values
+
+    N = sim_outputs["N"]
+    P = sim_outputs["P"]
+    E = E_field(sim_outputs, params)
+    Sf = params['Sf']
+    Sb = params["Sb"]
+    n0 = params["N0"]
+    p0 = params["P0"]
+    T = params["temperature"]
+    mu_n = params["mu_N"]
+    mu_p = params["mu_P"]
+    q = 1
+    kB = 8.61773e-5
+    dx = params["Node_width"]
+    N_edges = (N[:-1] + np.roll(N, -1)[:-1]) / 2 # Excluding the boundaries; see the following FIXME
+    P_edges = (P[:-1] + np.roll(P, -1)[:-1]) / 2
+    
+    ## Do boundary conditions of Jn, Jp
+    Sft = Sf * (N[0] * P[0] - n0 * p0) / (N[0] + P[0])
+    Sbt = Sb * (N[m-1] * P[m-1] - n0 * p0) / (N[m-1] + P[m-1])
+    Jn[0] = Sft
+    Jn[m] = -Sbt
+    Jp[0] = -Sft
+    Jp[m] = Sbt
+
+    ## Calculate Jn, Jp [nm^-2 ns^-1] over the space dimension, 
+    # Jn(t) ~ N(t) * E_field(t) + (dN/dt)
+    # np.roll(y,m) shifts the values of array y by m places, allowing for quick approximation of dy/dx ~ (y[m+1] - y[m-1] / 2*dx) over entire array y
+    Jn[1:-1] = (-mu_n * (N_edges) * (q * (E[1:-1])) 
+                + (mu_n*kB*T) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dx)))
+
+    ## Changed sign
+    Jp[1:-1] = (-mu_p * (P_edges) * (q * (E[1:-1])) 
+                -(mu_p*kB*T) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dx)))
+    
+    return Jp + Jn
     
 def delta_n(sim_outputs, params):
     """Calculate above-equilibrium electron density from N, n0"""
@@ -534,6 +590,9 @@ def delta_n(sim_outputs, params):
 def delta_p(sim_outputs, params):
     """Calculate above-equilibrium hole density from P, p0"""
     return sim_outputs["P"] - params["P0"]
+
+def carrier_diff(sim_outputs, params):
+    return delta_p(sim_outputs, params) - delta_n(sim_outputs, params)
 
 def radiative_recombination(sim_outputs, params):
     """Calculate radiative recombination"""

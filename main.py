@@ -3028,7 +3028,7 @@ class Notebook:
                 with tables.open_file(path, mode='w') as ofstream:
                     length = num_nodes[layer_name] 
                     if layer.s_outputs[variable].is_edge:
-                        num_nodes[layer_name] += 1
+                        length += 1
     
                     # Important - "data" must be used as the array name here, as pytables will use the string "data" 
                     # to name the attribute earray.data, which is then used to access the array
