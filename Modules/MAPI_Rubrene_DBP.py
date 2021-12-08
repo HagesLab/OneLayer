@@ -60,6 +60,7 @@ class MAPI_Rubrene(OneD_Model):
                           "W_CB":Parameter(units="[eV]", is_edge=False, is_space_dependent=False), 
                           "W_VB":Parameter(units="[eV]", is_edge=False, is_space_dependent=False), 
                           "Rubrene_temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
+                          "uc_permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
                           "delta_T":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                           "delta_S":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                           "delta_D":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
@@ -77,8 +78,7 @@ class MAPI_Rubrene(OneD_Model):
                                    "P":Output("P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="MAPI", yscale='symlog', yfactors=(1e-4,1e1)),
                                   }
         
-        rubrene_simulation_outputs = {"N_up":Output("N_up", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)), 
-                                      "P_up":Output("P_up", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
+        rubrene_simulation_outputs = {"P_up":Output("P_up", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
                                       "T":Output("T", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)), 
                                       "delta_S":Output("delta_S", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
                                       "delta_D":Output("delta_D", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="Rubrene", yscale='symlog', yfactors=(1e-4,1e1)),
@@ -96,7 +96,8 @@ class MAPI_Rubrene(OneD_Model):
                                  "eta_MAPI":Output("MAPI eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="MAPI", analysis_plotable=False)
                                  }
         
-        rubrene_calculated_outputs = {"dbp_PL":Output("DBP TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
+        rubrene_calculated_outputs = {"E_upc":Output("E (Upc)", units="[V/nm]", integrated_units="[V]", xlabel="nm", xvar="position",is_edge=True, layer="Rubrene"),
+                                      "dbp_PL":Output("DBP TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
                                       "TTA":Output("TTA Rate", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene"),
                                       "T_form_eff":Output("Triplet form. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
                                       "T_anni_eff":Output("Triplet anni. eff.", units="", xlabel="ns", xvar="time", is_edge=False, layer="Rubrene", analysis_plotable=False),
@@ -135,14 +136,15 @@ class MAPI_Rubrene(OneD_Model):
                               "tau_T": 1, "tau_S": 1, "tau_D": 1,               # [ns]
                               "k_fusion":1e12,                                  # [cm^3 / s] to [nm^3 / ns]
                               "k_0":1e-9,                                       # [nm^3 / s] to [nm^3 / ns]
-                              "Rubrene_temperature":1,
+                              "Rubrene_temperature":1, "uc_permitivity":1,
                               "Ssct":1e12,
                               "St": (1e7) / (1e9),                              # [cm/s] to [nm/ns]
                               "Sn":1e-2, "Sp":1e-2,
                               "W_VB":1, "W_CB":1,
-                              "N_up":1e-21, "P_up":1e-21,
+                              "P_up":1e-21,
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21,                   # [cm^-3] to [nm^-3]
+                              "E_upc":1,
                               "T_form_eff":1, "T_anni_eff":1, "S_up_eff":1,
                               "eta_UC":1
                               }
@@ -150,8 +152,8 @@ class MAPI_Rubrene(OneD_Model):
         rubrene_convert_in["dbp_PL"] = rubrene_convert_in["delta_D"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         rubrene_convert_in["TTA"] = rubrene_convert_in["k_fusion"] * rubrene_convert_in["delta_T"] ** 2
 
-        ru_iconvert_in = {"N_up":1e7, "P_up":1e7,"T": 1e7, "delta_S": 1e7, "delta_D":1e7, "dbp_PL":1e7, "TTA":1e7
-                         }
+        ru_iconvert_in = {"P_up":1e7,"T": 1e7, "delta_S": 1e7, "delta_D":1e7, "dbp_PL":1e7, "TTA":1e7,
+                          "E_upc":1}
         self.layers = {"MAPI":Layer(mapi_params, mapi_simulation_outputs, mapi_calculated_outputs,
                                     "[nm]", mapi_convert_in, mapi_iconvert_in),
                        "Rubrene":Layer(rubrene_params, rubrene_simulation_outputs, rubrene_calculated_outputs,
@@ -169,7 +171,6 @@ class MAPI_Rubrene(OneD_Model):
         init_T = (ru.params["T0"].value + ru.params["delta_T"].value) * ru.convert_in["T"]
         init_S = (ru.params["delta_S"].value) * ru.convert_in["S"]
         init_D = (ru.params["delta_D"].value) * ru.convert_in["D"]
-        init_N_up = 0
         init_P_up = 0
         
         # "Typecast" single values to uniform arrays
@@ -188,14 +189,11 @@ class MAPI_Rubrene(OneD_Model):
         if not isinstance(init_D, np.ndarray):
             init_D = to_array(init_D, len(ru.grid_x_nodes), False)     
             
-        if not isinstance(init_N_up, np.ndarray):
-            init_N_up = to_array(init_N_up, len(ru.grid_x_nodes), False)   
-            
         if not isinstance(init_P_up, np.ndarray):
             init_P_up = to_array(init_P_up, len(ru.grid_x_nodes), False)   
         
         return {"N":init_N, "P":init_P, "T":init_T, "delta_S":init_S, "delta_D":init_D,
-                "N_up":init_N_up, "P_up":init_P_up}
+                "P_up":init_P_up}
     
     def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
         """Calls ODEINT solver."""
@@ -275,6 +273,8 @@ class MAPI_Rubrene(OneD_Model):
             print("Error: failed to calculate tau_diff")
             data_dict["MAPI"]["tau_diff"] = 0
         #################
+        
+        data_dict["Rubrene"]["E_upc"] = E_field_r(data_dict["Rubrene"], ru_params)
         
         #### DBP PL ####
         with tables.open_file(os.path.join(data_dirname, file_name_base + "-delta_D.h5"), mode='r') as ifstream_D:
@@ -401,6 +401,9 @@ class MAPI_Rubrene(OneD_Model):
                     rad_rec = radiative_recombination(layer_sim_data, layer_params)
                     data = prep_PL(rad_rec, 0, len(rad_rec)-1, False, 
                                    layer_params, where_layer).flatten()
+                    
+            elif (datatype == "E_upc"):
+                data = E_field_r(layer_sim_data, layer_params)
                     
             elif (datatype == "dbp_PL"):
     
@@ -718,11 +721,14 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     k_fusion = to_array(ru_params["k_fusion"].value, f, False)
     k_0 = to_array(ru_params["k_0"].value, f, False)
     eps = to_array(mapi_params["rel_permitivity"].value, m, True)
+    uc_eps = to_array(ru_params["uc_permitivity"].value, f, True)
    
     ## Package initial condition
     # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
     init_E_field = E_field({"N":init_N, "P":init_P}, 
                            {"rel_permitivity":eps, "N0":n0, "P0":p0, "Node_width":dm})
+    
+    init_E_upc = np.zeros(f+1)
     #init_E_field = np.zeros(m+1)
     
     ## Generate a weight distribution needed for FRET term
@@ -763,7 +769,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     
     
     if do_seq_charge_transfer:
-        init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D, init_P_up], axis=None)
+        init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D, init_P_up, init_E_upc], axis=None)
     else:
         init_condition = np.concatenate([init_N, init_P, init_E_field, init_T, init_S, init_D], axis=None)
 
@@ -778,7 +784,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
                 tauN, tauP, tauT, tauS, tauD, 
                 mu_n, mu_p, mu_s, mu_T,
                 n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
-                eps, 
+                eps, uc_eps,
                 mu_n_up, mu_p_up, Ssct, Sn, Sp, w_cb, w_vb, 
                 weight1, weight2, do_Fret, do_ss, 
                 init_dN, init_dP)
@@ -802,14 +808,12 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
                 tables.open_file(data_path_name + "-T.h5", mode='a') as ofstream_T,\
                 tables.open_file(data_path_name + "-delta_S.h5", mode='a') as ofstream_S,\
                 tables.open_file(data_path_name + "-delta_D.h5", mode='a') as ofstream_D,\
-                tables.open_file(data_path_name + "-N_up.h5", mode='a') as ofstream_N_up, \
                 tables.open_file(data_path_name + "-P_up.h5", mode='a') as ofstream_P_up:
             array_N = ofstream_N.root.data
             array_P = ofstream_P.root.data
             array_T = ofstream_T.root.data
             array_S = ofstream_S.root.data
             array_D = ofstream_D.root.data
-            array_N_up = ofstream_N_up.root.data
             array_P_up = ofstream_P_up.root.data
             
             array_N.append(data[1:,0:m])
@@ -819,13 +823,10 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
             # array_D.append(data[1:,3*(m)+1+2*(f):])
             array_D.append(data[1:,3*(m)+1+2*(f):3*(m)+1+3*(f)])
             if do_seq_charge_transfer:
-                array_P_up.append(data[1:, 3*(m)+1+3*(f):])
+                array_P_up.append(data[1:, 3*(m)+1+3*(f):3*m+1 + 4*f])
             else:
                 # No hole transfer - Insert dummy zeros
-                array_P_up.append(np.zeros_like(data[1:,3*(m)+1:3*(m)+1+f]))
-                
-            # Electron transfer not implemented yet - insert dummy zeros
-            array_N_up.append(np.zeros_like(data[1:,3*(m)+1:3*(m)+1+f]))
+                array_P_up.append(np.zeros_like(data[1:,3*(m)+1:3*(m)+1+f:3*m+1 + 4*f]))
 
         return #error_data
 
@@ -866,6 +867,24 @@ def E_field(sim_outputs, params):
         averaged_rel_permitivity = params["rel_permitivity"]
     
     dEdx = q_C * (delta_p(sim_outputs, params) - delta_n(sim_outputs, params)) / (eps0 * averaged_rel_permitivity)
+    if dEdx.ndim == 1:
+        E_field = np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
+        #E_field[-1] = 0
+    else:
+        E_field = np.concatenate((np.zeros(len(dEdx)).reshape((len(dEdx), 1)), np.cumsum(dEdx, axis=1) * params["Node_width"]), axis=1) #[V/nm]
+        #E_field[:,-1] = 0
+    return E_field
+
+def E_field_r(sim_outputs, params):
+    """Calculate electric field from T+S+D, Q"""
+    eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
+    q_C = 1.602e-19 # [C per carrier]
+    if isinstance(params["uc_permitivity"], np.ndarray):
+        averaged_rel_permitivity = (params["uc_permitivity"][:-1] + np.roll(params["uc_permitivity"], -1)[:-1]) / 2
+    else:
+        averaged_rel_permitivity = params["uc_permitivity"]
+    
+    dEdx = q_C * (sim_outputs["P_up"] - (sim_outputs["T"] + sim_outputs["delta_S"] + sim_outputs["delta_D"])) / (eps0 * averaged_rel_permitivity)
     if dEdx.ndim == 1:
         E_field = np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
         #E_field[-1] = 0

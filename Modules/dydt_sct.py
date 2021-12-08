@@ -17,7 +17,7 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
          tauN, tauP, tauT, tauS, tauD, 
          mu_n, mu_p, mu_s, mu_T,
          n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
-         eps, 
+         eps, uc_eps,
          mu_n_up, mu_q, Ssct, Sn, Sp, W_CB, W_VB, 
          weight1=0, weight2=0, do_Fret=False, do_ss=False, 
          init_dN=0, init_dP=0):
@@ -48,12 +48,15 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
     delta_T = y[3*(m)+1:3*(m)+1+f]
     delta_S = y[3*(m)+1+f:3*(m)+1+2*(f)]
     delta_D = y[3*(m)+1+2*(f):3*(m)+1+3*(f)]
-    Q = y[3*(m)+1+3*(f):]
+    Q = y[3*(m)+1+3*(f):3*m+1 + 4*f]
+    E_upc = y[3*m+1 + 4*f:]
 
     N_edges = (N[:-1] + np.roll(N, -1)[:-1]) / 2 # Excluding the boundaries; see the following FIXME
 
     P_edges = (P[:-1] + np.roll(P, -1)[:-1]) / 2
-    
+    T_edges = (delta_T[:-1] + np.roll(delta_T, -1)[:-1]) / 2
+    S_edges = (delta_S[:-1] + np.roll(delta_S, -1)[:-1]) / 2
+    Q_edges = (Q[:-1] + np.roll(Q, -1)[:-1]) / 2
     
     # MAPI boundaries
     Sft = Sf * (N[0] * P[0] - n0[0] * p0[0]) / (N[0] + P[0])                # surf. recomb. front
@@ -91,17 +94,23 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
     dEdt = (Jn + Jp) * ((q_C) / (eps * eps0))
     
     ## Rubrene J fluxes
-    JT[1:-1] = (mu_T[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(delta_T,-1)[:-1] - delta_T[:-1]) / (df))
-    JS[1:-1] = (mu_s[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(delta_S,-1)[:-1] - delta_S[:-1]) / (df))
+    JT[1:-1] = (-mu_T[1:-1] * (T_edges) * (q * E_upc[1:-1]) 
+               + (mu_T[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(delta_T,-1)[:-1] - delta_T[:-1]) / (df)))
+    JS[1:-1] = (-mu_s[1:-1] * (S_edges) * (q * E_upc[1:-1]) 
+               + (mu_s[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(delta_S,-1)[:-1] - delta_S[:-1]) / (df)))
     ## Rubrene Jq flux (q = holes in rubrene vs p = holes in MAPI)
     ## Not account E_field
-    Jq[1:-1] = -(mu_q[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(Q,-1)[:-1] - Q[:-1]) / (df))
+    Jq[1:-1] = (-mu_q[1:-1] * (Q_edges) * (q * E_upc[1:-1]) 
+                -(mu_q[1:-1]*kB*rubrene_temperature[1:-1]) * ((np.roll(Q,-1)[:-1] - Q[:-1]) / (df)))
 
     dJT = (np.roll(JT, -1)[:-1] - JT[:-1]) / (df)
     dJS = (np.roll(JS, -1)[:-1] - JS[:-1]) / (df)
     ## Rubrene dJq
     dJq = (np.roll(Jq, -1)[:-1] - Jq[:-1]) / (df)
 
+
+    #dE_ucdt = np.zeros_like(E_upc)
+    dE_ucdt = (JT + JS + Jq) * ((q_C) / (uc_eps * eps0))
 
     
     ## Calculate recombination (consumption) terms
@@ -140,5 +149,5 @@ def dydt_sct(t, y, m, f, dm, df, Cn, Cp,
 
 
     ## Package results
-    dydt = np.concatenate([dNdt, dPdt, dEdt, dTdt, dSdt, dDdt, dQdt], axis=None)
+    dydt = np.concatenate([dNdt, dPdt, dEdt, dTdt, dSdt, dDdt, dQdt, dE_ucdt], axis=None)
     return dydt
