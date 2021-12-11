@@ -43,8 +43,7 @@ class MAPI_Rubrene(OneD_Model):
                       "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                       }
         
-        rubrene_params = {"mu_N_up":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
-                          "mu_P_up":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)),
+        rubrene_params = {"mu_P_up":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)),
                           "mu_T":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
                           "mu_S":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)),
                           "T0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
@@ -54,10 +53,8 @@ class MAPI_Rubrene(OneD_Model):
                           "k_fusion":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)),
                           "k_0":Parameter(units="[nm^3 s^-1]", is_edge=False, valid_range=(0,np.inf)),
                           "Ssct":Parameter(units="[cm^3 / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
-                          "Sn":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                           "Sp":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                           "St":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
-                          "W_CB":Parameter(units="[eV]", is_edge=False, is_space_dependent=False), 
                           "W_VB":Parameter(units="[eV]", is_edge=False, is_space_dependent=False), 
                           "Rubrene_temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
                           "uc_permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
@@ -130,7 +127,7 @@ class MAPI_Rubrene(OneD_Model):
                             }
         
         
-        rubrene_convert_in = {"mu_N_up":1e5, "mu_P_up":1e5,
+        rubrene_convert_in = {"mu_P_up":1e5,
                               "mu_T": 1e5, "mu_S": 1e5,                         # [cm^2 / V s] to [nm^2 / V ns]
                               "T0": 1e-21,                                      # [cm^-3] to [nm^-3]
                               "tau_T": 1, "tau_S": 1, "tau_D": 1,               # [ns]
@@ -139,8 +136,8 @@ class MAPI_Rubrene(OneD_Model):
                               "Rubrene_temperature":1, "uc_permitivity":1,
                               "Ssct":1e12,
                               "St": (1e7) / (1e9),                              # [cm/s] to [nm/ns]
-                              "Sn":1e-2, "Sp":1e-2,
-                              "W_VB":1, "W_CB":1,
+                              "Sp":1e-2,
+                              "W_VB":1,
                               "P_up":1e-21,
                               "delta_T":1e-21, "delta_S":1e-21, "delta_D":1e-21,# [cm^-3] to [nm^-3]
                               "T":1e-21, "S":1e-21, "D":1e-21,                   # [cm^-3] to [nm^-3]
@@ -683,23 +680,14 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     Sb = mapi_params["Sb"].value
     if do_seq_charge_transfer:
         # Unpack additional params for this physics model
-        St = 0
-        Ssct = 0 if no_upconverter else ru_params["Ssct"].value
-        Sp = ru_params["Sp"].value
-        Sn = ru_params["Sp"].value
+        Sp = 0 if no_upconverter else ru_params["Sp"].value
+        Ssct = ru_params["Ssct"].value
         w_vb = ru_params["W_VB"].value
-        w_cb = ru_params["W_CB"].value
         mu_p_up = to_array(ru_params["mu_P_up"].value, f, True)
-        mu_n_up = to_array(ru_params["mu_N_up"].value, f, True)
+        uc_eps = to_array(ru_params["uc_permitivity"].value, f, True)
+
     else:
         St = 0 if no_upconverter else ru_params["St"].value
-        Ssct = 0
-        Sp = 0
-        Sn = 0
-        w_vb = 0
-        w_cb = 0
-        mu_p_up = 0
-        mu_n_up = 0
 
     mu_n = to_array(mapi_params["mu_N"].value, m, True)
     mu_p = to_array(mapi_params["mu_P"].value, m, True)
@@ -721,7 +709,7 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
     k_fusion = to_array(ru_params["k_fusion"].value, f, False)
     k_0 = to_array(ru_params["k_0"].value, f, False)
     eps = to_array(mapi_params["rel_permitivity"].value, m, True)
-    uc_eps = to_array(ru_params["uc_permitivity"].value, f, True)
+    
    
     ## Package initial condition
     # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
@@ -783,9 +771,9 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         args=(m, f, dm, df, Cn, Cp, 
                 tauN, tauP, tauT, tauS, tauD, 
                 mu_n, mu_p, mu_s, mu_T,
-                n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
+                n0, p0, T0, Sf, Sb, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
                 eps, uc_eps,
-                mu_n_up, mu_p_up, Ssct, Sn, Sp, w_cb, w_vb, 
+                mu_p_up, Ssct, Sp, w_vb, 
                 weight1, weight2, do_Fret, do_ss, 
                 init_dN, init_dP)
         sol = intg.solve_ivp(dydt_sct, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit

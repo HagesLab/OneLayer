@@ -1436,6 +1436,19 @@ class Notebook:
                       text="Continue", 
                       command=partial(self.on_sys_param_shortcut_popup_close, 
                                       True)).grid(row=2,column=1)
+            
+            # FIXME: Temporary patch while we decide between surface recombination and seq-transfer models
+            
+            if self.module.system_ID == "MAPI_Rubrene" and self.current_layer_name == "Rubrene":
+                if self.sys_flag_dict["do_sct"].value():
+                    disable_these = ["St"]
+                    
+                else:
+                    disable_these = ["Ssct", "Sp", "uc_permitivity", "W_VB", "mu_P_up"]
+                    
+                for param in disable_these:
+                    self.enter(self.sys_param_entryboxes_dict[param], 0)
+                    self.sys_param_entryboxes_dict[param].config(state='disabled')
                     
             self.sys_param_shortcut_popup.protocol("WM_DELETE_WINDOW", 
                                                    self.on_sys_param_shortcut_popup_close)

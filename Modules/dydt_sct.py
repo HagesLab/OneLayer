@@ -16,9 +16,9 @@ eps0 = 8.854e-12 * 1e-9     #[C/V-m] to [C/V-nm]
 def dydt_sct(t, y, m, f, dm, df, Cn, Cp, 
          tauN, tauP, tauT, tauS, tauD, 
          mu_n, mu_p, mu_s, mu_T,
-         n0, p0, T0, Sf, Sb, St, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
+         n0, p0, T0, Sf, Sb, B, k_fusion, k_0, mapi_temperature, rubrene_temperature,
          eps, uc_eps,
-         mu_n_up, mu_q, Ssct, Sn, Sp, W_CB, W_VB, 
+         mu_q, Ssct, Sp, W_VB, 
          weight1=0, weight2=0, do_Fret=False, do_ss=False, 
          init_dN=0, init_dP=0):
 
