@@ -799,7 +799,8 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         sol = intg.solve_ivp(dydt, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
     
     data = sol.y.T
-            
+    e1 = data[:, 2*m:3*m+1]
+    e2 = data[:,3*m+1+4*f:]
     if write_output:
         ## Prep output files
         # TODO: Py 3.9 removes need for \
@@ -884,12 +885,12 @@ def E_field_r(sim_outputs, params):
     else:
         averaged_rel_permitivity = params["uc_permitivity"]
     
-    dEdx = q_C * (sim_outputs["P_up"] - (sim_outputs["T"] + sim_outputs["delta_S"] + sim_outputs["delta_D"])) / (eps0 * averaged_rel_permitivity)
+    dEdx = q_C * (sim_outputs["P_up"] - (sim_outputs["T"] - params["T0"] + sim_outputs["delta_S"] + sim_outputs["delta_D"])) / (eps0 * averaged_rel_permitivity)
     if dEdx.ndim == 1:
-        E_field = np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
+        E_field = np.concatenate(([0], -np.cumsum(dEdx[::-1]) * params["Node_width"]))[::-1] #[V/nm]
         #E_field[-1] = 0
     else:
-        E_field = np.concatenate((np.zeros(len(dEdx)).reshape((len(dEdx), 1)), np.cumsum(dEdx, axis=1) * params["Node_width"]), axis=1) #[V/nm]
+        E_field = np.concatenate((np.zeros(len(dEdx)).reshape((len(dEdx), 1)), -np.cumsum(dEdx[:, ::-1], axis=1) * params["Node_width"]), axis=1)[:, ::-1] #[V/nm]
         #E_field[:,-1] = 0
     return E_field
     
