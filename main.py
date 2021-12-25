@@ -715,6 +715,10 @@ class Notebook:
                            value="Log").grid(row=1,column=1)
         tk.Label(self.overview_setup_frame, text="Log").grid(row=1,column=2)
         
+        tk.ttk.Radiobutton(self.overview_setup_frame, variable=self.overview_sample_mode,
+                           value="Custom").grid(row=2,column=1)
+        tk.Label(self.overview_setup_frame, text="Custom").grid(row=2,column=2)
+        
         tk.Button(master=self.overview_setup_frame, text="Select Dataset", 
                       command=self.plot_overview_analysis).grid(row=0,rowspan=2,column=3)
         
@@ -2401,7 +2405,8 @@ class Notebook:
         td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=ts_popup)
         td_plotwidget = td_canvas.get_tk_widget()
         td_plotwidget.grid(row=0,column=0, columnspan=2)
-        #tkagg.NavigationToolbar2Tk(td_canvas, ts_popup).grid(row=1,column=0,columnspan=2)
+        
+        
         name = td[next(iter(td))][ts_ID][0]
         where_layer = self.module.find_layer(name)
         scale_f = self.module.layers[where_layer].convert_out[name]
@@ -2413,6 +2418,7 @@ class Notebook:
         assert tspopup_ID not in self.active_timeseries, "Error: a timeseries was overwritten"
         self.active_timeseries[tspopup_ID] = []
         for tag in td:
+            print(list(td[tag][ts_ID][1] * scale_f))
             td_subplot.plot(td_gridt[tag], td[tag][ts_ID][1] * scale_f, label=tag.strip('_'))
             self.active_timeseries[tspopup_ID].append((tag, td_gridt[tag], td[tag][ts_ID][1] * scale_f))
     
@@ -2420,8 +2426,12 @@ class Notebook:
         td_fig.tight_layout()
         td_fig.canvas.draw()
         
-        tk.ttk.Button(ts_popup, text="Export All", command=partial(self.export_timeseries, tspopup_ID, tail=False)).grid(row=2,column=0, padx=(10,10))
-        tk.ttk.Button(ts_popup, text="Export Tail", command=partial(self.export_timeseries, tspopup_ID, tail=True)).grid(row=2,column=1, padx=(10,10))
+        tframe = tk.Frame(master=ts_popup)
+        tframe.grid(row=1,column=0,columnspan=2)
+        tkagg.NavigationToolbar2Tk(td_canvas, tframe).grid(row=0,column=0,columnspan=2)
+        
+        tk.ttk.Button(tframe, text="Export All", command=partial(self.export_timeseries, tspopup_ID, tail=False)).grid(row=2,column=0, padx=(10,10))
+        tk.ttk.Button(tframe, text="Export Tail", command=partial(self.export_timeseries, tspopup_ID, tail=True)).grid(row=2,column=1, padx=(10,10))
         ts_popup.protocol("WM_DELETE_WINDOW", partial(self.on_timeseries_popup_close, ts_popup,
                                                  tspopup_ID))
         
@@ -2556,11 +2566,6 @@ class Notebook:
 
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
         
-        try:
-            sample_ct = int(self.overview_samplect_entry.get())
-            assert sample_ct > 0
-        except Exception:
-            sample_ct = 5
         
         try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
@@ -2580,9 +2585,25 @@ class Notebook:
             data_node_t = np.linspace(0, total_time, data_n + 1)
             
             if self.overview_sample_mode.get() == 'Log':
+                try:
+                    sample_ct = int(self.overview_samplect_entry.get())
+                    assert sample_ct > 0
+                except Exception:
+                    sample_ct = 5
+                    
                 tstep_list = np.append([0], np.geomspace(1, data_n, num=sample_ct-1, dtype=int))
-            else:
+            elif self.overview_sample_mode.get() == 'Linear':
+                try:
+                    sample_ct = int(self.overview_samplect_entry.get())
+                    assert sample_ct > 0
+                except Exception:
+                    sample_ct = 5
+                    
                 tstep_list = np.linspace(0, data_n, num=sample_ct)
+                
+            else:
+                sample_ct = self.overview_samplect_entry.get()
+                tstep_list = np.array(np.array(extract_values(sample_ct, ' ')) / dt, dtype=int)
                 
         except AssertionError as oops:
             self.do_confirmation_popup(str(oops), hide_cancel=True)
@@ -3058,7 +3079,8 @@ class Notebook:
                                    num_nodes, self.n, self.dt,
                                    self.sys_flag_dict, self.hmax, init_conditions)
             
-        except FloatingPointError:
+        except FloatingPointError as e:
+            print(e)
             self.sim_warning_msg.append("Error: an unusual value occurred while simulating {}. "
                                         "This file may have invalid parameters.".format(data_file_name))
             for file in os.listdir(dirname):

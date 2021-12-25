@@ -53,7 +53,14 @@ class Std_SingleLayer(OneD_Model):
         # List of all variables calculated from those in simulation_outputs_dict
         calculated_outputs = {"E_field":Output("Electric Field", units="[V/nm]", integrated_units="[V]", xlabel="nm", xvar="position",is_edge=True, layer="OneLayer"),
                               "dP-dN":Output("Net Charge Density", units="[cm^-3]", integrated_units="[cm^-2]", xlabel='nm', xvar='position', is_edge=False, layer="Onelayer"),
-                              "Jp-Jn":Output("Jp - Jn", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer"),
+                              "Jp+Jn":Output("Jp + Jn", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer"),
+                              "Jp":Output("Jp", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer", yscale='linear'),
+                              "Jn":Output("Jn", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer", yscale='linear'),
+                              
+                              "Jn_drift":Output("Jn_drift", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer", yscale='linear'),
+                              "Jn_diff":Output("Jn_diffusion", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer", yscale='linear'),
+                              "Jp_drift":Output("Jp_drift", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer", yscale='linear'),
+                              "Jp_diff":Output("Jp_diffusion", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer", yscale='linear'),
                              "delta_N":Output("delta_N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
                              "delta_P":Output("delta_P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
                              "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
@@ -79,7 +86,15 @@ class Std_SingleLayer(OneD_Model):
                       "E_field": 1, 
                       "tau_diff": 1,
                       "dP-dN":(1e-7)**3,
-                      "Jp-Jn":(1e-7)**2 * 1e-9}
+                      "Jp+Jn":(1e-7)**2 * 1e-9,
+                      "Jn_drift":(1e-7)**2 * 1e-9,
+                      "Jn_diff":(1e-7)**2 * 1e-9,
+                      "Jp_drift":(1e-7)**2 * 1e-9,
+                      "Jp_diff":(1e-7)**2 * 1e-9,
+                      "Jn":(1e-7)**2 * 1e-9,
+                      "Jp":(1e-7)**2 * 1e-9,
+                      
+                      }
         
         convert_in["RR"] = convert_in["B"] * convert_in["N"] * convert_in["P"] # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["NRR"] = convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
@@ -87,7 +102,8 @@ class Std_SingleLayer(OneD_Model):
         
         iconvert_in = {"N":1e7, "P":1e7, "delta_N":1e7, "delta_P":1e7, # cm to nm
                        "E_field":1, # nm to nm
-                       "RR": 1e7, "NRR": 1e7, "PL": 1e7, "dP-dN":1e7, "Jp-Jn":1e7}
+                       "RR": 1e7, "NRR": 1e7, "PL": 1e7, "dP-dN":1e7, "Jp+Jn":1e7,
+                       "Jn_drift":1e7,"Jn_diff":1e7,"Jp_drift":1e7,"Jp_diff":1e7, "Jn":1e7,"Jp":1e7}
 
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
             
@@ -153,7 +169,13 @@ class Std_SingleLayer(OneD_Model):
         data_dict["OneLayer"]["RR"] = radiative_recombination(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["NRR"] = nonradiative_recombination(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["dP-dN"] = carrier_diff(data_dict["OneLayer"], params)
-        data_dict["OneLayer"]["Jp-Jn"] = Jp_Jn(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["Jp+Jn"] = Jp_Jn(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["Jn_diff"] = Jn_diff(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["Jp_diff"] = Jp_diff(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["Jn_drift"] = Jn_drift(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["Jp_drift"] = Jp_drift(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["Jn"] = Jn(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["Jp"] = Jp(data_dict["OneLayer"], params)
                 
         with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
             tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
@@ -203,8 +225,26 @@ class Std_SingleLayer(OneD_Model):
             elif (datatype == "dP-dN"):
                 data = carrier_diff(sim_data, params)
                 
-            elif (datatype == "Jp-Jn"):
+            elif (datatype == "Jp+Jn"):
                 data = Jp_Jn(sim_data, params)
+                
+            elif (datatype == "Jn_drift"):
+                data = Jn_drift(sim_data, params)
+                
+            elif (datatype == "Jp_drift"):
+                data = Jp_drift(sim_data, params)
+                
+            elif (datatype == "Jn_diff"):
+                data = Jn_diff(sim_data, params)
+                
+            elif (datatype == "Jp_diff"):
+                data = Jp_diff(sim_data, params)
+                
+            elif (datatype == "Jn"):
+                data = Jn(sim_data, params)
+                
+            elif (datatype == "Jp"):
+                data = Jp(sim_data, params)
                 
             elif (datatype == "E_field"):
                 data = E_field(sim_data, params)
@@ -228,6 +268,8 @@ class Std_SingleLayer(OneD_Model):
         if datatype == "PL":
             return [("tau_diff", tau_diff(parent_data, dt))]
         
+        elif datatype == "delta_N":
+            return [("tau_diff", tau_diff(parent_data, dt))]
         else:
             return
     
@@ -339,7 +381,7 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     Jp[1:-1] = (-mu_p[1:-1] * (P_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEcdz[1:-1]) 
                 -(mu_p[1:-1]*kB*T[1:-1]) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dx)))
 
-        
+
     # [V nm^-1 ns^-1]
     dEdt = (Jn + Jp) * ((q_C) / (eps * eps0))
     
@@ -540,48 +582,135 @@ def E_field(sim_outputs, params):
     return E_field
 
 def Jp_Jn(sim_outputs, params):
+    return Jp(sim_outputs, params) + Jn(sim_outputs, params)
+
+def Jn(sim_outputs, params):
     m = int(0.5 + params["Total_length"] / params['Node_width'])
     Jn = np.zeros((m+1))
-    Jp = np.zeros((m+1))
-
-    # These are calculated at node centers, of which there are m
-    # dE/dt, dn/dt, and dp/dt are also node center values
-
-    N = sim_outputs["N"]
-    P = sim_outputs["P"]
-    E = E_field(sim_outputs, params)
     Sf = params['Sf']
     Sb = params["Sb"]
     n0 = params["N0"]
     p0 = params["P0"]
-    T = params["temperature"]
+    N = sim_outputs["N"]
+    P = sim_outputs["P"]
+    
+    
+    Jn = Jn_drift(sim_outputs, params) + Jn_diff(sim_outputs, params)
+    
+    if N.ndim == 1:
+        Sft = Sf * (N[0] * P[0] - n0 * p0) / (N[0] + P[0])
+        Sbt = Sb * (N[m-1] * P[m-1] - n0 * p0) / (N[m-1] + P[m-1])
+        Jn[0] = Sft
+        Jn[m] = -Sbt
+    elif N.ndim == 2:
+        Sft = Sf * (N[:,0] * P[:,0] - n0 * p0) / (N[:,0] + P[:,0])
+        Sbt = Sb * (N[:,m-1] * P[:,m-1] - n0 * p0) / (N[:,m-1] + P[:,m-1])
+        Jn[:,0] = Sft
+        Jn[:,m] = -Sbt
+    
+    
+    return Jn
+
+def Jp(sim_outputs, params):
+    m = int(0.5 + params["Total_length"] / params['Node_width'])
+    Jp = np.zeros((m+1))
+    Sf = params['Sf']
+    Sb = params["Sb"]
+    n0 = params["N0"]
+    p0 = params["P0"]
+    N = sim_outputs["N"]
+    P = sim_outputs["P"]
+    
+    
+    Jp = Jp_drift(sim_outputs, params) + Jp_diff(sim_outputs, params)
+    
+    if N.ndim == 1:
+        Sft = Sf * (N[0] * P[0] - n0 * p0) / (N[0] + P[0])
+        Sbt = Sb * (N[m-1] * P[m-1] - n0 * p0) / (N[m-1] + P[m-1])
+        Jp[:,0] = -Sft
+        Jp[:,m] = Sbt
+    elif N.ndim == 2:
+        Sft = Sf * (N[:,0] * P[:,0] - n0 * p0) / (N[:,0] + P[:,0])
+        Sbt = Sb * (N[:,m-1] * P[:,m-1] - n0 * p0) / (N[:,m-1] + P[:,m-1])
+        Jp[:,0] = -Sft
+        Jp[:,m] = Sbt
+    
+    
+    return Jp
+
+def Jn_diff(sim_outputs, params):
     mu_n = params["mu_N"]
-    mu_p = params["mu_P"]
-    q = 1
+    N = sim_outputs["N"]
+
     kB = 8.61773e-5
     dx = params["Node_width"]
-    N_edges = (N[:-1] + np.roll(N, -1)[:-1]) / 2 # Excluding the boundaries; see the following FIXME
-    P_edges = (P[:-1] + np.roll(P, -1)[:-1]) / 2
-    
-    ## Do boundary conditions of Jn, Jp
-    Sft = Sf * (N[0] * P[0] - n0 * p0) / (N[0] + P[0])
-    Sbt = Sb * (N[m-1] * P[m-1] - n0 * p0) / (N[m-1] + P[m-1])
-    Jn[0] = Sft
-    Jn[m] = -Sbt
-    Jp[0] = -Sft
-    Jp[m] = Sbt
+    T = params["temperature"]
 
-    ## Calculate Jn, Jp [nm^-2 ns^-1] over the space dimension, 
-    # Jn(t) ~ N(t) * E_field(t) + (dN/dt)
-    # np.roll(y,m) shifts the values of array y by m places, allowing for quick approximation of dy/dx ~ (y[m+1] - y[m-1] / 2*dx) over entire array y
-    Jn[1:-1] = (-mu_n * (N_edges) * (q * (E[1:-1])) 
-                + (mu_n*kB*T) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dx)))
+    if N.ndim == 1:
+        out = (mu_n*kB*T) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dx))
+        out = np.concatenate(([0], out, [0]))
+    elif N.ndim == 2:
+        out = (mu_n*kB*T) * ((np.roll(N,-1, axis=1)[:, :-1] - N[:, :-1]) / (dx))
+        out = np.concatenate((np.zeros((len(out), 1)), out, np.zeros((len(out), 1))), axis=1)
+        
+    return out
 
-    ## Changed sign
-    Jp[1:-1] = (-mu_p * (P_edges) * (q * (E[1:-1])) 
-                -(mu_p*kB*T) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dx)))
+def Jp_diff(sim_outputs, params):
+    mu_p = params["mu_P"]
+    P = sim_outputs["P"]
+
+    kB = 8.61773e-5
+    dx = params["Node_width"]
+    T = params["temperature"]
+
     
-    return Jp + Jn
+    if P.ndim == 1:
+        out = -(mu_p*kB*T) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dx))
+        out = np.concatenate(([0], out, [0]))
+    elif P.ndim == 2:
+        out = -(mu_p*kB*T) * ((np.roll(P, -1, axis=1)[:, :-1] - P[:, :-1]) / (dx))
+        out = np.concatenate((np.zeros((len(out), 1)), out, np.zeros((len(out), 1))), axis=1)
+        
+    return out
+
+def Jn_drift(sim_outputs, params):
+    mu_n = params["mu_N"]
+    N = sim_outputs["N"]
+    q = 1
+    
+    E = E_field(sim_outputs, params)
+    
+    if N.ndim == 1:
+        N_edges = (N[:-1] + np.roll(N, -1)[:-1]) / 2
+        out = -mu_n * (N_edges) * (q * (E[1:-1])) 
+        out = np.concatenate(([0], out, [0]))
+    elif N.ndim == 2:
+        N_edges = (N[:, :-1] + np.roll(N, -1, axis=1)[:, :-1]) / 2
+        out = -mu_n * (N_edges) * (q * (E[:, 1:-1])) 
+        out = np.concatenate((np.zeros((len(out), 1)), out, np.zeros((len(out), 1))), axis=1)
+        
+    return out
+
+def Jp_drift(sim_outputs, params):
+    mu_p = params["mu_P"]
+    P = sim_outputs["P"]
+    q = 1
+    
+    E = E_field(sim_outputs, params)
+    
+    
+    if P.ndim == 1:
+        P_edges = (P[:-1] + np.roll(P, -1)[:-1]) / 2
+        out = -mu_p * (P_edges) * (q * (E[1:-1])) 
+        out = np.concatenate(([0], out, [0]))
+    elif P.ndim == 2:
+        P_edges = (P[:, :-1] + np.roll(P, -1, axis=1)[:, :-1]) / 2
+        out = -mu_p * (P_edges) * (q * (E[:, 1:-1])) 
+        out = np.concatenate((np.zeros((len(out), 1)), out, np.zeros((len(out), 1))), axis=1)
+        
+    return out
+    
+    
     
 def delta_n(sim_outputs, params):
     """Calculate above-equilibrium electron density from N, n0"""
@@ -631,6 +760,8 @@ def tau_diff(PL, dt):
     dln_PLdt[-1] = (ln_PL[-1] - ln_PL[-2]) / dt
     dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)
     return -(dln_PLdt ** -1)
+    
+
 
 def prep_PL(rad_rec, i, j, need_extra_node, params, ignore_recycle):
     """
