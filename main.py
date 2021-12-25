@@ -1745,42 +1745,70 @@ class Notebook:
             self.plotter_popup = tk.Toplevel(self.root)
 
             tk.ttk.Label(self.plotter_popup, 
-                         text="Select a data type", 
+                         text="Select simulated data", 
                          style="Header.TLabel").grid(row=0,column=0,columnspan=2)
 
+            def sims_sort_alpha():
+                self.data_listbox.delete(0,tk.END)
+                self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
+                                  if not file.endswith(".txt")]
+                
+                self.data_listbox.insert(0,*(self.data_list))
+                return
+                
+            def sims_sort_recent():
+                self.data_listbox.delete(0,tk.END)
+                self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
+                                  if not file.endswith(".txt")]
+                
+                self.data_list = sorted(self.data_list, key=lambda file: os.path.getmtime(os.path.join(self.default_dirs["Data"], self.module.system_ID, file)), reverse=True)
+                self.data_listbox.insert(0,*(self.data_list))
+                return
+            
+            sorting_frame = tk.Frame(self.plotter_popup)
+            sorting_frame.grid(row=1,column=0)
+            
+            tk.Button(sorting_frame, text='A-Z',
+                      command=sims_sort_alpha).grid(row=0,column=0)
+            
+            tk.Button(sorting_frame, text='Recent First',
+                      command=sims_sort_recent).grid(row=0,column=1)
+            
+            
+            data_listbox_frame = tk.Frame(self.plotter_popup)
+            data_listbox_frame.grid(row=2,column=0)
+            
+            self.data_listbox = tk.Listbox(data_listbox_frame, width=60, 
+                                           height=40, 
+                                           selectmode="extended")
+            self.data_listbox.grid(row=0,column=0)
+            
+
+            data_listbox_scrollbar = tk.ttk.Scrollbar(data_listbox_frame, orient="vertical",
+                                                           command=self.data_listbox.yview)
+            data_listbox_scrollbar.grid(row=0,column=1, sticky='ns')
+            
+            self.data_listbox.config(yscrollcommand=data_listbox_scrollbar.set)
+            sims_sort_alpha()
+            
+            plotter_options_frame = tk.Frame(self.plotter_popup)
+            plotter_options_frame.grid(row=2,column=1)
             all_outputs = []
             for layer_name, layer in self.module.layers.items():
                 all_outputs += [output for output in layer.outputs if layer.outputs[output].analysis_plotable]
-            tk.OptionMenu(self.plotter_popup, self.data_var, 
-                          *all_outputs).grid(row=1,column=0)
-            
-            self.data_listbox_frame = tk.Frame(self.plotter_popup)
-            self.data_listbox_frame.grid(row=2,column=0, rowspan=99)
-            self.data_listbox = tk.Listbox(self.data_listbox_frame, width=30, 
-                                           height=20, 
-                                           selectmode="extended")
-            self.data_listbox.grid(row=0,column=0)
-            self.data_listbox.delete(0,tk.END)
-            self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
-                              if not file.endswith(".txt")]
-            self.data_listbox.insert(0,*(self.data_list))
+            tk.OptionMenu(plotter_options_frame, self.data_var, 
+                          *all_outputs).grid(row=0,column=0)
 
-            self.data_listbox_scrollbar = tk.ttk.Scrollbar(self.data_listbox_frame, orient="vertical",
-                                                           command=self.data_listbox.yview)
-            self.data_listbox_scrollbar.grid(row=0,column=1, sticky='ns')
-            
-            self.data_listbox.config(yscrollcommand=self.data_listbox_scrollbar.set)
-
-            tk.Checkbutton(self.plotter_popup, text="Auto-integrate", 
+            tk.Checkbutton(plotter_options_frame, text="Auto-integrate", 
                            variable=self.check_autointegrate, 
-                           onvalue=1, offvalue=0).grid(row=1,column=1)
+                           onvalue=1, offvalue=0).grid(row=0,column=1)
             
-            tk.Button(self.plotter_popup, text="Continue", 
+            tk.Button(plotter_options_frame, text="Continue", 
                       command=partial(self.on_plotter_popup_close, 
-                                      plot_ID, continue_=True)).grid(row=2,column=1)
+                                      plot_ID, continue_=True)).grid(row=1,column=0,columnspan=2)
 
-            self.plotter_status = tk.Text(self.plotter_popup, width=24,height=2)
-            self.plotter_status.grid(row=3,rowspan=2,column=1)
+            self.plotter_status = tk.Text(plotter_options_frame, width=24,height=2)
+            self.plotter_status.grid(row=2,column=0,columnspan=2, padx=(20,20))
             self.plotter_status.configure(state="disabled")
 
             self.plotter_popup.protocol("WM_DELETE_WINDOW", partial(self.on_plotter_popup_close, 
