@@ -37,7 +37,7 @@ from utils import to_index, to_pos, to_array, get_all_combinations, \
 from Modules.Nanowire import Nanowire, tau_diff
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
-from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
+from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
 ## AND HERE
 def mod_list():
     """
