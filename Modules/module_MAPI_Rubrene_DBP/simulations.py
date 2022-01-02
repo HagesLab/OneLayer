@@ -2,7 +2,7 @@
 
 import numpy as np
 from scipy import integrate as intg
-from utils import u_read, to_index, to_array, to_pos, new_integrate
+from utils import to_array
 import tables
 
 from Modules.module_MAPI_Rubrene_DBP.simulations_dydt import dydt_sct

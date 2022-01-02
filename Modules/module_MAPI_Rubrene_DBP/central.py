@@ -4,9 +4,6 @@ Created on Wed May 12 18:01:07 2021
 
 @author: cfai2
 """
-import numpy as np
-from scipy import integrate as intg
-import tables
 from _OneD_Model import OneD_Model
 from Modules.module_MAPI_Rubrene_DBP.definitions import define_layers
 from Modules.module_MAPI_Rubrene_DBP.definitions import define_flags
@@ -15,7 +12,6 @@ from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_overview_anal
 from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_prep_dataset
 from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_timeseries
 from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_IC_carry
-
 from Modules.module_MAPI_Rubrene_DBP.simulations import ode_twolayer
 
 
