@@ -1,0 +1,318 @@
+import numpy as np
+import os
+import tables
+from scipy import integrate as intg
+from utils import u_read, to_index, new_integrate
+from Modules.module_MAPI_Rubrene_DBP.calculations import delta_n
+from Modules.module_MAPI_Rubrene_DBP.calculations import radiative_recombination
+from Modules.module_MAPI_Rubrene_DBP.calculations import prep_PL
+from Modules.module_MAPI_Rubrene_DBP.calculations import delta_n
+from Modules.module_MAPI_Rubrene_DBP.calculations import tau_diff
+from Modules.module_MAPI_Rubrene_DBP.calculations import E_field_r
+from Modules.module_MAPI_Rubrene_DBP.calculations import CalculatedOutputs
+from Modules.module_MAPI_Rubrene_DBP.mechanisms import TTA
+
+def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
+    """Calculates at a selection of sample times: N, P, (total carrier densities)
+    delta_N, delta_P, (above-equilibrium carrier densities)
+    internal electric field due to differences in N, P,
+    radiative recombination,
+    non-radiative (SRH model) recombination,
+    
+    Integrates over nanowire length: PL due to
+    radiative recombination, waveguiding, and carrier regeneration."""
+    # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
+
+    mapi = layers["MAPI"]
+    mapi_params = params["MAPI"]
+    mapi_length = mapi_params["Total_length"]
+    dm = mapi_params["Node_width"]
+    
+    ru = layers["Rubrene"]
+    ru_params = params["Rubrene"]
+    ru_length = ru_params["Total_length"]
+    df = ru_params["Node_width"]
+
+    data_dict = {"MAPI":{}, "Rubrene":{}}
+        
+    for layer_name, layer in layers.items():
+        for raw_output_name in layer.s_outputs:
+            data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
+                                                    raw_output_name)
+            data = []
+            for tstep in tsteps:
+                data.append(u_read(data_filename, t0=tstep, single_tstep=True))
+            
+            data_dict[layer_name][raw_output_name] = np.array(data)
+                
+
+    calculated_outputs = CalculatedOutputs(data_dict["MAPI"], mapi_params)
+    data_dict["MAPI"]["E_field"] = calculated_outputs.E_field()
+    data_dict["MAPI"]["delta_N"] = calculated_outputs.delta_n()
+    data_dict["MAPI"]["delta_P"] = calculated_outputs.delta_p()
+    data_dict["MAPI"]["RR"] = calculated_outputs.radiative_recombination()
+    data_dict["MAPI"]["NRR"] = calculated_outputs.nonradiative_recombination()
+            
+    #### MAPI PL ####
+    with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
+        tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
+        temp_N = np.array(ifstream_N.root.data)
+        temp_P = np.array(ifstream_P.root.data)
+    temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, mapi_params)
+    PL_base = prep_PL(temp_RR, 0, to_index(mapi_length, dm, mapi_length), 
+                        False, mapi_params, "MAPI")
+    data_dict["MAPI"]["mapi_PL"] = new_integrate(PL_base, 0, mapi_length, 
+                                                dm, mapi_length, False)
+    
+    temp_dN = delta_n({"N":temp_N}, mapi_params)
+    temp_dN = intg.trapz(temp_dN, dx=dm, axis=1)
+    temp_dN /= mapi_length
+    data_dict["MAPI"]["avg_delta_N"] = temp_dN
+    
+    try:
+        data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["mapi_PL"], dt)
+    except Exception:
+        print("Error: failed to calculate tau_diff")
+        data_dict["MAPI"]["tau_diff"] = 0
+    #################
+    
+    data_dict["Rubrene"]["E_upc"] = E_field_r(data_dict["Rubrene"], ru_params)
+    
+    #### DBP PL ####
+    with tables.open_file(os.path.join(data_dirname, file_name_base + "-delta_D.h5"), mode='r') as ifstream_D:
+        temp_D = np.array(ifstream_D.root.data)
+        
+    temp_D = prep_PL(temp_D, 0, to_index(ru_length, df, ru_length), 
+                        False, ru_params, "Rubrene")
+
+    data_dict["Rubrene"]["dbp_PL"] = new_integrate(temp_D, 0, ru_length, 
+                                                    df, ru_length, False)
+    ################
+    
+    #### TTA Rate ####
+    # "Triplet-Triplet Annihilation"
+    with tables.open_file(os.path.join(data_dirname, file_name_base + "-T.h5"), mode='r') as ifstream_T:
+        temp_TTA = np.array(ifstream_T.root.data)
+        
+    temp_TTA = TTA(temp_TTA, 0, to_index(ru_length, df, ru_length), 
+                    False, ru_params)
+
+    data_dict["Rubrene"]["TTA"] = new_integrate(temp_TTA, 0, ru_length, 
+                                                df, ru_length, False)
+    ##################
+    
+    #### Efficiencies ####
+    with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
+            tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
+        temp_N = np.array(ifstream_N.root.data[:,-1])
+        temp_init_N = np.array(ifstream_N.root.data[0,:])
+        temp_P = np.array(ifstream_P.root.data[:,-1])
+            
+        temp_init_N = intg.trapz(temp_init_N, dx=dm)
+        
+        
+    tail_n0 = mapi_params["N0"]
+    if isinstance(tail_n0, np.ndarray):
+        tail_n0 = tail_n0[-1]
+        
+    tail_p0 = mapi_params["P0"]
+    if isinstance(tail_p0, np.ndarray):
+        tail_p0 = tail_p0[-1]
+        
+    if "no_upconverter" in flags and flags["no_upconverter"]:
+        t_form = temp_N * 0
+        
+    else:
+        t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+                                    / (temp_N + temp_P))
+    
+    try:
+        data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
+    except FloatingPointError:
+        data_dict["Rubrene"]["T_form_eff"] =  t_form * 0
+    try:
+        data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] / t_form
+    except FloatingPointError:
+        data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] * 0
+        
+        
+    data_dict["Rubrene"]["S_up_eff"] = data_dict["Rubrene"]["T_anni_eff"] * data_dict["Rubrene"]["T_form_eff"]
+    
+    try:
+        data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] / temp_init_N
+    except FloatingPointError:
+        data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] * 0
+        
+    try:
+        data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] / temp_init_N
+    except FloatingPointError:
+        data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] * 0
+        
+    for data in data_dict["MAPI"]:
+        data_dict["MAPI"][data] *= mapi.convert_out[data]
+        
+    for data in data_dict["Rubrene"]:
+        data_dict["Rubrene"][data] *= ru.convert_out[data]
+        
+    data_dict["MAPI"]["mapi_PL"] *= mapi.iconvert_out["mapi_PL"]
+    data_dict["Rubrene"]["dbp_PL"] *= ru.iconvert_out["dbp_PL"]
+    data_dict["Rubrene"]["TTA"] *= ru.iconvert_out["TTA"]
+        
+    return data_dict
+
+
+def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_integrate, 
+                     i, j, nen, extra_data):
+    """ Provides delta_N, delta_P, electric field,
+    recombination, and spatial PL values on demand."""
+    # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
+    layer_params = params[where_layer]
+    layer_sim_data = sim_data[where_layer]
+    data = None
+    if (datatype in layer.s_outputs):
+        data = layer_sim_data[datatype]
+    
+    else:
+        calculated_outputs = CalculatedOutputs(layer_sim_data, layer_params)
+        if (datatype == "delta_N"):
+            data = calculated_outputs.delta_n()
+            
+        elif (datatype == "delta_P"):
+            data = calculated_outputs.delta_p()
+            
+        elif (datatype == "delta_T"):
+            data = calculated_outputs.delta_T()
+            
+        elif (datatype == "RR"):
+            data = calculated_outputs.radiative_recombination()
+
+        elif (datatype == "NRR"):
+            data = calculated_outputs.nonradiative_recombination()
+            
+        elif (datatype == "E_field"):
+            data = calculated_outputs.E_field()
+
+        elif (datatype == "mapi_PL"):
+
+            if for_integrate:
+                rad_rec = radiative_recombination(extra_data[where_layer], layer_params)
+                data = prep_PL(rad_rec, i, j, nen, layer_params, where_layer)
+            else:
+                rad_rec = calculated_outputs.radiative_recombination()
+                data = prep_PL(rad_rec, 0, len(rad_rec)-1, False, 
+                                layer_params, where_layer).flatten()
+                
+        elif (datatype == "E_upc"):
+            data = calculated_outputs.E_field_r()
+                
+        elif (datatype == "dbp_PL"):
+
+            if for_integrate:
+                delta_D = extra_data[where_layer]["delta_D"]
+                data = prep_PL(delta_D, i, j, nen, layer_params, where_layer)
+            else:
+                delta_D = layer_sim_data["delta_D"]
+                data = prep_PL(delta_D, 0, len(delta_D)-1, False, 
+                                layer_params, where_layer).flatten()
+                
+        elif (datatype == "TTA"):
+
+            if for_integrate:
+                T = extra_data[where_layer]["T"]
+                data = TTA(T, i, j, nen, layer_params)
+            else:
+                T = layer_sim_data["T"]
+                data = TTA(T, 0, len(T)-1, False, 
+                            layer_params).flatten()
+                
+        
+        else:
+            raise ValueError
+            
+    return data
+
+
+def submodule_get_timeseries(pathname, datatype, parent_data, total_time, dt, params, flags):
+    """Depending on requested datatype, returns the equivalent timeseries."""
+
+    if datatype == "delta_N":
+        temp_dN = parent_data / params["MAPI"]["Total_length"]
+        return [("avg_delta_N", temp_dN)]
+    
+    if datatype == "mapi_PL":
+        # photons emitted per photon absorbed
+        # generally this is meaningful in ss mode - thus units are [phot/nm^2 ns] per [carr/nm^2 ns]
+        with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N:
+            temp_init_N = np.array(ifstream_N.root.data[0,:])
+            
+        temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
+        try:
+            tdiff = tau_diff(parent_data, dt)
+        except FloatingPointError:
+            print("Error: failed to calculate tau_diff - effective lifetime is near infinite")
+            tdiff = np.zeros_like(np.linspace(0, total_time, int(total_time/dt) + 1))
+            
+        return [("tau_diff", tdiff),
+                ("eta_MAPI", parent_data / temp_init_N)]
+                
+    
+    elif datatype == "TTA":
+        with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N, \
+            tables.open_file(pathname + "-P.h5", mode='r') as ifstream_P:
+            temp_N = np.array(ifstream_N.root.data[:,-1])
+            temp_init_N = np.array(ifstream_N.root.data[0,:])
+            temp_P = np.array(ifstream_P.root.data[:,-1])
+            
+        temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
+
+        tail_n0 = params["MAPI"]["N0"]
+        if isinstance(tail_n0, np.ndarray):
+            tail_n0 = tail_n0[-1]
+            
+        tail_p0 = params["MAPI"]["P0"]
+        if isinstance(tail_p0, np.ndarray):
+            tail_p0 = tail_p0[-1]
+            
+        if "no_upconverter" in flags and flags["no_upconverter"]:
+            t_form = 0 * temp_N
+        else:
+            t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+                                            / (temp_N + temp_P))
+        
+        # In order:
+        # Triplets formed per photon absorbed
+        try:
+            t_form_eff = t_form / temp_init_N
+        except FloatingPointError:
+            t_form_eff = t_form * 0
+        # Singlets formed per triplet formed
+        try:
+            t_anni_eff = parent_data / t_form
+        except FloatingPointError:
+            t_anni_eff = parent_data * 0
+        # Singlets formed per photon absorbed
+        s_up_eff = t_form_eff * t_anni_eff
+        return [("T_form_eff", t_form_eff),
+                ("T_anni_eff", t_anni_eff),
+                ("S_up_eff", s_up_eff)]
+    
+    elif datatype == "dbp_PL":
+        with tables.open_file(pathname + "-N.h5", mode='r') as ifstream_N:
+            temp_init_N = np.array(ifstream_N.root.data[0,:])
+            
+        temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
+        
+        # DBP photons emitted per photon absorbed
+        return [("eta_UC", parent_data / temp_init_N)]
+    else:
+        return
+
+
+def submodule_get_IC_carry(sim_data, param_dict, include_flags, grid_x):
+    """ Set delta_N and delta_P of outgoing regenerated IC file."""
+    param_dict = param_dict["MAPI"]
+    sim_data = sim_data["MAPI"]
+    include_flags = include_flags["MAPI"]
+    param_dict["delta_N"] = (sim_data["N"] - param_dict["N0"]) if include_flags['N'] else np.zeros(len(grid_x))
+    param_dict["delta_P"] = (sim_data["P"] - param_dict["P0"]) if include_flags['P'] else np.zeros(len(grid_x))
+    return # TODO isnt this missing something?
