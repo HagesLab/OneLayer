@@ -4612,7 +4612,7 @@ class Notebook:
         return
     
     def export_timeseries(self, tspopup_ID, tail=False):
-        paired_data = self.active_timeseries[tspopup_ID]
+        paired_data = list(self.active_timeseries[tspopup_ID])
         
         # paired_data = [(tag, tgrid, values), (...,...,...), ...]
         # Unpack list of array tuples into list of arrays
@@ -4626,15 +4626,16 @@ class Notebook:
             
             header.append(paired_data[0][0])
             # unpack
-            if first:
+            if tail:
+                paired_data.append(paired_data[0][1][-10:])
+                paired_data.append(paired_data[0][2][-10:])
+            else:
                 paired_data.append(paired_data[0][1])
-                first = False
-            paired_data.append(paired_data[0][2])
+                paired_data.append(paired_data[0][2])
             paired_data.pop(0)
             
         paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
-        if tail:
-            paired_data = paired_data[-10:]
+        
         
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
                                                           title="Save data", 
