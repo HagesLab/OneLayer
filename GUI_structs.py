@@ -72,9 +72,11 @@ class Batchable:
         return
     
 class Data_Set:
-    def __init__(self, data, grid_x, params_dict, flags, type, filename):
+    def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type, filename):
         self.data = data
         self.grid_x = grid_x
+        self.total_time = total_time
+        self.dt = dt
         self.params_dict = dict(params_dict)
         self.flags = dict(flags)
         self.type = type
@@ -91,16 +93,14 @@ class Data_Set:
         
 class Raw_Data_Set(Data_Set):
     """Object containing all the metadata required to plot and integrate saved data sets"""
-    def __init__(self, data, grid_x, node_x, total_time, dt, params_dict, flags, type, filename, show_index):
-        super().__init__(data, grid_x, params_dict, flags, type, filename)
+    def __init__(self, data, grid_x, node_x, total_time, dt, params_dict, flags, type, filename, current_time):
+        super().__init__(data, grid_x, total_time, dt, params_dict, flags, type, filename)
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
 
         # node_x and grid_x will usually be identical, unless the data is a type (like E-field) that exists on edges
         # There's a little optimization that can be made here because grid_x will either be identical to node_x or not, but that makes the code harder to follow
 
-        self.show_index = show_index # Time step number data belongs to
-        self.total_time = total_time
-        self.dt = dt
+        self.current_time = current_time # Time step number data belongs to
         self.num_tsteps = int(0.5 + total_time / dt)
         return
 
@@ -110,9 +110,7 @@ class Raw_Data_Set(Data_Set):
     
 class Integrated_Data_Set(Data_Set):
     def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type, filename):
-        super().__init__(data, grid_x, params_dict, flags, type, filename)
-        self.total_time = total_time
-        self.dt = dt
+        super().__init__(data, grid_x, total_time, dt, params_dict, flags, type, filename)
         return
     
 
@@ -120,8 +118,6 @@ class Data_Group:
     def __init__(self):
         self.type = "None"
         self.datasets = {}
-        self.dt = -1
-        self.total_t = -1
         return
     
     def get_maxval(self):
@@ -145,17 +141,13 @@ class Raw_Data_Group(Data_Group):
     def add(self, data, tag):
         
         if not self.datasets: 
-            # Allow the first set in to set the dt and t restrictions
-            self.dt = data.dt
-            self.total_t = data.total_time
             self.type = data.type
 
-        # Only allow datasets with identical time step size and total time
-        if (self.dt == data.dt and self.total_t == data.total_time and self.type == data.type):
+        if (self.type == data.type):
             self.datasets[tag] = data
 
         else:
-            print("Cannot plot selected data sets: dt or total t mismatch")
+            print("Cannot plot selected data sets: type mismatch")
 
         return
 
@@ -188,12 +180,9 @@ class Integrated_Data_Group(Data_Group):
     
     def add(self, new_set):
         if not self.datasets: 
-            # Allow the first set in to set the type restriction
-            self.dt = new_set.dt
-            self.total_t = new_set.total_time
             self.type = new_set.type
 
-        # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong
+        # Only allow datasets with identical type - this should always be the case after any integration; otherwise something has gone wrong
         if (self.type == new_set.type):
             self.datasets[new_set.tag()] = new_set
 
@@ -225,24 +214,16 @@ class Analysis_Plot_State(Scalable_Plot_State):
     # There are currently four of these
     def __init__(self):
         super().__init__()
-        self.time_index = 0
+        self.time = 0
         self.data_filenames = []
         self.datagroup = Raw_Data_Group()
         return
 
-    # def remove_duplicate_filenames(self):
-    #     # Sets, unlike arrays, contain at most one copy of each item. Forcing an array into a set like this
-    #     # is a fast way to scrub duplicate entries, which is needed because we don't want to waste time
-    #     # plotting the same data set multiple times.
-    #     # Unfortunately, sets are not indexable, so we convert back into arrays to regain index access ability.
+    def add_time(self, offset):
+        self.time += offset
+        if self.time < 0: 
+            self.time = 0
             
-    #     self.data_filenames = list(set(self.data_filenames))
-    #     return
-
-    def add_time_index(self, offset):
-        self.time_index += offset
-        if self.time_index < 0: 
-            self.time_index = 0
-        if self.time_index > self.datagroup.get_maxnumtsteps(): 
-            self.time_index = self.datagroup.get_maxnumtsteps()
+        if self.time > self.datagroup.get_maxtime(): 
+            self.time = self.datagroup.get_maxtime()
         return

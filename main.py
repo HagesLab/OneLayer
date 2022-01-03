@@ -34,7 +34,7 @@ from utils import to_index, to_pos, to_array, get_all_combinations, \
                   autoscale, new_integrate
 
 ## ADD MODULES HERE
-from Modules.Nanowire import Nanowire, tau_diff
+from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
@@ -803,7 +803,7 @@ class Notebook:
         self.analyze_tstep_entry.grid(row=1,column=1)
 
         tk.ttk.Button(self.analyze_toolbar_frame, 
-                      text="Step >>", 
+                      text="Time >>", 
                       command=partial(self.plot_tstep)).grid(row=1,column=2)
 
         tk.ttk.Button(self.analyze_toolbar_frame, 
@@ -2739,16 +2739,17 @@ class Notebook:
 
             # This data is in TEDs units since we just used it in a calculation - convert back to common units first
             for dataset in active_datagroup.datasets.values():
-                label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
-                subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
-
+                if active_plot_data.time <= dataset.total_time:
+                    label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
+                    subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
+                else:
+                    print("Warning: time out of range for dataset {}".format(dataset.tag()))
+                    
             subplot.set_xlabel("x {}".format(self.module.layers[where_layer].length_unit))
             subplot.set_ylabel("{} {}".format(active_datagroup.type, self.module.layers[where_layer].outputs[active_datagroup.type].units))
             if active_plot_data.display_legend:
                 subplot.legend().set_draggable(True)
-            subplot.set_title("Time: " 
-                              + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) 
-                              + " / " + str(active_datagroup.get_maxtime()) + "ns")
+            subplot.set_title("Time: {} / {} ns".format(active_plot_data.time, active_datagroup.get_maxtime()))
             self.analyze_fig.tight_layout()
             self.analyze_fig.canvas.draw()
             
@@ -2765,14 +2766,10 @@ class Notebook:
         """Create a dataset object and prepare to plot on analysis tab."""
         # Select data type of incoming dataset from existing datasets
         active_plot = self.analysis_plots[plot_ID]
-        datagroup = active_plot.datagroup
 
         try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
-            if datagroup.size():
-                assert (datagroup.total_t == total_time), "Error: time grid mismatch"
-                assert (datagroup.dt == dt), "Error: time grid mismatch"
-                
+            
             data_m = {}
             data_edge_x = {}
             data_node_x = {}
@@ -2798,7 +2795,7 @@ class Notebook:
                                             self.module.system_ID,
                                             data_filename,
                                             "{}-{}.h5".format(data_filename, sim_datatype))
-                sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
+                sim_data[layer_name][sim_datatype] = u_read(path_name, t0=0, 
                                                             single_tstep=True)
         where_layer = self.module.find_layer(datatype)
         try:
@@ -2818,12 +2815,12 @@ class Notebook:
             return Raw_Data_Set(values, data_edge_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt, 
                                 param_values_dict, flag_values_dict, datatype, data_filename, 
-                                active_plot.time_index)
+                                active_plot.time)
         else:
             return Raw_Data_Set(values, data_node_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt,
                                 param_values_dict, flag_values_dict, datatype, data_filename, 
-                                active_plot.time_index)
+                                active_plot.time)
 
     def load_datasets(self):
         """ Interpret selection from do_plotter_popup()."""
@@ -2836,7 +2833,7 @@ class Notebook:
         active_plot = self.analysis_plots[plot_ID]
         datatype = self.data_var.get()
 
-        active_plot.time_index = 0
+        active_plot.time = 0
         active_plot.datagroup.clear()
         err_msg = ["Error: the following data could not be plotted"]
         for i in range(0, len(active_plot.data_filenames)):
@@ -2870,13 +2867,14 @@ class Notebook:
         plot_ID = self.active_analysisplot_ID.get()
         active_plot = self.analysis_plots[plot_ID]
         try:
-            active_plot.add_time_index(int(self.analyze_tstep_entry.get()))
+            active_plot.add_time(float(self.analyze_tstep_entry.get()))
         except ValueError:
             self.write(self.analysis_status, "Invalid number of time steps")
             return
 
         active_datagroup = active_plot.datagroup
-        # Search data files for data at new time step
+        # Search data files for data at new time
+        # Interpolate if necessary
         for tag, dataset in active_datagroup.datasets.items():
             sim_data = {}
             for layer_name, layer in self.module.layers.items():
@@ -2886,12 +2884,30 @@ class Notebook:
                                                 self.module.system_ID,
                                                 dataset.filename,
                                                 "{}-{}.h5".format(dataset.filename, sim_datatype))
-                    sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
-                                                                single_tstep=True)
+                    
+                    floor_tstep = int(active_plot.time / dataset.dt)
+                    interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                    over_time = False
+                    
+                    if active_plot.time > dataset.total_time:
+                        interpolated_step = np.zeros_like(dataset.node_x)
+                        over_time = True
+                        
+                    elif active_plot.time == dataset.total_time:
+                        pass
+                    else:
+                        slope = (interpolated_step[1] - interpolated_step[0]) / (dataset.dt)
+                        interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * dataset.dt)
+                    
+                    sim_data[layer_name][sim_datatype] = interpolated_step
         
-            dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
-                                                      dataset.params_dict, dataset.flags)
-            dataset.show_index = active_plot.time_index
+            if over_time:
+                dataset.data = interpolated_step
+            else:
+                dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
+                                                          dataset.params_dict, dataset.flags)
+            dataset.current_time = active_plot.time
+            
             
         self.plot_analyze(plot_ID, force_axis_update=False)
         self.write(self.analysis_status, "")
