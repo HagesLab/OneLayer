@@ -2344,8 +2344,6 @@ class Notebook:
                     
                 status_msg = ["Files generated:"]
                 for key in datasets:
-                    
-                
                     new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], 
                                                                    title="Save IC text file for {}".format(key), 
                                                                    filetypes=[("Text files","*.txt")])
@@ -3270,9 +3268,6 @@ class Notebook:
         self.integration_plots[ip_ID].mode = self.PL_mode
         self.integration_plots[ip_ID].global_gridx = None
 
-        
-        n = active_datagroup.get_maxnumtsteps()
-        
         if self.PL_mode == "All time steps":
             td_gridt = {}
             td = {}
@@ -3288,16 +3283,15 @@ class Notebook:
             # Unpack needed params from the dictionaries of params
             dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
             total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
-            total_time = active_datagroup.total_t
-            dt = active_datagroup.dt
+            total_time = active_datagroup.datasets[tag].total_time
+            dt = active_datagroup.datasets[tag].dt
+            n = active_datagroup.datasets[tag].num_tsteps
             symmetric_flag = active_datagroup.datasets[tag].flags["symmetric_system"]
 
             if self.PL_mode == "Current time step":
                 show_index = active_datagroup.datasets[tag].show_index
             else:
                 show_index = None
-                
-            
 
             # Clean up any bounds that extend past the confines of the system
             # The system usually exists from x=0 to x=total_length, 
@@ -3405,8 +3399,7 @@ class Notebook:
                     xaxis_label = self.xaxis_param + " [WIP]"
 
                 elif self.PL_mode == "All time steps":
-                    self.integration_plots[ip_ID].global_gridx = np.linspace(0, total_time, n + 1)
-                    grid_xaxis = -1 # A dummy value for the I_Set constructor
+                    grid_xaxis = np.linspace(0, total_time, n + 1)
                     xaxis_label = "Time [ns]"
 
                 ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
@@ -3450,19 +3443,19 @@ class Notebook:
         
         for key in datagroup.datasets:
 
-            if self.PL_mode == "Current time step":
-                subplot.scatter(datagroup.datasets[key].grid_x, 
-                                datagroup.datasets[key].data * 
-                                self.module.layers[where_layer].convert_out[datagroup.type] *
-                                self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                                label=datagroup.datasets[key].tag(for_matplotlib=True))
+            #if self.PL_mode == "Current time step":
+            subplot.scatter(datagroup.datasets[key].grid_x, 
+                            datagroup.datasets[key].data * 
+                            self.module.layers[where_layer].convert_out[datagroup.type] *
+                            self.module.layers[where_layer].iconvert_out[datagroup.type], 
+                            label=datagroup.datasets[key].tag(for_matplotlib=True))
 
-            elif self.PL_mode == "All time steps":
-                subplot.plot(self.integration_plots[ip_ID].global_gridx, 
-                             datagroup.datasets[key].data * 
-                             self.module.layers[where_layer].convert_out[datagroup.type] *
-                             self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                             label=datagroup.datasets[key].tag(for_matplotlib=True))
+            #elif self.PL_mode == "All time steps":
+                # subplot.plot(self.integration_plots[ip_ID].grid_x, 
+                #              datagroup.datasets[key].data * 
+                #              self.module.layers[where_layer].convert_out[datagroup.type] *
+                #              self.module.layers[where_layer].iconvert_out[datagroup.type], 
+                #              label=datagroup.datasets[key].tag(for_matplotlib=True))
                 
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
         self.integration_plots[ip_ID].ylim = subplot.get_ylim()
