@@ -91,6 +91,10 @@ class Data_Set:
         else:
             return (self.filename + "_" + self.type).strip('_')
         
+    def build(self):
+        """Concatenate (x,y) pairs for export"""
+        return np.vstack((self.grid_x, self.data))
+        
 class Raw_Data_Set(Data_Set):
     """Object containing all the metadata required to plot and integrate saved data sets"""
     def __init__(self, data, grid_x, node_x, total_time, dt, params_dict, flags, type, filename, current_time):
@@ -104,9 +108,7 @@ class Raw_Data_Set(Data_Set):
         self.num_tsteps = int(0.5 + total_time / dt)
         return
 
-    def build(self):
-        """Concatenate (x,y) pairs for export"""
-        return np.vstack((self.grid_x, self.data))
+    
     
 class Integrated_Data_Set(Data_Set):
     def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type, filename):
@@ -145,12 +147,10 @@ class Raw_Data_Group(Data_Group):
 
         if (self.type == data.type):
             self.datasets[tag] = data
-
         else:
             print("Cannot plot selected data sets: type mismatch")
-
         return
-
+    
     def build(self, convert_out_dict):
         result = []
         for key in self.datasets:
@@ -185,8 +185,14 @@ class Integrated_Data_Group(Data_Group):
         # Only allow datasets with identical type - this should always be the case after any integration; otherwise something has gone wrong
         if (self.type == new_set.type):
             self.datasets[new_set.tag()] = new_set
-
         return
+    
+    def build(self, convert_out_dict, iconvert_out):
+        result = []
+        for key in self.datasets:
+            result.append(self.datasets[key].grid_x)
+            result.append(self.datasets[key].data * convert_out_dict[self.type] * iconvert_out[self.type])
+        return result
 
 class Scalable_Plot_State:
     def __init__(self, plot_obj=None):

@@ -3289,9 +3289,11 @@ class Notebook:
             symmetric_flag = active_datagroup.datasets[tag].flags["symmetric_system"]
 
             if self.PL_mode == "Current time step":
-                show_index = active_datagroup.datasets[tag].show_index
+                show_index = int(active_datagroup.datasets[tag].current_time / dt)
+                end_index = show_index+2
             else:
                 show_index = None
+                end_index = None
 
             # Clean up any bounds that extend past the confines of the system
             # The system usually exists from x=0 to x=total_length, 
@@ -3320,82 +3322,48 @@ class Notebook:
                 print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
                 j = to_index(u_bound, dx, total_length)
-                if include_negative:
-                    i = to_index(-l_bound, dx, total_length)
+                i = to_index(abs(l_bound), dx, total_length)
+                if include_negative:  
                     nen = [-l_bound > to_pos(i, dx) + dx / 2,
                                        u_bound > to_pos(j, dx) + dx / 2]
+                    
+                    space_bounds = [(0,i,nen[0], 0, -l_bound), (0,j,nen[1], 0, u_bound)]
                 else:
-                    i = to_index(l_bound, dx, total_length)
                     nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
-                
+                    space_bounds = [(i,j,nen, l_bound, u_bound)]
 
                 do_curr_t = self.PL_mode == "Current time step"
                 
                 pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
                 
-                if include_negative:
+                extra_data = {}
+                for c, s in enumerate(space_bounds):
                     sim_data = {}
-                    extra_data = {}
                     for layer_name, layer in self.module.layers.items():
                         sim_data[layer_name] = {}
                         extra_data[layer_name] = {}
                         for sim_datatype in layer.s_outputs:
                             sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, l=0, r=i+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=nen[0], 
+                                                                        t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                        single_tstep=do_curr_t, need_extra_node=s[2], 
                                                                         force_1D=False) 
-                            extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                          t0=show_index, single_tstep=do_curr_t, force_1D=False)
+                            
+                            if c == 0:
+                                extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                              t0=show_index, t1=end_index, single_tstep=do_curr_t, force_1D=False)
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
                                                       active_datagroup.datasets[tag].flags,
-                                                      True, 0, i, nen[0], extra_data)
-                    I_data = new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
-                    sim_data = {}
+                                                      True, s[0], s[1], s[2], extra_data)
                     
-                    for layer_name, layer in self.module.layers.items():
-                        sim_data[layer_name] = {}
-                        for sim_datatype in layer.s_outputs:
-                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, l=0, r=j+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=nen[1],
-                                                                        force_1D=False) 
-            
-                    data = self.module.prep_dataset(datatype, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.datasets[tag].flags,
-                                                      True, 0, j, nen[1], extra_data)
-                    I_data += new_integrate(data, 0, u_bound, dx, total_length, nen[1])
-                    
-                else:
-                    sim_data = {}
-                    extra_data = {}
-                    for layer_name, layer in self.module.layers.items():
-                        sim_data[layer_name] = {}
-                        extra_data[layer_name] = {}
-                        for sim_datatype in layer.s_outputs:
-                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, l=i, r=j+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=nen,
-                                                                        force_1D=False) 
-                            extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                          t0=show_index, single_tstep=do_curr_t,
-                                                                          force_1D=False) 
-            
-                    data = self.module.prep_dataset(datatype, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict,
-                                                      active_datagroup.datasets[tag].flags,
-                                                      True, i, j, nen, extra_data)
-                    
-                    I_data = new_integrate(data, l_bound, u_bound, dx, total_length, nen)
-
+                    if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2])
+                    else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2])
                             
                 if self.PL_mode == "Current time step":
                     # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
                     grid_xaxis = float(active_datagroup.datasets[tag].params_dict[where_layer][self.xaxis_param]
                                        * self.module.layers[where_layer].convert_out[self.xaxis_param])
-
                     xaxis_label = self.xaxis_param + " [WIP]"
 
                 elif self.PL_mode == "All time steps":
@@ -3442,21 +3410,17 @@ class Notebook:
 
         
         for key in datagroup.datasets:
+            if self.PL_mode == "Current time step":
+                f = subplot.scatter
+            elif self.PL_mode == "All time steps":
+                f = subplot.plot
+            f(datagroup.datasets[key].grid_x, 
+                datagroup.datasets[key].data * 
+                self.module.layers[where_layer].convert_out[datagroup.type] *
+                self.module.layers[where_layer].iconvert_out[datagroup.type], 
+                label=datagroup.datasets[key].tag(for_matplotlib=True))
 
-            #if self.PL_mode == "Current time step":
-            subplot.scatter(datagroup.datasets[key].grid_x, 
-                            datagroup.datasets[key].data * 
-                            self.module.layers[where_layer].convert_out[datagroup.type] *
-                            self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                            label=datagroup.datasets[key].tag(for_matplotlib=True))
-
-            #elif self.PL_mode == "All time steps":
-                # subplot.plot(self.integration_plots[ip_ID].grid_x, 
-                #              datagroup.datasets[key].data * 
-                #              self.module.layers[where_layer].convert_out[datagroup.type] *
-                #              self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                #              label=datagroup.datasets[key].tag(for_matplotlib=True))
-                
+            
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
         self.integration_plots[ip_ID].ylim = subplot.get_ylim()
                 
@@ -4608,15 +4572,13 @@ class Notebook:
                                             datagroup.type)
 
             else: # if self.I_plot.mode == "All time steps"
-                raw_data = np.array([datagroup.datasets[key].data * 
-                                     self.module.layers[where_layer].convert_out[datagroup.type] *
-                                     self.module.layers[where_layer].iconvert_out[datagroup.type]
-                                     for key in datagroup.datasets])
-                grid_x = np.reshape(plot_info.global_gridx, (1,len(plot_info.global_gridx)))
-                paired_data = np.concatenate((grid_x, raw_data), axis=0).T
-                header = "Time [ns],"
-                for key in datagroup.datasets:
-                    header += datagroup.datasets[key].tag().replace("Δ", "") + ","
+                paired_data = datagroup.build(self.module.layers[where_layer].convert_out, self.module.layers[where_layer].iconvert_out)
+                paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
+                
+                header = "".join(["Time [ns]," + 
+                                  datagroup.datasets[key].filename + 
+                                  "," for key in datagroup.datasets])
+                
 
         else:
             plot_ID = self.active_analysisplot_ID.get()
