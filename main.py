@@ -2307,7 +2307,9 @@ class Notebook:
             self.carry_IC_listbox = tk.Listbox(self.IC_carry_popup, width=30,height=10, 
                                                selectmode='extended')
             self.carry_IC_listbox.grid(row=4,column=0,columnspan=2)
-            for key in self.analysis_plots[plot_ID].datagroup.datasets:
+            for key, dataset in self.analysis_plots[plot_ID].datagroup.datasets.items():
+                over_time = (self.analysis_plots[plot_ID].time > dataset.total_time)
+                if over_time: continue
                 self.carry_IC_listbox.insert(tk.END, key)
 
             tk.Button(self.IC_carry_popup, text="Continue", 
@@ -2328,7 +2330,8 @@ class Notebook:
         try:
             if continue_:
                 plot_ID = self.active_analysisplot_ID.get()
-                active_sets = self.analysis_plots[plot_ID].datagroup.datasets
+                active_plot = self.analysis_plots[plot_ID]
+                active_sets = active_plot.datagroup.datasets
                 datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
                 if not datasets: 
                     return
@@ -2341,6 +2344,8 @@ class Notebook:
                     
                 status_msg = ["Files generated:"]
                 for key in datasets:
+                    
+                
                     new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], 
                                                                    title="Save IC text file for {}".format(key), 
                                                                    filetypes=[("Text files","*.txt")])
@@ -2363,8 +2368,16 @@ class Notebook:
                                                         self.module.system_ID,
                                                         filename,
                                                         "{}-{}.h5".format(filename, var))
-                            sim_data[layer_name][var] = u_read(path_name, t0=active_sets[key].show_index, 
-                                                               single_tstep=True)
+                            floor_tstep = int(active_plot.time / active_sets[key].dt)
+                            interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                            
+                            if active_plot.time == active_sets[key].total_time:
+                                pass
+                            else:
+                                slope = (interpolated_step[1] - interpolated_step[0]) / (active_sets[key].dt)
+                                interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * active_sets[key].dt)
+                            
+                            sim_data[layer_name][var] = interpolated_step
 
                     self.module.get_IC_carry(sim_data, param_dict_copy, 
                                                include_flags, grid_x)
@@ -2388,6 +2401,7 @@ class Notebook:
                             for param in layer.params:
                                 if not (param == "Total_length" or param == "Node_width"):
                                     param_values = layer_params[param]
+                                    param_values *= self.module.layers[layer_name].convert_out[param]
                                     if isinstance(param_values, np.ndarray):
                                         # Write the array in a more convenient format
                                         ofstream.write("{}: {:.8e}".format(param, param_values[0]))
