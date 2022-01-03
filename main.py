@@ -3284,12 +3284,15 @@ class Notebook:
             dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
             total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
             total_time = active_datagroup.datasets[tag].total_time
+            current_time = active_datagroup.datasets[tag].current_time
             dt = active_datagroup.datasets[tag].dt
             n = active_datagroup.datasets[tag].num_tsteps
             symmetric_flag = active_datagroup.datasets[tag].flags["symmetric_system"]
 
+            if current_time > total_time: continue
+
             if self.PL_mode == "Current time step":
-                show_index = int(active_datagroup.datasets[tag].current_time / dt)
+                show_index = int(current_time / dt)
                 end_index = show_index+2
             else:
                 show_index = None
@@ -3343,14 +3346,41 @@ class Notebook:
                         sim_data[layer_name] = {}
                         extra_data[layer_name] = {}
                         for sim_datatype in layer.s_outputs:
-                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=s[2], 
-                                                                        force_1D=False) 
+
+                            if do_curr_t:
+                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                           t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                           single_tstep=False, need_extra_node=s[2], 
+                                                           force_1D=False)
+                                if current_time == total_time:
+                                    pass
+                                else:
+                                    floor_tstep = int(current_time / dt)
+                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                                
+                                sim_data[layer_name][sim_datatype] = np.array(interpolated_step)
+                                
+                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                             t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+                                if current_time == total_time:
+                                    pass
+                                else:
+                                    floor_tstep = int(current_time / dt)
+                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                                    
+                                extra_data[layer_name][sim_datatype] = np.array(interpolated_step)
                             
-                            if c == 0:
-                                extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                              t0=show_index, t1=end_index, single_tstep=do_curr_t, force_1D=False)
+                            else:
+                                sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                            t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                            single_tstep=False, need_extra_node=s[2], 
+                                                                            force_1D=False) 
+                                
+                                if c == 0:
+                                    extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                  t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
             
                     data = self.module.prep_dataset(datatype, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
@@ -4616,14 +4646,10 @@ class Notebook:
         
         # paired_data = [(tag, tgrid, values), (...,...,...), ...]
         # Unpack list of array tuples into list of arrays
-        
-        # TODO WHEN FLEXIBILE TGRID COMPLETE: 
-        # currently assumes all t grids are identical
-        # should save all t arrays rather than the common one
-        first = True
-        header = ["Time [ns]"]
+
+        header = []
         while isinstance(paired_data[0], tuple):
-            
+            header.append("Time [ns]")
             header.append(paired_data[0][0])
             # unpack
             if tail:
