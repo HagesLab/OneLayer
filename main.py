@@ -30,11 +30,12 @@ from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, \
                         Integrated_Data_Set, Analysis_Plot_State, \
                         Integration_Plot_State
 from utils import to_index, to_pos, to_array, get_all_combinations, \
-                  extract_values, u_read, check_valid_filename, \
                   autoscale, new_integrate
+                  
+from io_utils import extract_values, u_read, check_valid_filename, get_split_and_clean_line
 
 ## ADD MODULES HERE
-from Modules.Nanowire import Nanowire, tau_diff
+from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
@@ -4297,6 +4298,7 @@ class Notebook:
 
     def load_ICfile(self, cycle_through_IC_plots=True):
         """Read parameters from IC file and store into module."""
+
         warning_flag = False
         warning_mssg = ""
 
@@ -4323,68 +4325,72 @@ class Notebook:
                                 
                 # Extract parameters, ICs
                 for line in ifstream:
-                    
-                    if ("#" in line) or not line.strip('\n'):
+                    line = line.strip('\n')
+                    line_split = get_split_and_clean_line(line)
+
+                    if ("#" in line) or not line:
                         continue
 
                     # There are three "$" markers in an IC file: "Space Grid", "System Parameters" and "System Flags"
                     # each corresponding to a different section of the file
-                    
-                    elif "L$" in line:
-                        layer_name = line[line.find(":")+1:].strip(' \n')
-                        init_param_values_dict[layer_name] = {}
-                        LGC_values[layer_name] = {}
-                        LGC_options[layer_name] = {}
-                        print("Found layer {}".format(layer_name))
-                        continue
-                        
-                    elif "p$ Space Grid" in line:
+
+                    if "p$ Space Grid" in line:
                         print("Now searching for space grid: length and dx")
                         initFlag = 'g'
+                        continue
                         
                     elif "p$ System Parameters" in line:
                         print("Now searching for system parameters...")
                         initFlag = 'p'
+                        continue
                         
                     elif "f$" in line:
                         print("Now searching for flag values...")
                         initFlag = 'f'
+                        continue
                         
                     elif "$ Laser Parameters" in line:
                         print("Now searching for laser parameters...")
                         if self.module.system_ID not in self.LGC_eligible_modules:
                             print("Warning: laser params found for unsupported module (these will be ignored)")
                         initFlag = 'l'
+                        continue
                         
                     elif "$ Laser Options" in line:
                         print("Now searching for laser options...")
                         if self.module.system_ID not in self.LGC_eligible_modules:
                             print("Warning: laser options found for unsupported module (these will be ignored)")
                         initFlag = 'o'
-                        
-                    elif (initFlag == 'g'):
-                        line = line.strip('\n')
-                        if line.startswith("Total_length"):
-                            total_length[layer_name] = (line[line.rfind(' ') + 1:])
-                            
-                        elif line.startswith("Node_width"):
-                            dx[layer_name] = (line[line.rfind(' ') + 1:])
-                            
-                    elif (initFlag == 'p'):
-                        line = line.strip('\n')
-                        init_param_values_dict[layer_name][line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
+                        continue
 
-                    elif (initFlag == 'f'):
-                        line = line.strip('\n')
-                        flag_values_dict[line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
+                    if len(line_split) > 1:
+                    
+                        if "L$" in line:
+                            layer_name = line_split[1]
+                            init_param_values_dict[layer_name] = {}
+                            LGC_values[layer_name] = {}
+                            LGC_options[layer_name] = {}
+                            print("Found layer {}".format(layer_name))
+                            continue
                         
-                    elif (initFlag == 'l'):
-                        line = line.strip('\n')
-                        LGC_values[layer_name][line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
-                        
-                    elif (initFlag == 'o'):
-                        line = line.strip('\n')
-                        LGC_options[layer_name][line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
+                        if (initFlag == 'g'):
+                            if line.startswith("Total_length"):
+                                total_length[layer_name] = (line_split[1])
+                                
+                            elif line.startswith("Node_width"):
+                                dx[layer_name] = (line_split[1])
+                            
+                        elif (initFlag == 'p'):
+                            init_param_values_dict[layer_name][line_split[0]] = (line_split[1])
+
+                        elif (initFlag == 'f'):
+                            flag_values_dict[line_split[0]] = (line_split[1])
+                            
+                        elif (initFlag == 'l'):
+                            LGC_values[layer_name][line_split[0]] = (line_split[1])
+                            
+                        elif (initFlag == 'o'):
+                            LGC_options[layer_name][line_split[0]] = (line_split[1])
 
 
         except Exception as oops:
