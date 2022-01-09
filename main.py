@@ -30,11 +30,12 @@ from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, \
                         Integrated_Data_Set, Analysis_Plot_State, \
                         Integration_Plot_State
 from utils import to_index, to_pos, to_array, get_all_combinations, \
-                  extract_values, u_read, check_valid_filename, \
                   autoscale, new_integrate
+                  
+from io_utils import extract_values, u_read, check_valid_filename, get_split_and_clean_line
 
 ## ADD MODULES HERE
-from Modules.Nanowire import Nanowire, tau_diff
+from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
@@ -4297,13 +4298,6 @@ class Notebook:
 
     def load_ICfile(self, cycle_through_IC_plots=True):
         """Read parameters from IC file and store into module."""
-
-        def get_split_and_clean_line(line: str):
-            """Split line by colon symbol ':' and
-            remove preceding and trailing spaces."""
-            split_line = line.split(':')
-            split_line = [i.strip() for i in split_line]
-            return split_line
 
         warning_flag = False
         warning_mssg = ""
