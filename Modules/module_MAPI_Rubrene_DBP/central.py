@@ -12,7 +12,7 @@ from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_overview_anal
 from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_prep_dataset
 from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_timeseries
 from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_IC_carry
-from Modules.module_MAPI_Rubrene_DBP.simulations import ode_twolayer
+from Modules.module_MAPI_Rubrene_DBP.simulations import OdeTwoLayerSimulation
 
 
 
@@ -49,21 +49,15 @@ class MAPI_Rubrene(OneD_Model):
     def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
         """Calls ODEINT solver."""
         mapi = self.layers["MAPI"]
-        ru = self.layers["Rubrene"]
+        rubrene = self.layers["Rubrene"]
         for param_name, param in mapi.params.items():
             param.value *= mapi.convert_in[param_name]
             
-        for param_name, param in ru.params.items():
-            param.value *= ru.convert_in[param_name]
+        for param_name, param in rubrene.params.items():
+            param.value *= rubrene.convert_in[param_name]
 
-        ode_twolayer(data_path, m["MAPI"], mapi.dx, m["Rubrene"], ru.dx,
-                     n, dt, mapi.params, ru.params, flags['do_fret'].value(),
-                     flags['check_do_ss'].value(), flags['no_upconverter'].value(),
-                     flags['predict_sst'].value(), flags["do_sct"].value(),
-                     hmax_, True,
-                     init_conditions["N"], init_conditions["P"],
-                     init_conditions["T"], init_conditions["delta_S"],
-                     init_conditions["delta_D"], init_conditions["P_up"])
+        ode_two_layer = OdeTwoLayerSimulation(mapi, rubrene, m, flags, init_conditions)
+        ode_two_layer.simulate(data_path, n, dt, hmax_)
 
 
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
