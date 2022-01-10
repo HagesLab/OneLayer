@@ -189,46 +189,6 @@ def get_all_combinations(value_dict):
             
     return combinations
     
-def extract_values(string, delimiter):
-    """Converts a string with deliimiters into a list of float values"""
-	# E.g. "100,200,300" with "," delimiter becomes [100,200,300]
-    # values = []
-    # substring = string
-    
-    # while (not substring.find(delimiter) == -1):
-    #     next_delimiter = substring.find(delimiter)
-    #     values.append(float(substring[0:next_delimiter]))
-    #     substring = substring[next_delimiter + 1:]
-
-    # values.append(float(substring))
-    values = string.split(delimiter)
-    values = np.array(values, dtype=float)
-    return values
-
-def check_valid_filename(file_name):
-    """Screens file_name for prohibited characters"""
-    prohibited_characters = [".","<",">","/","\\","*","?",":","\"","|"]
-	# return !any(char in file_name for char in prohibited_characters)
-    if any(char in file_name for char in prohibited_characters):
-        return False
-
-    return True
-        
-def u_read(filename, t0=None, t1=None, l=None, r=None, single_tstep=False, 
-           need_extra_node=False, force_1D=True):
-    """Read a subset of a 2D array (from time t0 to t1 and position l to r) stored in an .h5 file"""
-    if (t0 is not None) and single_tstep:
-        t1 = t0 + 1
-        
-    if need_extra_node:
-        r = r + 1
-        
-    with tables.open_file(filename, mode='r') as ifstream:
-        data = np.array(ifstream.root.data[t0:t1, l:r])
-        
-        if force_1D and np.ndim(data) == 2 and len(data) == 1:
-            data = data.flatten()
-        return data
     
 def autoscale(val_array=None, min_val=None, max_val=None):
     """Help a matplotlib plot determine whether a log or linear scale should be used

@@ -30,11 +30,12 @@ from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, \
                         Integrated_Data_Set, Analysis_Plot_State, \
                         Integration_Plot_State
 from utils import to_index, to_pos, to_array, get_all_combinations, \
-                  extract_values, u_read, check_valid_filename, \
                   autoscale, new_integrate
+                  
+from io_utils import extract_values, u_read, check_valid_filename, get_split_and_clean_line
 
 ## ADD MODULES HERE
-from Modules.Nanowire import Nanowire, tau_diff
+from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
@@ -803,7 +804,7 @@ class Notebook:
         self.analyze_tstep_entry.grid(row=1,column=1)
 
         tk.ttk.Button(self.analyze_toolbar_frame, 
-                      text="Step >>", 
+                      text="Time >>", 
                       command=partial(self.plot_tstep)).grid(row=1,column=2)
 
         tk.ttk.Button(self.analyze_toolbar_frame, 
@@ -2307,7 +2308,9 @@ class Notebook:
             self.carry_IC_listbox = tk.Listbox(self.IC_carry_popup, width=30,height=10, 
                                                selectmode='extended')
             self.carry_IC_listbox.grid(row=4,column=0,columnspan=2)
-            for key in self.analysis_plots[plot_ID].datagroup.datasets:
+            for key, dataset in self.analysis_plots[plot_ID].datagroup.datasets.items():
+                over_time = (self.analysis_plots[plot_ID].time > dataset.total_time)
+                if over_time: continue
                 self.carry_IC_listbox.insert(tk.END, key)
 
             tk.Button(self.IC_carry_popup, text="Continue", 
@@ -2328,7 +2331,8 @@ class Notebook:
         try:
             if continue_:
                 plot_ID = self.active_analysisplot_ID.get()
-                active_sets = self.analysis_plots[plot_ID].datagroup.datasets
+                active_plot = self.analysis_plots[plot_ID]
+                active_sets = active_plot.datagroup.datasets
                 datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
                 if not datasets: 
                     return
@@ -2363,8 +2367,16 @@ class Notebook:
                                                         self.module.system_ID,
                                                         filename,
                                                         "{}-{}.h5".format(filename, var))
-                            sim_data[layer_name][var] = u_read(path_name, t0=active_sets[key].show_index, 
-                                                               single_tstep=True)
+                            floor_tstep = int(active_plot.time / active_sets[key].dt)
+                            interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                            
+                            if active_plot.time == active_sets[key].total_time:
+                                pass
+                            else:
+                                slope = (interpolated_step[1] - interpolated_step[0]) / (active_sets[key].dt)
+                                interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * active_sets[key].dt)
+                            
+                            sim_data[layer_name][var] = interpolated_step
 
                     self.module.get_IC_carry(sim_data, param_dict_copy, 
                                                include_flags, grid_x)
@@ -2388,6 +2400,7 @@ class Notebook:
                             for param in layer.params:
                                 if not (param == "Total_length" or param == "Node_width"):
                                     param_values = layer_params[param]
+                                    param_values *= self.module.layers[layer_name].convert_out[param]
                                     if isinstance(param_values, np.ndarray):
                                         # Write the array in a more convenient format
                                         ofstream.write("{}: {:.8e}".format(param, param_values[0]))
@@ -2739,16 +2752,17 @@ class Notebook:
 
             # This data is in TEDs units since we just used it in a calculation - convert back to common units first
             for dataset in active_datagroup.datasets.values():
-                label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
-                subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
-
+                if active_plot_data.time <= dataset.total_time:
+                    label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
+                    subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
+                else:
+                    print("Warning: time out of range for dataset {}".format(dataset.tag()))
+                    
             subplot.set_xlabel("x {}".format(self.module.layers[where_layer].length_unit))
             subplot.set_ylabel("{} {}".format(active_datagroup.type, self.module.layers[where_layer].outputs[active_datagroup.type].units))
             if active_plot_data.display_legend:
                 subplot.legend().set_draggable(True)
-            subplot.set_title("Time: " 
-                              + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) 
-                              + " / " + str(active_datagroup.get_maxtime()) + "ns")
+            subplot.set_title("Time: {} / {} ns".format(active_plot_data.time, active_datagroup.get_maxtime()))
             self.analyze_fig.tight_layout()
             self.analyze_fig.canvas.draw()
             
@@ -2765,14 +2779,10 @@ class Notebook:
         """Create a dataset object and prepare to plot on analysis tab."""
         # Select data type of incoming dataset from existing datasets
         active_plot = self.analysis_plots[plot_ID]
-        datagroup = active_plot.datagroup
 
         try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
-            if datagroup.size():
-                assert (datagroup.total_t == total_time), "Error: time grid mismatch"
-                assert (datagroup.dt == dt), "Error: time grid mismatch"
-                
+            
             data_m = {}
             data_edge_x = {}
             data_node_x = {}
@@ -2798,7 +2808,7 @@ class Notebook:
                                             self.module.system_ID,
                                             data_filename,
                                             "{}-{}.h5".format(data_filename, sim_datatype))
-                sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
+                sim_data[layer_name][sim_datatype] = u_read(path_name, t0=0, 
                                                             single_tstep=True)
         where_layer = self.module.find_layer(datatype)
         try:
@@ -2818,12 +2828,12 @@ class Notebook:
             return Raw_Data_Set(values, data_edge_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt, 
                                 param_values_dict, flag_values_dict, datatype, data_filename, 
-                                active_plot.time_index)
+                                active_plot.time)
         else:
             return Raw_Data_Set(values, data_node_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt,
                                 param_values_dict, flag_values_dict, datatype, data_filename, 
-                                active_plot.time_index)
+                                active_plot.time)
 
     def load_datasets(self):
         """ Interpret selection from do_plotter_popup()."""
@@ -2836,7 +2846,7 @@ class Notebook:
         active_plot = self.analysis_plots[plot_ID]
         datatype = self.data_var.get()
 
-        active_plot.time_index = 0
+        active_plot.time = 0
         active_plot.datagroup.clear()
         err_msg = ["Error: the following data could not be plotted"]
         for i in range(0, len(active_plot.data_filenames)):
@@ -2870,13 +2880,14 @@ class Notebook:
         plot_ID = self.active_analysisplot_ID.get()
         active_plot = self.analysis_plots[plot_ID]
         try:
-            active_plot.add_time_index(int(self.analyze_tstep_entry.get()))
+            active_plot.add_time(float(self.analyze_tstep_entry.get()))
         except ValueError:
             self.write(self.analysis_status, "Invalid number of time steps")
             return
 
         active_datagroup = active_plot.datagroup
-        # Search data files for data at new time step
+        # Search data files for data at new time
+        # Interpolate if necessary
         for tag, dataset in active_datagroup.datasets.items():
             sim_data = {}
             for layer_name, layer in self.module.layers.items():
@@ -2886,12 +2897,30 @@ class Notebook:
                                                 self.module.system_ID,
                                                 dataset.filename,
                                                 "{}-{}.h5".format(dataset.filename, sim_datatype))
-                    sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
-                                                                single_tstep=True)
+                    
+                    floor_tstep = int(active_plot.time / dataset.dt)
+                    interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                    over_time = False
+                    
+                    if active_plot.time > dataset.total_time:
+                        interpolated_step = np.zeros_like(dataset.node_x)
+                        over_time = True
+                        
+                    elif active_plot.time == dataset.total_time:
+                        pass
+                    else:
+                        slope = (interpolated_step[1] - interpolated_step[0]) / (dataset.dt)
+                        interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * dataset.dt)
+                    
+                    sim_data[layer_name][sim_datatype] = interpolated_step
         
-            dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
-                                                      dataset.params_dict, dataset.flags)
-            dataset.show_index = active_plot.time_index
+            if over_time:
+                dataset.data = interpolated_step
+            else:
+                dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
+                                                          dataset.params_dict, dataset.flags)
+            dataset.current_time = active_plot.time
+            
             
         self.plot_analyze(plot_ID, force_axis_update=False)
         self.write(self.analysis_status, "")
@@ -3240,9 +3269,6 @@ class Notebook:
         self.integration_plots[ip_ID].mode = self.PL_mode
         self.integration_plots[ip_ID].global_gridx = None
 
-        
-        n = active_datagroup.get_maxnumtsteps()
-        
         if self.PL_mode == "All time steps":
             td_gridt = {}
             td = {}
@@ -3258,16 +3284,20 @@ class Notebook:
             # Unpack needed params from the dictionaries of params
             dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
             total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
-            total_time = active_datagroup.total_t
-            dt = active_datagroup.dt
+            total_time = active_datagroup.datasets[tag].total_time
+            current_time = active_datagroup.datasets[tag].current_time
+            dt = active_datagroup.datasets[tag].dt
+            n = active_datagroup.datasets[tag].num_tsteps
             symmetric_flag = active_datagroup.datasets[tag].flags["symmetric_system"]
 
+            if current_time > total_time: continue
+
             if self.PL_mode == "Current time step":
-                show_index = active_datagroup.datasets[tag].show_index
+                show_index = int(current_time / dt)
+                end_index = show_index+2
             else:
                 show_index = None
-                
-            
+                end_index = None
 
             # Clean up any bounds that extend past the confines of the system
             # The system usually exists from x=0 to x=total_length, 
@@ -3296,87 +3326,79 @@ class Notebook:
                 print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
                 j = to_index(u_bound, dx, total_length)
-                if include_negative:
-                    i = to_index(-l_bound, dx, total_length)
+                i = to_index(abs(l_bound), dx, total_length)
+                if include_negative:  
                     nen = [-l_bound > to_pos(i, dx) + dx / 2,
                                        u_bound > to_pos(j, dx) + dx / 2]
+                    
+                    space_bounds = [(0,i,nen[0], 0, -l_bound), (0,j,nen[1], 0, u_bound)]
                 else:
-                    i = to_index(l_bound, dx, total_length)
                     nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
-                
+                    space_bounds = [(i,j,nen, l_bound, u_bound)]
 
                 do_curr_t = self.PL_mode == "Current time step"
                 
                 pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
                 
-                if include_negative:
+                extra_data = {}
+                for c, s in enumerate(space_bounds):
                     sim_data = {}
-                    extra_data = {}
                     for layer_name, layer in self.module.layers.items():
                         sim_data[layer_name] = {}
                         extra_data[layer_name] = {}
                         for sim_datatype in layer.s_outputs:
-                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, l=0, r=i+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=nen[0], 
-                                                                        force_1D=False) 
-                            extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                          t0=show_index, single_tstep=do_curr_t, force_1D=False)
-            
-                    data = self.module.prep_dataset(datatype, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.datasets[tag].flags,
-                                                      True, 0, i, nen[0], extra_data)
-                    I_data = new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
-                    sim_data = {}
-                    
-                    for layer_name, layer in self.module.layers.items():
-                        sim_data[layer_name] = {}
-                        for sim_datatype in layer.s_outputs:
-                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, l=0, r=j+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=nen[1],
-                                                                        force_1D=False) 
-            
-                    data = self.module.prep_dataset(datatype, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.datasets[tag].flags,
-                                                      True, 0, j, nen[1], extra_data)
-                    I_data += new_integrate(data, 0, u_bound, dx, total_length, nen[1])
-                    
-                else:
-                    sim_data = {}
-                    extra_data = {}
-                    for layer_name, layer in self.module.layers.items():
-                        sim_data[layer_name] = {}
-                        extra_data[layer_name] = {}
-                        for sim_datatype in layer.s_outputs:
-                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, l=i, r=j+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=nen,
-                                                                        force_1D=False) 
-                            extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                          t0=show_index, single_tstep=do_curr_t,
-                                                                          force_1D=False) 
-            
-                    data = self.module.prep_dataset(datatype, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict,
-                                                      active_datagroup.datasets[tag].flags,
-                                                      True, i, j, nen, extra_data)
-                    
-                    I_data = new_integrate(data, l_bound, u_bound, dx, total_length, nen)
 
+                            if do_curr_t:
+                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                           t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                           single_tstep=False, need_extra_node=s[2], 
+                                                           force_1D=False)
+                                if current_time == total_time:
+                                    pass
+                                else:
+                                    floor_tstep = int(current_time / dt)
+                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                                
+                                sim_data[layer_name][sim_datatype] = np.array(interpolated_step)
+                                
+                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                             t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+                                if current_time == total_time:
+                                    pass
+                                else:
+                                    floor_tstep = int(current_time / dt)
+                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                                    
+                                extra_data[layer_name][sim_datatype] = np.array(interpolated_step)
+                            
+                            else:
+                                sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                            t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                            single_tstep=False, need_extra_node=s[2], 
+                                                                            force_1D=False) 
+                                
+                                if c == 0:
+                                    extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                  t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+            
+                    data = self.module.prep_dataset(datatype, sim_data, 
+                                                      active_datagroup.datasets[tag].params_dict, 
+                                                      active_datagroup.datasets[tag].flags,
+                                                      True, s[0], s[1], s[2], extra_data)
+                    
+                    if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2])
+                    else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2])
                             
                 if self.PL_mode == "Current time step":
                     # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
                     grid_xaxis = float(active_datagroup.datasets[tag].params_dict[where_layer][self.xaxis_param]
                                        * self.module.layers[where_layer].convert_out[self.xaxis_param])
-
                     xaxis_label = self.xaxis_param + " [WIP]"
 
                 elif self.PL_mode == "All time steps":
-                    self.integration_plots[ip_ID].global_gridx = np.linspace(0, total_time, n + 1)
-                    grid_xaxis = -1 # A dummy value for the I_Set constructor
+                    grid_xaxis = np.linspace(0, total_time, n + 1)
                     xaxis_label = "Time [ns]"
 
                 ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
@@ -3419,21 +3441,17 @@ class Notebook:
 
         
         for key in datagroup.datasets:
-
             if self.PL_mode == "Current time step":
-                subplot.scatter(datagroup.datasets[key].grid_x, 
-                                datagroup.datasets[key].data * 
-                                self.module.layers[where_layer].convert_out[datagroup.type] *
-                                self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                                label=datagroup.datasets[key].tag(for_matplotlib=True))
-
+                f = subplot.scatter
             elif self.PL_mode == "All time steps":
-                subplot.plot(self.integration_plots[ip_ID].global_gridx, 
-                             datagroup.datasets[key].data * 
-                             self.module.layers[where_layer].convert_out[datagroup.type] *
-                             self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                             label=datagroup.datasets[key].tag(for_matplotlib=True))
-                
+                f = subplot.plot
+            f(datagroup.datasets[key].grid_x, 
+                datagroup.datasets[key].data * 
+                self.module.layers[where_layer].convert_out[datagroup.type] *
+                self.module.layers[where_layer].iconvert_out[datagroup.type], 
+                label=datagroup.datasets[key].tag(for_matplotlib=True))
+
+            
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
         self.integration_plots[ip_ID].ylim = subplot.get_ylim()
                 
@@ -4360,6 +4378,7 @@ class Notebook:
 
     def load_ICfile(self, cycle_through_IC_plots=True):
         """Read parameters from IC file and store into module."""
+
         warning_flag = False
         warning_mssg = ""
 
@@ -4386,68 +4405,72 @@ class Notebook:
                                 
                 # Extract parameters, ICs
                 for line in ifstream:
-                    
-                    if ("#" in line) or not line.strip('\n'):
+                    line = line.strip('\n')
+                    line_split = get_split_and_clean_line(line)
+
+                    if ("#" in line) or not line:
                         continue
 
                     # There are three "$" markers in an IC file: "Space Grid", "System Parameters" and "System Flags"
                     # each corresponding to a different section of the file
-                    
-                    elif "L$" in line:
-                        layer_name = line[line.find(":")+1:].strip(' \n')
-                        init_param_values_dict[layer_name] = {}
-                        LGC_values[layer_name] = {}
-                        LGC_options[layer_name] = {}
-                        print("Found layer {}".format(layer_name))
-                        continue
-                        
-                    elif "p$ Space Grid" in line:
+
+                    if "p$ Space Grid" in line:
                         print("Now searching for space grid: length and dx")
                         initFlag = 'g'
+                        continue
                         
                     elif "p$ System Parameters" in line:
                         print("Now searching for system parameters...")
                         initFlag = 'p'
+                        continue
                         
                     elif "f$" in line:
                         print("Now searching for flag values...")
                         initFlag = 'f'
+                        continue
                         
                     elif "$ Laser Parameters" in line:
                         print("Now searching for laser parameters...")
                         if self.module.system_ID not in self.LGC_eligible_modules:
                             print("Warning: laser params found for unsupported module (these will be ignored)")
                         initFlag = 'l'
+                        continue
                         
                     elif "$ Laser Options" in line:
                         print("Now searching for laser options...")
                         if self.module.system_ID not in self.LGC_eligible_modules:
                             print("Warning: laser options found for unsupported module (these will be ignored)")
                         initFlag = 'o'
-                        
-                    elif (initFlag == 'g'):
-                        line = line.strip('\n')
-                        if line.startswith("Total_length"):
-                            total_length[layer_name] = (line[line.rfind(' ') + 1:])
-                            
-                        elif line.startswith("Node_width"):
-                            dx[layer_name] = (line[line.rfind(' ') + 1:])
-                            
-                    elif (initFlag == 'p'):
-                        line = line.strip('\n')
-                        init_param_values_dict[layer_name][line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
+                        continue
 
-                    elif (initFlag == 'f'):
-                        line = line.strip('\n')
-                        flag_values_dict[line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
+                    if len(line_split) > 1:
+                    
+                        if "L$" in line:
+                            layer_name = line_split[1]
+                            init_param_values_dict[layer_name] = {}
+                            LGC_values[layer_name] = {}
+                            LGC_options[layer_name] = {}
+                            print("Found layer {}".format(layer_name))
+                            continue
                         
-                    elif (initFlag == 'l'):
-                        line = line.strip('\n')
-                        LGC_values[layer_name][line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
-                        
-                    elif (initFlag == 'o'):
-                        line = line.strip('\n')
-                        LGC_options[layer_name][line[0:line.find(':')]] = (line[line.rfind(' ') + 1:])
+                        if (initFlag == 'g'):
+                            if line.startswith("Total_length"):
+                                total_length[layer_name] = (line_split[1])
+                                
+                            elif line.startswith("Node_width"):
+                                dx[layer_name] = (line_split[1])
+                            
+                        elif (initFlag == 'p'):
+                            init_param_values_dict[layer_name][line_split[0]] = (line_split[1])
+
+                        elif (initFlag == 'f'):
+                            flag_values_dict[line_split[0]] = (line_split[1])
+                            
+                        elif (initFlag == 'l'):
+                            LGC_values[layer_name][line_split[0]] = (line_split[1])
+                            
+                        elif (initFlag == 'o'):
+                            LGC_options[layer_name][line_split[0]] = (line_split[1])
 
 
         except Exception as oops:
@@ -4585,15 +4608,13 @@ class Notebook:
                                             datagroup.type)
 
             else: # if self.I_plot.mode == "All time steps"
-                raw_data = np.array([datagroup.datasets[key].data * 
-                                     self.module.layers[where_layer].convert_out[datagroup.type] *
-                                     self.module.layers[where_layer].iconvert_out[datagroup.type]
-                                     for key in datagroup.datasets])
-                grid_x = np.reshape(plot_info.global_gridx, (1,len(plot_info.global_gridx)))
-                paired_data = np.concatenate((grid_x, raw_data), axis=0).T
-                header = "Time [ns],"
-                for key in datagroup.datasets:
-                    header += datagroup.datasets[key].tag().replace("Δ", "") + ","
+                paired_data = datagroup.build(self.module.layers[where_layer].convert_out, self.module.layers[where_layer].iconvert_out)
+                paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
+                
+                header = "".join(["Time [ns]," + 
+                                  datagroup.datasets[key].filename + 
+                                  "," for key in datagroup.datasets])
+                
 
         else:
             plot_ID = self.active_analysisplot_ID.get()
@@ -4627,29 +4648,26 @@ class Notebook:
         return
     
     def export_timeseries(self, tspopup_ID, tail=False):
-        paired_data = self.active_timeseries[tspopup_ID]
+        paired_data = list(self.active_timeseries[tspopup_ID])
         
         # paired_data = [(tag, tgrid, values), (...,...,...), ...]
         # Unpack list of array tuples into list of arrays
-        
-        # TODO WHEN FLEXIBILE TGRID COMPLETE: 
-        # currently assumes all t grids are identical
-        # should save all t arrays rather than the common one
-        first = True
-        header = ["Time [ns]"]
+
+        header = []
         while isinstance(paired_data[0], tuple):
-            
+            header.append("Time [ns]")
             header.append(paired_data[0][0])
             # unpack
-            if first:
+            if tail:
+                paired_data.append(paired_data[0][1][-10:])
+                paired_data.append(paired_data[0][2][-10:])
+            else:
                 paired_data.append(paired_data[0][1])
-                first = False
-            paired_data.append(paired_data[0][2])
+                paired_data.append(paired_data[0][2])
             paired_data.pop(0)
             
         paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
-        if tail:
-            paired_data = paired_data[-10:]
+        
         
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
                                                           title="Save data", 
