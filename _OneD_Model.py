@@ -6,8 +6,7 @@ Created on Wed May 12 18:01:25 2021
 """
 import numpy as np
 from helper_structs import Parameter, Output, Layer
-from utils import u_read, to_index, to_array, to_pos
-import tables
+from utils import to_index, to_pos
 
 class OneD_Model:
     """ Template class for modules.

@@ -9,7 +9,8 @@ import os
 from scipy import integrate as intg
 from scipy import optimize
 from helper_structs import Parameter, Output, Layer
-from utils import u_read, to_index, to_array, to_pos, new_integrate
+from io_utils import u_read
+from utils import to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
 from Modules.dydt_sct import dydt_sct
