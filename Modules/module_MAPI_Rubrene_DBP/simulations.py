@@ -7,8 +7,8 @@ import tables
 
 from Modules.module_MAPI_Rubrene_DBP.simulations_dydt import dydt_sct
 from Modules.module_MAPI_Rubrene_DBP.simulations_dydt import dydt_basic
-from Modules.module_MAPI_Rubrene_DBP.mechanisms import SST
 from Modules.module_MAPI_Rubrene_DBP.calculations import E_field
+from Modules.module_MAPI_Rubrene_DBP.calculations import SST
 
 
 def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params, 

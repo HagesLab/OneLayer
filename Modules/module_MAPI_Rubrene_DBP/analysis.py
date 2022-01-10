@@ -2,15 +2,17 @@ import numpy as np
 import os
 import tables
 from scipy import integrate as intg
-from utils import u_read, to_index, new_integrate
+from io_utils import u_read
+from utils import to_index, new_integrate
 from Modules.module_MAPI_Rubrene_DBP.calculations import delta_n
 from Modules.module_MAPI_Rubrene_DBP.calculations import radiative_recombination
 from Modules.module_MAPI_Rubrene_DBP.calculations import prep_PL
 from Modules.module_MAPI_Rubrene_DBP.calculations import delta_n
 from Modules.module_MAPI_Rubrene_DBP.calculations import tau_diff
 from Modules.module_MAPI_Rubrene_DBP.calculations import E_field_r
+from Modules.module_MAPI_Rubrene_DBP.calculations import TTA
 from Modules.module_MAPI_Rubrene_DBP.calculations import CalculatedOutputs
-from Modules.module_MAPI_Rubrene_DBP.mechanisms import TTA
+
 
 def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
     """Calculates at a selection of sample times: N, P, (total carrier densities)
