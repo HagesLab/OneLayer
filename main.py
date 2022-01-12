@@ -2488,7 +2488,7 @@ class Notebook:
         return
     
     ## Plotter for simulation tab    
-    def update_sim_plots(self, index, do_clear_plots=True):
+    def update_sim_plots(self, index, failed_vars, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
         
         for layer_name, layer in self.module.layers.items():
@@ -2508,7 +2508,8 @@ class Notebook:
                 plot.set_yscale(output_obj.yscale)
                 
                 grid_x = layer.grid_x_nodes if not output_obj.is_edge else layer.grid_x_edges
-                plot.plot(grid_x, self.sim_data[variable] * convert_out[variable])
+                if not failed_vars[variable]:
+                    plot.plot(grid_x, self.sim_data[variable] * convert_out[variable])
     
                 plot.set_xlabel("x {}".format(layer.length_unit))
                 plot.set_ylabel("{} {}".format(variable, output_obj.units))
@@ -3170,17 +3171,25 @@ class Notebook:
 
         self.write(self.status, "Finalizing...")
 
-        try:
-            for i in range(1,6):
-                for var in self.sim_data:
-                    path_name = os.path.join(dirname, "{}-{}.h5".format(data_file_name, var))
+        failed_vars = {}
+        for i in range(1,6):
+            for var in self.sim_data:
+                path_name = os.path.join(dirname, "{}-{}.h5".format(data_file_name, var))
+                failed_vars[var] = 0
+                try:
                     self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
                                                 single_tstep=True)
-                is_first = (i == 1)
-                self.update_sim_plots(self.n, do_clear_plots=is_first)
-        except Exception:
-            self.sim_warning_msg.append("Warning: unable to plot {}. Output data "
-                                        "may not have been saved correctly.\n".format(data_file_name))
+                    
+                except Exception:
+                    self.sim_data[var] = 0
+                    failed_vars[var] = 1
+            is_first = (i == 1)
+            self.update_sim_plots(self.n, failed_vars, do_clear_plots=is_first)
+        
+        if failed_vars:
+            failed_vars = [var for var, fail_state in failed_vars.items() if fail_state]
+            self.sim_warning_msg.append("Warning: unable to plot {} for {}. Output data "
+                                        "may not have been saved correctly.\n".format(failed_vars, data_file_name))
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
