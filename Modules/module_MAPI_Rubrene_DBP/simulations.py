@@ -122,7 +122,7 @@ class OdeTwoLayerSimulation():
         data = solution.y.T
 
         if self.write_output:
-            self.write_output_to_file(data_path, data)
+            self.write_output_to_file(data_path, data, calc)
 
         return
 
@@ -223,9 +223,13 @@ class OdeTwoLayerSimulation():
         
         
         if self.do_seq_charge_transfer:
-            s.init_condition = np.concatenate([self.init_N, self.init_P, s.init_E_field, init_T, init_S, init_D, self.init_P_up, s.init_E_upc], axis=None)
+            s.init_condition = [self.init_N, self.init_P, s.init_E_field, init_T, init_S, init_D, self.init_P_up, s.init_E_upc]
+            s.data_splits = np.cumsum([len(d) for d in s.init_condition])[:-1]            
+            s.init_condition = np.concatenate(s.init_condition, axis=None)
         else:
-            s.init_condition = np.concatenate([self.init_N, self.init_P, s.init_E_field, init_T, init_S, init_D], axis=None)
+            s.init_condition = [self.init_N, self.init_P, s.init_E_field, init_T, init_S, init_D]
+            s.data_splits = np.cumsum([len(d) for d in s.init_condition])[:-1] 
+            s.init_condition = np.concatenate(s.init_condition, axis=None)
         
         return s
 
@@ -258,37 +262,24 @@ class OdeTwoLayerSimulation():
                             method='BDF', max_step=sim.hmax_)   #  Variable time_step_size explicit 
 
 
-    def write_output_to_file(self, data_path: str, data: any):
+    def write_output_to_file(self, data_path: str, data: any, s):
         
         ## Prep output files
         # TODO: Py 3.9 removes need for \
-        N = data[:,0:self.mapi_node_number]
-        P = data[:,self.mapi_node_number:2*(self.mapi_node_number)]
-        T = data[:,3*(self.mapi_node_number)+1:3*(self.mapi_node_number)+1+self.rubrene_node_number]
-        S = data[:,3*(self.mapi_node_number)+1+self.rubrene_node_number:3*(self.mapi_node_number)+1+2*(self.rubrene_node_number)]
-        D = data[:,3*(self.mapi_node_number)+1+2*(self.rubrene_node_number):3*(self.mapi_node_number)+1+3*(self.rubrene_node_number)]
-        P_up = data[:, 3*(self.mapi_node_number)+1+3*(self.rubrene_node_number):3*self.mapi_node_number+1 + 4*self.rubrene_node_number]
+        
+        if self.do_seq_charge_transfer:
+            N, P, E_field, T, S, D, P_up, E_up = np.split(data, s.data_splits, axis=1)
+            to_write = {"N":N, "P":P, "T":T, "delta_S":S, "delta_D":D, "P_up":P_up}
+            
+        else:
+            N, P, E_field, T, S, D = np.split(data, s.data_splits, axis=1)
+            to_write = {"N":N, "P":P, "T":T, "delta_S":S, "delta_D":D}
+
         atom = tables.Float64Atom()
         
-        with tables.open_file(data_path + "-N.h5", mode='a') as ofstream_N, \
-                tables.open_file(data_path + "-P.h5", mode='a') as ofstream_P,\
-                tables.open_file(data_path + "-T.h5", mode='a') as ofstream_T,\
-                tables.open_file(data_path + "-delta_S.h5", mode='a') as ofstream_S,\
-                tables.open_file(data_path + "-delta_D.h5", mode='a') as ofstream_D,\
-                tables.open_file(data_path + "-P_up.h5", mode='a') as ofstream_P_up:
-            array_N = ofstream_N.create_earray(ofstream_N.root, "data", atom, (0, len(N[0])))
-            array_P = ofstream_P.create_earray(ofstream_P.root, "data", atom, (0, len(P[0])))
-            array_T = ofstream_T.create_earray(ofstream_T.root, "data", atom, (0, len(T[0])))
-            array_S = ofstream_S.create_earray(ofstream_S.root, "data", atom, (0, len(S[0])))
-            array_D = ofstream_D.create_earray(ofstream_D.root, "data", atom, (0, len(D[0])))
-            array_P_up = ofstream_P_up.create_earray(ofstream_P_up.root, "data", atom, (0, len(P_up[0])))
-            
-            array_N.append(N)
-            array_P.append(P)
-            array_T.append(T)
-            array_S.append(S)
-            array_D.append(D)
-            if self.do_seq_charge_transfer:
-                array_P_up.append(P_up)
+        for oname, output in to_write.items():
+            with tables.open_file(data_path + f"-{oname}.h5", mode='a') as ofstream:
+                table = ofstream.create_earray(ofstream.root, "data", atom, (0, len(output[0])))
+                table.append(output)
             
         return #error_data
