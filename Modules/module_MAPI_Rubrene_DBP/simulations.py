@@ -72,7 +72,7 @@ class OdeTwoLayerSimulation():
         self.rubrene_node_number = m["Rubrene"]
 
     def set_flags(self, flags: dict):
-        self.do_fret = flags.get('self.do_fret', False)
+        self.do_fret = flags.get('do_fret', False)
         self.do_ss = flags.get('check_do_ss', False)
         self.no_upconverter = flags.get('no_upconverter', False)
         self.predict_sstriplets = flags.get('predict_sst', False)
@@ -157,7 +157,7 @@ class OdeTwoLayerSimulation():
         if self.do_seq_charge_transfer:
             # Unpack additional params for this physics model
             p.Sp = 0 if self.no_upconverter else self.rubrene_params["Sp"].value
-            p.Ssct = self.rubrene_params["Ssct"].value
+            p.Ssct = 0 if self.no_upconverter else self.rubrene_params["Ssct"].value
             p.w_vb = self.rubrene_params["W_VB"].value
             p.mu_p_up = to_array(self.rubrene_params["mu_P_up"].value, self.rubrene_node_number, True)
             p.uc_eps = to_array(self.rubrene_params["uc_permitivity"].value, self.rubrene_node_number, True)
@@ -212,7 +212,7 @@ class OdeTwoLayerSimulation():
             if self.do_seq_charge_transfer:
                 #raise NotImplementedError
                 print("Warning: SST not implemented for seq charge transfer model. Keeping original triplet count")
-                init_T = self.init_T + p.T0
+                init_T = self.init_T
                 init_S = self.init_S
                 init_D = self.init_D
             else:
