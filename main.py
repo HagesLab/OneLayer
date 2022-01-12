@@ -3110,26 +3110,26 @@ class Notebook:
 
 
         ## Calculate!
-        atom = tables.Float64Atom()
+        #atom = tables.Float64Atom()
 
         ## Create data files
-        for layer_name, layer in self.module.layers.items():
-            for variable in layer.s_outputs:
-                path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
-                with tables.open_file(path, mode='w') as ofstream:
-                    length = num_nodes[layer_name] 
-                    if layer.s_outputs[variable].is_edge:
-                        length += 1
+        # for layer_name, layer in self.module.layers.items():
+        #     for variable in layer.s_outputs:
+        #         path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
+        #         with tables.open_file(path, mode='w') as ofstream:
+        #             length = num_nodes[layer_name] 
+        #             if layer.s_outputs[variable].is_edge:
+        #                 length += 1
     
-                    # Important - "data" must be used as the array name here, as pytables will use the string "data" 
-                    # to name the attribute earray.data, which is then used to access the array
-                    earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
-                    earray.append(np.reshape(init_conditions[variable], (1, length)))
+        #             # Important - "data" must be used as the array name here, as pytables will use the string "data" 
+        #             # to name the attribute earray.data, which is then used to access the array
+        #             earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
+        #             earray.append(np.reshape(init_conditions[variable], (1, length)))
         
         ## Setup simulation plots and plot initial
         
         self.sim_data = dict(init_conditions)
-        self.update_sim_plots(0)
+        #self.update_sim_plots(0)
         flag_values = {f:flag.value() for f, flag in self.sys_flag_dict.items()}
 
         try:

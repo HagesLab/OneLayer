@@ -85,7 +85,7 @@ class OdeTwoLayerSimulation():
         self.init_T = init_conditions.get("T", 0)
         self.init_S = init_conditions.get("delta_S", 0)
         self.init_D = init_conditions.get("delta_D", 0)
-        self.init_P_up = init_conditions.get("P_up", 0)
+        if self.do_seq_charge_transfer: self.init_P_up = init_conditions.get("P_up", 0)
 
 
     def simulate(self, data_path: str, time_step_number: int, time_step_size: float, hmax_ = 0):
@@ -259,31 +259,36 @@ class OdeTwoLayerSimulation():
 
 
     def write_output_to_file(self, data_path: str, data: any):
+        
         ## Prep output files
         # TODO: Py 3.9 removes need for \
+        N = data[:,0:self.mapi_node_number]
+        P = data[:,self.mapi_node_number:2*(self.mapi_node_number)]
+        T = data[:,3*(self.mapi_node_number)+1:3*(self.mapi_node_number)+1+self.rubrene_node_number]
+        S = data[:,3*(self.mapi_node_number)+1+self.rubrene_node_number:3*(self.mapi_node_number)+1+2*(self.rubrene_node_number)]
+        D = data[:,3*(self.mapi_node_number)+1+2*(self.rubrene_node_number):3*(self.mapi_node_number)+1+3*(self.rubrene_node_number)]
+        P_up = data[:, 3*(self.mapi_node_number)+1+3*(self.rubrene_node_number):3*self.mapi_node_number+1 + 4*self.rubrene_node_number]
+        atom = tables.Float64Atom()
+        
         with tables.open_file(data_path + "-N.h5", mode='a') as ofstream_N, \
                 tables.open_file(data_path + "-P.h5", mode='a') as ofstream_P,\
                 tables.open_file(data_path + "-T.h5", mode='a') as ofstream_T,\
                 tables.open_file(data_path + "-delta_S.h5", mode='a') as ofstream_S,\
                 tables.open_file(data_path + "-delta_D.h5", mode='a') as ofstream_D,\
                 tables.open_file(data_path + "-P_up.h5", mode='a') as ofstream_P_up:
-            array_N = ofstream_N.root.data
-            array_P = ofstream_P.root.data
-            array_T = ofstream_T.root.data
-            array_S = ofstream_S.root.data
-            array_D = ofstream_D.root.data
-            array_P_up = ofstream_P_up.root.data
+            array_N = ofstream_N.create_earray(ofstream_N.root, "data", atom, (0, len(N[0])))
+            array_P = ofstream_P.create_earray(ofstream_P.root, "data", atom, (0, len(P[0])))
+            array_T = ofstream_T.create_earray(ofstream_T.root, "data", atom, (0, len(T[0])))
+            array_S = ofstream_S.create_earray(ofstream_S.root, "data", atom, (0, len(S[0])))
+            array_D = ofstream_D.create_earray(ofstream_D.root, "data", atom, (0, len(D[0])))
+            array_P_up = ofstream_P_up.create_earray(ofstream_P_up.root, "data", atom, (0, len(P_up[0])))
             
-            array_N.append(data[1:,0:self.mapi_node_number])
-            array_P.append(data[1:,self.mapi_node_number:2*(self.mapi_node_number)])
-            array_T.append(data[1:,3*(self.mapi_node_number)+1:3*(self.mapi_node_number)+1+self.rubrene_node_number])
-            array_S.append(data[1:,3*(self.mapi_node_number)+1+self.rubrene_node_number:3*(self.mapi_node_number)+1+2*(self.rubrene_node_number)])
-            # array_D.append(data[1:,3*(mapi_node_number)+1+2*(self.rubrene_node_number):])
-            array_D.append(data[1:,3*(self.mapi_node_number)+1+2*(self.rubrene_node_number):3*(self.mapi_node_number)+1+3*(self.rubrene_node_number)])
+            array_N.append(N)
+            array_P.append(P)
+            array_T.append(T)
+            array_S.append(S)
+            array_D.append(D)
             if self.do_seq_charge_transfer:
-                array_P_up.append(data[1:, 3*(self.mapi_node_number)+1+3*(self.rubrene_node_number):3*self.mapi_node_number+1 + 4*self.rubrene_node_number])
-            else:
-                # No hole transfer - Insert dummy zeros
-                array_P_up.append(np.zeros_like(data[1:,3*(self.mapi_node_number)+1:3*(self.mapi_node_number)+1+self.rubrene_node_number:3*self.mapi_node_number+1 + 4*self.rubrene_node_number]))
-
+                array_P_up.append(P_up)
+            
         return #error_data
