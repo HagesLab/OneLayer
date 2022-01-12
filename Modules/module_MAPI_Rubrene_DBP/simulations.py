@@ -88,7 +88,7 @@ class OdeTwoLayerSimulation():
         self.init_P_up = init_conditions.get("P_up", 0)
 
 
-    def simulate(data_path: str, time_step_number: int, time_step_size: float, hmax_ = 0):
+    def simulate(self, data_path: str, time_step_number: int, time_step_size: float, hmax_ = 0):
         """
         Master function for MAPI_Rubrene_DBP module simulation.
         Problem statement:
@@ -208,8 +208,16 @@ class OdeTwoLayerSimulation():
                 s.tauD_eff = (p.k_0 * s.weight2 / p.tauD) + (1/p.tauD)
             else:
                 p.tauD_eff = 1 / p.tauD
-            init_T, init_S, init_D = SST(p.tauN[-1], p.tauP[-1], p.n0[-1], p.p0[-1], p.B[-1], 
-                                        p.St, p.k_fusion, p.tauT, p.tauS, p.tauD_eff, self.rubrene_node_number*self.rubrene_node_width, np.mean(s.init_dN))
+                
+            if self.do_seq_charge_transfer:
+                #raise NotImplementedError
+                print("Warning: SST not implemented for seq charge transfer model. Keeping original triplet count")
+                init_T = self.init_T + p.T0
+                init_S = self.init_S
+                init_D = self.init_D
+            else:
+                init_T, init_S, init_D = SST(p.tauN[-1], p.tauP[-1], p.n0[-1], p.p0[-1], p.B[-1], 
+                                            p.St, p.k_fusion, p.tauT, p.tauS, p.tauD_eff, self.rubrene_node_number*self.rubrene_node_width, np.mean(s.init_dN))
         
         
         if self.do_seq_charge_transfer:
