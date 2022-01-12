@@ -3176,7 +3176,8 @@ class Notebook:
                     path_name = os.path.join(dirname, "{}-{}.h5".format(data_file_name, var))
                     self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
                                                 single_tstep=True)
-                self.update_sim_plots(self.n, do_clear_plots=False)
+                is_first = (i == 1)
+                self.update_sim_plots(self.n, do_clear_plots=is_first)
         except Exception:
             self.sim_warning_msg.append("Warning: unable to plot {}. Output data "
                                         "may not have been saved correctly.\n".format(data_file_name))
