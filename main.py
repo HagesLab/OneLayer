@@ -3130,11 +3130,12 @@ class Notebook:
         
         self.sim_data = dict(init_conditions)
         self.update_sim_plots(0)
+        flag_values = {f:flag.value() for f, flag in self.sys_flag_dict.items()}
 
         try:
             self.module.simulate(os.path.join(dirname, data_file_name), 
                                    num_nodes, self.n, self.dt,
-                                   self.sys_flag_dict, self.hmax, init_conditions)
+                                   flag_values, self.hmax, init_conditions)
             
         except FloatingPointError as e:
             print(e)

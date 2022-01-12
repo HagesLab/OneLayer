@@ -197,6 +197,10 @@ class OdeTwoLayerSimulation():
             s.init_dN = 0
             s.init_dP = 0
             
+        init_T = self.init_T
+        init_S = self.init_S
+        init_D = self.init_D
+            
         if self.do_ss and self.predict_sstriplets:
             print("Overriding init_T")
             try:
@@ -212,9 +216,7 @@ class OdeTwoLayerSimulation():
             if self.do_seq_charge_transfer:
                 #raise NotImplementedError
                 print("Warning: SST not implemented for seq charge transfer model. Keeping original triplet count")
-                init_T = self.init_T
-                init_S = self.init_S
-                init_D = self.init_D
+                
             else:
                 init_T, init_S, init_D = SST(p.tauN[-1], p.tauP[-1], p.n0[-1], p.p0[-1], p.B[-1], 
                                             p.St, p.k_fusion, p.tauT, p.tauS, p.tauD_eff, self.rubrene_node_number*self.rubrene_node_width, np.mean(s.init_dN))

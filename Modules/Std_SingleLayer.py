@@ -136,8 +136,8 @@ class Std_SingleLayer(OneD_Model):
             param.value *= one_layer.convert_in[param_name]
 
         ode_onelayer(data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
-                     not flags['ignore_recycle'].value(), 
-                     flags['check_do_ss'].value(), hmax_, True,
+                     not flags['ignore_recycle'], 
+                     flags['check_do_ss'], hmax_, True,
                      init_conditions["N"], init_conditions["P"])
     
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
