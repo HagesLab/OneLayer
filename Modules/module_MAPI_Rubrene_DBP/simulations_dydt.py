@@ -13,7 +13,7 @@ kB = 8.61773e-5             #[eV / K]
 eps0 = 8.854e-12 * 1e-9     #[C/V-m] to [C/V-nm]
 
 
-def dydt_basic(t, y, g, p, weight1=0, weight2=0, do_Fret=False, do_ss=False, 
+def dydt_basic(t, y, g, p, wt_fret_to_mapi=0, wt_fret_from_rubrene=0, do_Fret=False, do_ss=False, 
          init_dN=0, init_dP=0):
     """Derivative function for two-layer carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
@@ -82,8 +82,8 @@ def dydt_basic(t, y, g, p, weight1=0, weight2=0, do_Fret=False, do_ss=False,
     
     ## Calculate D_Fretting
     if do_Fret:
-        D_Fret1 = intg.trapz(weight1 * delta_D * p.k_0 / p.tauD, dx=g.rubrene_dx, axis=1)
-        D_Fret2 = (delta_D * p.k_0 / p.tauD) * weight2
+        D_Fret1 = intg.trapz(wt_fret_to_mapi * delta_D * p.k_0 / p.tauD, dx=g.rubrene_dx, axis=1)
+        D_Fret2 = (delta_D * p.k_0 / p.tauD) * wt_fret_from_rubrene
         
     else:
         D_Fret1 = 0
@@ -107,7 +107,7 @@ def dydt_basic(t, y, g, p, weight1=0, weight2=0, do_Fret=False, do_ss=False,
 
 
 def dydt_sct(t, y, g, p,
-         weight1=0, weight2=0, do_Fret=False, do_ss=False, 
+         wt_fret_to_mapi=0, wt_fret_from_rubrene=0, do_Fret=False, do_ss=False, 
          init_dN=0, init_dP=0):
 
     """Derivative function for two-layer carrier model."""
@@ -205,8 +205,8 @@ def dydt_sct(t, y, g, p,
     
     ## Calculate D_Fretting
     if do_Fret:
-        D_Fret1 = intg.trapz(weight1 * delta_D * p.k_0 / p.tauD, dx=g.rubrene_dx, axis=1)
-        D_Fret2 = (delta_D * p.k_0 / p.tauD) * weight2
+        D_Fret1 = intg.trapz(wt_fret_to_mapi * delta_D * p.k_0 / p.tauD, dx=g.rubrene_dx, axis=1)
+        D_Fret2 = (delta_D * p.k_0 / p.tauD) * wt_fret_from_rubrene
         
     else:
         D_Fret1 = 0

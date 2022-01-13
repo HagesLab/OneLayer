@@ -193,15 +193,15 @@ class OdeTwoLayerSimulation():
         if self.do_fret:
             init_m = np.linspace(g.mapi_dx / 2, g.mapi_nx*g.mapi_dx - g.mapi_dx / 2, g.mapi_nx)
             init_f = np.linspace(g.rubrene_dx / 2, g.rubrene_nx*g.rubrene_dx - g.rubrene_dx / 2, g.rubrene_nx)
-            s.weight1 = np.array([1 / ((init_f + (g.mapi_nx*g.mapi_dx - i)) ** 3) for i in init_m])
-            s.weight2 = np.array([1 / ((i + (g.mapi_nx*g.mapi_dx - init_m)) ** 3) for i in init_f])
+            s.wt_fret_to_mapi = np.array([1 / ((init_f + (g.mapi_nx*g.mapi_dx - i)) ** 3) for i in init_m])
+            s.wt_fret_from_rubrene = np.array([1 / ((i + (g.mapi_nx*g.mapi_dx - init_m)) ** 3) for i in init_f])
             # It turns out that weight2 contains ALL of the parts of the FRET integral that depend
             # on the variable of integration, so we do that integral right away.
-            s.weight2 = intg.trapz(s.weight2, dx=g.mapi_dx, axis=1)
+            s.wt_fret_from_rubrene = intg.trapz(s.wt_fret_from_rubrene, dx=g.mapi_dx, axis=1)
 
         else:
-            s.weight1 = 0
-            s.weight2 = 0
+            s.wt_fret_to_mapi = 0
+            s.wt_fret_from_rubrene = 0
         
         if self.do_ss:
             s.init_dN = self.init_N - p.n0
@@ -223,7 +223,7 @@ class OdeTwoLayerSimulation():
                 print("Warning: ss triplet prediction assumes equal excitation of holes and electrons. Unequal excitation is WIP.")
                 
             if self.do_fret:
-                s.tauD_eff = (p.k_0 * s.weight2 / p.tauD) + (1/p.tauD)
+                s.tauD_eff = (p.k_0 * s.wt_fret_from_rubrene / p.tauD) + (1/p.tauD)
             else:
                 p.tauD_eff = 1 / p.tauD
                 
@@ -249,7 +249,7 @@ class OdeTwoLayerSimulation():
 
 
     def simulate_sct(self, sim, g, p, s):
-        args=(g, p, s.weight1, s.weight2, self.do_fret, self.do_ss, 
+        args=(g, p, s.wt_fret_to_mapi, s.wt_fret_from_rubrene, self.do_fret, self.do_ss, 
               s.init_dN, s.init_dP)
         return intg.solve_ivp(dydt_sct,
                             [0, sim.time_step_number * sim.time_step_size],
@@ -258,7 +258,7 @@ class OdeTwoLayerSimulation():
 
 
     def simulate_basic(self, sim, g, p, s):
-        args=(g, p, s.weight1, s.weight2, self.do_fret, self.do_ss, 
+        args=(g, p, s.wt_fret_to_mapi, s.wt_fret_from_rubrene, self.do_fret, self.do_ss, 
               s.init_dN, s.init_dP)
         return intg.solve_ivp(dydt_basic,
                             [0,sim.time_step_number * sim.time_step_size],
