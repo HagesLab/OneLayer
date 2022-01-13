@@ -1,5 +1,3 @@
-
-
 import numpy as np
 from scipy import integrate as intg
 from utils import to_array
@@ -180,16 +178,31 @@ class OdeTwoLayerSimulation():
         
         return p
 
-
     def calculate_system_values(self, g, p, s):
+        s = self.make_fret_weights(g, s)
+        
+        s = self.make_steady_state_injection(p, s)
+            
+        init_T, init_S, init_D = self.apply_SST_approx(g, p, s)
+        
         # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
         init_E_field = E_field({"N":self.init_N, "P":self.init_P}, 
                             {"rel_permitivity":p.eps, "N0":p.n0, "P0":p.p0, "Node_width":g.mapi_dx})
         
         init_E_upc = np.zeros(g.rubrene_nx+1)
-        #init_E_field = np.zeros(mapi_node_number+1)
         
-        ## Generate a weight distribution needed for FRET term
+        if self.do_seq_charge_transfer:
+            s.init_condition = [self.init_N, self.init_P, init_E_field, init_T, init_S, init_D, self.init_P_up, init_E_upc]
+            s.data_splits = np.cumsum([len(d) for d in s.init_condition])[:-1]            
+            s.init_condition = np.concatenate(s.init_condition, axis=None)
+        else:
+            s.init_condition = [self.init_N, self.init_P, init_E_field, init_T, init_S, init_D]
+            s.data_splits = np.cumsum([len(d) for d in s.init_condition])[:-1] 
+            s.init_condition = np.concatenate(s.init_condition, axis=None)
+        
+        return s
+    
+    def make_fret_weights(self, g, s):
         if self.do_fret:
             init_m = np.linspace(g.mapi_dx / 2, g.mapi_nx*g.mapi_dx - g.mapi_dx / 2, g.mapi_nx)
             init_f = np.linspace(g.rubrene_dx / 2, g.rubrene_nx*g.rubrene_dx - g.rubrene_dx / 2, g.rubrene_nx)
@@ -202,7 +215,9 @@ class OdeTwoLayerSimulation():
         else:
             s.wt_fret_to_mapi = 0
             s.wt_fret_from_rubrene = 0
-        
+        return s
+
+    def make_steady_state_injection(self, p, s):
         if self.do_ss:
             s.init_dN = self.init_N - p.n0
             s.init_dP = self.init_P - p.p0
@@ -210,7 +225,9 @@ class OdeTwoLayerSimulation():
         else:
             s.init_dN = 0
             s.init_dP = 0
-            
+        return s
+    
+    def apply_SST_approx(self, g, p, s):
         init_T = self.init_T
         init_S = self.init_S
         init_D = self.init_D
@@ -234,20 +251,9 @@ class OdeTwoLayerSimulation():
             else:
                 init_T, init_S, init_D = SST(p.tauN[-1], p.tauP[-1], p.n0[-1], p.p0[-1], p.B[-1], 
                                             p.St, p.k_fusion, p.tauT, p.tauS, p.tauD_eff, g.rubrene_nx*g.rubrene_dx, np.mean(s.init_dN))
-        
-        
-        if self.do_seq_charge_transfer:
-            s.init_condition = [self.init_N, self.init_P, init_E_field, init_T, init_S, init_D, self.init_P_up, init_E_upc]
-            s.data_splits = np.cumsum([len(d) for d in s.init_condition])[:-1]            
-            s.init_condition = np.concatenate(s.init_condition, axis=None)
-        else:
-            s.init_condition = [self.init_N, self.init_P, init_E_field, init_T, init_S, init_D]
-            s.data_splits = np.cumsum([len(d) for d in s.init_condition])[:-1] 
-            s.init_condition = np.concatenate(s.init_condition, axis=None)
-        
-        return s
-
-
+            
+        return init_T, init_S, init_D
+    
     def simulate_sct(self, sim, g, p, s):
         args=(g, p, s, self.do_fret, self.do_ss)
         return intg.solve_ivp(dydt_sct,
@@ -255,14 +261,12 @@ class OdeTwoLayerSimulation():
                             s.init_condition, args=args, t_eval=sim.tSteps,
                             method='BDF', max_step=sim.hmax_)   #  Variable time_step_size explicit
 
-
     def simulate_basic(self, sim, g, p, s):
         args=(g, p, s, self.do_fret, self.do_ss)
         return intg.solve_ivp(dydt_basic,
                             [0,sim.time_step_number * sim.time_step_size],
                             s.init_condition, args=args, t_eval=sim.tSteps,
                             method='BDF', max_step=sim.hmax_)   #  Variable time_step_size explicit 
-
 
     def write_output_to_file(self, data_path: str, data: any, s):
         if self.do_seq_charge_transfer:
