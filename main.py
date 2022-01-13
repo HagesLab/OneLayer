@@ -3185,9 +3185,9 @@ class Notebook:
                     failed_vars[var] = 1
             is_first = (i == 1)
             self.update_sim_plots(self.n, failed_vars, do_clear_plots=is_first)
-        
+            
+        failed_vars = [var for var, fail_state in failed_vars.items() if fail_state]
         if failed_vars:
-            failed_vars = [var for var, fail_state in failed_vars.items() if fail_state]
             self.sim_warning_msg.append("Warning: unable to plot {} for {}. Output data "
                                         "may not have been saved correctly.\n".format(failed_vars, data_file_name))
         
