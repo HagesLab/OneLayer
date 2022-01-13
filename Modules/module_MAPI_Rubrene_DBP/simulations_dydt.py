@@ -24,12 +24,7 @@ def dydt_basic(t, y, g, p, s, do_Fret=False, do_ss=False):
     JS = np.zeros((g.rubrene_nx+1))
 
     # Unpack simulated variables
-    N = y[0:g.mapi_nx]
-    P = y[g.mapi_nx:2*(g.mapi_nx)]
-    E_field = y[2*(g.mapi_nx):3*(g.mapi_nx)+1]
-    delta_T = y[3*(g.mapi_nx)+1:3*(g.mapi_nx)+1+g.rubrene_nx]
-    delta_S = y[3*(g.mapi_nx)+1+g.rubrene_nx:3*(g.mapi_nx)+1+2*(g.rubrene_nx)]
-    delta_D = y[3*(g.mapi_nx)+1+2*(g.rubrene_nx):]
+    N, P, E_field, delta_T, delta_S, delta_D = np.split(y, s.data_splits)
     
     N_edges = (N[:-1] + np.roll(N, -1)[:-1]) / 2 # Excluding the boundaries; see the following FIXME
     P_edges = (P[:-1] + np.roll(P, -1)[:-1]) / 2
@@ -116,18 +111,9 @@ def dydt_sct(t, y, g, p,s, do_Fret=False, do_ss=False):
     JT = np.zeros((g.rubrene_nx+1))
     JS = np.zeros((g.rubrene_nx+1))
     Jq = np.zeros((g.rubrene_nx+1))
-    
 
     # Unpack simulated variables
-    # y = 0 - N - m - P - 2m - E_field - 3m - delta_T - 3m+f - delta_S - 3m+2f - delta_D - 3m+3f - Q - 3m+4f
-    N = y[0:g.mapi_nx]
-    P = y[g.mapi_nx:2*(g.mapi_nx)]
-    E_field = y[2*(g.mapi_nx):3*(g.mapi_nx)+1]
-    delta_T = y[3*(g.mapi_nx)+1:3*(g.mapi_nx)+1+g.rubrene_nx]
-    delta_S = y[3*(g.mapi_nx)+1+g.rubrene_nx:3*(g.mapi_nx)+1+2*(g.rubrene_nx)]
-    delta_D = y[3*(g.mapi_nx)+1+2*(g.rubrene_nx):3*(g.mapi_nx)+1+3*(g.rubrene_nx)]
-    Q = y[3*(g.mapi_nx)+1+3*(g.rubrene_nx):3*g.mapi_nx+1 + 4*g.rubrene_nx]
-    E_upc = y[3*g.mapi_nx+1 + 4*g.rubrene_nx:]
+    N, P, E_field, delta_T, delta_S, delta_D, Q, E_upc = np.split(y, s.data_splits)
 
     N_edges = (N[:-1] + np.roll(N, -1)[:-1]) / 2 # Excluding the boundaries; see the following FIXME
 
