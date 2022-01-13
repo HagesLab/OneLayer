@@ -25,6 +25,10 @@ class SimulationSettings(object):
                                 time_step_number*time_step_size,
                                 time_step_number+1)
 
+class SpaceGrid():
+    def __init__(self):
+        pass
+
 class SystemParams():
     def __init__(self):
         pass
@@ -105,19 +109,22 @@ class OdeTwoLayerSimulation():
         """
 
         sim = SimulationSettings(time_step_number, time_step_size, hmax_)
+        
+        grid = SpaceGrid()
+        grid = self.package_space_grid(grid)
     
         ## Unpack params; typecast non-array params to arrays if needed
         par = SystemParams()
-        par = self.unpack_params(par)
+        par = self.unpack_params(grid, par)
 
         ## Package initial condition
         calc = CalculatedValues()
-        calc = self.calculate_system_values(par,calc)
+        calc = self.calculate_system_values(grid, par, calc)
 
         if self.do_seq_charge_transfer:
-            solution = self.simulate_sct(sim, par, calc)
+            solution = self.simulate_sct(sim, grid, par, calc)
         else:
-            solution = self.simulate_basic(sim, par, calc)
+            solution = self.simulate_basic(sim, grid, par, calc)
             
         data = solution.y.T
 
@@ -126,64 +133,71 @@ class OdeTwoLayerSimulation():
 
         return
 
+    def package_space_grid(self, g):
+        g.mapi_dx = self.mapi_node_width
+        g.mapi_nx = self.mapi_node_number
+        g.rubrene_dx = self.rubrene_node_width
+        g.rubrene_nx = self.rubrene_node_number
+        return g
     
-    def unpack_params(self,p):
+    def unpack_params(self,g, p):
         #MAPI
         p.Sf = self.mapi_params["Sf"].value
         p.Sb = self.mapi_params["Sb"].value
-        p.mu_n = to_array(self.mapi_params["mu_N"].value, self.mapi_node_number, True)
-        p.mu_p = to_array(self.mapi_params["mu_P"].value, self.mapi_node_number, True)
-        p.mapi_temperature = to_array(self.mapi_params["MAPI_temperature"].value, self.mapi_node_number, True)
-        p.n0 = to_array(self.mapi_params["N0"].value, self.mapi_node_number, False)
-        p.p0 = to_array(self.mapi_params["P0"].value, self.mapi_node_number, False)
-        p.B = to_array(self.mapi_params["B"].value, self.mapi_node_number, False)
-        p.Cn = to_array(self.mapi_params["Cn"].value, self.mapi_node_number, False)
-        p.Cp = to_array(self.mapi_params["Cp"].value, self.mapi_node_number, False)
-        p.tauN = to_array(self.mapi_params["tau_N"].value, self.mapi_node_number, False)
-        p.tauP = to_array(self.mapi_params["tau_P"].value, self.mapi_node_number, False)
+        p.mu_n = to_array(self.mapi_params["mu_N"].value, g.mapi_nx, True)
+        p.mu_p = to_array(self.mapi_params["mu_P"].value, g.mapi_nx, True)
+        p.mapi_temperature = to_array(self.mapi_params["MAPI_temperature"].value, g.mapi_nx, True)
+        p.n0 = to_array(self.mapi_params["N0"].value, g.mapi_nx, False)
+        p.p0 = to_array(self.mapi_params["P0"].value, g.mapi_nx, False)
+        p.B = to_array(self.mapi_params["B"].value, g.mapi_nx, False)
+        p.Cn = to_array(self.mapi_params["Cn"].value, g.mapi_nx, False)
+        p.Cp = to_array(self.mapi_params["Cp"].value, g.mapi_nx, False)
+        p.tauN = to_array(self.mapi_params["tau_N"].value, g.mapi_nx, False)
+        p.tauP = to_array(self.mapi_params["tau_P"].value, g.mapi_nx, False)
+        p.eps = to_array(self.mapi_params["rel_permitivity"].value, g.mapi_nx, True)
     
         #Rubrene
-        p.mu_s = to_array(self.rubrene_params["mu_S"].value, self.rubrene_node_number, True)
-        p.mu_T = to_array(self.rubrene_params["mu_T"].value, self.rubrene_node_number, True)
-        p.rubrene_temperature = to_array(self.rubrene_params["Rubrene_temperature"].value, self.rubrene_node_number, True)
-        p.T0 = to_array(self.rubrene_params["T0"].value, self.rubrene_node_number, False)
-        p.tauT = to_array(self.rubrene_params["tau_T"].value, self.rubrene_node_number, False)
-        p.tauS = to_array(self.rubrene_params["tau_S"].value, self.rubrene_node_number, False)
-        p.tauD = to_array(self.rubrene_params["tau_D"].value, self.rubrene_node_number, False)
-        p.k_fusion = to_array(self.rubrene_params["k_fusion"].value, self.rubrene_node_number, False)
-        p.k_0 = to_array(self.rubrene_params["k_0"].value, self.rubrene_node_number, False)
-        p.eps = to_array(self.mapi_params["rel_permitivity"].value, self.mapi_node_number, True)
+        p.mu_s = to_array(self.rubrene_params["mu_S"].value, g.rubrene_nx, True)
+        p.mu_T = to_array(self.rubrene_params["mu_T"].value, g.rubrene_nx, True)
+        p.rubrene_temperature = to_array(self.rubrene_params["Rubrene_temperature"].value, g.rubrene_nx, True)
+        p.T0 = to_array(self.rubrene_params["T0"].value, g.rubrene_nx, False)
+        p.tauT = to_array(self.rubrene_params["tau_T"].value, g.rubrene_nx, False)
+        p.tauS = to_array(self.rubrene_params["tau_S"].value, g.rubrene_nx, False)
+        p.tauD = to_array(self.rubrene_params["tau_D"].value, g.rubrene_nx, False)
+        p.k_fusion = to_array(self.rubrene_params["k_fusion"].value, g.rubrene_nx, False)
+        p.k_0 = to_array(self.rubrene_params["k_0"].value, g.rubrene_nx, False)
+        
 
         if self.do_seq_charge_transfer:
             # Unpack additional params for this physics model
             p.Sp = 0 if self.no_upconverter else self.rubrene_params["Sp"].value
             p.Ssct = 0 if self.no_upconverter else self.rubrene_params["Ssct"].value
             p.w_vb = self.rubrene_params["W_VB"].value
-            p.mu_p_up = to_array(self.rubrene_params["mu_P_up"].value, self.rubrene_node_number, True)
-            p.uc_eps = to_array(self.rubrene_params["uc_permitivity"].value, self.rubrene_node_number, True)
+            p.mu_p_up = to_array(self.rubrene_params["mu_P_up"].value, g.rubrene_nx, True)
+            p.uc_eps = to_array(self.rubrene_params["uc_permitivity"].value, g.rubrene_nx, True)
         else:
             p.St = 0 if self.no_upconverter else self.rubrene_params["St"].value
         
         return p
 
 
-    def calculate_system_values(self, p, s):
+    def calculate_system_values(self, g, p, s):
         # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
-        s.init_E_field = E_field({"N":self.init_N, "P":self.init_P}, 
-                            {"rel_permitivity":p.eps, "N0":p.n0, "P0":p.p0, "Node_width":self.mapi_node_width})
+        init_E_field = E_field({"N":self.init_N, "P":self.init_P}, 
+                            {"rel_permitivity":p.eps, "N0":p.n0, "P0":p.p0, "Node_width":g.mapi_dx})
         
-        s.init_E_upc = np.zeros(self.rubrene_node_number+1)
+        init_E_upc = np.zeros(g.rubrene_nx+1)
         #init_E_field = np.zeros(mapi_node_number+1)
         
         ## Generate a weight distribution needed for FRET term
         if self.do_fret:
-            s.init_m = np.linspace(self.mapi_node_width / 2, self.mapi_node_number*self.mapi_node_width - self.mapi_node_width / 2, self.mapi_node_number)
-            s.init_f = np.linspace(self.rubrene_node_width / 2, self.rubrene_node_number*self.rubrene_node_width - self.rubrene_node_width / 2, self.rubrene_node_number)
-            s.weight1 = np.array([1 / ((s.init_f + (self.mapi_node_number*self.mapi_node_width - i)) ** 3) for i in s.init_m])
-            s.weight2 = np.array([1 / ((i + (self.mapi_node_number*self.mapi_node_width - s.init_m)) ** 3) for i in s.init_f])
+            init_m = np.linspace(g.mapi_dx / 2, g.mapi_nx*g.mapi_dx - g.mapi_dx / 2, g.mapi_nx)
+            init_f = np.linspace(g.rubrene_dx / 2, g.rubrene_nx*g.rubrene_dx - g.rubrene_dx / 2, g.rubrene_nx)
+            s.weight1 = np.array([1 / ((init_f + (g.mapi_nx*g.mapi_dx - i)) ** 3) for i in init_m])
+            s.weight2 = np.array([1 / ((i + (g.mapi_nx*g.mapi_dx - init_m)) ** 3) for i in init_f])
             # It turns out that weight2 contains ALL of the parts of the FRET integral that depend
             # on the variable of integration, so we do that integral right away.
-            s.weight2 = intg.trapz(s.weight2, dx=self.mapi_node_width, axis=1)
+            s.weight2 = intg.trapz(s.weight2, dx=g.mapi_dx, axis=1)
 
         else:
             s.weight1 = 0
@@ -219,24 +233,23 @@ class OdeTwoLayerSimulation():
                 
             else:
                 init_T, init_S, init_D = SST(p.tauN[-1], p.tauP[-1], p.n0[-1], p.p0[-1], p.B[-1], 
-                                            p.St, p.k_fusion, p.tauT, p.tauS, p.tauD_eff, self.rubrene_node_number*self.rubrene_node_width, np.mean(s.init_dN))
+                                            p.St, p.k_fusion, p.tauT, p.tauS, p.tauD_eff, g.rubrene_nx*g.rubrene_dx, np.mean(s.init_dN))
         
         
         if self.do_seq_charge_transfer:
-            s.init_condition = [self.init_N, self.init_P, s.init_E_field, init_T, init_S, init_D, self.init_P_up, s.init_E_upc]
+            s.init_condition = [self.init_N, self.init_P, init_E_field, init_T, init_S, init_D, self.init_P_up, init_E_upc]
             s.data_splits = np.cumsum([len(d) for d in s.init_condition])[:-1]            
             s.init_condition = np.concatenate(s.init_condition, axis=None)
         else:
-            s.init_condition = [self.init_N, self.init_P, s.init_E_field, init_T, init_S, init_D]
+            s.init_condition = [self.init_N, self.init_P, init_E_field, init_T, init_S, init_D]
             s.data_splits = np.cumsum([len(d) for d in s.init_condition])[:-1] 
             s.init_condition = np.concatenate(s.init_condition, axis=None)
         
         return s
 
 
-    def simulate_sct(self, sim, p, s):
-        args=(self.mapi_node_number, self.rubrene_node_number, self.mapi_node_width, self.rubrene_node_width,
-              p, s.weight1, s.weight2, self.do_fret, self.do_ss, 
+    def simulate_sct(self, sim, g, p, s):
+        args=(g, p, s.weight1, s.weight2, self.do_fret, self.do_ss, 
               s.init_dN, s.init_dP)
         return intg.solve_ivp(dydt_sct,
                             [0, sim.time_step_number * sim.time_step_size],
@@ -244,9 +257,8 @@ class OdeTwoLayerSimulation():
                             method='BDF', max_step=sim.hmax_)   #  Variable time_step_size explicit
 
 
-    def simulate_basic(self, sim, p, s):
-        args=(self.mapi_node_number, self.rubrene_node_number, self.mapi_node_width, self.rubrene_node_width,
-              p, s.weight1, s.weight2, self.do_fret, self.do_ss, 
+    def simulate_basic(self, sim, g, p, s):
+        args=(g, p, s.weight1, s.weight2, self.do_fret, self.do_ss, 
               s.init_dN, s.init_dP)
         return intg.solve_ivp(dydt_basic,
                             [0,sim.time_step_number * sim.time_step_size],
