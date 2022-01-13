@@ -249,8 +249,7 @@ class OdeTwoLayerSimulation():
 
 
     def simulate_sct(self, sim, g, p, s):
-        args=(g, p, s.wt_fret_to_mapi, s.wt_fret_from_rubrene, self.do_fret, self.do_ss, 
-              s.init_dN, s.init_dP)
+        args=(g, p, s, self.do_fret, self.do_ss)
         return intg.solve_ivp(dydt_sct,
                             [0, sim.time_step_number * sim.time_step_size],
                             s.init_condition, args=args, t_eval=sim.tSteps,
@@ -258,8 +257,7 @@ class OdeTwoLayerSimulation():
 
 
     def simulate_basic(self, sim, g, p, s):
-        args=(g, p, s.wt_fret_to_mapi, s.wt_fret_from_rubrene, self.do_fret, self.do_ss, 
-              s.init_dN, s.init_dP)
+        args=(g, p, s, self.do_fret, self.do_ss)
         return intg.solve_ivp(dydt_basic,
                             [0,sim.time_step_number * sim.time_step_size],
                             s.init_condition, args=args, t_eval=sim.tSteps,

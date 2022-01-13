@@ -13,8 +13,7 @@ kB = 8.61773e-5             #[eV / K]
 eps0 = 8.854e-12 * 1e-9     #[C/V-m] to [C/V-nm]
 
 
-def dydt_basic(t, y, g, p, wt_fret_to_mapi=0, wt_fret_from_rubrene=0, do_Fret=False, do_ss=False, 
-         init_dN=0, init_dP=0):
+def dydt_basic(t, y, g, p, s, do_Fret=False, do_ss=False):
     """Derivative function for two-layer carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
     # These are calculated at node edges, of which there are m + 1
@@ -82,8 +81,8 @@ def dydt_basic(t, y, g, p, wt_fret_to_mapi=0, wt_fret_from_rubrene=0, do_Fret=Fa
     
     ## Calculate D_Fretting
     if do_Fret:
-        D_Fret1 = intg.trapz(wt_fret_to_mapi * delta_D * p.k_0 / p.tauD, dx=g.rubrene_dx, axis=1)
-        D_Fret2 = (delta_D * p.k_0 / p.tauD) * wt_fret_from_rubrene
+        D_Fret1 = intg.trapz(s.wt_fret_to_mapi * delta_D * p.k_0 / p.tauD, dx=g.rubrene_dx, axis=1)
+        D_Fret2 = (delta_D * p.k_0 / p.tauD) * s.wt_fret_from_rubrene
         
     else:
         D_Fret1 = 0
@@ -91,11 +90,11 @@ def dydt_basic(t, y, g, p, wt_fret_to_mapi=0, wt_fret_from_rubrene=0, do_Fret=Fa
     
     dNdt = ((1/q) * dJn - n_rec + D_Fret1)
     if do_ss: 
-        dNdt += init_dN
+        dNdt += s.init_dN
 
     dPdt = ((1/q) * -dJp - p_rec + D_Fret1)
     if do_ss: 
-        dPdt += init_dP
+        dPdt += s.init_dP
         
     dTdt = ((1/q) * dJT - T_fusion - T_rec)
     dSdt = ((1/q) * dJS + T_fusion - S_Fret)
@@ -106,9 +105,7 @@ def dydt_basic(t, y, g, p, wt_fret_to_mapi=0, wt_fret_from_rubrene=0, do_Fret=Fa
     return dydt
 
 
-def dydt_sct(t, y, g, p,
-         wt_fret_to_mapi=0, wt_fret_from_rubrene=0, do_Fret=False, do_ss=False, 
-         init_dN=0, init_dP=0):
+def dydt_sct(t, y, g, p,s, do_Fret=False, do_ss=False):
 
     """Derivative function for two-layer carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
@@ -205,8 +202,8 @@ def dydt_sct(t, y, g, p,
     
     ## Calculate D_Fretting
     if do_Fret:
-        D_Fret1 = intg.trapz(wt_fret_to_mapi * delta_D * p.k_0 / p.tauD, dx=g.rubrene_dx, axis=1)
-        D_Fret2 = (delta_D * p.k_0 / p.tauD) * wt_fret_from_rubrene
+        D_Fret1 = intg.trapz(s.wt_fret_to_mapi * delta_D * p.k_0 / p.tauD, dx=g.rubrene_dx, axis=1)
+        D_Fret2 = (delta_D * p.k_0 / p.tauD) * s.wt_fret_from_rubrene
         
     else:
         D_Fret1 = 0
@@ -215,11 +212,11 @@ def dydt_sct(t, y, g, p,
     
     dNdt = ((1/q) * dJn - n_rec + D_Fret1)
     if do_ss: 
-        dNdt += init_dN
+        dNdt += s.init_dN
 
     dPdt = ((1/q) * -dJp - p_rec + D_Fret1)
     if do_ss: 
-        dPdt += init_dP
+        dPdt += s.init_dP
         
     dTdt = ((1/q) * dJT - T_fusion - T_rec)
     dSdt = ((1/q) * dJS + T_fusion - S_Fret)
