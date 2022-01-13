@@ -235,14 +235,9 @@ class OdeTwoLayerSimulation():
 
 
     def simulate_sct(self, sim, p, s):
-        args=(self.mapi_node_number, self.rubrene_node_number, self.mapi_node_width, self.rubrene_node_width, p.Cn, p.Cp, 
-                    p.tauN, p.tauP, p.tauT, p.tauS, p.tauD, 
-                    p.mu_n, p.mu_p, p.mu_s, p.mu_T,
-                    p.n0, p.p0, p.T0, p.Sf, p.Sb, p.B, p.k_fusion, p.k_0, p.mapi_temperature, p.rubrene_temperature,
-                    p.eps, p.uc_eps,
-                    p.mu_p_up, p.Ssct, p.Sp, p.w_vb, 
-                    s.weight1, s.weight2, self.do_fret, self.do_ss, 
-                    s.init_dN, s.init_dP)
+        args=(self.mapi_node_number, self.rubrene_node_number, self.mapi_node_width, self.rubrene_node_width,
+              p, s.weight1, s.weight2, self.do_fret, self.do_ss, 
+              s.init_dN, s.init_dP)
         return intg.solve_ivp(dydt_sct,
                             [0, sim.time_step_number * sim.time_step_size],
                             s.init_condition, args=args, t_eval=sim.tSteps,
@@ -250,12 +245,9 @@ class OdeTwoLayerSimulation():
 
 
     def simulate_basic(self, sim, p, s):
-        args=(self.mapi_node_number, self.rubrene_node_number, self.mapi_node_width, self.rubrene_node_width, p.Cn, p.Cp, 
-                p.tauN, p.tauP, p.tauT, p.tauS, p.tauD, 
-                p.mu_n, p.mu_p, p.mu_s, p.mu_T,
-                p.n0, p.p0, p.T0, p.Sf, p.Sb, p.St, p.B, p.k_fusion, p.k_0, p.mapi_temperature, p.rubrene_temperature,
-                p.eps, s.weight1, s.weight2, self.do_fret, self.do_ss, 
-                s.init_dN, s.init_dP)
+        args=(self.mapi_node_number, self.rubrene_node_number, self.mapi_node_width, self.rubrene_node_width,
+              p, s.weight1, s.weight2, self.do_fret, self.do_ss, 
+              s.init_dN, s.init_dP)
         return intg.solve_ivp(dydt_basic,
                             [0,sim.time_step_number * sim.time_step_size],
                             s.init_condition, args=args, t_eval=sim.tSteps,
@@ -263,10 +255,6 @@ class OdeTwoLayerSimulation():
 
 
     def write_output_to_file(self, data_path: str, data: any, s):
-        
-        ## Prep output files
-        # TODO: Py 3.9 removes need for \
-        
         if self.do_seq_charge_transfer:
             N, P, E_field, T, S, D, P_up, E_up = np.split(data, s.data_splits, axis=1)
             to_write = {"N":N, "P":P, "T":T, "delta_S":S, "delta_D":D, "P_up":P_up}
@@ -282,4 +270,4 @@ class OdeTwoLayerSimulation():
                 table = ofstream.create_earray(ofstream.root, "data", atom, (0, len(output[0])))
                 table.append(output)
             
-        return #error_data
+        return
