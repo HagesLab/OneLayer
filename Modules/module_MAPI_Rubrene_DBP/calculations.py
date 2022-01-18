@@ -268,11 +268,11 @@ class CalculatedOutputs():
         return delta_T(self.sim_outputs, self.mapi_params)
 
 
-    def radiative_recombination(sim_outputs, params):
+    def radiative_recombination(self):
         """Calculate radiative recombination."""
         return radiative_recombination(self.sim_outputs, self.mapi_params)
 
-    def nonradiative_recombination(sim_outputs, params):
+    def nonradiative_recombination(self):
         """Calculate nonradiative recombination using SRH model
         Assumes quasi steady state trap level occupation."""
         return nonradiative_recombination(self.sim_outputs, self.mapi_params)
