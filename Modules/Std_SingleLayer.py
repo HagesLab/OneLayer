@@ -136,8 +136,8 @@ class Std_SingleLayer(OneD_Model):
             param.value *= one_layer.convert_in[param_name]
 
         ode_onelayer(data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
-                     not flags['ignore_recycle'].value(), 
-                     flags['check_do_ss'].value(), hmax_, True,
+                     not flags['ignore_recycle'], 
+                     flags['check_do_ss'], hmax_, True,
                      init_conditions["N"], init_conditions["P"])
     
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
@@ -548,13 +548,15 @@ def ode_onelayer(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     data = sol.y.T
             
     if write_output:
+        N = data[:,0:m]
+        P = data[:,m:2*(m)]
         ## Prep output files
         with tables.open_file(data_path_name + "-N.h5", mode='a') as ofstream_N, \
             tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P:
-            array_N = ofstream_N.root.data
-            array_P = ofstream_P.root.data
-            array_N.append(data[1:,0:m])
-            array_P.append(data[1:,m:2*(m)])
+            array_N = ofstream_N.create_earray(ofstream_N.root, "data", atom, (0, len(N[0])))
+            array_P = ofstream_P.create_earray(ofstream_P.root, "data", atom, (0, len(P[0])))
+            array_N.append(N)
+            array_P.append(P)
             
         return #error_data
 
