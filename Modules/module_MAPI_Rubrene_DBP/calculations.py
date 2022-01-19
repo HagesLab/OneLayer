@@ -238,23 +238,25 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
 
 class CalculatedOutputs():
     
-    def __init__(self, sim_outputs, mapi_params):
-        self.sim_outputs = sim_outputs
+    def __init__(self, mapi_sim_outputs, ru_sim_outputs, mapi_params, rubrene_params):
+        self.mapi_sim_outputs = mapi_sim_outputs
         self.mapi_params = mapi_params
+        self.rubrene_sim_outputs = ru_sim_outputs
+        self.rubrene_params = rubrene_params
         
     def E_field(self):
         """Calculate electric field from N, P"""
-        return E_field(self.sim_outputs, self.mapi_params)
+        return E_field(self.mapi_sim_outputs, self.mapi_params)
 
 
     def E_field_r(self):
         """Calculate electric field from T+S+D, Q"""
-        return E_field_r(self.sim_outputs, self.mapi_params)
+        return E_field_r(self.rubrene_sim_outputs, self.rubrene_params)
 
 
     def delta_n(self):
         """Calculate above-equilibrium electron density from N, n0"""
-        return delta_n(self.sim_outputs, self.mapi_params)
+        return delta_n(self.mapi_sim_outputs, self.mapi_params)
     
     def average_delta_n(self, temp_N):
         temp_dN = delta_n({"N":temp_N}, self.mapi_params)
@@ -266,22 +268,22 @@ class CalculatedOutputs():
 
     def delta_p(self):
         """Calculate above-equilibrium hole density from P, p0"""
-        return delta_p(self.sim_outputs, self.mapi_params)
+        return delta_p(self.mapi_sim_outputs, self.mapi_params)
 
 
     def delta_T(self):
         """Calculate above-equilibrium triplet density from T, T0"""
-        return delta_T(self.sim_outputs, self.mapi_params)
+        return delta_T(self.mapi_sim_outputs, self.mapi_params)
 
 
     def radiative_recombination(self):
         """Calculate radiative recombination."""
-        return radiative_recombination(self.sim_outputs, self.mapi_params)
+        return radiative_recombination(self.mapi_sim_outputs, self.mapi_params)
 
     def nonradiative_recombination(self):
         """Calculate nonradiative recombination using SRH model
         Assumes quasi steady state trap level occupation."""
-        return nonradiative_recombination(self.sim_outputs, self.mapi_params)
+        return nonradiative_recombination(self.mapi_sim_outputs, self.mapi_params)
     
     def mapi_PL(self, temp_N, temp_P):
         temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, self.mapi_params)
@@ -291,3 +293,20 @@ class CalculatedOutputs():
                             False, self.mapi_params, "MAPI")
         
         return new_integrate(PL_base, 0, mapi_thickness, dm, mapi_thickness, False)
+    
+    def dbp_PL(self, temp_D):
+        ru_thickness = self.rubrene_params["Total_length"]
+        df = self.rubrene_params["Node_width"]
+        
+        temp_D = prep_PL(temp_D, 0, to_index(ru_thickness, df, ru_thickness), 
+                            False, self.rubrene_params, "Rubrene")
+
+        return new_integrate(temp_D, 0, ru_thickness, df, ru_thickness, False)
+
+    def TTA(self, temp_T):
+        ru_thickness = self.rubrene_params["Total_length"]
+        df = self.rubrene_params["Node_width"]
+        temp_T = TTA(temp_T, 0, to_index(ru_thickness, df, ru_thickness), 
+                        False, self.rubrene_params)
+
+        return new_integrate(temp_T, 0, ru_thickness, df, ru_thickness, False)

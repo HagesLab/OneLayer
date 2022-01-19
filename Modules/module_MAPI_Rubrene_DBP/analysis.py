@@ -48,7 +48,8 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
             data_dict[layer_name][raw_output_name] = np.array(data)
                 
 
-    calculated_outputs = CalculatedOutputs(data_dict["MAPI"], mapi_params)
+    calculated_outputs = CalculatedOutputs(data_dict["MAPI"], data_dict["Rubrene"],
+                                           mapi_params, ru_params)
     data_dict["MAPI"]["E_field"] = calculated_outputs.E_field()
     data_dict["MAPI"]["delta_N"] = calculated_outputs.delta_n()
     data_dict["MAPI"]["delta_P"] = calculated_outputs.delta_p()
@@ -73,7 +74,7 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
     #################
     
     if flags["do_sct"]:
-        data_dict["Rubrene"]["E_upc"] = E_field_r(data_dict["Rubrene"], ru_params)
+        data_dict["Rubrene"]["E_upc"] = calculated_outputs.E_field_r()
         
     # else:
     #     data_dict["Rubrene"]["E_upc"] = np.zeros_like(data_dict["Rubrene"]["T"])
@@ -82,23 +83,16 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
     with tables.open_file(os.path.join(data_dirname, file_name_base + "-delta_D.h5"), mode='r') as ifstream_D:
         temp_D = np.array(ifstream_D.root.data)
         
-    temp_D = prep_PL(temp_D, 0, to_index(ru_length, df, ru_length), 
-                        False, ru_params, "Rubrene")
-
-    data_dict["Rubrene"]["dbp_PL"] = new_integrate(temp_D, 0, ru_length, 
-                                                    df, ru_length, False)
+    data_dict["Rubrene"]["dbp_PL"] = calculated_outputs.dbp_PL(temp_D)
+        
     ################
     
     #### TTA Rate ####
     # "Triplet-Triplet Annihilation"
     with tables.open_file(os.path.join(data_dirname, file_name_base + "-T.h5"), mode='r') as ifstream_T:
-        temp_TTA = np.array(ifstream_T.root.data)
+        temp_T = np.array(ifstream_T.root.data)
         
-    temp_TTA = TTA(temp_TTA, 0, to_index(ru_length, df, ru_length), 
-                    False, ru_params)
-
-    data_dict["Rubrene"]["TTA"] = new_integrate(temp_TTA, 0, ru_length, 
-                                                df, ru_length, False)
+    data_dict["Rubrene"]["TTA"] = calculated_outputs.TTA(temp_T)
     ##################
     
     #### Efficiencies ####
