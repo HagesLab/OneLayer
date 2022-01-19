@@ -4,10 +4,8 @@ import tables
 from scipy import integrate as intg
 from io_utils import u_read
 from utils import to_index, new_integrate
-from Modules.module_MAPI_Rubrene_DBP.calculations import delta_n
 from Modules.module_MAPI_Rubrene_DBP.calculations import radiative_recombination
 from Modules.module_MAPI_Rubrene_DBP.calculations import prep_PL
-from Modules.module_MAPI_Rubrene_DBP.calculations import delta_n
 from Modules.module_MAPI_Rubrene_DBP.calculations import tau_diff
 from Modules.module_MAPI_Rubrene_DBP.calculations import E_field_r
 from Modules.module_MAPI_Rubrene_DBP.calculations import TTA
@@ -39,6 +37,8 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
         
     for layer_name, layer in layers.items():
         for raw_output_name in layer.s_outputs:
+            if not flags["do_sct"] and raw_output_name == "P_up": continue # Skip, SRH model doesn't have P_up
+            
             data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
                                                     raw_output_name)
             data = []
@@ -72,7 +72,11 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
         data_dict["MAPI"]["tau_diff"] = 0
     #################
     
-    data_dict["Rubrene"]["E_upc"] = E_field_r(data_dict["Rubrene"], ru_params)
+    if flags["do_sct"]:
+        data_dict["Rubrene"]["E_upc"] = E_field_r(data_dict["Rubrene"], ru_params)
+        
+    # else:
+    #     data_dict["Rubrene"]["E_upc"] = np.zeros_like(data_dict["Rubrene"]["T"])
     
     #### DBP PL ####
     with tables.open_file(os.path.join(data_dirname, file_name_base + "-delta_D.h5"), mode='r') as ifstream_D:
