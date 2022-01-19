@@ -104,6 +104,10 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
             
         temp_init_N = intg.trapz(temp_init_N, dx=dm)
         
+    if flags["do_sct"]:
+        with tables.open_file(os.path.join(data_dirname, file_name_base + "-P_up.h5"), mode='r') as ifstream_Q:
+            temp_P_up = np.array(ifstream_Q.root.data[:, 0])
+        
         
     tail_n0 = mapi_params["N0"]
     if isinstance(tail_n0, np.ndarray):
@@ -117,8 +121,12 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
         t_form = temp_N * 0
         
     else:
-        t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
-                                    / (temp_N + temp_P))
+        if flags["do_sct"]:
+            # TODO: Verify this is correct for the seq charge transfer
+            t_form = ru_params["Ssct"] * (temp_N * temp_P_up)
+        else:
+            t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+                                        / (temp_N + temp_P))
     
     try:
         data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
