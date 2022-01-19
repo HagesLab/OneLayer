@@ -167,16 +167,17 @@ def tau_diff(PL, dt):
         tau_diff.
 
     """
-    try:
-        ln_PL = np.log(PL)
-    except Exception:
-        print("Error: could not calculate tau_diff from non-positive PL values")
-        return np.zeros(len(PL))
+    with np.errstate(invalid='ignore', divide='ignore'):
+        ln_PL = np.where(PL <= 0, 0, np.log(PL))
+    
     dln_PLdt = np.zeros(len(ln_PL))
     dln_PLdt[0] = (ln_PL[1] - ln_PL[0]) / dt
     dln_PLdt[-1] = (ln_PL[-1] - ln_PL[-2]) / dt
     dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] - np.roll(ln_PL, 1)[1:-1]) / (2*dt)
-    return -(dln_PLdt ** -1)
+    
+    with np.errstate(invalid='ignore', divide='ignore'):
+        dln_PLdt = np.where(dln_PLdt <= 0, 0, -(dln_PLdt ** -1))
+    return dln_PLdt
 
 def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
     """
