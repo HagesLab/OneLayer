@@ -128,27 +128,13 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
             t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
                                         / (temp_N + temp_P))
     
-    try:
+    with np.errstate(invalid='ignore', divide='ignore'):
         data_dict["Rubrene"]["T_form_eff"] =  t_form / temp_init_N
-    except FloatingPointError:
-        data_dict["Rubrene"]["T_form_eff"] =  t_form * 0
-    try:
-        data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] / t_form
-    except FloatingPointError:
-        data_dict["Rubrene"]["T_anni_eff"] = data_dict["Rubrene"]["TTA"] * 0
-        
-        
-    data_dict["Rubrene"]["S_up_eff"] = data_dict["Rubrene"]["T_anni_eff"] * data_dict["Rubrene"]["T_form_eff"]
-    
-    try:
+        data_dict["Rubrene"]["T_anni_eff"] = np.where(t_form==0, 0, data_dict["Rubrene"]["TTA"] / t_form)
+        data_dict["Rubrene"]["S_up_eff"] = data_dict["Rubrene"]["T_anni_eff"] * data_dict["Rubrene"]["T_form_eff"]
         data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] / temp_init_N
-    except FloatingPointError:
-        data_dict["MAPI"]["eta_MAPI"] = data_dict["MAPI"]["mapi_PL"] * 0
-        
-    try:
         data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] / temp_init_N
-    except FloatingPointError:
-        data_dict["Rubrene"]["eta_UC"] = data_dict["Rubrene"]["dbp_PL"] * 0
+    
         
     for data in data_dict["MAPI"]:
         data_dict["MAPI"][data] *= mapi.convert_out[data]
