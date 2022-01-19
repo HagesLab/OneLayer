@@ -60,16 +60,10 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
         tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
         temp_N = np.array(ifstream_N.root.data)
         temp_P = np.array(ifstream_P.root.data)
-    temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, mapi_params)
-    PL_base = prep_PL(temp_RR, 0, to_index(mapi_length, dm, mapi_length), 
-                        False, mapi_params, "MAPI")
-    data_dict["MAPI"]["mapi_PL"] = new_integrate(PL_base, 0, mapi_length, 
-                                                dm, mapi_length, False)
+
+    data_dict["MAPI"]["mapi_PL"] = calculated_outputs.mapi_PL(temp_N, temp_P)
     
-    temp_dN = delta_n({"N":temp_N}, mapi_params)
-    temp_dN = intg.trapz(temp_dN, dx=dm, axis=1)
-    temp_dN /= mapi_length
-    data_dict["MAPI"]["avg_delta_N"] = temp_dN
+    data_dict["MAPI"]["avg_delta_N"] = calculated_outputs.average_delta_n(temp_N)
     
     try:
         data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["mapi_PL"], dt)

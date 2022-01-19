@@ -1,6 +1,6 @@
 import numpy as np
-from utils import to_pos
-from scipy import optimize
+from utils import to_pos, to_index, new_integrate
+from scipy import optimize, integrate as intg
 
 
 def SST(tauN, tauP, n0, p0, B, St, k_fusion, tauT, tauS, tauD_eff, ru_thickness, gen_rate):
@@ -241,8 +241,7 @@ class CalculatedOutputs():
     def __init__(self, sim_outputs, mapi_params):
         self.sim_outputs = sim_outputs
         self.mapi_params = mapi_params
-
-
+        
     def E_field(self):
         """Calculate electric field from N, P"""
         return E_field(self.sim_outputs, self.mapi_params)
@@ -256,6 +255,13 @@ class CalculatedOutputs():
     def delta_n(self):
         """Calculate above-equilibrium electron density from N, n0"""
         return delta_n(self.sim_outputs, self.mapi_params)
+    
+    def average_delta_n(self, temp_N):
+        temp_dN = delta_n({"N":temp_N}, self.mapi_params)
+        temp_dN = intg.trapz(temp_dN, dx=self.mapi_params["Node_width"], axis=1)
+        temp_dN /= self.mapi_params["Total_length"]
+        
+        return temp_dN
 
 
     def delta_p(self):
@@ -276,3 +282,12 @@ class CalculatedOutputs():
         """Calculate nonradiative recombination using SRH model
         Assumes quasi steady state trap level occupation."""
         return nonradiative_recombination(self.sim_outputs, self.mapi_params)
+    
+    def mapi_PL(self, temp_N, temp_P):
+        temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, self.mapi_params)
+        mapi_thickness = self.mapi_params["Total_length"]
+        dm = self.mapi_params["Node_width"]
+        PL_base = prep_PL(temp_RR, 0, to_index(mapi_thickness, dm, mapi_thickness), 
+                            False, self.mapi_params, "MAPI")
+        
+        return new_integrate(PL_base, 0, mapi_thickness, dm, mapi_thickness, False)
