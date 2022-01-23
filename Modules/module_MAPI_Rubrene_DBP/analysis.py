@@ -37,7 +37,7 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
         
     for layer_name, layer in layers.items():
         for raw_output_name in layer.s_outputs:
-            if not flags["do_sct"] and raw_output_name == "P_up": continue # Skip, SRH model doesn't have P_up
+            if not flags.get("do_sct") and raw_output_name == "P_up": continue # Skip, SRH model doesn't have P_up
             
             data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
                                                     raw_output_name)
@@ -73,7 +73,7 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
         data_dict["MAPI"]["tau_diff"] = 0
     #################
     
-    if flags["do_sct"]:
+    if flags.get("do_sct"):
         data_dict["Rubrene"]["E_upc"] = calculated_outputs.E_field_r()
         
     # else:
@@ -104,7 +104,7 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
             
         temp_init_N = intg.trapz(temp_init_N, dx=dm)
         
-    if flags["do_sct"]:
+    if flags.get("do_sct"):
         with tables.open_file(os.path.join(data_dirname, file_name_base + "-P_up.h5"), mode='r') as ifstream_Q:
             temp_P_up = np.array(ifstream_Q.root.data[:, 0])
         
@@ -116,12 +116,11 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
     tail_p0 = mapi_params["P0"]
     if isinstance(tail_p0, np.ndarray):
         tail_p0 = tail_p0[-1]
-        
-    if "no_upconverter" in flags and flags["no_upconverter"]:
+
+    if flags.get("no_upconverter"):
         t_form = temp_N * 0
-        
     else:
-        if flags["do_sct"]:
+        if flags.get("do_sct"):
             # TODO: Verify this is correct for the seq charge transfer
             t_form = ru_params["Ssct"] * (temp_N * temp_P_up)
         else:
@@ -260,9 +259,9 @@ def submodule_get_timeseries(pathname, datatype, parent_data, total_time, dt, pa
         tail_p0 = params["MAPI"]["P0"]
         if isinstance(tail_p0, np.ndarray):
             tail_p0 = tail_p0[-1]
-            
-        if "no_upconverter" in flags and flags["no_upconverter"]:
-            t_form = 0 * temp_N
+
+        if flags.get("no_upconverter"):
+            t_form = temp_N * 0
         else:
             t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
                                             / (temp_N + temp_P))
