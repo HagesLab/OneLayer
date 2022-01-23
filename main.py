@@ -6,6 +6,19 @@
 # Contact:
 ################################################# 
 
+
+"""
+Usage:
+  ./main --module=<module>
+
+Options:
+--module:
+1 = Nanowire
+2 = Std_SingleLayer
+3 = MAPI_Rubrene_DBP
+"""
+
+from docopt import docopt
 import numpy as np
 import matplotlib
 starting_backend = matplotlib.get_backend()
@@ -56,19 +69,44 @@ def mod_list():
             #"Neumann Bound Heatplate":HeatPlate, 
             "MAPI-Rubrene/DBP":MAPI_Rubrene}
 
+
+def get_cli_args():
+    """Parses the CLI arguments, verifies their
+    validity in the context and returns a dict"""
+
+    try:
+        raw_args = docopt(__doc__, version='ingest 0.1.0')
+        args = {}
+        module = int(raw_args.get("--module"))
+        if module in [0, 1, 2]:
+            args["module"] = module
+        return args
+    except:
+        print("Invalid CLI arguments")
+        return {}
+
+
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
 class Notebook:
 
-    def __init__(self, title):
+    def __init__(self, title, cli_args):
         """ Create main tkinter object and select module. """
         self.module = None
         self.root = tk.Tk()
         self.root.attributes('-fullscreen', False)
         self.root.title(title)
         
-        self.do_module_popup()
-        self.root.wait_window(self.select_module_popup)
+
+        if cli_args.get("module"):
+            module_list = mod_list()
+            self.module = module_list[list(module_list.keys())[2]]()  # always MAPI_Rubrene , hack for development
+            self.module.verify()
+            self.verified=True
+        else:
+            self.do_module_popup()
+            self.root.wait_window(self.select_module_popup)
+
         if self.module is None: 
             return
         if not self.verified: 
@@ -4648,5 +4686,5 @@ class Notebook:
         
 
 if __name__ == "__main__":
-    nb = Notebook("ted")
+    nb = Notebook("ted", get_cli_args())
     nb.run()
