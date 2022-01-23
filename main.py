@@ -72,8 +72,8 @@ def get_cli_args():
         raw_args = docopt(__doc__, version='ingest 0.1.0')
         args = {}
         module = str(raw_args.get("--module"))
-        if module in MODULE_LIST.keys():
-            args["module"] = module
+        assert module in MODULE_LIST.keys()
+        args["module"] = module
         return args
     except:
         print("Invalid CLI arguments")
