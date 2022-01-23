@@ -13,9 +13,9 @@ Usage:
 
 Options:
 --module:
-1 = Nanowire
-2 = Std_SingleLayer
-3 = MAPI_Rubrene_DBP
+"Standard One-Layer"
+"Nanowire"
+"MAPI-Rubrene/DBP"
 """
 
 from docopt import docopt
@@ -52,22 +52,16 @@ from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
+
 ## AND HERE
-def mod_list():
-    """
-    Tells TEDs what modules are available.
-
-    Returns
-    -------
-    dict
-        {"Display name of module": OneD_Model derived module class}.
-
-    """
-    
-    return {"Standard One-Layer":Std_SingleLayer,
-            "Nanowire":Nanowire, 
-            #"Neumann Bound Heatplate":HeatPlate, 
-            "MAPI-Rubrene/DBP":MAPI_Rubrene}
+# Tells TEDs what modules are available.
+# {"Display name of module": OneD_Model derived module class}.
+MODULE_LIST = {
+    "Standard One-Layer": Std_SingleLayer,
+    "Nanowire": Nanowire,
+    # "Neumann Bound Heatplate":HeatPlate,
+    "MAPI-Rubrene/DBP": MAPI_Rubrene
+}
 
 
 def get_cli_args():
@@ -77,8 +71,8 @@ def get_cli_args():
     try:
         raw_args = docopt(__doc__, version='ingest 0.1.0')
         args = {}
-        module = int(raw_args.get("--module"))
-        if module in [0, 1, 2]:
+        module = str(raw_args.get("--module"))
+        if module in MODULE_LIST.keys():
             args["module"] = module
         return args
     except:
@@ -97,10 +91,9 @@ class Notebook:
         self.root.attributes('-fullscreen', False)
         self.root.title(title)
         
-
-        if cli_args.get("module"):
-            module_list = mod_list()
-            self.module = module_list[list(module_list.keys())[2]]()  # always MAPI_Rubrene , hack for development
+        cli_module = cli_args.get("module")
+        if cli_module:
+            self.module = MODULE_LIST[cli_module]()
             self.module.verify()
             self.verified=True
         else:
@@ -1252,8 +1245,7 @@ class Notebook:
                  text="The following TEDs modules were found; "
                  "select one to continue: ").grid(row=0,column=0)
         
-        self.modules_list = mod_list()
-        self.module_names = list(self.modules_list.keys())
+        self.module_names = list(MODULE_LIST.keys())
         self.module_listbox = tk.Listbox(self.select_module_popup, width=40, height=10)
         self.module_listbox.grid(row=1,column=0)
         self.module_listbox.delete(0,tk.END)
@@ -1280,7 +1272,7 @@ class Notebook:
         try:
             if continue_:
                 self.verified=False
-                self.module = self.modules_list[self.module_names[self.module_listbox.curselection()[0]]]()
+                self.module = MODULE_LIST[self.module_names[self.module_listbox.curselection()[0]]]()
                 self.module.verify()
                 self.verified=True
                 
