@@ -9,13 +9,18 @@
 
 """
 Usage:
-  ./main [--module=<module>]
+  ./main [--module=<module>] [--tab=<tab_index>]
 
 Options:
 --module:
-"Standard One-Layer"
-"Nanowire"
-"MAPI-Rubrene/DBP"
+    "Standard One-Layer"
+    "Nanowire"
+    "MAPI-Rubrene/DBP"
+
+--tab:
+    "0": Inputs
+    "1": Simulate
+    "2": Analyze
 """
 
 from docopt import docopt
@@ -80,6 +85,15 @@ def get_cli_args():
             args["module"] = module
     except AssertionError:
         print("Invalid module \"{}\"".format(module))
+        
+    try:
+        tab_id = raw_args.get("--tab")
+        if tab_id is not None:
+            tab_id = int(tab_id)
+            assert 0 <= tab_id <= 2
+            args["tab_id"] = tab_id
+    except AssertionError:
+        print("Invalid tab_id \"{}\"".format(tab_id))
     
     return args
 
@@ -96,7 +110,7 @@ class Notebook:
         self.root.title(title)
         
         cli_module = cli_args.get("module")
-        if cli_module:
+        if cli_module is not None:
             self.module = MODULE_LIST[cli_module]()
             self.module.verify()
             self.verified=True
@@ -110,7 +124,9 @@ class Notebook:
             return
         self.prep_notebook()
         
-        
+        tab_id = cli_args.get("tab_id")
+        if tab_id is not None:
+            self.notebook.select(tab_id)
         return
         
     def prep_notebook(self):
@@ -178,7 +194,7 @@ class Notebook:
         self.IC_file_list = None
         self.IC_file_name = ""
         
-        # Add (e.g. for Nanowire) module-specific functionality
+        # Add (e.g. for Nanowire) b_id-specific functionality
         self.LGC_eligible_modules = ("Nanowire", "OneLayer", "MAPI_Rubrene")
         if self.module.system_ID in self.LGC_eligible_modules:
             self.using_LGC = {}
@@ -327,7 +343,7 @@ class Notebook:
         print("Closed TEDs")
         matplotlib.use(starting_backend)
         return
-    
+  
     def toggle_fullscreen(self):
         self.root.attributes('-fullscreen', not self.root.attributes('-fullscreen'))
         if self.root.attributes('-fullscreen'):
