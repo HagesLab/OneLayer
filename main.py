@@ -9,7 +9,7 @@
 
 """
 Usage:
-  ./main --module=<module>
+  ./main [--module=<module>]
 
 Options:
 --module:
@@ -68,16 +68,19 @@ def get_cli_args():
     """Parses the CLI arguments, verifies their
     validity in the context and returns a dict"""
 
+
+    raw_args = docopt(__doc__, version='ingest 0.1.0')
+    args = {}
+    print(raw_args)
     try:
-        raw_args = docopt(__doc__, version='ingest 0.1.0')
-        args = {}
         module = str(raw_args.get("--module"))
-        assert module in MODULE_LIST.keys()
-        args["module"] = module
-        return args
-    except:
-        print("Invalid CLI arguments")
-        return {}
+        if module != str(None):
+            assert module in MODULE_LIST.keys()
+            args["module"] = module
+    except AssertionError:
+        print("Invalid module \"{}\"".format(module))
+    
+    return args
 
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
