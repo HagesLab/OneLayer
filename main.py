@@ -6,6 +6,24 @@
 # Contact:
 ################################################# 
 
+
+"""
+Usage:
+  ./main [--module=<module>] [--tab=<tab_index>]
+
+Options:
+--module:
+    "Standard One-Layer"
+    "Nanowire"
+    "MAPI-Rubrene/DBP"
+
+--tab:
+    "0": Inputs
+    "1": Simulate
+    "2": Analyze
+"""
+
+from docopt import docopt
 import numpy as np
 import matplotlib
 starting_backend = matplotlib.get_backend()
@@ -39,43 +57,76 @@ from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
+
 ## AND HERE
-def mod_list():
-    """
-    Tells TEDs what modules are available.
+# Tells TEDs what modules are available.
+# {"Display name of module": OneD_Model derived module class}.
+MODULE_LIST = {
+    "Standard One-Layer": Std_SingleLayer,
+    "Nanowire": Nanowire,
+    # "Neumann Bound Heatplate":HeatPlate,
+    "MAPI-Rubrene/DBP": MAPI_Rubrene
+}
 
-    Returns
-    -------
-    dict
-        {"Display name of module": OneD_Model derived module class}.
 
-    """
+def get_cli_args():
+    """Parses the CLI arguments, verifies their
+    validity in the context and returns a dict"""
+
+
+    raw_args = docopt(__doc__, version='ingest 0.1.0')
+    args = {}
+    print(raw_args)
+    try:
+        module = raw_args.get("--module")
+        if module is not None:
+            module = str(module)
+            assert module in MODULE_LIST.keys()
+            args["module"] = module
+    except AssertionError:
+        print("Invalid module \"{}\"".format(module))
+        
+    try:
+        tab_id = raw_args.get("--tab")
+        if tab_id is not None:
+            tab_id = int(tab_id)
+            assert 0 <= tab_id <= 2
+            args["tab_id"] = tab_id
+    except AssertionError:
+        print("Invalid tab_id \"{}\"".format(tab_id))
     
-    return {"Standard One-Layer":Std_SingleLayer,
-            "Nanowire":Nanowire, 
-            #"Neumann Bound Heatplate":HeatPlate, 
-            "MAPI-Rubrene/DBP":MAPI_Rubrene}
+    return args
+
 
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
 class Notebook:
 
-    def __init__(self, title):
+    def __init__(self, title, cli_args):
         """ Create main tkinter object and select module. """
         self.module = None
         self.root = tk.Tk()
         self.root.attributes('-fullscreen', False)
         self.root.title(title)
         
-        self.do_module_popup()
-        self.root.wait_window(self.select_module_popup)
+        cli_module = cli_args.get("module")
+        if cli_module is not None:
+            self.module = MODULE_LIST[cli_module]()
+            self.module.verify()
+            self.verified=True
+        else:
+            self.do_module_popup()
+            self.root.wait_window(self.select_module_popup)
+
         if self.module is None: 
             return
         if not self.verified: 
             return
         self.prep_notebook()
         
-        
+        tab_id = cli_args.get("tab_id")
+        if tab_id is not None:
+            self.notebook.select(tab_id)
         return
         
     def prep_notebook(self):
@@ -143,7 +194,7 @@ class Notebook:
         self.IC_file_list = None
         self.IC_file_name = ""
         
-        # Add (e.g. for Nanowire) module-specific functionality
+        # Add (e.g. for Nanowire) b_id-specific functionality
         self.LGC_eligible_modules = ("Nanowire", "OneLayer", "MAPI_Rubrene")
         if self.module.system_ID in self.LGC_eligible_modules:
             self.using_LGC = {}
@@ -292,7 +343,7 @@ class Notebook:
         print("Closed TEDs")
         matplotlib.use(starting_backend)
         return
-    
+  
     def toggle_fullscreen(self):
         self.root.attributes('-fullscreen', not self.root.attributes('-fullscreen'))
         if self.root.attributes('-fullscreen'):
@@ -1218,8 +1269,7 @@ class Notebook:
                  text="The following TEDs modules were found; "
                  "select one to continue: ").grid(row=0,column=0)
         
-        self.modules_list = mod_list()
-        self.module_names = list(self.modules_list.keys())
+        self.module_names = list(MODULE_LIST.keys())
         self.module_listbox = tk.Listbox(self.select_module_popup, width=40, height=10)
         self.module_listbox.grid(row=1,column=0)
         self.module_listbox.delete(0,tk.END)
@@ -1246,7 +1296,7 @@ class Notebook:
         try:
             if continue_:
                 self.verified=False
-                self.module = self.modules_list[self.module_names[self.module_listbox.curselection()[0]]]()
+                self.module = MODULE_LIST[self.module_names[self.module_listbox.curselection()[0]]]()
                 self.module.verify()
                 self.verified=True
                 
@@ -4734,5 +4784,5 @@ class Notebook:
         
 
 if __name__ == "__main__":
-    nb = Notebook("ted")
+    nb = Notebook("ted", get_cli_args())
     nb.run()
