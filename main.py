@@ -73,8 +73,9 @@ def get_cli_args():
     args = {}
     print(raw_args)
     try:
-        module = str(raw_args.get("--module"))
-        if module != str(None):
+        module = raw_args.get("--module")
+        if module is not None:
+            module = str(module)
             assert module in MODULE_LIST.keys()
             args["module"] = module
     except AssertionError:
