@@ -160,7 +160,7 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
         data = layer_sim_data[datatype]
     
     else:
-        calculated_outputs = CalculatedOutputs(layer_sim_data, layer_params)
+        calculated_outputs = CalculatedOutputs(sim_data["MAPI"], sim_data["Rubrene"], params["MAPI"], params["Rubrene"])
         if (datatype == "delta_N"):
             data = calculated_outputs.delta_n()
             
@@ -250,10 +250,9 @@ def submodule_get_timeseries(pathname, datatype, parent_data, total_time, dt, pa
             temp_init_N = np.array(ifstream_N.root.data[0,:])
             temp_P = np.array(ifstream_P.root.data[:,-1])
 
-        # TODO: make sure to add S_sct to this method?
-        # if flags.get("do_sct"):
-        #     with tables.open_file(os.path.join(pathname + "-P_up.h5"), mode='r') as ifstream_Q:
-        #         temp_P_up = np.array(ifstream_Q.root.data[:, 0])
+        if flags.get("do_sct"):
+            with tables.open_file(os.path.join(pathname + "-P_up.h5"), mode='r') as ifstream_Q:
+                temp_P_up = np.array(ifstream_Q.root.data[:, 0])
 
         temp_init_N = intg.trapz(temp_init_N, dx=params["MAPI"]["Node_width"])
 
@@ -268,30 +267,21 @@ def submodule_get_timeseries(pathname, datatype, parent_data, total_time, dt, pa
         if flags.get("no_upconverter"):
             t_form = temp_N * 0
         else:
-            # TODO: make sure to add S_sct to this method?
-            # if flags.get("do_sct"):
-            #     # TODO: Verify this is correct for the seq charge transfer
-            #     t_form = params["Rubrene"]["Ssct"] * (temp_N * temp_P_up)
-            # else:
-                # t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
-                #                         / (temp_N + temp_P))
-            t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
-                                    / (temp_N + temp_P))
-
+            if flags.get("do_sct"):
+                # TODO: Verify this is correct for the seq charge transfer
+                t_form = params["Rubrene"]["Ssct"] * (temp_N * temp_P_up)
+            else:
+                t_form = params["Rubrene"]["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
+                                        / (temp_N + temp_P))
         
-        # In order:
-        # Triplets formed per photon absorbed
-        try:
-            t_form_eff = t_form / temp_init_N
-        except FloatingPointError:
-            t_form_eff = t_form * 0
-        # Singlets formed per triplet formed
-        try:
-            t_anni_eff = parent_data / t_form
-        except FloatingPointError:
-            t_anni_eff = parent_data * 0
-        # Singlets formed per photon absorbed
-        s_up_eff = t_form_eff * t_anni_eff
+        with np.errstate(invalid='ignore', divide='ignore'):
+            # In order:
+            # Triplets formed per photon absorbed
+            t_form_eff = np.where(temp_init_N==0, 0, t_form / temp_init_N)
+            # Singlets formed per triplet formed
+            t_anni_eff = np.where(t_form==0, 0, parent_data / t_form)
+            # Singlets formed per photon absorbed
+            s_up_eff = t_form_eff * t_anni_eff
         return [("T_form_eff", t_form_eff),
                 ("T_anni_eff", t_anni_eff),
                 ("S_up_eff", s_up_eff)]

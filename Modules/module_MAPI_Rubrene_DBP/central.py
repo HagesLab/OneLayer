@@ -73,7 +73,7 @@ class MAPI_Rubrene(OneD_Model):
         (name and arguments of method) with rest of the system for stability"""
         where_layer = self.find_layer(datatype)
         layer = self.layers[where_layer]
-        data = submodule_prep_dataset(where_layer, layer, sim_data, params,
+        data = submodule_prep_dataset(where_layer, layer, datatype, sim_data, params,
                     for_integrate, i, j, nen, extra_data)
         return data
 
