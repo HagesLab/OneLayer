@@ -135,7 +135,7 @@ def dydt_sct(t, y, g, p,s, do_Fret=False, do_ss=False):
     Jn[g.mapi_nx] = -(Sbt+Stt)                                                      # electron current back (interface)
     Jp[0] = -Sft                                                            # hole current front
     #Jp[g.mapi_nx] = (Sbt+Spt)                                                       # hole current back (interface)
-    Jp[g.mapi_nx] = (Sbt+Stt+Spt)                                                       # hole current back (interface)
+    Jp[g.mapi_nx] = (Sbt+Spt)                                                       # hole current back (interface)
     
     # Rubrene boundaries
     JT[0] = -Stt                                                            # triplet "current" (flux) at interface
