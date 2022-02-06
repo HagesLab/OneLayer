@@ -56,7 +56,7 @@ from io_utils import extract_values, u_read, check_valid_filename, get_split_and
 from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
-from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
+from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
 
 ## AND HERE
 # Tells TEDs what modules are available.
@@ -2538,7 +2538,7 @@ class Notebook:
         return
     
     ## Plotter for simulation tab    
-    def update_sim_plots(self, index, do_clear_plots=True):
+    def update_sim_plots(self, index, failed_vars, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
         
         for layer_name, layer in self.module.layers.items():
@@ -2558,7 +2558,8 @@ class Notebook:
                 plot.set_yscale(output_obj.yscale)
                 
                 grid_x = layer.grid_x_nodes if not output_obj.is_edge else layer.grid_x_edges
-                plot.plot(grid_x, self.sim_data[variable] * convert_out[variable])
+                if not failed_vars[variable]:
+                    plot.plot(grid_x, self.sim_data[variable] * convert_out[variable])
     
                 plot.set_xlabel("x {}".format(layer.length_unit))
                 plot.set_ylabel("{} {}".format(variable, output_obj.units))
@@ -2858,8 +2859,11 @@ class Notebook:
                                             self.module.system_ID,
                                             data_filename,
                                             "{}-{}.h5".format(data_filename, sim_datatype))
-                sim_data[layer_name][sim_datatype] = u_read(path_name, t0=0, 
-                                                            single_tstep=True)
+                try:
+                    sim_data[layer_name][sim_datatype] = u_read(path_name, t0=0, 
+                                                                single_tstep=True)
+                except OSError:
+                    continue
         where_layer = self.module.find_layer(datatype)
         try:
             values = self.module.prep_dataset(datatype, sim_data, param_values_dict, flag_values_dict)
@@ -2949,7 +2953,10 @@ class Notebook:
                                                 "{}-{}.h5".format(dataset.filename, sim_datatype))
                     
                     floor_tstep = int(active_plot.time / dataset.dt)
-                    interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                    try:
+                        interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                    except OSError:
+                        continue
                     over_time = False
                     
                     if active_plot.time > dataset.total_time:
@@ -3160,31 +3167,32 @@ class Notebook:
 
 
         ## Calculate!
-        atom = tables.Float64Atom()
+        #atom = tables.Float64Atom()
 
         ## Create data files
-        for layer_name, layer in self.module.layers.items():
-            for variable in layer.s_outputs:
-                path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
-                with tables.open_file(path, mode='w') as ofstream:
-                    length = num_nodes[layer_name] 
-                    if layer.s_outputs[variable].is_edge:
-                        length += 1
+        # for layer_name, layer in self.module.layers.items():
+        #     for variable in layer.s_outputs:
+        #         path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
+        #         with tables.open_file(path, mode='w') as ofstream:
+        #             length = num_nodes[layer_name] 
+        #             if layer.s_outputs[variable].is_edge:
+        #                 length += 1
     
-                    # Important - "data" must be used as the array name here, as pytables will use the string "data" 
-                    # to name the attribute earray.data, which is then used to access the array
-                    earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
-                    earray.append(np.reshape(init_conditions[variable], (1, length)))
+        #             # Important - "data" must be used as the array name here, as pytables will use the string "data" 
+        #             # to name the attribute earray.data, which is then used to access the array
+        #             earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
+        #             earray.append(np.reshape(init_conditions[variable], (1, length)))
         
         ## Setup simulation plots and plot initial
         
         self.sim_data = dict(init_conditions)
-        self.update_sim_plots(0)
+        #self.update_sim_plots(0)
+        flag_values = {f:flag.value() for f, flag in self.sys_flag_dict.items()}
 
         try:
             self.module.simulate(os.path.join(dirname, data_file_name), 
                                    num_nodes, self.n, self.dt,
-                                   self.sys_flag_dict, self.hmax, init_conditions)
+                                   flag_values, self.hmax, init_conditions)
             
         except FloatingPointError as e:
             print(e)
@@ -3219,16 +3227,25 @@ class Notebook:
 
         self.write(self.status, "Finalizing...")
 
-        try:
-            for i in range(1,6):
-                for var in self.sim_data:
-                    path_name = os.path.join(dirname, "{}-{}.h5".format(data_file_name, var))
+        failed_vars = {}
+        for i in range(1,6):
+            for var in self.sim_data:
+                path_name = os.path.join(dirname, "{}-{}.h5".format(data_file_name, var))
+                failed_vars[var] = 0
+                try:
                     self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
                                                 single_tstep=True)
-                self.update_sim_plots(self.n, do_clear_plots=False)
-        except Exception:
-            self.sim_warning_msg.append("Warning: unable to plot {}. Output data "
-                                        "may not have been saved correctly.\n".format(data_file_name))
+                    
+                except Exception:
+                    self.sim_data[var] = 0
+                    failed_vars[var] = 1
+            is_first = (i == 1)
+            self.update_sim_plots(self.n, failed_vars, do_clear_plots=is_first)
+            
+        failed_vars = [var for var, fail_state in failed_vars.items() if fail_state]
+        if failed_vars:
+            self.sim_warning_msg.append("Warning: unable to plot {} for {}. Output data "
+                                        "may not have been saved correctly.\n".format(failed_vars, data_file_name))
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
@@ -3399,10 +3416,13 @@ class Notebook:
                         for sim_datatype in layer.s_outputs:
 
                             if do_curr_t:
-                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                           t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
-                                                           single_tstep=False, need_extra_node=s[2], 
-                                                           force_1D=False)
+                                try:
+                                    interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                               t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                               single_tstep=False, need_extra_node=s[2], 
+                                                               force_1D=False)
+                                except OSError:
+                                    continue
                                 if current_time == total_time:
                                     pass
                                 else:
@@ -3424,10 +3444,13 @@ class Notebook:
                                 extra_data[layer_name][sim_datatype] = np.array(interpolated_step)
                             
                             else:
-                                sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                            t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
-                                                                            single_tstep=False, need_extra_node=s[2], 
-                                                                            force_1D=False) 
+                                try:
+                                    sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                                single_tstep=False, need_extra_node=s[2], 
+                                                                                force_1D=False) 
+                                except OSError:
+                                    continue
                                 
                                 if c == 0:
                                     extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
