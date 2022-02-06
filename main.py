@@ -2859,8 +2859,11 @@ class Notebook:
                                             self.module.system_ID,
                                             data_filename,
                                             "{}-{}.h5".format(data_filename, sim_datatype))
-                sim_data[layer_name][sim_datatype] = u_read(path_name, t0=0, 
-                                                            single_tstep=True)
+                try:
+                    sim_data[layer_name][sim_datatype] = u_read(path_name, t0=0, 
+                                                                single_tstep=True)
+                except OSError:
+                    continue
         where_layer = self.module.find_layer(datatype)
         try:
             values = self.module.prep_dataset(datatype, sim_data, param_values_dict, flag_values_dict)
@@ -2950,7 +2953,10 @@ class Notebook:
                                                 "{}-{}.h5".format(dataset.filename, sim_datatype))
                     
                     floor_tstep = int(active_plot.time / dataset.dt)
-                    interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                    try:
+                        interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                    except OSError:
+                        continue
                     over_time = False
                     
                     if active_plot.time > dataset.total_time:
@@ -3410,10 +3416,13 @@ class Notebook:
                         for sim_datatype in layer.s_outputs:
 
                             if do_curr_t:
-                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                           t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
-                                                           single_tstep=False, need_extra_node=s[2], 
-                                                           force_1D=False)
+                                try:
+                                    interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                               t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                               single_tstep=False, need_extra_node=s[2], 
+                                                               force_1D=False)
+                                except OSError:
+                                    continue
                                 if current_time == total_time:
                                     pass
                                 else:
@@ -3435,10 +3444,13 @@ class Notebook:
                                 extra_data[layer_name][sim_datatype] = np.array(interpolated_step)
                             
                             else:
-                                sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                            t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
-                                                                            single_tstep=False, need_extra_node=s[2], 
-                                                                            force_1D=False) 
+                                try:
+                                    sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                                single_tstep=False, need_extra_node=s[2], 
+                                                                                force_1D=False) 
+                                except OSError:
+                                    continue
                                 
                                 if c == 0:
                                     extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
