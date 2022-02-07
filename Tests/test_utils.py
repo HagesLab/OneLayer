@@ -1,6 +1,8 @@
 import unittest
+import numpy as np
 from utils import to_index
 from utils import to_pos
+from utils import to_array
 
 class TestUtils(unittest.TestCase):
     
@@ -40,3 +42,15 @@ class TestUtils(unittest.TestCase):
         # Grid: x = [0, 2, ...]
         self.assertEqual(to_pos(0, dx, is_edge=True), 0)
         self.assertEqual(to_pos(23235, dx, is_edge=True), 46470)
+        
+    def test_to_array(self):
+        size = 10
+        x = 12
+        expected = np.ones(size) * x
+        np.testing.assert_equal(to_array(x, size, is_edge=False), expected)
+        
+        expected = np.ones(size+1) * x
+        np.testing.assert_equal(to_array(x, size, is_edge=True), expected)
+        
+        already_an_array = expected
+        np.testing.assert_equal(to_array(already_an_array, size, is_edge=True), already_an_array)
