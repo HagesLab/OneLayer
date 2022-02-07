@@ -6,17 +6,19 @@ Created on Sun Jan 10 15:53:38 2021
 """
 import numpy as np
 from scipy import integrate as intg
-import tables
 
 def to_index(x,dx, absUpperBound, is_edge=False):
     """Returns largest node index less than or equal to position x
     # Warning: this always rounds x down to the nearest node (or edge if is_edge=True)!"""
     absLowerBound = dx / 2 if not is_edge else 0
+    
+    if (x < 0):
+        raise ValueError("cannot index negative position")
     if (x < absLowerBound):
         return 0
 
     if (x > absUpperBound):
-        return int(absUpperBound / dx)
+        raise ValueError("position larger than length of system")
 
     return int((x - absLowerBound) / dx)
 
