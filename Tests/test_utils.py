@@ -1,5 +1,6 @@
 import unittest
 from utils import to_index
+from utils import to_pos
 
 class TestUtils(unittest.TestCase):
     
@@ -29,3 +30,13 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(to_index(1.0001, dx, upper_bound, is_edge=True), 1)
         self.assertEqual(to_index(9.999, dx, upper_bound, is_edge=True), 9)
         self.assertEqual(to_index(10, dx, upper_bound, is_edge=True), 10)
+        
+    def test_to_pos(self):
+        # Grid: x = [1, 3, ...]
+        dx = 2
+        self.assertEqual(to_pos(0, dx, is_edge=False), 1)
+        self.assertEqual(to_pos(62, dx, is_edge=False), 125)
+        
+        # Grid: x = [0, 2, ...]
+        self.assertEqual(to_pos(0, dx, is_edge=True), 0)
+        self.assertEqual(to_pos(23235, dx, is_edge=True), 46470)
