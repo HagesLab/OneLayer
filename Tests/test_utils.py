@@ -3,6 +3,7 @@ import numpy as np
 from utils import to_index
 from utils import to_pos
 from utils import to_array
+from utils import get_all_combinations
 
 class TestUtils(unittest.TestCase):
     
@@ -54,3 +55,18 @@ class TestUtils(unittest.TestCase):
         
         already_an_array = expected
         np.testing.assert_equal(to_array(already_an_array, size, is_edge=True), already_an_array)
+        
+    def test_get_all_combinations(self):
+        test_empty = {}
+        expected = []
+        self.assertEqual(get_all_combinations(test_empty), expected)
+        
+        test_one = {"Param1":[1,2,3]}
+        expected = [{"Param1":1},{"Param1":2},{"Param1":3}]
+        self.assertEqual(get_all_combinations(test_one), expected)
+        
+        test_two = {"Param1":[1,2,3], "Param2":[4,5]}
+        expected = [{"Param1":1,"Param2":4},{"Param1":1,"Param2":5},
+                    {"Param1":2,"Param2":4},{"Param1":2,"Param2":5},
+                    {"Param1":3,"Param2":4},{"Param1":3,"Param2":5}] 
+        self.assertEqual(get_all_combinations(test_two), expected)

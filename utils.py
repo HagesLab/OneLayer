@@ -147,6 +147,17 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
     return u_bound_correction - l_bound_correction
     
 def get_all_combinations(value_dict):
+    """
+    >>> value_dict = {"a":[1,2], "b":[3,4]}
+    
+    >>> g = get_all_combinations(value_dict)
+    
+    >>> g
+    
+    [{"a":1, "b":3}, {"a":1, "b":4},
+     {"a":2, "b":3}, {"a":2, "b":4}]
+    """
+    
     combinations = []
     param_names = list(value_dict.keys())
         
