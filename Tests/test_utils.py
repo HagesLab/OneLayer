@@ -1,0 +1,31 @@
+import unittest
+from utils import to_index
+
+class TestUtils(unittest.TestCase):
+    
+    def test_to_index(self):
+        # Grid: x = [0.5, 1.5, ..., 9.5]
+        upper_bound = 10
+        dx = 1
+        with self.assertRaises(ValueError):
+            to_index(-1, dx, upper_bound, is_edge=False)
+        with self.assertRaises(ValueError):
+            to_index(1000, dx, upper_bound, is_edge=False)
+            
+        self.assertEqual(to_index(0, dx, upper_bound, is_edge=False), 0)
+        self.assertEqual(to_index(1.4999, dx, upper_bound, is_edge=False), 0)
+        self.assertEqual(to_index(1.5001, dx, upper_bound, is_edge=False), 1)
+        self.assertEqual(to_index(9.4, dx, upper_bound, is_edge=False), 8)
+        self.assertEqual(to_index(10, dx, upper_bound, is_edge=False), 9)
+        
+        # Grid: x = [0,1,...,10]
+        with self.assertRaises(ValueError):
+            to_index(-1, dx, upper_bound, is_edge=True)
+        with self.assertRaises(ValueError):
+            to_index(1000, dx, upper_bound, is_edge=True)
+            
+        self.assertEqual(to_index(0, dx, upper_bound, is_edge=True), 0)
+        self.assertEqual(to_index(0.999, dx, upper_bound, is_edge=True), 0)
+        self.assertEqual(to_index(1.0001, dx, upper_bound, is_edge=True), 1)
+        self.assertEqual(to_index(9.999, dx, upper_bound, is_edge=True), 9)
+        self.assertEqual(to_index(10, dx, upper_bound, is_edge=True), 10)
