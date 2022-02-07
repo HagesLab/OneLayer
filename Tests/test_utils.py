@@ -4,6 +4,7 @@ from utils import to_index
 from utils import to_pos
 from utils import to_array
 from utils import get_all_combinations
+from utils import autoscale
 
 class TestUtils(unittest.TestCase):
     
@@ -70,3 +71,20 @@ class TestUtils(unittest.TestCase):
                     {"Param1":2,"Param2":4},{"Param1":2,"Param2":5},
                     {"Param1":3,"Param2":4},{"Param1":3,"Param2":5}] 
         self.assertEqual(get_all_combinations(test_two), expected)
+        
+    def test_autoscale(self):
+        with self.assertRaises(AssertionError):
+            autoscale(min_val=1, max_val=0)
+        
+        self.assertEqual(autoscale(min_val=0, max_val=0), 'linear')
+        
+        self.assertEqual(autoscale(min_val=0, max_val=1), 'linear')
+        self.assertEqual(autoscale(min_val=-1, max_val=0), 'linear')
+                         
+        self.assertEqual(autoscale(min_val=1, max_val=100), 'symlog')
+        self.assertEqual(autoscale(min_val=-100, max_val=-1), 'symlog')
+                    
+        self.assertEqual(autoscale(min_val=-100, max_val=1), 'symlog')
+        self.assertEqual(autoscale(min_val=-1, max_val=100), 'symlog')
+        
+                         

@@ -204,10 +204,14 @@ def get_all_combinations(value_dict):
     
     
 def autoscale(val_array=None, min_val=None, max_val=None):
-    """Help a matplotlib plot determine whether a log or linear scale should be used
-       when plotting val_array
+    """
+    Help a matplotlib plot determine whether a log or linear scale should be used
+    when plotting val_array
+    
+    if val_array spans more than one order of magnitude? -> log scale
     """
     if max_val is not None and min_val is not None:
+        assert min_val <= max_val, "autoscale min larger than max"
         pass
     elif val_array is not None:
         max_val = np.amax(val_array)
