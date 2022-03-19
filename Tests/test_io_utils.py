@@ -1,7 +1,12 @@
 import unittest
+import tables
+import os
+import numpy as np
+
 from io_utils import get_split_and_clean_line
 from io_utils import check_valid_filename
 from io_utils import extract_values
+from io_utils import u_read
 
 class TestUtils(unittest.TestCase):
     
@@ -60,5 +65,44 @@ class TestUtils(unittest.TestCase):
         # ValueError: could not convert string to float: '100,01'
         #string = "100,01;200,02;300,03"
         #delimiter = ";"
+        
+    def test_u_read(self):
+        np.random.seed(42)
+        test_array = np.random.normal(size=(5,5))
+        path = os.path.join("u_read_test1.h5")
+        with tables.open_file(path, mode='w') as ofstream:
+
+            # Important - "data" must be used as the array name here, as pytables will use the string "data" 
+            # to name the attribute earray.data, which is then used to access the array
+            earray = ofstream.create_array(ofstream.root, "data", test_array)
+
+        test_out = u_read(path)
+        
+        # Read full array
+        np.testing.assert_equal(test_array, test_out)
+        
+        # Read one time step
+        # Force_1D will coerce this into a 1D array (for plotting) by default
+        t0 = 2
+        test_out = u_read(path, t0=t0, single_tstep=True)
+        
+        np.testing.assert_equal(test_array[t0], test_out)
+        
+        # Read one time step, but an integral wants it to stay as a 2D array
+        test_out = u_read(path, t0=t0, single_tstep=True, force_1D=False)
+        
+        np.testing.assert_equal(test_array[t0, np.newaxis], test_out)
+        
+        # Read a few space steps
+        l = 1
+        r = 3
+        test_out = u_read(path, l=l, r=r)
+        
+        np.testing.assert_equal(test_array[:,l:r], test_out)
+        
+        # "I need an extra space node for this integral"
+        test_out = u_read(path, l=l, r=r, need_extra_node=True)
+        
+        np.testing.assert_equal(test_array[:,l:r+1], test_out)
         
         
