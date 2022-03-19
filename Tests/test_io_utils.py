@@ -69,13 +69,13 @@ class TestUtils(unittest.TestCase):
     def test_u_read(self):
         np.random.seed(42)
         test_array = np.random.normal(size=(5,5))
-        path = os.path.join("u_read_test1.h5")
-        with tables.open_file(path, mode='w') as ofstream:
+        path = os.path.join("Tests", "u_read_test1.h5")
+        try:
+            with tables.open_file(path, mode='w') as ofstream:
+                earray = ofstream.create_array(ofstream.root, "data", test_array)
 
-            # Important - "data" must be used as the array name here, as pytables will use the string "data" 
-            # to name the attribute earray.data, which is then used to access the array
-            earray = ofstream.create_array(ofstream.root, "data", test_array)
-
+        except Exception:
+            print("Error: failed to create u_read test file")
         test_out = u_read(path)
         
         # Read full array
@@ -105,4 +105,6 @@ class TestUtils(unittest.TestCase):
         
         np.testing.assert_equal(test_array[:,l:r+1], test_out)
         
+        assert os.path.exists(path)
+        os.remove(path)
         
