@@ -1,5 +1,7 @@
 import unittest
 import numpy as np
+import sys
+sys.path.append("..")
 from utils import to_index
 from utils import to_pos
 from utils import to_array
@@ -141,4 +143,50 @@ class TestUtils(unittest.TestCase):
         u_bound = 100
         out = correct_integral(integrand, l_bound, u_bound, dx, thickness)
         self.assertEqual(out, 500)
+
+    def test_new_integrate(self):
+        dx = 1
+        thickness = 100
+        nx = 100
+        # x = [0.5, 1.5, ...99.5]
+        x = np.linspace(dx/2, thickness-dx/2, nx)
         
+        # y = [5,15,25,...995]
+        A = 10
+        B = -2
+        integrand = A*np.linspace(dx/2, thickness-dx/2, nx) + B
+        
+        # A trapezoidal sum should deliver exact solutions for linear polynomials
+        l_bound = 0.5
+        u_bound = 99.5
+
+        out = new_integrate(integrand, l_bound, u_bound, dx, thickness, need_extra_node=False)
+        expected = 0.5 * A * (u_bound ** 2 - l_bound ** 2) + B * (u_bound - l_bound)
+        
+        self.assertEqual(out[0], expected)
+        
+        # A case which needs the extra node
+        # This unfortunately won't be exact due to the nature of correct_integral(),
+        # but errors here are negligible compared to the trapezoidal approx.
+        l_bound = 0.5
+        u_bound = 99.25
+
+        out = new_integrate(integrand, l_bound, u_bound, dx, thickness, need_extra_node=True)
+        expected = 0.5 * A * (u_bound ** 2 - l_bound ** 2) + B * (u_bound - l_bound)
+        
+        self.assertAlmostEqual(out[0], expected, delta=expected*1e-5)
+        
+        # If bounds are equal, return the value at that bound
+        A = 10
+        B = 0
+        integrand = A*np.linspace(dx/2, thickness-dx/2, nx) + B
+        l_bounds = [0, 0.25, 0.5, 0.75, 1, 1.5, 98.5, 99, 99.25, 99.5, 99.75, 100]
+        expected = [5, 5, 5, 5, 10, 15, 985, 990, 995, 995, 995, 995]
+        for i, l in enumerate(l_bounds):
+            ii = to_index(l, dx, thickness)
+            out = new_integrate(integrand[ii:ii+2], l, l, dx, thickness, need_extra_node=True)
+            self.assertEqual(out, expected[i], msg=f"Failed #{i}: single bound {l}")
+            
+if __name__ == "__main__":
+    t = TestUtils()
+    t.test_new_integrate()

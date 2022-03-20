@@ -56,8 +56,8 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
     total_length : float
         Length of system
     need_extra_node : bool
-        Whether the smallest node with position larger than u_bound should be considered.
-        Correction for converting from actual boundaries to discrete nodes
+        Whether an extra node was read in. If so, warn integrator to ignore this node,
+        as correct_integral() will take care of it.
 
     Returns
     -------
@@ -66,7 +66,6 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
 
     """
     i = to_index(l_bound, dx, total_length)
-    j = to_index(u_bound, dx, total_length)
     if base_data.ndim == 1:
         base_data = base_data[None]
     
@@ -136,6 +135,7 @@ def correct_integral(integrand, l_bound, u_bound, dx, total_length):
         l_bound_correction += integrand[0+1] * lfrac2
 
     ufrac1 = min(u_bound - uncorrected_u_bound, dx / 2)
+    
     u_bound_correction = integrand[j-i] * ufrac1
     
     if u_bound > uncorrected_u_bound + dx / 2:
