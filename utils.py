@@ -48,7 +48,7 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
     base_data : 1D or 2D ndarray
         Values to integrate over.
     l_bound : float
-        Lower boundary.
+        Lower boundary. This is informational only - the base_data is already trimmed to these bounds.
     u_bound : float
         Upper boundary.
     dx : float
@@ -92,10 +92,10 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
             I_base = base_data
             I_data = intg.trapz(I_base, dx=dx, axis=1)
 
-        I_data += correct_integral(I_base.T, l_bound, u_bound, i, j, dx)
+        I_data += correct_integral(I_base.T, l_bound, u_bound, dx, total_length)
     return I_data
 
-def correct_integral(integrand, l_bound, u_bound, i, j, dx):
+def correct_integral(integrand, l_bound, u_bound, dx, total_length):
     """
     Corrects new_integrate() for mismatch between nodes and actual integration bounds using linear interpolation.
 
@@ -121,11 +121,14 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
         Corrected integration results.
 
     """
+    i = to_index(l_bound, dx, total_length)
+    j = to_index(u_bound, dx, total_length)
     uncorrected_l_bound = to_pos(i, dx)
     uncorrected_u_bound = to_pos(j, dx)
     lfrac1 = min(l_bound - uncorrected_l_bound, dx / 2)
 
-    # Yes, integrand[0] and not integrand[i]. Note that in integrate(), the ith node maps to integrand[0] and the jth node maps to integrand[j-i].
+    # Note that because integrate() accepts pre-trimmed base data, 
+    # the ith node maps to integrand[0] and the jth node maps to integrand[j-i].
     l_bound_correction = integrand[0] * lfrac1
 
     if l_bound > uncorrected_l_bound + dx / 2:

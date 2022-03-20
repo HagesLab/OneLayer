@@ -5,6 +5,8 @@ from utils import to_pos
 from utils import to_array
 from utils import get_all_combinations
 from utils import autoscale
+from utils import correct_integral
+from utils import new_integrate
 
 class TestUtils(unittest.TestCase):
     
@@ -87,4 +89,56 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(autoscale(min_val=-100, max_val=1), 'symlog')
         self.assertEqual(autoscale(min_val=-1, max_val=100), 'symlog')
         
-                         
+    def test_correct_integral(self):
+        dx = 1
+        thickness = 100
+        nx = 100
+        # x = [0.5, 1.5, ...99.5]
+        x = np.linspace(dx/2, thickness-dx/2, nx)
+        
+        # y = [5,15,25,...995]
+        integrand = 10*np.linspace(dx/2, thickness-dx/2, nx)
+        
+        # No correction needed if bounds match
+        l_bound = 0.5
+        u_bound = 99.5
+        out = correct_integral(integrand, l_bound, u_bound, dx, thickness)
+        self.assertEqual(out, 0.0)
+        
+        # Add one quarter of the first node
+        l_bound = 0.25
+        u_bound = 99.5
+        out = correct_integral(integrand, l_bound, u_bound, dx, thickness)
+        self.assertEqual(out, 1.25)
+        
+        # REMOVE one quarter of the first node
+        l_bound = 0.75
+        u_bound = 99.5
+        out = correct_integral(integrand, l_bound, u_bound, dx, thickness)
+        self.assertEqual(out, -1.25)
+        
+        # REMOVE one half of the first node and one quarter of the second node
+        l_bound = 1.25 # maps to real pos -> 0.5
+        u_bound = 99.5 # -> 9.5
+
+        out = correct_integral(integrand, l_bound, u_bound, dx, thickness)
+        self.assertEqual(out, -2.5 - 3.75)
+        
+        # Add half the last node
+        l_bound = 0.5
+        u_bound = 100
+        out = correct_integral(integrand, l_bound, u_bound, dx, thickness)
+        self.assertEqual(out, 497.5)
+        
+        # Add half the 50th node and a quarter of the 51st node
+        l_bound = 0.5
+        u_bound = 50.25 # -> 49.5
+        out = correct_integral(integrand, l_bound, u_bound, dx, thickness)
+        self.assertEqual(out, 0.5*495 + 0.25*505)
+        
+        # Integrate over nominal thickness - add half the area of the first and last nodes
+        l_bound = 0
+        u_bound = 100
+        out = correct_integral(integrand, l_bound, u_bound, dx, thickness)
+        self.assertEqual(out, 500)
+        
