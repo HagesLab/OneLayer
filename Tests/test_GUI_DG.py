@@ -55,7 +55,7 @@ class TestRDG(unittest.TestCase):
         flags = {}
         type_ = "X"
         filename = "f1"
-        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, filename, show_index=0)
+        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, filename, current_time=0)
         
         self.data2 = 10 * np.linspace(0,100,101)
         self.grid_x2 = 10 * np.linspace(0,100,101)
@@ -65,7 +65,7 @@ class TestRDG(unittest.TestCase):
         flags = {}
         type_ = "X"
         filename = "f2"
-        ds2 = RDS(self.data2, self.grid_x2, self.grid_x2, total_time, dt, params_dict, flags, type_, filename, show_index=0)
+        ds2 = RDS(self.data2, self.grid_x2, self.grid_x2, total_time, dt, params_dict, flags, type_, filename, current_time=0)
         
         data = 10 * np.linspace(0,100,101)
         grid_x = 10 * np.linspace(0,100,101)
@@ -75,7 +75,7 @@ class TestRDG(unittest.TestCase):
         flags = {}
         type_ = "wrong_type"
         filename = "f3"
-        ds3 = RDS(data, grid_x, grid_x, total_time, dt, params_dict, flags, type_, filename, show_index=0)
+        ds3 = RDS(data, grid_x, grid_x, total_time, dt, params_dict, flags, type_, filename, current_time=0)
         
         self.rdg.add(ds1)
         self.rdg.add(ds2)
@@ -83,8 +83,6 @@ class TestRDG(unittest.TestCase):
         return
     
     def test_init(self):
-        self.assertEqual(self.rdg.dt, 0.025)
-        self.assertEqual(self.rdg.total_t, 1)
         self.assertEqual(self.rdg.type, "X")
         self.assertEqual(len(self.rdg.datasets), 2)
         return
@@ -122,7 +120,7 @@ class TestIDG(unittest.TestCase):
         flags = {}
         type_ = "X"
         filename = "f1"
-        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, filename, show_index=0)
+        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, filename, current_time=0)
         
         self.data2 = 10 * np.linspace(0,100,101)
         self.grid_x2 = 10 * np.linspace(0,100,101)
@@ -132,7 +130,7 @@ class TestIDG(unittest.TestCase):
         flags = {}
         type_ = "X"
         filename = "f2"
-        ds2 = RDS(self.data2, self.grid_x2, self.grid_x2, total_time, dt, params_dict, flags, type_, filename, show_index=0)
+        ds2 = RDS(self.data2, self.grid_x2, self.grid_x2, total_time, dt, params_dict, flags, type_, filename, current_time=0)
         
         data = 10 * np.linspace(0,100,101)
         grid_x = 10 * np.linspace(0,100,101)
@@ -142,7 +140,7 @@ class TestIDG(unittest.TestCase):
         flags = {}
         type_ = "wrong_type"
         filename = "f3"
-        ds3 = RDS(data, grid_x, grid_x, total_time, dt, params_dict, flags, type_, filename, show_index=0)
+        ds3 = RDS(data, grid_x, grid_x, total_time, dt, params_dict, flags, type_, filename, current_time=0)
         
         self.idg.add(ds1)
         self.idg.add(ds2)
@@ -150,8 +148,6 @@ class TestIDG(unittest.TestCase):
         return
     
     def test_init(self):
-        self.assertEqual(self.idg.dt, 0.025)
-        self.assertEqual(self.idg.total_t, 1)
         self.assertEqual(self.idg.type, "X")
         self.assertEqual(len(self.idg.datasets), 2)
         return

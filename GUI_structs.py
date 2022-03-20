@@ -77,7 +77,7 @@ class Batchable:
         return
     
 class Data_Set:
-    def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type, filename):
+    def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type_, filename):
         self.data = data
         self.grid_x = grid_x
         self.total_time = total_time

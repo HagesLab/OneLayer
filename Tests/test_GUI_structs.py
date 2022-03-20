@@ -81,12 +81,14 @@ class TestUtils(unittest.TestCase):
     def test_Data_Set(self):
         data = -1
         grid_x = -1
+        total_time = 1
+        dt = 0.025
         params_dict = {}
         flags = {}
         type_ = "X"
         filename = "__file__"
         
-        ds = Data_Set(data, grid_x, params_dict, flags, type_, filename)
+        ds = Data_Set(data, grid_x, total_time, dt, params_dict, flags, type_, filename)
         
         tag = ds.tag(for_matplotlib=False)
         self.assertEqual(tag, "__file___X")
@@ -112,11 +114,11 @@ class TestUtils(unittest.TestCase):
         flags = {'f':1}
         type_ = "X"
         filename = "__file__"
-        show_index = 0
-        rds = RDS(data, grid_x, node_x, total_time, dt, params_dict, flags, type_, filename, show_index)
+        current_time = 0
+        rds = RDS(data, grid_x, node_x, total_time, dt, params_dict, flags, type_, filename, current_time)
         
         np.testing.assert_equal(rds.node_x, node_x)
-        self.assertEqual(rds.show_index, show_index)
+        self.assertEqual(rds.current_time, current_time)
         self.assertEqual(rds.total_time, total_time)
         self.assertEqual(rds.dt, dt)
         self.assertEqual(rds.num_tsteps, total_time / dt)
