@@ -20,3 +20,12 @@ Alternatively, [PyInstaller](https://pyinstaller.readthedocs.io/en/v3.6/usage.ht
 0. Install PyInstaller with `pip install pyinstaller`, `conda install pyinstaller`, or similar command in the appropriate command prompt.
 1. Navigate to this repository.
 2. Run the command `pyinstaller main.py --onefile -n TEDs`. This creates several directories containing some intermediate files PyInstaller uses, but the executable will be generated in the **dist** directory. Replacing the argument "TEDs" changes the name of the generated executable.
+
+### Tests
+Add test scripts using unittest with similar structure to existing scripts in Tests/ directory. 
+Run tests by:
+```python -m unittest discover Tests```
+
+One can also track the progress of code and its test coverage with:
+```python3 -m coverage run --source='.' -m unittest discover Tests && python3 -m coverage report```
+(need to install "coverage" by: ```pip install coverage```)
