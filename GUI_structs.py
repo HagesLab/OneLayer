@@ -5,13 +5,14 @@ Created on Mon Feb 22 14:03:19 2021
 @author: cfai2
 """
 import tkinter as tk
+from tkinter import ttk
 import numpy as np
 
 class Param_Rule:
     """The Parameter Toolkit uses these to build Parameter()'s values"""
-    def __init__(self, variable, type, l_bound, r_bound=-1, l_boundval=-1, r_boundval=-1):
+    def __init__(self, variable : str, type_ : str, l_bound : float, r_bound=-1, l_boundval=-1, r_boundval=-1):
         self.variable = variable # e.g. N, P, E-Field
-        self.type = type
+        self.type = type_
         self.l_bound = l_bound
         self.r_bound = r_bound
         self.l_boundval = l_boundval
@@ -46,7 +47,7 @@ class Param_Rule:
                     + " and right value: " + '{:.4e}'.format(self.r_boundval)))
 
         else:
-            return("Error #101: Invalid initial condition")
+            raise ValueError("Error #101: Invalid initial condition")
         
 class Flag:
     """This class exists to solve a little problem involving tkinter checkbuttons: we get the value of a checkbutton using its tk.IntVar() 
@@ -62,6 +63,10 @@ class Flag:
     
     def value(self):
         return self.tk_var.get()
+    
+    def set(self, value):
+        self.tk_var.set(value)
+        return
 
 class Batchable:
     """Much like the flag class, the Batchable() serves to collect together various tk elements and values for the batch IC tool."""
@@ -72,12 +77,12 @@ class Batchable:
         return
     
 class Data_Set:
-    def __init__(self, data, grid_x, params_dict, flags, type, filename):
+    def __init__(self, data, grid_x, params_dict, flags, type_, filename):
         self.data = data
         self.grid_x = grid_x
         self.params_dict = dict(params_dict)
         self.flags = dict(flags)
-        self.type = type
+        self.type = type_
         self.filename = filename
         return
     
@@ -115,7 +120,6 @@ class Integrated_Data_Set(Data_Set):
         self.dt = dt
         return
     
-
 class Data_Group:
     def __init__(self):
         self.type = "None"
@@ -142,7 +146,7 @@ class Raw_Data_Group(Data_Group):
         super().__init__()
         return
 
-    def add(self, data, tag):
+    def add(self, data):
         
         if not self.datasets: 
             # Allow the first set in to set the dt and t restrictions
@@ -152,7 +156,7 @@ class Raw_Data_Group(Data_Group):
 
         # Only allow datasets with identical time step size and total time
         if (self.dt == data.dt and self.total_t == data.total_time and self.type == data.type):
-            self.datasets[tag] = data
+            self.datasets[data.tag()] = data
 
         else:
             print("Cannot plot selected data sets: dt or total t mismatch")
@@ -193,7 +197,7 @@ class Integrated_Data_Group(Data_Group):
             self.total_t = new_set.total_time
             self.type = new_set.type
 
-        # Only allow datasets with identical time step size and total time - this should always be the case after any integration; otherwise something has gone wrong
+        # Only allow datasets with identical type - this should always be the case after any integration; otherwise something has gone wrong
         if (self.type == new_set.type):
             self.datasets[new_set.tag()] = new_set
 

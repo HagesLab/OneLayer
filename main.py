@@ -462,7 +462,7 @@ class Notebook:
         for flag in self.module.flags_dict:
             self.sys_flag_dict[flag] = Flag(self.flags_frame, 
                                             self.module.flags_dict[flag][0])
-            self.sys_flag_dict[flag].tk_var.set(self.module.flags_dict[flag][2])
+            self.sys_flag_dict[flag].set(self.module.flags_dict[flag][2])
             
             if not self.module.flags_dict[flag][1]:
                 continue
@@ -2836,7 +2836,7 @@ class Notebook:
             if isinstance(new_data, str):
                 err_msg.append("{}: {}".format(short_filename, new_data))
             else:
-                active_plot.datagroup.add(new_data, new_data.tag())
+                active_plot.datagroup.add(new_data)
     
         if len(err_msg) > 1:
             self.do_confirmation_popup("\n".join(err_msg), 
@@ -4503,7 +4503,7 @@ class Notebook:
         for flag in self.module.flags_dict:
             # All we need to do here is mark the appropriate GUI elements as selected
             try:
-                self.sys_flag_dict[flag].tk_var.set(flag_values_dict[flag])
+                self.sys_flag_dict[flag].set(flag_values_dict[flag])
             except Exception:
                 warning_mssg += "\nWarning: could not apply value for flag: {}".format(flag)
                 warning_mssg += "\nFlags must have integer value 1 or 0"
