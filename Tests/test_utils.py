@@ -91,6 +91,12 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(autoscale(min_val=-100, max_val=1), 'symlog')
         self.assertEqual(autoscale(min_val=-1, max_val=100), 'symlog')
         
+        # Blank
+        self.assertEqual(autoscale(), 'linear')
+        
+        # Test data
+        self.assertEqual(autoscale(np.logspace(1, 2, 100)), 'linear')
+        
     def test_correct_integral(self):
         dx = 1
         thickness = 100
