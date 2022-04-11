@@ -45,17 +45,17 @@ def dydt_basic(t, y, g, p, s, do_Fret=False, do_ss=False):
     JS[g.rubrene_nx] = 0
 
     ## Calculate Jn, Jp [nm^-2 ns^-1] for MAPI, 
-    Jn[1:-1] = (-p.mu_n[1:-1] * (N_edges) * (q * E_field[1:-1]) 
+    Jn[1:-1] = (p.mu_n[1:-1] * (N_edges) * (q * E_field[1:-1]) 
                 + (p.mu_n[1:-1]*kB*p.mapi_temperature[1:-1]) * ((np.roll(N,-1)[:-1] - N[:-1]) / (g.mapi_dx)))
 
-    Jp[1:-1] = (-p.mu_p[1:-1] * (P_edges) * (q * E_field[1:-1]) 
+    Jp[1:-1] = (p.mu_p[1:-1] * (P_edges) * (q * E_field[1:-1]) 
                 - (p.mu_p[1:-1]*kB*p.mapi_temperature[1:-1]) * ((np.roll(P, -1)[:-1] - P[:-1]) / (g.mapi_dx)))
 
     dJn = (np.roll(Jn, -1)[:-1] - Jn[:-1]) / (g.mapi_dx)
     dJp = (np.roll(Jp, -1)[:-1] - Jp[:-1]) / (g.mapi_dx)
         
     # [V nm^-1 ns^-1]
-    dEdt = (Jn + Jp) * ((q_C) / (p.eps * eps0))
+    dEdt = -(Jn + Jp) * ((q_C) / (p.eps * eps0))
     
     ## Rubrene J fluxes
     JT[1:-1] = (p.mu_T[1:-1]*kB*p.rubrene_temperature[1:-1]) * ((np.roll(delta_T,-1)[:-1] - delta_T[:-1]) / (g.rubrene_dx))
@@ -145,15 +145,15 @@ def dydt_sct(t, y, g, p,s, do_Fret=False, do_ss=False):
     #Jq[0] = -Spt+Stt
     Jq[0] = Spt-Stt
 
-    Jn[1:-1] = (-p.mu_n[1:-1] * (N_edges) * (q * E_field[1:-1]) 
+    Jn[1:-1] = (p.mu_n[1:-1] * (N_edges) * (q * E_field[1:-1]) 
                 + (p.mu_n[1:-1]*kB*p.mapi_temperature[1:-1]) * ((np.roll(N,-1)[:-1] - N[:-1]) / (g.mapi_dx)))
-    Jp[1:-1] = (-p.mu_p[1:-1] * (P_edges) * (q * E_field[1:-1]) 
+    Jp[1:-1] = (p.mu_p[1:-1] * (P_edges) * (q * E_field[1:-1]) 
                 - (p.mu_p[1:-1]*kB*p.mapi_temperature[1:-1]) * ((np.roll(P, -1)[:-1] - P[:-1]) / (g.mapi_dx)))
     dJn = (np.roll(Jn, -1)[:-1] - Jn[:-1]) / (g.mapi_dx)
     dJp = (np.roll(Jp, -1)[:-1] - Jp[:-1]) / (g.mapi_dx)
         
     # [V nm^-1 ns^-1]
-    dEdt = (Jn + Jp) * ((q_C) / (p.eps * eps0))
+    dEdt = -(Jn + Jp) * ((q_C) / (p.eps * eps0))
     
     ## Rubrene J fluxes
     JT[1:-1] = (-p.mu_T[1:-1] * (T_edges) * (q * E_upc[1:-1]) 

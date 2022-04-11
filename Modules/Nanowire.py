@@ -312,16 +312,16 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     ## Calculate Jn, Jp [nm^-2 ns^-1] over the space dimension, 
     # Jn(t) ~ N(t) * E_field(t) + (dN/dt)
     # np.roll(y,m) shifts the values of array y by m places, allowing for quick approximation of dy/dx ~ (y[m+1] - y[m-1] / 2*dx) over entire array y
-    Jn[1:-1] = (-mu_n[1:-1] * (N_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1]) 
+    Jn[1:-1] = (mu_n[1:-1] * (N_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1]) 
                 + (mu_n[1:-1]*kB*T[1:-1]) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dx)))
 
     ## Changed sign
-    Jp[1:-1] = (-mu_p[1:-1] * (P_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEcdz[1:-1]) 
+    Jp[1:-1] = (mu_p[1:-1] * (P_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEcdz[1:-1]) 
                 -(mu_p[1:-1]*kB*T[1:-1]) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dx)))
 
         
     # [V nm^-1 ns^-1]
-    dEdt = (Jn + Jp) * ((q_C) / (eps * eps0))
+    dEdt = -(Jn + Jp) * ((q_C) / (eps * eps0))
     
     ## Calculate recombination (consumption) terms
     rad_rec = B * (N * P - n0 * p0)
