@@ -1,3 +1,4 @@
 Data/*
 Initial/*
 .coverage
+**/*.pyc
