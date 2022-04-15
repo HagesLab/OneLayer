@@ -27,5 +27,5 @@ Run tests by:
 ```python -m unittest discover Tests```
 
 One can also track the progress of code and its test coverage with:
-```python3 -m coverage run --source='.' -m unittest discover Tests && python3 -m coverage report```
+```python -m coverage run --source='.' -m unittest discover Tests && python -m coverage report```
 (need to install "coverage" by: ```pip install coverage```)
