@@ -42,7 +42,6 @@ import tables
 import itertools
 # This lets us pass params to functions called by tkinter buttons
 from functools import partial 
-
 import carrier_excitations
 from GUI_structs import Param_Rule, Flag, Batchable, Raw_Data_Set, \
                         Integrated_Data_Set, Analysis_Plot_State, \
@@ -57,6 +56,9 @@ from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
+
+from config import init_logging
+logger = init_logging(__name__)
 
 ## AND HERE
 # Tells TEDs what modules are available.
@@ -76,7 +78,7 @@ def get_cli_args():
 
     raw_args = docopt(__doc__, version='ingest 0.1.0')
     args = {}
-    print(raw_args)
+    logger.info(raw_args)
     try:
         module = raw_args.get("--module")
         if module is not None:
@@ -84,7 +86,7 @@ def get_cli_args():
             assert module in MODULE_LIST.keys()
             args["module"] = module
     except AssertionError:
-        print("Invalid module \"{}\"".format(module))
+        logger.info("Invalid module \"{}\"".format(module))
         
     try:
         tab_id = raw_args.get("--tab")
@@ -93,7 +95,7 @@ def get_cli_args():
             assert 0 <= tab_id <= 2
             args["tab_id"] = tab_id
     except AssertionError:
-        print("Invalid tab_id \"{}\"".format(tab_id))
+        logger.info("Invalid tab_id \"{}\"".format(tab_id))
     
     return args
 
@@ -287,33 +289,33 @@ class Notebook:
         # Initialize to default layer
         self.change_layer()
 
-        print("Initialization complete")
-        print("Detecting Initial Condition and Data Directories...")
+        logger.info("Initialization complete")
+        logger.info("Detecting Initial Condition and Data Directories...")
         try:
             os.mkdir(self.default_dirs["Initial"])
-            print("No Initial Condition Directory detected; automatically creating...")
+            logger.info("No Initial Condition Directory detected; automatically creating...")
         except FileExistsError:
-            print("Initial Condition Directory detected")
+            logger.info("Initial Condition Directory detected")
         
         try:
             os.mkdir(self.default_dirs["Data"])
-            print("No Data Directory detected; automatically creating...")
+            logger.info("No Data Directory detected; automatically creating...")
         except FileExistsError:
-            print("Data Directory detected")
+            logger.info("Data Directory detected")
 
         try:
             os.mkdir(self.default_dirs["PL"])
-            print("No PL Directory detected; automatically creating...")
+            logger.info("No PL Directory detected; automatically creating...")
         except FileExistsError:
-            print("PL Directory detected")
+            logger.info("PL Directory detected")
             
-        print("Checking whether the current system class ({}) "
+        logger.info("Checking whether the current system class ({}) "
               "has a dedicated data subdirectory...".format(self.module.system_ID))
         try:
             os.mkdir(os.path.join(self.default_dirs["Data"], self.module.system_ID))
-            print("No such subdirectory detected; automatically creating...")
+            logger.info("No such subdirectory detected; automatically creating...")
         except FileExistsError:
-            print("Subdirectory detected")
+            logger.info("Subdirectory detected")
 
         
         return
@@ -329,7 +331,7 @@ class Notebook:
         self.root.attributes("-topmost", True)
         self.root.after_idle(self.root.attributes,'-topmost',False)
         self.root.mainloop()
-        print("Closed TEDs")
+        logger.info("Closed TEDs")
         matplotlib.use(starting_backend)
         return
 
@@ -340,7 +342,7 @@ class Notebook:
         if not self.confirmed: 
             return
         self.root.destroy()
-        print("Closed TEDs")
+        logger.info("Closed TEDs")
         matplotlib.use(starting_backend)
         return
   
@@ -1169,9 +1171,9 @@ class Notebook:
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        print(self.using_LGC)
-        print(self.LGC_options)
-        print(self.LGC_values)
+        logger.info(self.using_LGC)
+        logger.info(self.LGC_options)
+        logger.info(self.LGC_values)
         return
     
     def change_layer(self, clear=True, update_LGC_display=True):
@@ -1303,10 +1305,10 @@ class Notebook:
             self.select_module_popup.destroy()
 
         except IndexError:
-            print("No module selected: Select a module from the list")
+            logger.info("No module selected: Select a module from the list")
         except AssertionError as oops:
-            print("Error: could not verify selected module")
-            print(str(oops))
+            logger.info("Error: could not verify selected module")
+            logger.info(str(oops))
             
         return
         
@@ -1365,7 +1367,7 @@ class Notebook:
             self.sys_printsummary_popup.destroy()
             self.sys_printsummary_popup_isopen = False
         except Exception:
-            print("Error #2022: Failed to close shortcut popup.")
+            logger.error("Error #2022: Failed to close shortcut popup.")
         return
     
     def do_sys_plotsummary_popup(self):
@@ -1419,7 +1421,7 @@ class Notebook:
             self.sys_plotsummary_popup.destroy()
             self.sys_plotsummary_popup_isopen = False
         except Exception:
-            print("Error #2023: Failed to close plotsummary popup.")
+            logger.error("Error #2023: Failed to close plotsummary popup.")
         return
         
     def do_sys_param_shortcut_popup(self):
@@ -1514,7 +1516,7 @@ class Notebook:
             return
                     
         else:
-            print("Error #2020: Opened more than one sys param shortcut popup at a time")
+            logger.error("Error #2020: Opened more than one sys param shortcut popup at a time")
             
     def on_sys_param_shortcut_popup_close(self, continue_=False):
         """ Transfer and store collected parameters. """ 
@@ -1562,8 +1564,8 @@ class Notebook:
             self.sys_param_shortcut_popup.destroy()
             self.sys_param_shortcut_popup_isopen = False
         except Exception as e:
-            print("Error #2021: Failed to close shortcut popup.")
-            print(e)
+            logger.error("Error #2021: Failed to close shortcut popup.")
+            logger.error(e)
         
         return
 
@@ -1698,16 +1700,16 @@ class Notebook:
             self.batch_popup_isopen = True
 
         else:
-            print("Error #102: Opened more than one batch popup at a time")
+            logger.error("Error #102: Opened more than one batch popup at a time")
         return
 
     def on_batch_popup_close(self):
         try:
             self.batch_popup.destroy()
-            print("Batch popup closed")
+            logger.info("Batch popup closed")
             self.batch_popup_isopen = False
         except Exception:
-            print("Error #103: Failed to close batch popup.")
+            logger.error("Error #103: Failed to close batch popup.")
 
         return
 
@@ -1765,7 +1767,7 @@ class Notebook:
             return
 
         else:
-            print("Error #700: Opened more than one resetIC popup at a time")
+            logger.error("Error #700: Opened more than one resetIC popup at a time")
 
         return
 
@@ -1782,11 +1784,11 @@ class Notebook:
                                                     if self.resetIC_checklayers[layer_name].get()]
 
             self.resetIC_popup.destroy()
-            print("resetIC popup closed")
+            logger.info("resetIC popup closed")
             self.resetIC_popup_isopen = False
 
         except Exception:
-            print("Error #601: Failed to close Bayesim popup")
+            logger.error("Error #601: Failed to close Bayesim popup")
         return
 
     def do_plotter_popup(self, plot_ID):
@@ -1868,7 +1870,7 @@ class Notebook:
             self.plotter_popup_isopen = True
 
         else:
-            print("Error #501: Opened more than one plotter popup at a time")
+            logger.error("Error #501: Opened more than one plotter popup at a time")
         return
 
     def on_plotter_popup_close(self, plot_ID, continue_=False):
@@ -1889,13 +1891,13 @@ class Notebook:
                 assert self.analysis_plots[plot_ID].data_filenames, "Select data files"
 
             self.plotter_popup.destroy()
-            print("Plotter popup closed")
+            logger.info("Plotter popup closed")
             self.plotter_popup_isopen = False
 
         except AssertionError as oops:
             self.write(self.plotter_status, str(oops))
         except Exception:
-            print("Error #502: Failed to close plotter popup.")
+            logger.error("Error #502: Failed to close plotter popup.")
 
         return
 
@@ -1933,7 +1935,7 @@ class Notebook:
             self.integration_popup_isopen = True
             
         else:
-            print("Error #420: Opened more than one integration popup at a time")
+            logger.error("Error #420: Opened more than one integration popup at a time")
         return
 
     def on_integration_popup_close(self, continue_=False):
@@ -1944,10 +1946,10 @@ class Notebook:
                 self.PL_mode = ""
 
             self.integration_popup.destroy()
-            print("Integration popup closed")
+            logger.info("Integration popup closed")
             self.integration_popup_isopen = False
         except Exception:
-            print("Error #421: Failed to close PLmode popup.")
+            logger.error("Error #421: Failed to close PLmode popup.")
 
         return
 
@@ -2034,7 +2036,7 @@ class Notebook:
             self.integration_getbounds_popup.grab_set()
             self.integration_getbounds_popup_isopen = True
         else:
-            print("Error #422: Opened more than one integration getbounds popup at a time")
+            logger.error("Error #422: Opened more than one integration getbounds popup at a time")
         return
 
     def on_integration_getbounds_popup_close(self, continue_=False):
@@ -2045,7 +2047,7 @@ class Notebook:
             if continue_:
                 self.integration_bounds = []
                 if self.fetch_intg_mode.get() == "single":
-                    print("Single integral")
+                    logger.info("Single integral")
                     lbound = float(self.integration_lbound_entry.get())
                     ubound = float(self.integration_ubound_entry.get())
                     if (lbound > ubound):
@@ -2058,7 +2060,7 @@ class Notebook:
                     
 
                 elif self.fetch_intg_mode.get() == "multiple":
-                    print("Multiple integrals")
+                    logger.info("Multiple integrals")
                     if self.integration_center_entry.get() == "Aboma":
                         centers = [0,1600,3600,5000,6400,8000,14200]
                         #centers = [0,2200,3400,5200,6400,7200,8600,10000]
@@ -2079,13 +2081,13 @@ class Notebook:
                 else:
                     raise KeyError("Select \"Single\" or \"Multiple\"")
 
-                print("Over: {}".format(self.integration_bounds))
+                logger.info("Over: {}".format(self.integration_bounds))
 
             else:
                 self.write(self.analysis_status, "Integration cancelled")
 
             self.integration_getbounds_popup.destroy()
-            print("PL getbounds popup closed")
+            logger.info("PL getbounds popup closed")
             self.integration_getbounds_popup_isopen = False
 
         except (OSError, KeyError) as uh_oh:
@@ -2131,7 +2133,7 @@ class Notebook:
             self.PL_xaxis_popup.grab_set()
             self.PL_xaxis_popup_isopen = True
         else:
-            print("Error #424: Opened more than one PL xaxis popup at a time")
+            logger.error("Error #424: Opened more than one PL xaxis popup at a time")
         return
 
     def on_PL_xaxis_popup_close(self, continue_=False):
@@ -2142,10 +2144,10 @@ class Notebook:
                     self.write(self.PL_xaxis_status, "Select a parameter")
                     return
             self.PL_xaxis_popup.destroy()
-            print("PL xaxis popup closed")
+            logger.info("PL xaxis popup closed")
             self.PL_xaxis_popup_isopen = False
         except Exception:
-            print("Error #425: Failed to close PL xaxis popup.")
+            logger.error("Error #425: Failed to close PL xaxis popup.")
 
         return
     
@@ -2259,7 +2261,7 @@ class Notebook:
             self.change_axis_popup.grab_set()
             self.change_axis_popup_isopen = True
         else:
-            print("Error #440: Opened more than one change axis popup at a time")
+            logger.error("Error #440: Opened more than one change axis popup at a time")
         return
 
     def on_change_axis_popup_close(self, from_integration, continue_=False):
@@ -2326,7 +2328,7 @@ class Notebook:
             self.write(self.change_axis_status, oops)
             return
         except Exception:
-            print("Error #441: Failed to close change axis popup.")
+            logger.error("Error #441: Failed to close change axis popup.")
 
         return
 
@@ -2374,7 +2376,7 @@ class Notebook:
             self.IC_carry_popup_isopen = True
             
         else:
-            print("Error #510: Opened more than one IC carryover popup at a time")
+            logger.error("Error #510: Opened more than one IC carryover popup at a time")
         return
 
     def on_IC_carry_popup_close(self, continue_=False):
@@ -2478,7 +2480,7 @@ class Notebook:
             self.write(self.analysis_status, "Error: failed to regenerate IC file")
             
         except Exception:
-            print("Error #511: Failed to close IC carry popup.")
+            logger.error("Error #511: Failed to close IC carry popup.")
 
         return
 
@@ -2532,8 +2534,8 @@ class Notebook:
         try:
             del self.active_timeseries[tspopup_ID]
         except Exception as e:
-            print("Failed to clear time series")
-            print(e)
+            logger.error("Failed to clear time series")
+            logger.error(e)
         ts_popup.destroy()
         return
     
@@ -2653,7 +2655,7 @@ class Notebook:
         data_dirname = tk.filedialog.askdirectory(title="Select a dataset", 
                                                   initialdir=self.default_dirs["Data"])
         if not data_dirname:
-            print("No data set selected :(")
+            logger.info("No data set selected :(")
             return
 
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
@@ -3005,15 +3007,15 @@ class Notebook:
         tab_text = event.widget.tab(selected_tab, "text")
 
         if (tab_text == "Inputs"):
-            print("Inputs tab selected")
+            logger.info("Inputs tab selected")
             #self.update_IC_filebox()
 
         elif (tab_text == "Simulate"):
-            print("Simulate tab selected")
+            logger.info("Simulate tab selected")
             
 
         elif (tab_text == "Analyze"):
-            print("Analyze tab selected")
+            logger.info("Analyze tab selected")
 
         return
 
@@ -3136,7 +3138,7 @@ class Notebook:
             return
     
         try:
-            print("Attempting to create {} data folder".format(data_file_name))
+            logger.info("Attempting to create {} data folder".format(data_file_name))
             dirname = os.path.join(self.default_dirs["Data"], 
                                     self.module.system_ID,
                                     data_file_name)
@@ -3145,7 +3147,7 @@ class Notebook:
             assert "Data" in dirname
             assert self.module.system_ID in dirname
             if os.path.isdir(dirname):
-                print("{} folder already exists; trying alternate name".format(data_file_name))
+                logger.warning("{} folder already exists; trying alternate name".format(data_file_name))
                 append = 1
                 while (os.path.isdir("{}({})".format(dirname, append))):
                     append += 1
@@ -3206,7 +3208,7 @@ class Notebook:
             return
         
         except KeyboardInterrupt:
-            print("### Aborting {} ###".format(data_file_name))
+            logger.warning("### Aborting {} ###".format(data_file_name))
             self.sim_warning_msg.append("Abort signal received while simulating {}\n".format(data_file_name))
             for file in os.listdir(dirname):
                 tpath = os.path.join(dirname, file)
@@ -3346,7 +3348,7 @@ class Notebook:
             data_filename = active_datagroup.datasets[tag].filename
             datatype = active_datagroup.datasets[tag].type
             where_layer = self.module.find_layer(datatype)
-            print("Now integrating {}".format(data_filename))
+            logger.info("Now integrating {}".format(data_filename))
 
             # Unpack needed params from the dictionaries of params
             dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
@@ -3390,7 +3392,7 @@ class Notebook:
 
                 include_negative = symmetric_flag and (l_bound < 0)
 
-                print("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
+                logger.info("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
                 j = to_index(u_bound, dx, total_length)
                 i = to_index(abs(l_bound), dx, total_length)
@@ -3486,14 +3488,14 @@ class Notebook:
                         td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
                                                                  active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].flags)
                     except Exception:
-                        print("Error: failed to calculate time series")
+                        logger.error("Error: failed to calculate time series")
                         td[ext_tag] = None
                         
                     if td[ext_tag] is not None:
                         td_gridt[ext_tag] = np.linspace(0, total_time, n + 1)
                         
                 counter += 1
-                print("Integration: {} of {} complete".format(counter, active_datagroup.size() * len(self.integration_bounds)))
+                logger.info("Integration: {} of {} complete".format(counter, active_datagroup.size() * len(self.integration_bounds)))
 
         subplot = self.integration_plots[ip_ID].plot_obj
         datagroup = self.integration_plots[ip_ID].datagroup
@@ -3561,7 +3563,7 @@ class Notebook:
         self.root.wait_window(self.resetIC_popup)
 
         if (not self.resetIC_selected_layers):
-            print("No layers selected :(")
+            logger.info("No layers selected :(")
             return
 
         for layer_name in self.resetIC_selected_layers:
@@ -4289,7 +4291,7 @@ class Notebook:
             self.write(self.batch_status, "Error: Invalid batch values")
             return
 
-        print(batch_values)
+        logger.debug(batch_values)
 
         try:
             batch_dir_name = self.batch_name_entry.get()
@@ -4379,7 +4381,7 @@ class Notebook:
             self.write(self.ICtab_status, str(oops))
             
         except ValueError as uh_Oh:
-            print(uh_Oh)
+            logger.error(uh_Oh)
             
         return
 
@@ -4387,7 +4389,7 @@ class Notebook:
         """ Write current state of module into an initial condition (IC) file."""
         try:
             with open(newFileName, "w+") as ofstream:
-                print(dir_name + newFileName + " opened successfully")
+                logger.info(dir_name + newFileName + " opened successfully")
 
                 # We don't really need to note down the time of creation, but it could be useful for interaction with other programs.
                 ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
@@ -4456,7 +4458,7 @@ class Notebook:
         warning_mssg = ""
 
         try:
-            print("Poked file: {}".format(self.IC_file_name))
+            logger.info("Poked file: {}".format(self.IC_file_name))
             with open(self.IC_file_name, 'r') as ifstream:
                 init_param_values_dict = {}
 
@@ -4488,31 +4490,31 @@ class Notebook:
                     # each corresponding to a different section of the file
 
                     if "p$ Space Grid" in line:
-                        print("Now searching for space grid: length and dx")
+                        logger.info("Now searching for space grid: length and dx")
                         initFlag = 'g'
                         continue
                         
                     elif "p$ System Parameters" in line:
-                        print("Now searching for system parameters...")
+                        logger.info("Now searching for system parameters...")
                         initFlag = 'p'
                         continue
                         
                     elif "f$" in line:
-                        print("Now searching for flag values...")
+                        logger.info("Now searching for flag values...")
                         initFlag = 'f'
                         continue
                         
                     elif "$ Laser Parameters" in line:
-                        print("Now searching for laser parameters...")
+                        logger.info("Now searching for laser parameters...")
                         if self.module.system_ID not in self.LGC_eligible_modules:
-                            print("Warning: laser params found for unsupported module (these will be ignored)")
+                            logger.warning("Warning: laser params found for unsupported module (these will be ignored)")
                         initFlag = 'l'
                         continue
                         
                     elif "$ Laser Options" in line:
-                        print("Now searching for laser options...")
+                        logger.info("Now searching for laser options...")
                         if self.module.system_ID not in self.LGC_eligible_modules:
-                            print("Warning: laser options found for unsupported module (these will be ignored)")
+                            logger.warning("Warning: laser options found for unsupported module (these will be ignored)")
                         initFlag = 'o'
                         continue
 
@@ -4523,7 +4525,7 @@ class Notebook:
                             init_param_values_dict[layer_name] = {}
                             LGC_values[layer_name] = {}
                             LGC_options[layer_name] = {}
-                            print("Found layer {}".format(layer_name))
+                            logger.info("Found layer {}".format(layer_name))
                             continue
                         
                         if (initFlag == 'g'):
@@ -4771,7 +4773,7 @@ class Notebook:
         paired_data = self.overview_values[layer_name][output_name]
 
         if not isinstance(paired_data, np.ndarray):
-            print("No data found for export")
+            logger.info("No data found for export")
             return
         
         # Grab x axis from matplotlib by force
@@ -4788,9 +4790,9 @@ class Notebook:
                     export_filename = export_filename[:-4]
                 np.savetxt("{}.csv".format(export_filename), paired_data, 
                            delimiter=',')
-                print("Export from overview complete")
+                logger.info("Export from overview complete")
             except PermissionError:
-                print("Error: unable to access export destination")
+                logger.error("Error: unable to access export destination")
         
         return
         
