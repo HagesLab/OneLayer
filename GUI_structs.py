@@ -6,6 +6,9 @@ Created on Mon Feb 22 14:03:19 2021
 """
 import tkinter as tk
 import numpy as np
+from config import init_logging
+logger = init_logging(__name__)
+
 
 class Param_Rule:
     """The Parameter Toolkit uses these to build Parameter()'s values"""
@@ -155,7 +158,7 @@ class Raw_Data_Group(Data_Group):
             self.datasets[tag] = data
 
         else:
-            print("Cannot plot selected data sets: dt or total t mismatch")
+            logger.info("Cannot plot selected data sets: dt or total t mismatch")
 
         return
 

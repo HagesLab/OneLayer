@@ -8,6 +8,9 @@ import numpy as np
 from helper_structs import Parameter, Output, Layer
 from utils import to_index, to_pos
 
+from config import init_logging
+logger = init_logging(__name__)
+
 class OneD_Model:
     """ Template class for modules.
     
@@ -186,7 +189,7 @@ class OneD_Model:
                 try:
                     new_param_value[i:j+1] = condition.l_boundval * np.power(condition.r_boundval / condition.l_boundval, ndx / (j - i))
                 except FloatingPointError:
-                    print("Warning: Step size too large to resolve initial condition accurately")
+                    logger.info("Warning: Step size too large to resolve initial condition accurately")
 
         param.value = new_param_value
         return
@@ -428,11 +431,11 @@ class OneD_Model:
     
     def verify(self):
         """Performs basic syntactical checks on module's attributes."""
-        print("Verifying selected module...")
+        logger.info("Verifying selected module...")
         
         errors = ["{} verification error:".format(self.system_ID)]
         if not "symmetric_system" in self.flags_dict:
-            print("Warning: no symmetric_system flag defined."
+            logger.info("Warning: no symmetric_system flag defined."
                   "Automatically setting symmetric_system to FALSE")
             self.flags_dict["symmetric_system"] = ("Symmetric System", 0, 0)
         
@@ -444,6 +447,6 @@ class OneD_Model:
                     break
                 
         if len(errors) > 1:
-            print("\n".join(errors))
+            logger.info("\n".join(errors))
             raise NotImplementedError
         return

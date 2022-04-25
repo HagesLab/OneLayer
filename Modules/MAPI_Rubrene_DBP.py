@@ -14,6 +14,9 @@ from utils import to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
 
+from config import init_logging
+logger = init_logging(__name__)
+
 q = 1.0                     #[e]
 q_C = 1.602e-19             #[C]
 kB = 8.61773e-5             #[eV / K]
@@ -247,7 +250,7 @@ class MAPI_Rubrene(OneD_Model):
         try:
             data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["mapi_PL"], dt)
         except Exception:
-            print("Error: failed to calculate tau_diff")
+            logger.info("Error: failed to calculate tau_diff")
             data_dict["MAPI"]["tau_diff"] = 0
         #################
         
@@ -419,7 +422,7 @@ class MAPI_Rubrene(OneD_Model):
             try:
                 tdiff = tau_diff(parent_data, dt)
             except FloatingPointError:
-                print("Error: failed to calculate tau_diff - effective lifetime is near infinite")
+                logger.info("Error: failed to calculate tau_diff - effective lifetime is near infinite")
                 tdiff = np.zeros_like(np.linspace(0, total_time, int(total_time/dt) + 1))
                 
             return [("tau_diff", tdiff),
@@ -703,11 +706,11 @@ def ode_twolayer(data_path_name, m, dm, f, df, n, dt, mapi_params, ru_params,
         init_dP = 0
         
     if do_ss and predict_sstriplets:
-        print("Overriding init_T")
+        logger.info("Overriding init_T")
         try:
             np.testing.assert_almost_equal(init_dN, init_dP)
         except AssertionError:
-            print("Warning: ss triplet prediction assumes equal excitation of holes and electrons. Unequal excitation is WIP.")
+            logger.info("Warning: ss triplet prediction assumes equal excitation of holes and electrons. Unequal excitation is WIP.")
             
         if do_Fret:
             tauD_eff = (k_0*weight2/tauD) + (1/tauD)
@@ -842,7 +845,7 @@ def tau_diff(PL, dt):
     try:
         ln_PL = np.log(PL)
     except Exception:
-        print("Error: could not calculate tau_diff from non-positive PL values")
+        logger.info("Error: could not calculate tau_diff from non-positive PL values")
         return np.zeros(len(PL))
     dln_PLdt = np.zeros(len(ln_PL))
     dln_PLdt[0] = (ln_PL[1] - ln_PL[0]) / dt
