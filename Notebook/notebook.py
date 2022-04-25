@@ -2070,8 +2070,6 @@ class Notebook(BaseNotebook):
             #self.update_IC_filebox()
 
         elif (tab_text == "Simulate"):
-            
-            self.do_Batch()
             logger.info("Simulate tab selected")
             
 
