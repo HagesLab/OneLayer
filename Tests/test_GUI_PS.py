@@ -50,17 +50,16 @@ class TestAPS(unittest.TestCase):
         flags = {}
         type_ = "X"
         filename = "f1"
-        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, filename, show_index=0)
+        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, filename, current_time=0)
         self.aps.datagroup.add(ds1)
     
     def test_init(self):
         
-        self.assertEqual(self.aps.time_index, 0)
         self.assertEqual(self.aps.data_filenames, [])
         self.assertIsInstance(self.aps.datagroup, RDG)
         
-        self.aps.add_time_index(2000)
-        self.assertEqual(self.aps.time_index, 40)
+        self.aps.add_time(2000)
+        self.assertEqual(self.aps.time, 1)
         
-        self.aps.add_time_index(-2000)
-        self.assertEqual(self.aps.time_index, 0)
+        self.aps.add_time(-2000)
+        self.assertEqual(self.aps.time, 0)

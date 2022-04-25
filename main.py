@@ -55,7 +55,7 @@ from io_utils import extract_values, u_read, check_valid_filename, get_split_and
 from Modules.Nanowire import Nanowire
 from Modules.HeatPlate import HeatPlate
 from Modules.Std_SingleLayer import Std_SingleLayer
-from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
+from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
 
 from config import init_logging
 logger = init_logging(__name__)
@@ -769,6 +769,10 @@ class Notebook:
                            value="Log").grid(row=1,column=1)
         tk.Label(self.overview_setup_frame, text="Log").grid(row=1,column=2)
         
+        tk.ttk.Radiobutton(self.overview_setup_frame, variable=self.overview_sample_mode,
+                           value="Custom").grid(row=2,column=1)
+        tk.Label(self.overview_setup_frame, text="Custom").grid(row=2,column=2)
+        
         tk.Button(master=self.overview_setup_frame, text="Select Dataset", 
                       command=self.plot_overview_analysis).grid(row=0,rowspan=2,column=3)
         
@@ -853,7 +857,7 @@ class Notebook:
         self.analyze_tstep_entry.grid(row=1,column=1)
 
         tk.ttk.Button(self.analyze_toolbar_frame, 
-                      text="Step >>", 
+                      text="Time >>", 
                       command=partial(self.plot_tstep)).grid(row=1,column=2)
 
         tk.ttk.Button(self.analyze_toolbar_frame, 
@@ -1489,6 +1493,19 @@ class Notebook:
                       text="Continue", 
                       command=partial(self.on_sys_param_shortcut_popup_close, 
                                       True)).grid(row=2,column=1)
+            
+            # FIXME: Temporary patch while we decide between surface recombination and seq-transfer models
+            
+            if self.module.system_ID == "MAPI_Rubrene" and self.current_layer_name == "Rubrene":
+                if self.sys_flag_dict["do_sct"].value():
+                    disable_these = ["St"]
+                    
+                else:
+                    disable_these = ["Ssct", "Sp", "uc_permitivity", "W_VB", "mu_P_up"]
+                    
+                for param in disable_these:
+                    self.enter(self.sys_param_entryboxes_dict[param], 0)
+                    self.sys_param_entryboxes_dict[param].config(state='disabled')
                     
             self.sys_param_shortcut_popup.protocol("WM_DELETE_WINDOW", 
                                                    self.on_sys_param_shortcut_popup_close)
@@ -1781,42 +1798,70 @@ class Notebook:
             self.plotter_popup = tk.Toplevel(self.root)
 
             tk.ttk.Label(self.plotter_popup, 
-                         text="Select a data type", 
+                         text="Select simulated data", 
                          style="Header.TLabel").grid(row=0,column=0,columnspan=2)
 
+            def sims_sort_alpha():
+                self.data_listbox.delete(0,tk.END)
+                self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
+                                  if not file.endswith(".txt")]
+                
+                self.data_listbox.insert(0,*(self.data_list))
+                return
+                
+            def sims_sort_recent():
+                self.data_listbox.delete(0,tk.END)
+                self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
+                                  if not file.endswith(".txt")]
+                
+                self.data_list = sorted(self.data_list, key=lambda file: os.path.getmtime(os.path.join(self.default_dirs["Data"], self.module.system_ID, file)), reverse=True)
+                self.data_listbox.insert(0,*(self.data_list))
+                return
+            
+            sorting_frame = tk.Frame(self.plotter_popup)
+            sorting_frame.grid(row=1,column=0)
+            
+            tk.Button(sorting_frame, text='A-Z',
+                      command=sims_sort_alpha).grid(row=0,column=0)
+            
+            tk.Button(sorting_frame, text='Recent First',
+                      command=sims_sort_recent).grid(row=0,column=1)
+            
+            
+            data_listbox_frame = tk.Frame(self.plotter_popup)
+            data_listbox_frame.grid(row=2,column=0)
+            
+            self.data_listbox = tk.Listbox(data_listbox_frame, width=60, 
+                                           height=40, 
+                                           selectmode="extended")
+            self.data_listbox.grid(row=0,column=0)
+            
+
+            data_listbox_scrollbar = tk.ttk.Scrollbar(data_listbox_frame, orient="vertical",
+                                                           command=self.data_listbox.yview)
+            data_listbox_scrollbar.grid(row=0,column=1, sticky='ns')
+            
+            self.data_listbox.config(yscrollcommand=data_listbox_scrollbar.set)
+            sims_sort_alpha()
+            
+            plotter_options_frame = tk.Frame(self.plotter_popup)
+            plotter_options_frame.grid(row=2,column=1)
             all_outputs = []
             for layer_name, layer in self.module.layers.items():
                 all_outputs += [output for output in layer.outputs if layer.outputs[output].analysis_plotable]
-            tk.OptionMenu(self.plotter_popup, self.data_var, 
-                          *all_outputs).grid(row=1,column=0)
-            
-            self.data_listbox_frame = tk.Frame(self.plotter_popup)
-            self.data_listbox_frame.grid(row=2,column=0, rowspan=99)
-            self.data_listbox = tk.Listbox(self.data_listbox_frame, width=30, 
-                                           height=20, 
-                                           selectmode="extended")
-            self.data_listbox.grid(row=0,column=0)
-            self.data_listbox.delete(0,tk.END)
-            self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
-                              if not file.endswith(".txt")]
-            self.data_listbox.insert(0,*(self.data_list))
+            tk.OptionMenu(plotter_options_frame, self.data_var, 
+                          *all_outputs).grid(row=0,column=0)
 
-            self.data_listbox_scrollbar = tk.ttk.Scrollbar(self.data_listbox_frame, orient="vertical",
-                                                           command=self.data_listbox.yview)
-            self.data_listbox_scrollbar.grid(row=0,column=1, sticky='ns')
-            
-            self.data_listbox.config(yscrollcommand=self.data_listbox_scrollbar.set)
-
-            tk.Checkbutton(self.plotter_popup, text="Auto-integrate", 
+            tk.Checkbutton(plotter_options_frame, text="Auto-integrate", 
                            variable=self.check_autointegrate, 
-                           onvalue=1, offvalue=0).grid(row=1,column=1)
+                           onvalue=1, offvalue=0).grid(row=0,column=1)
             
-            tk.Button(self.plotter_popup, text="Continue", 
+            tk.Button(plotter_options_frame, text="Continue", 
                       command=partial(self.on_plotter_popup_close, 
-                                      plot_ID, continue_=True)).grid(row=2,column=1)
+                                      plot_ID, continue_=True)).grid(row=1,column=0,columnspan=2)
 
-            self.plotter_status = tk.Text(self.plotter_popup, width=24,height=2)
-            self.plotter_status.grid(row=3,rowspan=2,column=1)
+            self.plotter_status = tk.Text(plotter_options_frame, width=24,height=2)
+            self.plotter_status.grid(row=2,column=0,columnspan=2, padx=(20,20))
             self.plotter_status.configure(state="disabled")
 
             self.plotter_popup.protocol("WM_DELETE_WINDOW", partial(self.on_plotter_popup_close, 
@@ -2315,7 +2360,9 @@ class Notebook:
             self.carry_IC_listbox = tk.Listbox(self.IC_carry_popup, width=30,height=10, 
                                                selectmode='extended')
             self.carry_IC_listbox.grid(row=4,column=0,columnspan=2)
-            for key in self.analysis_plots[plot_ID].datagroup.datasets:
+            for key, dataset in self.analysis_plots[plot_ID].datagroup.datasets.items():
+                over_time = (self.analysis_plots[plot_ID].time > dataset.total_time)
+                if over_time: continue
                 self.carry_IC_listbox.insert(tk.END, key)
 
             tk.Button(self.IC_carry_popup, text="Continue", 
@@ -2336,7 +2383,8 @@ class Notebook:
         try:
             if continue_:
                 plot_ID = self.active_analysisplot_ID.get()
-                active_sets = self.analysis_plots[plot_ID].datagroup.datasets
+                active_plot = self.analysis_plots[plot_ID]
+                active_sets = active_plot.datagroup.datasets
                 datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
                 if not datasets: 
                     return
@@ -2371,8 +2419,16 @@ class Notebook:
                                                         self.module.system_ID,
                                                         filename,
                                                         "{}-{}.h5".format(filename, var))
-                            sim_data[layer_name][var] = u_read(path_name, t0=active_sets[key].show_index, 
-                                                               single_tstep=True)
+                            floor_tstep = int(active_plot.time / active_sets[key].dt)
+                            interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                            
+                            if active_plot.time == active_sets[key].total_time:
+                                pass
+                            else:
+                                slope = (interpolated_step[1] - interpolated_step[0]) / (active_sets[key].dt)
+                                interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * active_sets[key].dt)
+                            
+                            sim_data[layer_name][var] = interpolated_step
 
                     self.module.get_IC_carry(sim_data, param_dict_copy, 
                                                include_flags, grid_x)
@@ -2396,6 +2452,7 @@ class Notebook:
                             for param in layer.params:
                                 if not (param == "Total_length" or param == "Node_width"):
                                     param_values = layer_params[param]
+                                    param_values *= self.module.layers[layer_name].convert_out[param]
                                     if isinstance(param_values, np.ndarray):
                                         # Write the array in a more convenient format
                                         ofstream.write("{}: {:.8e}".format(param, param_values[0]))
@@ -2441,7 +2498,8 @@ class Notebook:
         td_canvas = tkagg.FigureCanvasTkAgg(td_fig, master=ts_popup)
         td_plotwidget = td_canvas.get_tk_widget()
         td_plotwidget.grid(row=0,column=0, columnspan=2)
-        #tkagg.NavigationToolbar2Tk(td_canvas, ts_popup).grid(row=1,column=0,columnspan=2)
+        
+        
         name = td[next(iter(td))][ts_ID][0]
         where_layer = self.module.find_layer(name)
         scale_f = self.module.layers[where_layer].convert_out[name]
@@ -2453,6 +2511,7 @@ class Notebook:
         assert tspopup_ID not in self.active_timeseries, "Error: a timeseries was overwritten"
         self.active_timeseries[tspopup_ID] = []
         for tag in td:
+            print(list(td[tag][ts_ID][1] * scale_f))
             td_subplot.plot(td_gridt[tag], td[tag][ts_ID][1] * scale_f, label=tag.strip('_'))
             self.active_timeseries[tspopup_ID].append((tag, td_gridt[tag], td[tag][ts_ID][1] * scale_f))
     
@@ -2460,8 +2519,12 @@ class Notebook:
         td_fig.tight_layout()
         td_fig.canvas.draw()
         
-        tk.ttk.Button(ts_popup, text="Export All", command=partial(self.export_timeseries, tspopup_ID, tail=False)).grid(row=2,column=0, padx=(10,10))
-        tk.ttk.Button(ts_popup, text="Export Tail", command=partial(self.export_timeseries, tspopup_ID, tail=True)).grid(row=2,column=1, padx=(10,10))
+        tframe = tk.Frame(master=ts_popup)
+        tframe.grid(row=1,column=0,columnspan=2)
+        tkagg.NavigationToolbar2Tk(td_canvas, tframe).grid(row=0,column=0,columnspan=2)
+        
+        tk.ttk.Button(tframe, text="Export All", command=partial(self.export_timeseries, tspopup_ID, tail=False)).grid(row=2,column=0, padx=(10,10))
+        tk.ttk.Button(tframe, text="Export Tail", command=partial(self.export_timeseries, tspopup_ID, tail=True)).grid(row=2,column=1, padx=(10,10))
         ts_popup.protocol("WM_DELETE_WINDOW", partial(self.on_timeseries_popup_close, ts_popup,
                                                  tspopup_ID))
         
@@ -2477,7 +2540,7 @@ class Notebook:
         return
     
     ## Plotter for simulation tab    
-    def update_sim_plots(self, index, do_clear_plots=True):
+    def update_sim_plots(self, index, failed_vars, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
         
         for layer_name, layer in self.module.layers.items():
@@ -2497,7 +2560,8 @@ class Notebook:
                 plot.set_yscale(output_obj.yscale)
                 
                 grid_x = layer.grid_x_nodes if not output_obj.is_edge else layer.grid_x_edges
-                plot.plot(grid_x, self.sim_data[variable] * convert_out[variable])
+                if not failed_vars[variable]:
+                    plot.plot(grid_x, self.sim_data[variable] * convert_out[variable])
     
                 plot.set_xlabel("x {}".format(layer.length_unit))
                 plot.set_ylabel("{} {}".format(variable, output_obj.units))
@@ -2596,11 +2660,6 @@ class Notebook:
 
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
         
-        try:
-            sample_ct = int(self.overview_samplect_entry.get())
-            assert sample_ct > 0
-        except Exception:
-            sample_ct = 5
         
         try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
@@ -2620,9 +2679,25 @@ class Notebook:
             data_node_t = np.linspace(0, total_time, data_n + 1)
             
             if self.overview_sample_mode.get() == 'Log':
+                try:
+                    sample_ct = int(self.overview_samplect_entry.get())
+                    assert sample_ct > 0
+                except Exception:
+                    sample_ct = 5
+                    
                 tstep_list = np.append([0], np.geomspace(1, data_n, num=sample_ct-1, dtype=int))
-            else:
+            elif self.overview_sample_mode.get() == 'Linear':
+                try:
+                    sample_ct = int(self.overview_samplect_entry.get())
+                    assert sample_ct > 0
+                except Exception:
+                    sample_ct = 5
+                    
                 tstep_list = np.linspace(0, data_n, num=sample_ct)
+                
+            else:
+                sample_ct = self.overview_samplect_entry.get()
+                tstep_list = np.array(np.array(extract_values(sample_ct, ' ')) / dt, dtype=int)
                 
         except AssertionError as oops:
             self.do_confirmation_popup(str(oops), hide_cancel=True)
@@ -2730,16 +2805,17 @@ class Notebook:
 
             # This data is in TEDs units since we just used it in a calculation - convert back to common units first
             for dataset in active_datagroup.datasets.values():
-                label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
-                subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
-
+                if active_plot_data.time <= dataset.total_time:
+                    label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
+                    subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
+                else:
+                    print("Warning: time out of range for dataset {}".format(dataset.tag()))
+                    
             subplot.set_xlabel("x {}".format(self.module.layers[where_layer].length_unit))
             subplot.set_ylabel("{} {}".format(active_datagroup.type, self.module.layers[where_layer].outputs[active_datagroup.type].units))
             if active_plot_data.display_legend:
                 subplot.legend().set_draggable(True)
-            subplot.set_title("Time: " 
-                              + str(active_datagroup.get_maxtime() * active_plot_data.time_index / active_datagroup.get_maxnumtsteps()) 
-                              + " / " + str(active_datagroup.get_maxtime()) + "ns")
+            subplot.set_title("Time: {} / {} ns".format(active_plot_data.time, active_datagroup.get_maxtime()))
             self.analyze_fig.tight_layout()
             self.analyze_fig.canvas.draw()
             
@@ -2756,14 +2832,10 @@ class Notebook:
         """Create a dataset object and prepare to plot on analysis tab."""
         # Select data type of incoming dataset from existing datasets
         active_plot = self.analysis_plots[plot_ID]
-        datagroup = active_plot.datagroup
 
         try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
-            if datagroup.size():
-                assert (datagroup.total_t == total_time), "Error: time grid mismatch"
-                assert (datagroup.dt == dt), "Error: time grid mismatch"
-                
+            
             data_m = {}
             data_edge_x = {}
             data_node_x = {}
@@ -2789,8 +2861,11 @@ class Notebook:
                                             self.module.system_ID,
                                             data_filename,
                                             "{}-{}.h5".format(data_filename, sim_datatype))
-                sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
-                                                            single_tstep=True)
+                try:
+                    sim_data[layer_name][sim_datatype] = u_read(path_name, t0=0, 
+                                                                single_tstep=True)
+                except OSError:
+                    continue
         where_layer = self.module.find_layer(datatype)
         try:
             values = self.module.prep_dataset(datatype, sim_data, param_values_dict, flag_values_dict)
@@ -2809,12 +2884,12 @@ class Notebook:
             return Raw_Data_Set(values, data_edge_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt, 
                                 param_values_dict, flag_values_dict, datatype, data_filename, 
-                                active_plot.time_index)
+                                active_plot.time)
         else:
             return Raw_Data_Set(values, data_node_x[where_layer], data_node_x[where_layer], 
                                 total_time, dt,
                                 param_values_dict, flag_values_dict, datatype, data_filename, 
-                                active_plot.time_index)
+                                active_plot.time)
 
     def load_datasets(self):
         """ Interpret selection from do_plotter_popup()."""
@@ -2827,7 +2902,7 @@ class Notebook:
         active_plot = self.analysis_plots[plot_ID]
         datatype = self.data_var.get()
 
-        active_plot.time_index = 0
+        active_plot.time = 0
         active_plot.datagroup.clear()
         err_msg = ["Error: the following data could not be plotted"]
         for i in range(0, len(active_plot.data_filenames)):
@@ -2861,13 +2936,14 @@ class Notebook:
         plot_ID = self.active_analysisplot_ID.get()
         active_plot = self.analysis_plots[plot_ID]
         try:
-            active_plot.add_time_index(int(self.analyze_tstep_entry.get()))
+            active_plot.add_time(float(self.analyze_tstep_entry.get()))
         except ValueError:
             self.write(self.analysis_status, "Invalid number of time steps")
             return
 
         active_datagroup = active_plot.datagroup
-        # Search data files for data at new time step
+        # Search data files for data at new time
+        # Interpolate if necessary
         for tag, dataset in active_datagroup.datasets.items():
             sim_data = {}
             for layer_name, layer in self.module.layers.items():
@@ -2877,12 +2953,33 @@ class Notebook:
                                                 self.module.system_ID,
                                                 dataset.filename,
                                                 "{}-{}.h5".format(dataset.filename, sim_datatype))
-                    sim_data[layer_name][sim_datatype] = u_read(path_name, t0=active_plot.time_index, 
-                                                                single_tstep=True)
+                    
+                    floor_tstep = int(active_plot.time / dataset.dt)
+                    try:
+                        interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                    except OSError:
+                        continue
+                    over_time = False
+                    
+                    if active_plot.time > dataset.total_time:
+                        interpolated_step = np.zeros_like(dataset.node_x)
+                        over_time = True
+                        
+                    elif active_plot.time == dataset.total_time:
+                        pass
+                    else:
+                        slope = (interpolated_step[1] - interpolated_step[0]) / (dataset.dt)
+                        interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * dataset.dt)
+                    
+                    sim_data[layer_name][sim_datatype] = interpolated_step
         
-            dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
-                                                      dataset.params_dict, dataset.flags)
-            dataset.show_index = active_plot.time_index
+            if over_time:
+                dataset.data = interpolated_step
+            else:
+                dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
+                                                          dataset.params_dict, dataset.flags)
+            dataset.current_time = active_plot.time
+            
             
         self.plot_analyze(plot_ID, force_axis_update=False)
         self.write(self.analysis_status, "")
@@ -3072,33 +3169,35 @@ class Notebook:
 
 
         ## Calculate!
-        atom = tables.Float64Atom()
+        #atom = tables.Float64Atom()
 
         ## Create data files
-        for layer_name, layer in self.module.layers.items():
-            for variable in layer.s_outputs:
-                path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
-                with tables.open_file(path, mode='w') as ofstream:
-                    length = num_nodes[layer_name] 
-                    if layer.s_outputs[variable].is_edge:
-                        num_nodes[layer_name] += 1
+        # for layer_name, layer in self.module.layers.items():
+        #     for variable in layer.s_outputs:
+        #         path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
+        #         with tables.open_file(path, mode='w') as ofstream:
+        #             length = num_nodes[layer_name] 
+        #             if layer.s_outputs[variable].is_edge:
+        #                 length += 1
     
-                    # Important - "data" must be used as the array name here, as pytables will use the string "data" 
-                    # to name the attribute earray.data, which is then used to access the array
-                    earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
-                    earray.append(np.reshape(init_conditions[variable], (1, length)))
+        #             # Important - "data" must be used as the array name here, as pytables will use the string "data" 
+        #             # to name the attribute earray.data, which is then used to access the array
+        #             earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
+        #             earray.append(np.reshape(init_conditions[variable], (1, length)))
         
         ## Setup simulation plots and plot initial
         
         self.sim_data = dict(init_conditions)
-        self.update_sim_plots(0)
+        #self.update_sim_plots(0)
+        flag_values = {f:flag.value() for f, flag in self.sys_flag_dict.items()}
 
         try:
             self.module.simulate(os.path.join(dirname, data_file_name), 
                                    num_nodes, self.n, self.dt,
-                                   self.sys_flag_dict, self.hmax, init_conditions)
+                                   flag_values, self.hmax, init_conditions)
             
-        except FloatingPointError:
+        except FloatingPointError as e:
+            print(e)
             self.sim_warning_msg.append("Error: an unusual value occurred while simulating {}. "
                                         "This file may have invalid parameters.".format(data_file_name))
             for file in os.listdir(dirname):
@@ -3130,16 +3229,25 @@ class Notebook:
 
         self.write(self.status, "Finalizing...")
 
-        try:
-            for i in range(1,6):
-                for var in self.sim_data:
-                    path_name = os.path.join(dirname, "{}-{}.h5".format(data_file_name, var))
+        failed_vars = {}
+        for i in range(1,6):
+            for var in self.sim_data:
+                path_name = os.path.join(dirname, "{}-{}.h5".format(data_file_name, var))
+                failed_vars[var] = 0
+                try:
                     self.sim_data[var] = u_read(path_name, t0=int(self.n * i / 5), 
                                                 single_tstep=True)
-                self.update_sim_plots(self.n, do_clear_plots=False)
-        except Exception:
-            self.sim_warning_msg.append("Warning: unable to plot {}. Output data "
-                                        "may not have been saved correctly.\n".format(data_file_name))
+                    
+                except Exception:
+                    self.sim_data[var] = 0
+                    failed_vars[var] = 1
+            is_first = (i == 1)
+            self.update_sim_plots(self.n, failed_vars, do_clear_plots=is_first)
+            
+        failed_vars = [var for var, fail_state in failed_vars.items() if fail_state]
+        if failed_vars:
+            self.sim_warning_msg.append("Warning: unable to plot {} for {}. Output data "
+                                        "may not have been saved correctly.\n".format(failed_vars, data_file_name))
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
@@ -3230,9 +3338,6 @@ class Notebook:
         self.integration_plots[ip_ID].mode = self.PL_mode
         self.integration_plots[ip_ID].global_gridx = None
 
-        
-        n = active_datagroup.get_maxnumtsteps()
-        
         if self.PL_mode == "All time steps":
             td_gridt = {}
             td = {}
@@ -3248,16 +3353,20 @@ class Notebook:
             # Unpack needed params from the dictionaries of params
             dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
             total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
-            total_time = active_datagroup.total_t
-            dt = active_datagroup.dt
+            total_time = active_datagroup.datasets[tag].total_time
+            current_time = active_datagroup.datasets[tag].current_time
+            dt = active_datagroup.datasets[tag].dt
+            n = active_datagroup.datasets[tag].num_tsteps
             symmetric_flag = active_datagroup.datasets[tag].flags["symmetric_system"]
 
+            if current_time > total_time: continue
+
             if self.PL_mode == "Current time step":
-                show_index = active_datagroup.datasets[tag].show_index
+                show_index = int(current_time / dt)
+                end_index = show_index+2
             else:
                 show_index = None
-                
-            
+                end_index = None
 
             # Clean up any bounds that extend past the confines of the system
             # The system usually exists from x=0 to x=total_length, 
@@ -3286,87 +3395,85 @@ class Notebook:
                 logger.info("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
 
                 j = to_index(u_bound, dx, total_length)
-                if include_negative:
-                    i = to_index(-l_bound, dx, total_length)
+                i = to_index(abs(l_bound), dx, total_length)
+                if include_negative:  
                     nen = [-l_bound > to_pos(i, dx) + dx / 2,
                                        u_bound > to_pos(j, dx) + dx / 2]
+                    
+                    space_bounds = [(0,i,nen[0], 0, -l_bound), (0,j,nen[1], 0, u_bound)]
                 else:
-                    i = to_index(l_bound, dx, total_length)
                     nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
-                
+                    space_bounds = [(i,j,nen, l_bound, u_bound)]
 
                 do_curr_t = self.PL_mode == "Current time step"
                 
                 pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
                 
-                if include_negative:
+                extra_data = {}
+                for c, s in enumerate(space_bounds):
                     sim_data = {}
-                    extra_data = {}
                     for layer_name, layer in self.module.layers.items():
                         sim_data[layer_name] = {}
                         extra_data[layer_name] = {}
                         for sim_datatype in layer.s_outputs:
-                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, l=0, r=i+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=nen[0], 
-                                                                        force_1D=False) 
-                            extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                          t0=show_index, single_tstep=do_curr_t, force_1D=False)
-            
-                    data = self.module.prep_dataset(datatype, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.datasets[tag].flags,
-                                                      True, 0, i, nen[0], extra_data)
-                    I_data = new_integrate(data, 0, -l_bound, dx, total_length, nen[0])
-                    sim_data = {}
-                    
-                    for layer_name, layer in self.module.layers.items():
-                        sim_data[layer_name] = {}
-                        for sim_datatype in layer.s_outputs:
-                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, l=0, r=j+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=nen[1],
-                                                                        force_1D=False) 
-            
-                    data = self.module.prep_dataset(datatype, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.datasets[tag].flags,
-                                                      True, 0, j, nen[1], extra_data)
-                    I_data += new_integrate(data, 0, u_bound, dx, total_length, nen[1])
-                    
-                else:
-                    sim_data = {}
-                    extra_data = {}
-                    for layer_name, layer in self.module.layers.items():
-                        sim_data[layer_name] = {}
-                        extra_data[layer_name] = {}
-                        for sim_datatype in layer.s_outputs:
-                            sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                        t0=show_index, l=i, r=j+1, 
-                                                                        single_tstep=do_curr_t, need_extra_node=nen,
-                                                                        force_1D=False) 
-                            extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                          t0=show_index, single_tstep=do_curr_t,
-                                                                          force_1D=False) 
-            
-                    data = self.module.prep_dataset(datatype, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict,
-                                                      active_datagroup.datasets[tag].flags,
-                                                      True, i, j, nen, extra_data)
-                    
-                    I_data = new_integrate(data, l_bound, u_bound, dx, total_length, nen)
 
+                            if do_curr_t:
+                                try:
+                                    interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                               t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                               single_tstep=False, need_extra_node=s[2], 
+                                                               force_1D=False)
+                                except OSError:
+                                    continue
+                                if current_time == total_time:
+                                    pass
+                                else:
+                                    floor_tstep = int(current_time / dt)
+                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                                
+                                sim_data[layer_name][sim_datatype] = np.array(interpolated_step)
+                                
+                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                             t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+                                if current_time == total_time:
+                                    pass
+                                else:
+                                    floor_tstep = int(current_time / dt)
+                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                                    
+                                extra_data[layer_name][sim_datatype] = np.array(interpolated_step)
+                            
+                            else:
+                                try:
+                                    sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                                single_tstep=False, need_extra_node=s[2], 
+                                                                                force_1D=False) 
+                                except OSError:
+                                    continue
+                                
+                                if c == 0:
+                                    extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                  t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+            
+                    data = self.module.prep_dataset(datatype, sim_data, 
+                                                      active_datagroup.datasets[tag].params_dict, 
+                                                      active_datagroup.datasets[tag].flags,
+                                                      True, s[0], s[1], s[2], extra_data)
+                    
+                    if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2])
+                    else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2])
                             
                 if self.PL_mode == "Current time step":
                     # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
                     grid_xaxis = float(active_datagroup.datasets[tag].params_dict[where_layer][self.xaxis_param]
                                        * self.module.layers[where_layer].convert_out[self.xaxis_param])
-
                     xaxis_label = self.xaxis_param + " [WIP]"
 
                 elif self.PL_mode == "All time steps":
-                    self.integration_plots[ip_ID].global_gridx = np.linspace(0, total_time, n + 1)
-                    grid_xaxis = -1 # A dummy value for the I_Set constructor
+                    grid_xaxis = np.linspace(0, total_time, n + 1)
                     xaxis_label = "Time [ns]"
 
                 ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
@@ -3409,21 +3516,17 @@ class Notebook:
 
         
         for key in datagroup.datasets:
-
             if self.PL_mode == "Current time step":
-                subplot.scatter(datagroup.datasets[key].grid_x, 
-                                datagroup.datasets[key].data * 
-                                self.module.layers[where_layer].convert_out[datagroup.type] *
-                                self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                                label=datagroup.datasets[key].tag(for_matplotlib=True))
-
+                f = subplot.scatter
             elif self.PL_mode == "All time steps":
-                subplot.plot(self.integration_plots[ip_ID].global_gridx, 
-                             datagroup.datasets[key].data * 
-                             self.module.layers[where_layer].convert_out[datagroup.type] *
-                             self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                             label=datagroup.datasets[key].tag(for_matplotlib=True))
-                
+                f = subplot.plot
+            f(datagroup.datasets[key].grid_x, 
+                datagroup.datasets[key].data * 
+                self.module.layers[where_layer].convert_out[datagroup.type] *
+                self.module.layers[where_layer].iconvert_out[datagroup.type], 
+                label=datagroup.datasets[key].tag(for_matplotlib=True))
+
+            
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
         self.integration_plots[ip_ID].ylim = subplot.get_ylim()
                 
@@ -4580,15 +4683,13 @@ class Notebook:
                                             datagroup.type)
 
             else: # if self.I_plot.mode == "All time steps"
-                raw_data = np.array([datagroup.datasets[key].data * 
-                                     self.module.layers[where_layer].convert_out[datagroup.type] *
-                                     self.module.layers[where_layer].iconvert_out[datagroup.type]
-                                     for key in datagroup.datasets])
-                grid_x = np.reshape(plot_info.global_gridx, (1,len(plot_info.global_gridx)))
-                paired_data = np.concatenate((grid_x, raw_data), axis=0).T
-                header = "Time [ns],"
-                for key in datagroup.datasets:
-                    header += datagroup.datasets[key].tag().replace("Δ", "") + ","
+                paired_data = datagroup.build(self.module.layers[where_layer].convert_out, self.module.layers[where_layer].iconvert_out)
+                paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
+                
+                header = "".join(["Time [ns]," + 
+                                  datagroup.datasets[key].filename + 
+                                  "," for key in datagroup.datasets])
+                
 
         else:
             plot_ID = self.active_analysisplot_ID.get()
@@ -4622,29 +4723,26 @@ class Notebook:
         return
     
     def export_timeseries(self, tspopup_ID, tail=False):
-        paired_data = self.active_timeseries[tspopup_ID]
+        paired_data = list(self.active_timeseries[tspopup_ID])
         
         # paired_data = [(tag, tgrid, values), (...,...,...), ...]
         # Unpack list of array tuples into list of arrays
-        
-        # TODO WHEN FLEXIBILE TGRID COMPLETE: 
-        # currently assumes all t grids are identical
-        # should save all t arrays rather than the common one
-        first = True
-        header = ["Time [ns]"]
+
+        header = []
         while isinstance(paired_data[0], tuple):
-            
+            header.append("Time [ns]")
             header.append(paired_data[0][0])
             # unpack
-            if first:
+            if tail:
+                paired_data.append(paired_data[0][1][-10:])
+                paired_data.append(paired_data[0][2][-10:])
+            else:
                 paired_data.append(paired_data[0][1])
-                first = False
-            paired_data.append(paired_data[0][2])
+                paired_data.append(paired_data[0][2])
             paired_data.pop(0)
             
         paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
-        if tail:
-            paired_data = paired_data[-10:]
+        
         
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
                                                           title="Save data", 
