@@ -17,12 +17,9 @@ from functools import partial
 
 import carrier_excitations
 from GUI_structs import Param_Rule
-from GUI_structs import Flag
 from GUI_structs import Batchable
 from GUI_structs import Raw_Data_Set
 from GUI_structs import Integrated_Data_Set
-from GUI_structs import Analysis_Plot_State
-from GUI_structs import Integration_Plot_State
 from utils import to_index
 from utils import to_pos
 from utils import to_array
@@ -34,9 +31,6 @@ from io_utils import u_read
 from io_utils import check_valid_filename
 from io_utils import get_split_and_clean_line
 
-# from Notebook.tabs import add_tab_inputs
-# from Notebook.tabs import add_tab_simulate
-# from Notebook.tabs import add_tab_analyze
 from Notebook.base import BaseNotebook
 
 from config import init_logging
@@ -239,9 +233,9 @@ class Notebook(BaseNotebook):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        logger.info(self.using_LGC)
-        logger.info(self.LGC_options)
-        logger.info(self.LGC_values)
+        logger.debug(self.using_LGC)
+        logger.debug(self.LGC_options)
+        logger.debug(self.LGC_values)
         return
     
     def change_layer(self, clear=True, update_LGC_display=True):
