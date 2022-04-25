@@ -68,5 +68,5 @@ def get_cli_args():
 
 
 if __name__ == "__main__":
-    nb = Notebook("ted", get_cli_args())
+    nb = Notebook("ted", MODULE_LIST, get_cli_args())
     nb.run()

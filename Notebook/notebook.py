@@ -43,27 +43,36 @@ from config import init_logging
 logger = init_logging(__name__)
 
 
-
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
 class Notebook(BaseNotebook):
 
-    def __init__(self, title: str, module_list: dict):
+    def __init__(self, title: str, module_list: dict, cli_args: dict):
         """ Create main tkinter object and select module. """
-        self.module_list = module_list
         self.module = None
         self.root = tk.Tk()
         self.root.attributes('-fullscreen', False)
         self.root.title(title)
         
-        self.do_module_popup()
-        self.root.wait_window(self.select_module_popup)
+        cli_module = cli_args.get("module")
+        if cli_module is not None:
+            self.module = module_list[cli_module]()
+            self.module.verify()
+            self.verified=True
+        else:
+            self.do_module_popup()
+            self.root.wait_window(self.select_module_popup)
+
         if self.module is None: 
             return
         if not self.verified: 
             return
-
         self.prep_notebook()
+        
+        tab_id = cli_args.get("tab_id")
+        if tab_id is not None:
+            self.notebook.select(tab_id)
+        return
 
         
     def prep_notebook(self):
