@@ -9,11 +9,6 @@ import tkinter as tk
 # This lets us pass params to functions called by tkinter buttons
 from functools import partial 
 from GUI_structs import Flag
-from GUI_structs import Param_Rule
-from GUI_structs import Flag
-from GUI_structs import Batchable
-from GUI_structs import Raw_Data_Set
-from GUI_structs import Integrated_Data_Set
 from GUI_structs import Analysis_Plot_State
 from GUI_structs import Integration_Plot_State
 

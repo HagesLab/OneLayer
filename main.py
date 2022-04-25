@@ -5,7 +5,7 @@
 # Author: Calvin Fai, Charles Hages
 # Contact:
 ################################################# 
-        
+
 """
 Usage:
   ./main [--module=<module>] [--tab=<tab_index>]
@@ -21,11 +21,13 @@ Options:
     "1": Simulate
     "2": Analyze
 """
+
 from Notebook.notebook import Notebook
 # Telling TED what modules are available.
 from Modules.Nanowire import Nanowire
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
+
 # {"Display name of module": OneD_Model derived module class}.
 MODULE_LIST = {
     "Standard One-Layer": Std_SingleLayer,
@@ -41,8 +43,6 @@ logger = init_logging(__name__)
 def get_cli_args():
     """Parses the CLI arguments, verifies their
     validity in the context and returns a dict"""
-
-
     raw_args = docopt(__doc__, version='ingest 0.1.0')
     args = {}
     logger.info(raw_args)
