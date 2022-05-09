@@ -17,6 +17,7 @@ from matplotlib.figure import Figure
 
 import tkinter as tk
 from tkinter import ttk
+from tkinter.scrolledtext import ScrolledText as tkScrolledText
 
 # This lets us pass params to functions called by tkinter buttons
 from functools import partial 
@@ -411,8 +412,8 @@ class Notebook(BaseNotebook):
         if not self.sys_printsummary_popup_isopen: 
             self.sys_printsummary_popup = tk.Toplevel(self.root)
             
-            self.printsummary_textbox = tkscrolledtext.ScrolledText(self.sys_printsummary_popup, 
-                                                                    width=100,height=30)
+            self.printsummary_textbox = tkScrolledText(self.sys_printsummary_popup, 
+                                                     width=100,height=30)
             self.printsummary_textbox.grid(row=0,column=0,padx=(20,0), pady=(20,20))
             
             self.sys_printsummary_popup_isopen = True
