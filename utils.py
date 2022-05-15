@@ -6,17 +6,19 @@ Created on Sun Jan 10 15:53:38 2021
 """
 import numpy as np
 from scipy import integrate as intg
-import tables
 
 def to_index(x,dx, absUpperBound, is_edge=False):
     """Returns largest node index less than or equal to position x
     # Warning: this always rounds x down to the nearest node (or edge if is_edge=True)!"""
     absLowerBound = dx / 2 if not is_edge else 0
+    
+    if (x < 0):
+        raise ValueError("cannot index negative position")
     if (x < absLowerBound):
         return 0
 
     if (x > absUpperBound):
-        return int(absUpperBound / dx)
+        raise ValueError("position larger than length of system")
 
     return int((x - absLowerBound) / dx)
 
@@ -46,7 +48,7 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
     base_data : 1D or 2D ndarray
         Values to integrate over.
     l_bound : float
-        Lower boundary.
+        Lower boundary. This is informational only - the base_data is already trimmed to these bounds.
     u_bound : float
         Upper boundary.
     dx : float
@@ -54,8 +56,8 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
     total_length : float
         Length of system
     need_extra_node : bool
-        Whether the smallest node with position larger than u_bound should be considered.
-        Correction for converting from actual boundaries to discrete nodes
+        Whether an extra node was read in. If so, warn integrator to ignore this node,
+        as correct_integral() will take care of it.
 
     Returns
     -------
@@ -64,7 +66,6 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
 
     """
     i = to_index(l_bound, dx, total_length)
-    j = to_index(u_bound, dx, total_length)
     if base_data.ndim == 1:
         base_data = base_data[None]
     
@@ -90,10 +91,10 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
             I_base = base_data
             I_data = intg.trapz(I_base, dx=dx, axis=1)
 
-        I_data += correct_integral(I_base.T, l_bound, u_bound, i, j, dx)
+        I_data += correct_integral(I_base.T, l_bound, u_bound, dx, total_length)
     return I_data
 
-def correct_integral(integrand, l_bound, u_bound, i, j, dx):
+def correct_integral(integrand, l_bound, u_bound, dx, total_length):
     """
     Corrects new_integrate() for mismatch between nodes and actual integration bounds using linear interpolation.
 
@@ -119,11 +120,14 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
         Corrected integration results.
 
     """
+    i = to_index(l_bound, dx, total_length)
+    j = to_index(u_bound, dx, total_length)
     uncorrected_l_bound = to_pos(i, dx)
     uncorrected_u_bound = to_pos(j, dx)
     lfrac1 = min(l_bound - uncorrected_l_bound, dx / 2)
 
-    # Yes, integrand[0] and not integrand[i]. Note that in integrate(), the ith node maps to integrand[0] and the jth node maps to integrand[j-i].
+    # Note that because integrate() accepts pre-trimmed base data, 
+    # the ith node maps to integrand[0] and the jth node maps to integrand[j-i].
     l_bound_correction = integrand[0] * lfrac1
 
     if l_bound > uncorrected_l_bound + dx / 2:
@@ -131,6 +135,7 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
         l_bound_correction += integrand[0+1] * lfrac2
 
     ufrac1 = min(u_bound - uncorrected_u_bound, dx / 2)
+    
     u_bound_correction = integrand[j-i] * ufrac1
     
     if u_bound > uncorrected_u_bound + dx / 2:
@@ -145,6 +150,17 @@ def correct_integral(integrand, l_bound, u_bound, i, j, dx):
     return u_bound_correction - l_bound_correction
     
 def get_all_combinations(value_dict):
+    """
+    >>> value_dict = {"a":[1,2], "b":[3,4]}
+    
+    >>> g = get_all_combinations(value_dict)
+    
+    >>> g
+    
+    [{"a":1, "b":3}, {"a":1, "b":4},
+     {"a":2, "b":3}, {"a":2, "b":4}]
+    """
+    
     combinations = []
     param_names = list(value_dict.keys())
         
@@ -191,10 +207,14 @@ def get_all_combinations(value_dict):
     
     
 def autoscale(val_array=None, min_val=None, max_val=None):
-    """Help a matplotlib plot determine whether a log or linear scale should be used
-       when plotting val_array
+    """
+    Help a matplotlib plot determine whether a log or linear scale should be used
+    when plotting val_array
+    
+    if val_array spans more than one order of magnitude? -> log scale
     """
     if max_val is not None and min_val is not None:
+        assert min_val <= max_val, "autoscale min larger than max"
         pass
     elif val_array is not None:
         max_val = np.amax(val_array)

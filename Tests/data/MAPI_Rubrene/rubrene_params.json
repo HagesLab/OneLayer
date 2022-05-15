@@ -1,0 +1,22 @@
+{
+    "Total_length": 100.0,
+    "Node_width": 5.0,
+    "mu_P_up": 3000.0,
+    "mu_T": 80.0,
+    "mu_S": 9000000.0,
+    "T0": 0.0,
+    "tau_T": 60000.0,
+    "tau_S": 1.0,
+    "tau_D": 1.0,
+    "k_fusion": 125.00000000000001,
+    "k_0": 18700.0,
+    "Ssct": 3e+23,
+    "Sp": 1.0,
+    "St": 0.0,
+    "W_VB": 0.1,
+    "Rubrene_temperature": 300.0,
+    "uc_permitivity": 10.0,
+    "delta_T": 0.0,
+    "delta_S": 0.0,
+    "delta_D": 0.0
+}

@@ -25,7 +25,7 @@ Options:
 from Notebook.notebook import Notebook
 from Modules.Nanowire import Nanowire
 from Modules.Std_SingleLayer import Std_SingleLayer
-from Modules.MAPI_Rubrene_DBP import MAPI_Rubrene
+from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
 
 from docopt import docopt
 from config import init_logging

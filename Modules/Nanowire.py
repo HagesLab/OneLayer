@@ -312,16 +312,16 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     ## Calculate Jn, Jp [nm^-2 ns^-1] over the space dimension, 
     # Jn(t) ~ N(t) * E_field(t) + (dN/dt)
     # np.roll(y,m) shifts the values of array y by m places, allowing for quick approximation of dy/dx ~ (y[m+1] - y[m-1] / 2*dx) over entire array y
-    Jn[1:-1] = (-mu_n[1:-1] * (N_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1]) 
+    Jn[1:-1] = (mu_n[1:-1] * (N_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1]) 
                 + (mu_n[1:-1]*kB*T[1:-1]) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dx)))
 
     ## Changed sign
-    Jp[1:-1] = (-mu_p[1:-1] * (P_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEcdz[1:-1]) 
+    Jp[1:-1] = (mu_p[1:-1] * (P_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEcdz[1:-1]) 
                 -(mu_p[1:-1]*kB*T[1:-1]) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dx)))
 
         
     # [V nm^-1 ns^-1]
-    dEdt = (Jn + Jp) * ((q_C) / (eps * eps0))
+    dEdt = -(Jn + Jp) * ((q_C) / (eps * eps0))
     
     ## Calculate recombination (consumption) terms
     rad_rec = B * (N * P - n0 * p0)
@@ -487,16 +487,15 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     data = sol.y.T
             
     if write_output:
+        N = data[:,0:m]
+        P = data[:,m:2*(m)]
         ## Prep output files
         with tables.open_file(data_path_name + "-N.h5", mode='a') as ofstream_N, \
             tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P:
-            #tables.open_file(data_path_name + "-E_field.h5", mode='a') as ofstream_E_field:
-            array_N = ofstream_N.root.data
-            array_P = ofstream_P.root.data
-            #array_E_field = ofstream_E_field.root.data
-            array_N.append(data[1:,0:m])
-            array_P.append(data[1:,m:2*(m)])
-            #array_E_field.append(data[1:,2*(m):])
+            array_N = ofstream_N.create_earray(ofstream_N.root, "data", atom, (0, len(N[0])))
+            array_P = ofstream_P.create_earray(ofstream_P.root, "data", atom, (0, len(P[0])))
+            array_N.append(N)
+            array_P.append(P)
 
         return #error_data
 
@@ -518,10 +517,10 @@ def E_field(sim_outputs, params):
     dEdx = q_C * (delta_p(sim_outputs, params) - delta_n(sim_outputs, params)) / (eps0 * averaged_rel_permitivity)
     if dEdx.ndim == 1:
         E_field = np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
-        E_field[-1] = 0
+        #E_field[-1] = 0
     else:
         E_field = np.concatenate((np.zeros(len(dEdx)).reshape((len(dEdx), 1)), np.cumsum(dEdx, axis=1) * params["Node_width"]), axis=1) #[V/nm]
-        E_field[:,-1] = 0
+        #E_field[:,-1] = 0
     return E_field
     
 def delta_n(sim_outputs, params):
