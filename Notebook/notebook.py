@@ -386,7 +386,7 @@ class Notebook(BaseNotebook):
             self.sys_printsummary_popup = tk.Toplevel(self.root)
             
             self.printsummary_textbox = \
-                tkscrolledtext.ScrolledText(
+                tkScrolledText(
                     self.sys_printsummary_popup, 
                     width=100,height=30)
             self.printsummary_textbox.grid(
