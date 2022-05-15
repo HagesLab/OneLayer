@@ -376,7 +376,7 @@ class Notebook(BaseNotebook):
         try:
             if continue_:
                 self.verified=False
-                self.module = self.modules_list[self.module_names[self.module_listbox.curselection()[0]]]()
+                self.module = self.module_list[self.module_names[self.module_listbox.curselection()[0]]]()
                 self.module.verify()
                 self.verified=True
                 
