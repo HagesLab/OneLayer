@@ -12,6 +12,9 @@ from io_utils import u_read
 from utils import to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
+from config import init_logging
+logger = init_logging(__name__)
+
 
 class Std_SingleLayer(OneD_Model):
     # A Nanowire object stores all information regarding the initial state being edited in the IC tab
@@ -760,7 +763,7 @@ def tau_diff(PL, dt):
     try:
         ln_PL = np.log(PL)
     except Exception:
-        print("Error: could not calculate tau_diff from non-positive PL values")
+        logger.error("Error: could not calculate tau_diff from non-positive PL values")
         return np.zeros(len(PL))
     dln_PLdt = np.zeros(len(ln_PL))
     dln_PLdt[0] = (ln_PL[1] - ln_PL[0]) / dt

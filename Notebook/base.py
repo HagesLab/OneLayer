@@ -27,8 +27,10 @@ np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
 class BaseNotebook:
     """Base class with all the necessary methods
     for the following Notebook class."""
-    
+
     def prepare_main_canvas(self):
+        """Setup main canvas of Notebook."""
+
         self.main_canvas = tk.Canvas(self.root)
         self.main_canvas.grid(row=0,column=0, sticky='nswe')
         
@@ -52,15 +54,18 @@ class BaseNotebook:
         self.main_canvas.create_window((0,0), window=self.notebook, anchor="nw")
         self.notebook.bind('<Configure>', 
                            lambda e:self.main_canvas.configure(scrollregion=self.main_canvas.bbox('all')))
-        return
-    
+
+        self.default_dirs = {"Initial":"Initial", "Data":"Data", "PL":"Analysis"}
+
+
     def prepare_radiobuttons_and_checkboxes(self):
-        # Tkinter checkboxes and radiobuttons require special variables 
-        # to extract user input.
-        # IntVars or BooleanVars are sufficient for binary choices 
-        # e.g. whether a checkbox is checked
-        # while StringVars are more suitable for open-ended choices 
-        # e.g. selecting one mode from a list
+        """Tkinter checkboxes and radiobuttons require special variables 
+        to extract user input.
+        IntVars or BooleanVars are sufficient for binary choices 
+        e.g. whether a checkbox is checked
+        while StringVars are more suitable for open-ended choices 
+        e.g. selecting one mode from a list."""
+
         self.check_reset_params = tk.IntVar()
         self.check_reset_inits = tk.IntVar()
         self.check_display_legend = tk.IntVar()
@@ -69,15 +74,16 @@ class BaseNotebook:
         
         self.active_analysisplot_ID = tk.IntVar()
         self.active_integrationplot_ID = tk.IntVar()
-        return
-    
+
+       
+
     def prepare_initial_things(self):
+        """Prepare inital empty variables and dictionaries"""
         self.init_shape_selection = tk.StringVar()
         self.init_var_selection = tk.StringVar()
         self.paramtoolkit_viewer_selection = tk.StringVar()
         self.listupload_var_selection = tk.StringVar()
         self.display_selection = tk.StringVar()
-
         # Stores whatever layer is being displayed in the layer selection box
         self.current_layer_selection = tk.StringVar()
         # Stores whatever layer TEDs is currently operating on
@@ -91,7 +97,6 @@ class BaseNotebook:
         self.paramtoolkit_currentparam = ""
         self.IC_file_list = None
         self.IC_file_name = ""
-        
         self.carryover_include_flags = {}
         for layer_name, layer in self.module.layers.items():
             self.carryover_include_flags[layer_name] = {}
@@ -99,8 +104,11 @@ class BaseNotebook:
                 self.carryover_include_flags[layer_name][var] = tk.IntVar()
             
         # Helpers, flags, and containers for analysis plots
-        self.analysis_plots = [Analysis_Plot_State(), Analysis_Plot_State(), 
-                               Analysis_Plot_State(), Analysis_Plot_State()]
+        self.analysis_plots = [
+            Analysis_Plot_State(),
+            Analysis_Plot_State(), 
+            Analysis_Plot_State(),
+            Analysis_Plot_State()]
         self.integration_plots = [Integration_Plot_State()]
         self.data_var = tk.StringVar()
         self.fetch_PLmode = tk.StringVar()
@@ -110,8 +118,8 @@ class BaseNotebook:
 
         # Track which timeseries popups are open
         self.active_timeseries = {}
-        return
-    
+
+
     def prepare_eligible_modules(self):
         # Add (e.g. for Nanowire) module-specific functionality
         # TODO: abstract the choices away from this code
@@ -120,11 +128,10 @@ class BaseNotebook:
             self.using_LGC = {}
             self.LGC_options = {}
             self.LGC_values = {}
-            
-        return
-    
+
+
     def reset_popup_flags(self):
-        # Record when popup menus open and close
+        """Flags to record when popup menus open and close."""
         self.sys_printsummary_popup_isopen = False
         self.sys_plotsummary_popup_isopen = False
         self.sys_param_shortcut_popup_isopen = False
@@ -138,8 +145,6 @@ class BaseNotebook:
         self.plotter_popup_isopen = False
         self.IC_carry_popup_isopen = False
         self.bayesim_popup_isopen = False
-        return
-    
     # Create GUI elements for each tab
     # Tkinter works a bit like a bulletin board:
     # we declare an overall frame and
@@ -191,42 +196,53 @@ class BaseNotebook:
                       command=self.reset_IC).grid(row=0, column=3)
 
         self.spacegrid_frame = tk.ttk.Frame(self.tab_inputs)
-        self.spacegrid_frame.grid(row=1,column=0,columnspan=2, pady=(10,10))
+        self.spacegrid_frame.grid(row=1, column=0, columnspan=2, pady=(10, 10))
 
-        tk.ttk.Label(self.spacegrid_frame, 
-                    text="Space Grid - Start Here", 
-                    style="Header.TLabel").grid(row=0,column=0,columnspan=2)
+        tk.ttk.Label(
+            self.spacegrid_frame,
+            text="Space Grid - Start Here",
+            style="Header.TLabel"
+            ).grid(row=0, column=0, columnspan=2)
 
-        tk.ttk.Label(self.spacegrid_frame, 
-                    text="Thickness " 
-                    + self.module.layers[first_layer].length_unit).grid(row=1,column=0)
+        tk.ttk.Label(
+            self.spacegrid_frame, 
+            text="Thickness " + self.module.layers[first_layer].length_unit
+            ).grid(row=1 ,column=0)
 
         self.thickness_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
-        self.thickness_entry.grid(row=1,column=1)
+        self.thickness_entry.grid(row=1, column=1)
 
-        tk.ttk.Label(self.spacegrid_frame, 
-                    text="Node width " 
-                    + self.module.layers[first_layer].length_unit).grid(row=2,column=0)
+        tk.ttk.Label(
+            self.spacegrid_frame,
+            text="Node width " + self.module.layers[first_layer].length_unit
+            ).grid(row=2, column=0)
 
         self.dx_entry = tk.ttk.Entry(self.spacegrid_frame, width=9)
         self.dx_entry.grid(row=2,column=1)
 
         self.params_frame = tk.ttk.Frame(self.tab_inputs)
-        self.params_frame.grid(row=2,column=0,columnspan=2, rowspan=4, pady=(10,10))
+        self.params_frame.grid(row=2, column=0, columnspan=2, rowspan=4, pady=(10, 10))
 
-        tk.ttk.Label(self.params_frame, 
-                    text="Constant-value Parameters",
-                    style="Header.TLabel").grid(row=0, column=0,columnspan=2)
+        tk.ttk.Label(
+            self.params_frame, 
+            text="Constant-value Parameters",
+            style="Header.TLabel"
+            ).grid(row=0, column=0, columnspan=2)
         
-        tk.ttk.Button(self.params_frame, 
-                      text="Fast Param Entry Tool", 
-                      command=self.do_sys_param_shortcut_popup).grid(row=1,column=0,columnspan=2)
+        tk.ttk.Button(
+            self.params_frame, 
+            text="Fast Param Entry Tool",
+            command=self.do_sys_param_shortcut_popup
+            ).grid(row=1, column=0, columnspan=2)
         
         self.flags_frame = tk.ttk.Frame(self.tab_inputs)
-        self.flags_frame.grid(row=6,column=0,columnspan=2, pady=(10,10))
+        self.flags_frame.grid(row=6, column=0, columnspan=2, pady=(10, 10))
 
-        tk.ttk.Label(self.flags_frame, text="Flags", 
-                     style="Header.TLabel").grid(row=0,column=0,columnspan=2)
+        tk.ttk.Label(
+            self.flags_frame,
+            text="Flags",
+            style="Header.TLabel"
+            ).grid(row=0, column=0, columnspan=2)
         
         # Procedurally generated elements for flags
         i = 1
@@ -239,59 +255,84 @@ class BaseNotebook:
             if not self.module.flags_dict[flag][1]:
                 continue
             else:
-                self.sys_flag_dict[flag].tk_element.grid(row=i,column=0)
+                self.sys_flag_dict[flag].tk_element.grid(row=i, column=0)
                 i += 1
                 
-        self.ICtab_status = tk.Text(self.tab_inputs, width=24,height=8)
+        self.ICtab_status = tk.Text(self.tab_inputs, width=24, height=8)
         self.ICtab_status.grid(row=7, column=0, columnspan=2)
         self.ICtab_status.configure(state='disabled')
         
-        tk.ttk.Button(self.tab_inputs, 
-                      text="Print Init. State Summary", 
-                      command=self.do_sys_printsummary_popup).grid(row=8,column=0,columnspan=2)
+        tk.ttk.Button(
+            self.tab_inputs, 
+            text="Print Init. State Summary", 
+            command=self.do_sys_printsummary_popup
+            ).grid(row=8, column=0, columnspan=2)
         
-        tk.ttk.Button(self.tab_inputs, 
-                      text="Show Init. State Plots", 
-                      command=self.do_sys_plotsummary_popup).grid(row=9,column=0,columnspan=2)
+        tk.ttk.Button(
+            self.tab_inputs,
+            text="Show Init. State Plots",
+            command=self.do_sys_plotsummary_popup
+            ).grid(row=9, column=0, columnspan=2)
         
-        tk.ttk.Separator(self.tab_inputs, 
-                         orient="horizontal", 
-                         style="Grey Bar.TSeparator").grid(row=10,column=0,columnspan=2, pady=(10,10), sticky="ew")
+        tk.ttk.Separator(
+            self.tab_inputs,
+            orient="horizontal",
+            style="Grey Bar.TSeparator"
+            ).grid(row=10, column=0, columnspan=2, pady=(10, 10), sticky="ew")
         
         self.layer_statusbox = tk.Text(self.tab_inputs, width=24, height=1)
-        self.layer_statusbox.grid(row=11,column=0,columnspan=2)
+        self.layer_statusbox.grid(row=11, column=0, columnspan=2)
         
         # Init this dropdown with some default layer
-        tk.ttk.OptionMenu(self.tab_inputs, self.current_layer_selection,
-                          first_layer, *self.module.layers).grid(row=12,column=0)
+        tk.ttk.OptionMenu(
+            self.tab_inputs,
+            self.current_layer_selection,
+            first_layer,
+            *self.module.layers
+            ).grid(row=12, column=0)
         
-        tk.ttk.Button(self.tab_inputs, text="Change to Layer",
-                      command=self.change_layer).grid(row=12,column=1)
+        tk.ttk.Button(
+            self.tab_inputs,
+            text="Change to Layer",
+            command=self.change_layer
+            ).grid(row=12, column=1)
         
-        tk.ttk.Separator(self.tab_inputs, orient="vertical", 
-                         style="Grey Bar.TSeparator").grid(row=0,rowspan=30,column=2,pady=(24,0),sticky="ns")
+        tk.ttk.Separator(
+            self.tab_inputs,
+            orient="vertical", 
+            style="Grey Bar.TSeparator"
+            ).grid(row=0, rowspan=30, column=2, pady=(24, 0), sticky="ns")
              
         ## Parameter Toolkit:
 
         self.param_rules_frame = tk.ttk.Frame(self.tab_rules_init)
         self.param_rules_frame.grid(row=0,column=0,padx=(370,0))
 
-        tk.ttk.Label(self.param_rules_frame, 
-                     text="Add/Edit/Remove Space-Dependent Parameters", 
-                     style="Header.TLabel").grid(row=0,column=0,columnspan=3)
+        tk.ttk.Label(
+            self.param_rules_frame, 
+            text="Add/Edit/Remove Space-Dependent Parameters", 
+            style="Header.TLabel"
+            ).grid(row=0, column=0, columnspan=3)
 
-        self.active_paramrule_listbox = tk.Listbox(self.param_rules_frame, width=86,
-                                                   height=8)
-        self.active_paramrule_listbox.grid(row=1,rowspan=3,column=0,columnspan=3, 
-                                           padx=(32,32))
+        self.active_paramrule_listbox = \
+            tk.Listbox(
+                self.param_rules_frame,
+                width=86,
+                height=8)
+        self.active_paramrule_listbox.grid(
+            row=1, rowspan=3, column=0, columnspan=3, padx=(32, 32))
 
-        tk.ttk.Label(self.param_rules_frame, 
-                     text="Select parameter to edit:").grid(row=4,column=0)
+        tk.ttk.Label(
+            self.param_rules_frame, 
+            text="Select parameter to edit:"
+            ).grid(row=4, column=0)
         
-        tk.ttk.OptionMenu(self.param_rules_frame, 
-                          self.init_var_selection, 
-                          var_dropdown_list[0], 
-                          *var_dropdown_list).grid(row=4,column=1)
+        tk.ttk.OptionMenu(
+            self.param_rules_frame, 
+            self.init_var_selection, 
+            var_dropdown_list[0], 
+            *var_dropdown_list
+            ).grid(row=4,column=1)
 
         tk.ttk.Label(self.param_rules_frame, 
                      text="Select calculation method:").grid(row=5,column=0)
@@ -433,10 +474,10 @@ class BaseNotebook:
         self.tab_inputs.add(self.tab_rules_init, text="Parameter Toolkit")
         self.tab_inputs.add(self.tab_explicit_init, text="Parameter List Upload")
         self.notebook.add(self.tab_inputs, text="Inputs")
-        return
-    
+
+
     def create_LGC_frame(self):
-        """ Create a special frame for collecting laser initial contiions"""
+        """Method generating the LGC input frame."""
         self.check_calculate_init_material_expfactor = tk.IntVar()
         self.LGC_layer = tk.StringVar()
         self.LGC_stim_mode = tk.StringVar()
@@ -688,26 +729,40 @@ class BaseNotebook:
                                 "incidence":self.LGC_stim_mode,
                                 "power_mode":self.LGC_gen_power_mode,
                                 "direction":self.LGC_direction}
-        return
-    
+
+
     def add_tab_simulate(self):
+        """Method to add the menu tab 'Simulate'
+        to the inout Notebook object and return it."""
+
         self.tab_simulate = tk.ttk.Frame(self.notebook)
 
-        tk.ttk.Label(self.tab_simulate, 
-                     text="Select Init. Cond.", 
-                     style="Header.TLabel").grid(row=0,column=0,columnspan=2, padx=(9,12))
+        tk.ttk.Label(
+            self.tab_simulate, 
+            text="Select Init. Cond.", 
+            style="Header.TLabel"
+            ).grid(row=0,column=0,columnspan=2, padx=(9,12))
 
-        tk.ttk.Label(self.tab_simulate, text="Simulation Time [ns]").grid(row=2,column=0)
+        tk.ttk.Label(
+            self.tab_simulate,
+            text="Simulation Time [ns]"
+            ).grid(row=2,column=0)
 
         self.simtime_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.simtime_entry.grid(row=2,column=1)
 
-        tk.ttk.Label(self.tab_simulate, text="dt [ns]").grid(row=3,column=0)
+        tk.ttk.Label(
+            self.tab_simulate,
+            text="dt [ns]"
+            ).grid(row=3,column=0)
 
         self.dt_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.dt_entry.grid(row=3,column=1)
         
-        tk.ttk.Label(self.tab_simulate, text="Max solver stepsize [ns]").grid(row=4,column=0)
+        tk.ttk.Label(
+            self.tab_simulate,
+            text="Max solver stepsize [ns]"
+            ).grid(row=4,column=0)
         
         self.hmax_entry = tk.ttk.Entry(self.tab_simulate, width=9)
         self.hmax_entry.grid(row=4,column=1)
@@ -715,20 +770,31 @@ class BaseNotebook:
         self.enter(self.dt_entry, "0.5")
         self.enter(self.hmax_entry, "0.25")
         
-        tk.ttk.Button(self.tab_simulate, text="Start Simulation(s)", 
-                      command=self.do_Batch).grid(row=6,column=0,columnspan=2,padx=(9,12))
+        tk.ttk.Button(
+            self.tab_simulate,
+            text="Start Simulation(s)", 
+            command=self.do_Batch
+            ).grid(row=6,column=0,columnspan=2,padx=(9,12))
 
-        tk.ttk.Label(self.tab_simulate, text="Status").grid(row=7, column=0, columnspan=2)
+        tk.ttk.Label(
+            self.tab_simulate,
+            text="Status"
+            ).grid(row=7, column=0, columnspan=2)
 
         self.status = tk.Text(self.tab_simulate, width=28,height=4)
         self.status.grid(row=8, rowspan=2, column=0, columnspan=2)
         self.status.configure(state='disabled')
 
-        tk.ttk.Separator(self.tab_simulate, orient="vertical", 
-                         style="Grey Bar.TSeparator").grid(row=0,rowspan=30,column=2,sticky="ns")
+        tk.ttk.Separator(
+            self.tab_simulate,
+            orient="vertical", 
+            style="Grey Bar.TSeparator"
+            ).grid(row=0,rowspan=30,column=2,sticky="ns")
 
-        tk.ttk.Label(self.tab_simulate, 
-                     text="Simulation - {}".format(self.module.system_ID)).grid(row=0,column=3,columnspan=3)
+        tk.ttk.Label(
+            self.tab_simulate, 
+            text="Simulation - {}".format(self.module.system_ID)
+            ).grid(row=0,column=3,columnspan=3)
         
         self.sim_fig = Figure(figsize=(14, 8))
         count = 1
@@ -739,13 +805,16 @@ class BaseNotebook:
         for layer_name, layer in self.module.layers.items():
             self.sim_subplots[layer_name] = {}
             for variable in layer.s_outputs:
-                self.sim_subplots[layer_name][variable] = self.sim_fig.add_subplot(int(rdim), 
-                                                                                   int(cdim), 
-                                                                                   int(count))
+                self.sim_subplots[layer_name][variable] = \
+                    self.sim_fig.add_subplot(
+                        int(rdim), 
+                        int(cdim), 
+                        int(count))
                 self.sim_subplots[layer_name][variable].set_title(variable)
                 count += 1
 
-        self.sim_canvas = tkagg.FigureCanvasTkAgg(self.sim_fig, master=self.tab_simulate)
+        self.sim_canvas = \
+            tkagg.FigureCanvasTkAgg(self.sim_fig, master=self.tab_simulate)
         self.sim_canvas.get_tk_widget().grid(row=1,column=3,rowspan=12,columnspan=2)
         
         self.simfig_toolbar_frame = tk.ttk.Frame(master=self.tab_simulate)
@@ -753,9 +822,11 @@ class BaseNotebook:
         tkagg.NavigationToolbar2Tk(self.sim_canvas, self.simfig_toolbar_frame)
 
         self.notebook.add(self.tab_simulate, text="Simulate")
-        return
-    
+
+
     def add_tab_analyze(self):
+        """Method to add the menu tab 'Analyze'
+        to the inout Notebook object and return it."""
         self.tab_analyze = tk.ttk.Notebook(self.notebook)
         self.tab_overview_analysis = tk.ttk.Frame(self.tab_analyze)
         self.tab_detailed_analysis = tk.ttk.Frame(self.tab_analyze)
@@ -936,4 +1007,3 @@ class BaseNotebook:
         self.tab_analyze.add(self.tab_overview_analysis, text="Overview")
         self.tab_analyze.add(self.tab_detailed_analysis, text="Detailed Analysis")
         self.notebook.add(self.tab_analyze, text="Analyze")
-        return

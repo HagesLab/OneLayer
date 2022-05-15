@@ -6,7 +6,6 @@
 # Contact:
 ################################################# 
 
-
 """
 Usage:
   ./main [--module=<module>] [--tab=<tab_index>]
@@ -28,29 +27,25 @@ from config import init_logging
 logger = init_logging(__name__)
 
 from Notebook.notebook import Notebook
-## ADD MODULES HERE
 from Modules.Nanowire import Nanowire
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
 
-
-
-## AND HERE
-# Tells TEDs what modules are available.
 # {"Display name of module": OneD_Model derived module class}.
 MODULE_LIST = {
     "Standard One-Layer": Std_SingleLayer,
     "Nanowire": Nanowire,
-    # "Neumann Bound Heatplate":HeatPlate,
     "MAPI-Rubrene/DBP": MAPI_Rubrene
 }
+
+from docopt import docopt
+from config import init_logging
+logger = init_logging(__name__)
 
 
 def get_cli_args():
     """Parses the CLI arguments, verifies their
     validity in the context and returns a dict"""
-
-
     raw_args = docopt(__doc__, version='ingest 0.1.0')
     args = {}
     logger.info(raw_args)
@@ -73,7 +68,6 @@ def get_cli_args():
         logger.info("Invalid tab_id \"{}\"".format(tab_id))
     
     return args
-
 
 
 if __name__ == "__main__":

@@ -47,11 +47,12 @@ logger = init_logging(__name__)
 np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
 class Notebook(BaseNotebook):
-    
+
     def __init__(self, title: str, module_list: dict, cli_args: dict):
         """ Create main tkinter object and select module. """
         self.module_list = module_list
         self.module = None
+        self.module_list = module_list
         self.root = tk.Tk()
         self.root.attributes('-fullscreen', False)
         self.root.title(title)
@@ -65,18 +66,19 @@ class Notebook(BaseNotebook):
             self.do_module_popup()
             self.root.wait_window(self.select_module_popup)
 
-        if self.module is None: 
+        if self.module is None or not self.verified: 
             return
-        if not self.verified: 
-            return
+
         self.prep_notebook()
         
         tab_id = cli_args.get("tab_id")
         if tab_id is not None:
             self.notebook.select(tab_id)
-        return
-    
+
+        
     def prep_notebook(self):
+        """ Attach elements to notebook based on selected module. """
+        
         self.default_dirs = {"Initial":"Initial", "Data":"Data", "PL":"Analysis"}
 
         self.prepare_main_canvas()
@@ -85,9 +87,9 @@ class Notebook(BaseNotebook):
         self.prepare_eligible_modules()
         self.add_menus()
         self.reset_popup_flags()
-        
+
         self.root.config(menu=self.menu_bar)
-        
+
         # Set a tkinter graphical theme
         s = ttk.Style()
         s.theme_use('classic')
@@ -100,10 +102,9 @@ class Notebook(BaseNotebook):
         
         # Initialize to default layer
         self.change_layer()
-        
         self.test_initialization()
-        return
-    
+
+
     def run(self):
         if self.module is None: 
             self.root.destroy()
@@ -117,18 +118,17 @@ class Notebook(BaseNotebook):
         self.root.mainloop()
         logger.info("Closed TEDs")
         matplotlib.use(starting_backend)
-        return
-    
+
+
     def quit(self):
         self.do_confirmation_popup("All unsaved data will be lost. "
                                    "Are you sure you want to close TEDs?")
         self.root.wait_window(self.confirmation_popup)
-        if not self.confirmed: 
-            return
-        self.root.destroy()
-        logger.info("Closed TEDs")
-        matplotlib.use(starting_backend)
-        return
+        if self.confirmed: 
+            self.root.destroy()
+            logger.info("Closed TEDs")
+            matplotlib.use(starting_backend)
+
     
     def toggle_fullscreen(self):
         self.root.attributes('-fullscreen', not self.root.attributes('-fullscreen'))
@@ -142,65 +142,84 @@ class Notebook(BaseNotebook):
             self.main_scroll_x.grid()
         return
 
+
     def change_module(self):
         self.do_confirmation_popup("Warning: This will close the current instance "
                                    "of TEDs (and all unsaved data). Are you sure "
                                    "you want to select a new module?")
         self.root.wait_window(self.confirmation_popup)
-        if not self.confirmed: 
-            return
+        if self.confirmed: 
+            
         
-        self.notebook.destroy()
-        self.do_module_popup()
-        self.root.wait_window(self.select_module_popup)
-        if self.module is None: 
-            return
-        self.prep_notebook()
-        
-        return
-    
+            self.notebook.destroy()
+            self.do_module_popup()
+            self.root.wait_window(self.select_module_popup)
+            if self.module is None: 
+                return
+            self.prep_notebook()
+
+
+
     def add_menus(self):
         """Adding menu_bar, file_menu, view_menu and tool_menu."""
-        # Add menu bars
+
+         # Add menu bars
         self.menu_bar = tk.Menu(self.notebook)
 
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         # TODO: Open file explorer instead of a file dialog
+
+        command_initial_condition_files = partial(
+            tk.filedialog.askopenfilenames, 
+            title="This window does not open anything - Use this window to move or delete IC files", 
+            initialdir=self.default_dirs["Initial"])
         self.file_menu.add_command(label="Manage Initial Condition Files", 
-                                   command=partial(tk.filedialog.askopenfilenames, 
-                                                   title="This window does not open anything - Use this window to move or delete IC files", 
-                                                   initialdir=self.default_dirs["Initial"]))
+                                   command=command_initial_condition_files)
+
+        command_data_files = partial(
+            tk.filedialog.askdirectory, 
+            title="This window does not open anything - Use this window to move or delete data files",
+            initialdir=self.default_dirs["Data"])
         self.file_menu.add_command(label="Manage Data Files", 
-                                   command=partial(tk.filedialog.askdirectory, 
-                                                   title="This window does not open anything - Use this window to move or delete data files",
-                                                   initialdir=self.default_dirs["Data"]))
+                                   command=command_data_files)
+
+        command_export_files = partial(
+            tk.filedialog.askopenfilenames, 
+            title="This window does not open anything - Use this window to move or delete export files",
+            initialdir=self.default_dirs["PL"])
         self.file_menu.add_command(label="Manage Export Files", 
-                                   command=partial(tk.filedialog.askopenfilenames, 
-                                                   title="This window does not open anything - Use this window to move or delete export files",
-                                                   initialdir=self.default_dirs["PL"]))
+                                   command=command_export_files)
+
         self.file_menu.add_command(label="Change Module", 
                                    command=self.change_module)
+
         self.file_menu.add_command(label="Exit", 
                                    command=self.quit)
+
         self.menu_bar.add_cascade(label="File", menu=self.file_menu)
 
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
+
         self.view_menu.add_command(label="Toggle Fullscreen", 
                                    command=self.toggle_fullscreen)
+
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
         self.tool_menu = tk.Menu(self.menu_bar, tearoff=0)
+
         self.tool_menu.add_command(label="Batch Op. Tool", 
                                    command=self.do_batch_popup)
+
         self.menu_bar.add_cascade(label="Tools", menu=self.tool_menu)
 
         #self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
         #self.help_menu.add_command(label="About", command=self.do_about_popup)
         #self.menu_bar.add_cascade(label="Help", menu=self.help_menu)
-        return
-    
+
+
     def test_initialization(self):
-        """Detect and create storage dirs"""
+        """Check the existence of the necessary directories."""
+
         logger.info("Initialization complete")
         logger.info("Detecting Initial Condition and Data Directories...")
         try:
@@ -228,8 +247,8 @@ class Notebook(BaseNotebook):
             logger.info("No such subdirectory detected; automatically creating...")
         except FileExistsError:
             logger.info("Subdirectory detected")
-        return
-    
+
+
     def DEBUG(self):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
@@ -296,10 +315,8 @@ class Notebook(BaseNotebook):
                         self.enter(box, str(self.LGC_values[self.current_layer_name][param_name]))
                     else:
                         self.enter(box, "")
-                        
-        
-        return
-    
+
+
     def update_system_summary(self):
         """ Transfer parameter values from the Initial Condition tab 
             to the summary popup windows.
@@ -324,7 +341,6 @@ class Notebook(BaseNotebook):
             self.plotsummary_fig.tight_layout()
             self.plotsummary_fig.canvas.draw()
 
-        return
     
     ## Functions to create popups and manage
     def do_module_popup(self):
@@ -351,9 +367,8 @@ class Notebook(BaseNotebook):
                                             '-topmost',False)
         
         self.select_module_popup.grab_set()
-        
-        return
-    
+
+
     def on_select_module_popup_close(self, continue_=False):
         """ Do basic verification checks defined by OneD_Model.verify() 
             and inform tkinter of selected module 
@@ -361,7 +376,7 @@ class Notebook(BaseNotebook):
         try:
             if continue_:
                 self.verified=False
-                self.module = self.module_list[self.module_names[self.module_listbox.curselection()[0]]]()
+                self.module = self.modules_list[self.module_names[self.module_listbox.curselection()[0]]]()
                 self.module.verify()
                 self.verified=True
                 
@@ -404,25 +419,29 @@ class Notebook(BaseNotebook):
         """
         self.confirmed = continue_
         self.confirmation_popup.destroy()
-        return
-    
+
+
     def do_sys_printsummary_popup(self):
         """ Display as text the current space grid and parameters. """
         # Don't open more than one of this window at a time
         if not self.sys_printsummary_popup_isopen: 
             self.sys_printsummary_popup = tk.Toplevel(self.root)
             
-            self.printsummary_textbox = tkScrolledText(self.sys_printsummary_popup, 
-                                                     width=100,height=30)
-            self.printsummary_textbox.grid(row=0,column=0,padx=(20,0), pady=(20,20))
+            self.printsummary_textbox = \
+                tkscrolledtext.ScrolledText(
+                    self.sys_printsummary_popup, 
+                    width=100,height=30)
+            self.printsummary_textbox.grid(
+                row=0,column=0,padx=(20,0), pady=(20,20))
             
             self.sys_printsummary_popup_isopen = True
             
             self.update_system_summary()
             
-            self.sys_printsummary_popup.protocol("WM_DELETE_WINDOW", 
-                                                 self.on_sys_printsummary_popup_close)
-            return
+            self.sys_printsummary_popup.protocol(
+                "WM_DELETE_WINDOW", 
+                self.on_sys_printsummary_popup_close)
+
         
     def on_sys_printsummary_popup_close(self):
         try:
@@ -431,7 +450,8 @@ class Notebook(BaseNotebook):
         except Exception:
             logger.error("Error #2022: Failed to close shortcut popup.")
         return
-    
+
+
     def do_sys_plotsummary_popup(self):
         """ Display as series of plots the current parameter distributions. """
         set_layers = {name for name in self.module.layers if self.module.layers[name].spacegrid_is_set}
@@ -475,8 +495,7 @@ class Notebook(BaseNotebook):
                                                 self.on_sys_plotsummary_popup_close)
             ## Temporarily disable the main window while this popup is active
             self.sys_plotsummary_popup.grab_set()
-            
-            return
+
         
     def on_sys_plotsummary_popup_close(self):
         try:
@@ -485,7 +504,8 @@ class Notebook(BaseNotebook):
         except Exception:
             logger.error("Error #2023: Failed to close plotsummary popup.")
         return
-    
+
+
     def do_sys_param_shortcut_popup(self):
         """ Open a box for inputting (spatially constant) parameters. """ 
         if not self.sys_param_shortcut_popup_isopen:
@@ -574,8 +594,6 @@ class Notebook(BaseNotebook):
             self.sys_param_shortcut_popup_isopen = True
             ## Temporarily disable the main window while this popup is active
             self.sys_param_shortcut_popup.grab_set()
-            
-            return
                     
         else:
             logger.error("Error #2020: Opened more than one sys param shortcut popup at a time")
@@ -620,17 +638,14 @@ class Notebook(BaseNotebook):
                 if len(err_msg) > 1:
                     self.do_confirmation_popup("\n".join(err_msg), hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
-                    
-                    
             self.write(self.ICtab_status, "")
             self.sys_param_shortcut_popup.destroy()
             self.sys_param_shortcut_popup_isopen = False
         except Exception as e:
             logger.error("Error #2021: Failed to close shortcut popup.")
             logger.error(e)
-        
-        return
-    
+
+
     def do_batch_popup(self):
         """ Open tool for making batches of similar initial condition files. """
         if not self.batch_popup_isopen:
@@ -665,14 +680,16 @@ class Notebook(BaseNotebook):
                        text="All copies will be stored "
                        "in a new folder with the name "
                        "you enter into the appropriate box.", 
-                       width=300).grid(row=2,column=0)
+                       width=300
+                       ).grid(row=2,column=0)
 
             tk.Message(self.batch_popup, 
                        text="For best results, load a "
                        "complete IC file or fill "
                        "in values for all params "
                        "before using this tool.", 
-                       width=300).grid(row=3,column=0)
+                       width=300
+                       ).grid(row=3,column=0)
 
             tk.ttk.Label(self.batch_popup, 
                          text="Select Layer {} Batch Parameter:".format(self.current_layer_name)).grid(row=0,column=1)
@@ -698,21 +715,25 @@ class Notebook(BaseNotebook):
             
             if any(LGC_active):
                 
-                self.LGC_instruction1 = tk.Message(self.batch_popup, 
-                                                   text="Additional options for generating "
-                                                        "delta_N and delta_P batches "
-                                                        "are available when using the "
-                                                        "Laser Generation Condition tool.", 
-                                                   width=300)
+                self.LGC_instruction1 = \
+                    tk.Message(
+                        self.batch_popup, 
+                        text="Additional options for generating "
+                            "delta_N and delta_P batches "
+                            "are available when using the "
+                            "Laser Generation Condition tool.", 
+                        width=300)
                 self.LGC_instruction1.grid(row=4,column=0)
                 
-                self.LGC_instruction2 = tk.Message(self.batch_popup, 
-                                                   text="Please note that TEDs will "
-                                                   "use the current values and settings on "
-                                                   "the L.G.C. tool's tab "
-                                                   "to complete the batches when one "
-                                                   "or more of these options are selected.", 
-                                                   width=300)
+                self.LGC_instruction2 = \
+                    tk.Message(
+                        self.batch_popup, 
+                        text="Please note that TEDs will "
+                            "use the current values and settings on "
+                            "the L.G.C. tool's tab "
+                            "to complete the batches when one "
+                            "or more of these options are selected.", 
+                        width=300)
                 self.LGC_instruction2.grid(row=5,column=0)
                 
                 # Boolean logic is fun
@@ -763,8 +784,8 @@ class Notebook(BaseNotebook):
 
         else:
             logger.error("Error #102: Opened more than one batch popup at a time")
-        return
-    
+        
+
     def on_batch_popup_close(self):
         try:
             self.batch_popup.destroy()
@@ -773,18 +794,19 @@ class Notebook(BaseNotebook):
         except Exception:
             logger.error("Error #103: Failed to close batch popup.")
 
-        return
-    
+
     def do_resetIC_popup(self):
         """ Clear stored parameter values. """
         if not self.resetIC_popup_isopen:
-
+    
             self.resetIC_popup = tk.Toplevel(self.root)
 
-            tk.ttk.Label(self.resetIC_popup, 
-                         text="Which Parameters "
-                         "should be cleared?", 
-                         style="Header.TLabel").grid(row=0,column=0,columnspan=2)
+            tk.ttk.Label(
+                self.resetIC_popup, 
+                text="Which Parameters "
+                "should be cleared?", 
+                style="Header.TLabel"
+                ).grid(row=0,column=0,columnspan=2)
 
             self.resetIC_checkbutton_frame = tk.ttk.Frame(self.resetIC_popup)
             self.resetIC_checkbutton_frame.grid(row=1,column=0,columnspan=2)
@@ -797,42 +819,48 @@ class Notebook(BaseNotebook):
             for layer_name in self.module.layers:
                 self.resetIC_checklayers[layer_name] = tk.IntVar()
 
-                self.resetIC_checkbuttons[layer_name] = tk.ttk.Checkbutton(self.resetIC_checkbutton_frame, 
-                                                                           text=layer_name, 
-                                                                           variable=self.resetIC_checklayers[layer_name], 
-                                                                           onvalue=1, 
-                                                                           offvalue=0)
+                self.resetIC_checkbuttons[layer_name] = \
+                    tk.ttk.Checkbutton(
+                        self.resetIC_checkbutton_frame, 
+                        text=layer_name, 
+                        variable=self.resetIC_checklayers[layer_name], 
+                        onvalue=1, 
+                        offvalue=0)
 
             for i, cb in enumerate(self.resetIC_checkbuttons):
                 self.resetIC_checkbuttons[cb].grid(row=i,column=0, pady=(6,6))
 
-            
-            tk.ttk.Separator(self.resetIC_popup, 
-                             orient="horizontal", 
-                             style="Grey Bar.TSeparator").grid(row=2,column=0,columnspan=2, pady=(10,10), sticky="ew")
+            tk.ttk.Separator(
+                self.resetIC_popup, 
+                orient="horizontal", 
+                style="Grey Bar.TSeparator"
+                ).grid(row=2,column=0,columnspan=2, pady=(10,10), sticky="ew")
 
             self.resetIC_check_clearall = tk.IntVar()
-            tk.Checkbutton(self.resetIC_popup, 
-                           text="Clear All", 
-                           variable=self.resetIC_check_clearall, 
-                           onvalue=1, offvalue=0).grid(row=3,column=0)
 
-            tk.Button(self.resetIC_popup, 
-                      text="Continue", 
-                      command=partial(self.on_resetIC_popup_close, 
-                                      True)).grid(row=3,column=1)
+            tk.Checkbutton(
+                self.resetIC_popup, 
+                text="Clear All", 
+                variable=self.resetIC_check_clearall, 
+                onvalue=1,
+                offvalue=0
+                ).grid(row=3,column=0)
 
-            self.resetIC_popup.protocol("WM_DELETE_WINDOW", 
-                                        self.on_resetIC_popup_close)
+            tk.Button(
+                self.resetIC_popup, 
+                text="Continue", 
+                command=partial(self.on_resetIC_popup_close, True)
+                ).grid(row=3,column=1)
+
+            self.resetIC_popup.protocol(
+                "WM_DELETE_WINDOW", 
+                self.on_resetIC_popup_close)
             self.resetIC_popup.grab_set()
             self.resetIC_popup_isopen = True
-            return
 
         else:
             logger.error("Error #700: Opened more than one resetIC popup at a time")
 
-        return
-    
     def on_resetIC_popup_close(self, continue_=False):
         try:
             self.resetIC_selected_layers = []
@@ -851,12 +879,13 @@ class Notebook(BaseNotebook):
 
         except Exception:
             logger.error("Error #601: Failed to close Bayesim popup")
-        return
-    
+        
+
+
     def do_plotter_popup(self, plot_ID):
         """ Select datasets for plotting on Analyze tab. """
         if not self.plotter_popup_isopen:
-
+    
             self.plotter_popup = tk.Toplevel(self.root)
 
             tk.ttk.Label(self.plotter_popup, 
@@ -933,7 +962,6 @@ class Notebook(BaseNotebook):
 
         else:
             logger.error("Error #501: Opened more than one plotter popup at a time")
-        return
 
     def on_plotter_popup_close(self, plot_ID, continue_=False):
         try:
@@ -943,7 +971,10 @@ class Notebook(BaseNotebook):
             if continue_:
                 assert (self.data_var.get()), "Select a data type from the drop-down menu"
                 self.analysis_plots[plot_ID].data_filenames = []
-                # This year for Christmas, I want Santa to implement tk.filedialog.askdirectories() so we can select multiple directories like we can do with files
+                # This year for Christmas, I want Santa to implement
+                # tk.filedialog.askdirectories()
+                # so we can select multiple directories like we can do with files
+                # LOL :)
                 dir_names = [self.data_list[i] for i in self.data_listbox.curselection()]
                 for next_dir in dir_names:
                     self.analysis_plots[plot_ID].data_filenames.append(next_dir)
@@ -958,11 +989,11 @@ class Notebook(BaseNotebook):
 
         except AssertionError as oops:
             self.write(self.plotter_status, str(oops))
+            logger.error("Error: %s", oops)
         except Exception:
             logger.error("Error #502: Failed to close plotter popup.")
 
-        return
-    
+
     def do_integration_timemode_popup(self):
         """ Select which timesteps to integrate through. """
         if not self.integration_popup_isopen:
@@ -998,7 +1029,6 @@ class Notebook(BaseNotebook):
             
         else:
             logger.error("Error #420: Opened more than one integration popup at a time")
-        return
 
     def on_integration_popup_close(self, continue_=False):
         try:
@@ -1013,8 +1043,8 @@ class Notebook(BaseNotebook):
         except Exception:
             logger.error("Error #421: Failed to close PLmode popup.")
 
-        return
-    
+
+
     def do_integration_getbounds_popup(self):
         """ Select spatial region to integrate through. """
         if not self.integration_getbounds_popup_isopen:
@@ -1079,28 +1109,33 @@ class Notebook(BaseNotebook):
                                                     width=9)
             self.integration_width_entry.grid(row=6,column=3)
 
-            tk.ttk.Separator(self.integration_getbounds_popup, 
-                             orient="horizontal", 
-                             style="Grey Bar.TSeparator").grid(row=7,column=0,columnspan=30, pady=(10,10), sticky="ew")
+            tk.ttk.Separator(
+                self.integration_getbounds_popup, 
+                orient="horizontal", 
+                style="Grey Bar.TSeparator"
+                ).grid(row=7,column=0,columnspan=30, pady=(10,10), sticky="ew")
 
-            tk.Button(self.integration_getbounds_popup, text="Continue", 
-                      command=partial(self.on_integration_getbounds_popup_close, 
-                                      continue_=True)).grid(row=8,column=5)
+            tk.Button(
+                self.integration_getbounds_popup,
+                text="Continue", 
+                command=partial(self.on_integration_getbounds_popup_close, continue_=True)
+                ).grid(row=8,column=5)
 
             self.integration_getbounds_status = tk.Text(self.integration_getbounds_popup, 
                                                         width=24,height=2)
             self.integration_getbounds_status.grid(row=8,rowspan=2,column=0,columnspan=5)
             self.integration_getbounds_status.configure(state="disabled")
 
-            self.integration_getbounds_popup.protocol("WM_DELETE_WINDOW", 
-                                                      partial(self.on_integration_getbounds_popup_close, 
-                                                              continue_=False))
+            self.integration_getbounds_popup.protocol(
+                "WM_DELETE_WINDOW", 
+                partial(self.on_integration_getbounds_popup_close, continue_=False))
+
             self.integration_getbounds_popup.grab_set()
             self.integration_getbounds_popup_isopen = True
         else:
             logger.error("Error #422: Opened more than one integration getbounds popup at a time")
-        return
-    
+
+
     def on_integration_getbounds_popup_close(self, continue_=False):
         """ Read in the pairs of integration bounds as-is. """
         # Checking if they make sense is do_Integrate()'s job
@@ -1154,12 +1189,12 @@ class Notebook(BaseNotebook):
 
         except (OSError, KeyError) as uh_oh:
             self.write(self.integration_getbounds_status, uh_oh)
+            logger.error("Error: %s", uh_oh)
 
         except Exception:
             self.write(self.integration_getbounds_status, "Error: missing or invalid paramters")
+            logger.error("Error: missing or invalid paramters")
 
-        return
-    
     def do_PL_xaxis_popup(self):
         """ If integrating over single timestep, 
             select which parameter to plot as horizontal axis. 
@@ -1169,8 +1204,11 @@ class Notebook(BaseNotebook):
             self.xaxis_selection = tk.StringVar()
             self.PL_xaxis_popup = tk.Toplevel(self.root)
 
-            tk.ttk.Label(self.PL_xaxis_popup, text="Select parameter for x axis", 
-                         style="Header.TLabel").grid(row=0,column=0,columnspan=3)
+            tk.ttk.Label(
+                self.PL_xaxis_popup,
+                text="Select parameter for x axis", 
+                style="Header.TLabel"
+                ).grid(row=0,column=0,columnspan=3)
 
 
             plot_ID = self.active_analysisplot_ID.get()
@@ -1189,15 +1227,15 @@ class Notebook(BaseNotebook):
             self.PL_xaxis_status.grid(row=2,rowspan=2,column=0,columnspan=3)
             self.PL_xaxis_status.configure(state="disabled")
 
-            self.PL_xaxis_popup.protocol("WM_DELETE_WINDOW", 
-                                         partial(self.on_PL_xaxis_popup_close, 
-                                                 continue_=False))
+            self.PL_xaxis_popup.protocol(
+                "WM_DELETE_WINDOW", 
+                partial(self.on_PL_xaxis_popup_close, continue_=False))
             self.PL_xaxis_popup.grab_set()
             self.PL_xaxis_popup_isopen = True
         else:
             logger.error("Error #424: Opened more than one PL xaxis popup at a time")
-        return
-    
+
+
     def on_PL_xaxis_popup_close(self, continue_=False):
         try:
             if continue_:
@@ -1211,8 +1249,6 @@ class Notebook(BaseNotebook):
         except Exception:
             logger.error("Error #425: Failed to close PL xaxis popup.")
 
-        return
-    
     def do_change_axis_popup(self, from_integration):
         """ Select new axis parameters for analysis plots. """
         # Don't open if no data plotted
@@ -1324,8 +1360,9 @@ class Notebook(BaseNotebook):
             self.change_axis_popup_isopen = True
         else:
             logger.error("Error #440: Opened more than one change axis popup at a time")
-        return
-    
+
+
+
     def on_change_axis_popup_close(self, from_integration, continue_=False):
         try:
             if continue_:
@@ -1388,12 +1425,13 @@ class Notebook(BaseNotebook):
 
         except (ValueError, AssertionError) as oops:
             self.write(self.change_axis_status, oops)
+            logger.error("Error: %s", oops)
             return
         except Exception:
             logger.error("Error #441: Failed to close change axis popup.")
 
-        return
-    
+
+
     def do_IC_carry_popup(self):
         """ Open a tool to regenerate IC files based on current state of analysis plots. """
         plot_ID = self.active_analysisplot_ID.get()
@@ -1413,34 +1451,42 @@ class Notebook(BaseNotebook):
             for layer_name, layer in self.module.layers.items():
                 self.carry_checkbuttons[layer_name] = {}
                 for var in layer.s_outputs:
-                    self.carry_checkbuttons[layer_name][var] = tk.Checkbutton(self.IC_carry_popup, 
-                                                                              text=var, 
-                                                                              variable=self.carryover_include_flags[layer_name][var])
+                    self.carry_checkbuttons[layer_name][var] = \
+                        tk.Checkbutton(
+                            self.IC_carry_popup,
+                            text=var,
+                            variable=self.carryover_include_flags[layer_name][var])
                     self.carry_checkbuttons[layer_name][var].grid(row=rcount, column=0)
                     rcount += 1
 
-            self.carry_IC_listbox = tk.Listbox(self.IC_carry_popup, width=30,height=10, 
-                                               selectmode='extended')
+            self.carry_IC_listbox = \
+                tk.Listbox(
+                    self.IC_carry_popup,
+                    width=30,
+                    height=10, 
+                    selectmode='extended')
             self.carry_IC_listbox.grid(row=4,column=0,columnspan=2)
             for key, dataset in self.analysis_plots[plot_ID].datagroup.datasets.items():
                 over_time = (self.analysis_plots[plot_ID].time > dataset.total_time)
                 if over_time: continue
                 self.carry_IC_listbox.insert(tk.END, key)
 
-            tk.Button(self.IC_carry_popup, text="Continue", 
-                      command=partial(self.on_IC_carry_popup_close,
-                                      continue_=True)).grid(row=5,column=0,columnspan=2)
+            tk.Button(
+                self.IC_carry_popup,
+                text="Continue", 
+                command=partial(self.on_IC_carry_popup_close, continue_=True)
+                ).grid(row=5,column=0,columnspan=2)
 
-            self.IC_carry_popup.protocol("WM_DELETE_WINDOW", 
-                                         partial(self.on_IC_carry_popup_close, 
-                                                 continue_=False))
+            self.IC_carry_popup.protocol(
+                "WM_DELETE_WINDOW", 
+                partial(self.on_IC_carry_popup_close, continue_=False))
             self.IC_carry_popup.grab_set()
             self.IC_carry_popup_isopen = True
             
         else:
             logger.error("Error #510: Opened more than one IC carryover popup at a time")
-        return
-    
+
+
     def on_IC_carry_popup_close(self, continue_=False):
         try:
             if continue_:
@@ -1535,17 +1581,15 @@ class Notebook(BaseNotebook):
                 self.root.wait_window(self.confirmation_popup)
 
             self.IC_carry_popup.destroy()
-
             self.IC_carry_popup_isopen = False
 
         except OSError:
             self.write(self.analysis_status, "Error: failed to regenerate IC file")
+            logger.error("Error: failed to regenerate IC file")
             
         except Exception:
             logger.error("Error #511: Failed to close IC carry popup.")
 
-        return
-    
     def do_timeseries_popup(self, ts_ID, td_gridt, td):
         ts_popup = tk.Toplevel(self.root)
         
@@ -1573,7 +1617,7 @@ class Notebook(BaseNotebook):
         assert tspopup_ID not in self.active_timeseries, "Error: a timeseries was overwritten"
         self.active_timeseries[tspopup_ID] = []
         for tag in td:
-            print(list(td[tag][ts_ID][1] * scale_f))
+            logger.debug(list(td[tag][ts_ID][1] * scale_f))
             td_subplot.plot(td_gridt[tag], td[tag][ts_ID][1] * scale_f, label=tag.strip('_'))
             self.active_timeseries[tspopup_ID].append((tag, td_gridt[tag], td[tag][ts_ID][1] * scale_f))
     
@@ -1585,13 +1629,23 @@ class Notebook(BaseNotebook):
         tframe.grid(row=1,column=0,columnspan=2)
         tkagg.NavigationToolbar2Tk(td_canvas, tframe).grid(row=0,column=0,columnspan=2)
         
-        tk.ttk.Button(tframe, text="Export All", command=partial(self.export_timeseries, tspopup_ID, tail=False)).grid(row=2,column=0, padx=(10,10))
-        tk.ttk.Button(tframe, text="Export Tail", command=partial(self.export_timeseries, tspopup_ID, tail=True)).grid(row=2,column=1, padx=(10,10))
-        ts_popup.protocol("WM_DELETE_WINDOW", partial(self.on_timeseries_popup_close, ts_popup,
-                                                 tspopup_ID))
+        tk.ttk.Button(
+            tframe,
+            text="Export All",
+            command=partial(self.export_timeseries, tspopup_ID, tail=False)
+            ).grid(row=2,column=0, padx=(10,10))
         
-        return
+        tk.ttk.Button(
+            tframe,
+            text="Export Tail",
+            command=partial(self.export_timeseries, tspopup_ID, tail=True)
+            ).grid(row=2,column=1, padx=(10,10))
+        
+        ts_popup.protocol(
+            "WM_DELETE_WINDOW",
+            partial(self.on_timeseries_popup_close, ts_popup, tspopup_ID))
     
+
     def on_timeseries_popup_close(self, ts_popup, tspopup_ID):
         try:
             del self.active_timeseries[tspopup_ID]
@@ -1599,9 +1653,8 @@ class Notebook(BaseNotebook):
             logger.error("Failed to clear time series")
             logger.error(e)
         ts_popup.destroy()
-        return
     
-    ## End of popups ##
+
     ## Plotter for simulation tab    
     def update_sim_plots(self, index, failed_vars, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
@@ -1633,8 +1686,8 @@ class Notebook(BaseNotebook):
             
         self.sim_fig.tight_layout()
         self.sim_fig.canvas.draw()
-        return
-    
+
+
     ## Func for overview analyze tab
     def fetch_metadata(self, data_filename):
         """ Read and store parameters from a metadata.txt file """
@@ -1710,7 +1763,8 @@ class Notebook(BaseNotebook):
         for layer_name, layer in param_values_dict.items():
             assert set(self.module.layers[layer_name].params.keys()).issubset(set(param_values_dict[layer_name].keys())), "Error: metadata is missing params"
         return param_values_dict, flag_values_dict, total_time, dt
-    
+
+
     def plot_overview_analysis(self):
         """ Plot dataset and calculations from OneD_Model.get_overview_analysis() 
             on Overview tab. 
@@ -1722,7 +1776,6 @@ class Notebook(BaseNotebook):
             return
 
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
-        
         
         try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
@@ -1783,12 +1836,16 @@ class Notebook(BaseNotebook):
                     plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.integrated_units))
                 else:
                     plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
-            
-            
-        self.overview_values = self.module.get_overview_analysis(param_values_dict, flag_values_dict,
-                                                      total_time, dt,
-                                                      tstep_list, data_dirname, 
-                                                      data_filename)
+
+        self.overview_values = \
+            self.module.get_overview_analysis(
+                param_values_dict,
+                flag_values_dict,
+                total_time,
+                dt,
+                tstep_list,
+                data_dirname,
+                data_filename)
         
         warning_msg = ["Error: the following occured while generating the overview"]
         for layer_name, layer in self.module.layers.items():
@@ -1829,10 +1886,9 @@ class Notebook(BaseNotebook):
             
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
-        return
-    
-    ## Funcs for detailed analyze tab
 
+
+    ## Funcs for detailed analyze tab
     def plot_analyze(self, plot_ID, force_axis_update=False):
         """ Plot dataset object from make_rawdataset() on analysis tab. """
         try:
@@ -1872,7 +1928,7 @@ class Notebook(BaseNotebook):
                     label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
                     subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
                 else:
-                    print("Warning: time out of range for dataset {}".format(dataset.tag()))
+                    logger.warning("Warning: time out of range for dataset {}".format(dataset.tag()))
                     
             subplot.set_xlabel("x {}".format(self.module.layers[where_layer].length_unit))
             subplot.set_ylabel("{} {}".format(active_datagroup.type, self.module.layers[where_layer].outputs[active_datagroup.type].units))
@@ -1887,10 +1943,9 @@ class Notebook(BaseNotebook):
 
         except Exception:
             self.write(self.analysis_status, "Error #106: Plot failed")
-            return
+            logger.error("Error #106: Plot failed")
 
-        return
-    
+
     def make_rawdataset(self, data_filename, plot_ID, datatype):
         """Create a dataset object and prepare to plot on analysis tab."""
         # Select data type of incoming dataset from existing datasets
@@ -1898,7 +1953,6 @@ class Notebook(BaseNotebook):
 
         try:
             param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
-            
             data_m = {}
             data_edge_x = {}
             data_node_x = {}
@@ -1906,10 +1960,10 @@ class Notebook(BaseNotebook):
                 total_length = param_values_dict[layer_name]["Total_length"]
                 dx = param_values_dict[layer_name]["Node_width"]
                 data_m[layer_name] = int(0.5 + total_length / dx)
-                data_edge_x[layer_name] = np.linspace(0,  total_length,
-                                                      data_m[layer_name]+1)
-                data_node_x[layer_name] = np.linspace(dx / 2, total_length - dx / 2, 
-                                                      data_m[layer_name])
+                data_edge_x[layer_name] = \
+                    np.linspace(0, total_length, data_m[layer_name]+1)
+                data_node_x[layer_name] = \
+                    np.linspace(dx/2, total_length-dx/2, data_m[layer_name])
         except AssertionError as oops:
             return str(oops)
         except Exception:
@@ -1920,18 +1974,23 @@ class Notebook(BaseNotebook):
         for layer_name, layer in self.module.layers.items():
             sim_data[layer_name] = {}
             for sim_datatype in layer.s_outputs:
-                path_name = os.path.join(self.default_dirs["Data"], 
-                                            self.module.system_ID,
-                                            data_filename,
-                                            "{}-{}.h5".format(data_filename, sim_datatype))
+                path_name = os.path.join(
+                    self.default_dirs["Data"], 
+                    self.module.system_ID,
+                    data_filename,
+                    "{}-{}.h5".format(data_filename, sim_datatype))
                 try:
-                    sim_data[layer_name][sim_datatype] = u_read(path_name, t0=0, 
-                                                                single_tstep=True)
+                    sim_data[layer_name][sim_datatype] = \
+                        u_read(path_name, t0=0, single_tstep=True)
                 except OSError:
                     continue
         where_layer = self.module.find_layer(datatype)
         try:
-            values = self.module.prep_dataset(datatype, sim_data, param_values_dict, flag_values_dict)
+            values = self.module.prep_dataset(
+                datatype,
+                sim_data,
+                param_values_dict,
+                flag_values_dict)
         except Exception as e:
             return "Error: Unable to calculate {} using prep_dataset\n{}".format(datatype, e)
         
@@ -1944,19 +2003,32 @@ class Notebook(BaseNotebook):
                     "prep_dataset did not return a 1D array".format(datatype))
 
         if self.module.layers[where_layer].outputs[datatype].is_edge: 
-            return Raw_Data_Set(values, data_edge_x[where_layer], data_node_x[where_layer], 
-                                total_time, dt, 
-                                param_values_dict, flag_values_dict, datatype, data_filename, 
-                                active_plot.time)
+            return Raw_Data_Set(
+                values,
+                data_edge_x[where_layer],
+                data_node_x[where_layer],
+                total_time,
+                dt,
+                param_values_dict,
+                flag_values_dict,
+                datatype,
+                data_filename, 
+                active_plot.time)
         else:
-            return Raw_Data_Set(values, data_node_x[where_layer], data_node_x[where_layer], 
-                                total_time, dt,
-                                param_values_dict, flag_values_dict, datatype, data_filename, 
-                                active_plot.time)
-        
+            return Raw_Data_Set(
+                values,
+                data_node_x[where_layer],
+                data_node_x[where_layer],
+                total_time,
+                dt,
+                param_values_dict,
+                flag_values_dict,
+                datatype,
+                data_filename, 
+                active_plot.time)
+
     def load_datasets(self):
         """ Interpret selection from do_plotter_popup()."""
-        
         plot_ID = self.active_analysisplot_ID.get()
         self.do_plotter_popup(plot_ID)
         self.root.wait_window(self.plotter_popup)
@@ -1991,9 +2063,8 @@ class Notebook(BaseNotebook):
             
         else:
             self.write(self.analysis_status, "Data read finished")
-        
-        return
-    
+
+
     def plot_tstep(self):
         """ Step already plotted data forward (or backward) in time"""
         plot_ID = self.active_analysisplot_ID.get()
@@ -2046,8 +2117,8 @@ class Notebook(BaseNotebook):
             
         self.plot_analyze(plot_ID, force_axis_update=False)
         self.write(self.analysis_status, "")
-        return
-    
+
+
     ## Status box update helpers
     def write(self, textBox, text):
         """ Edit the text in status display boxes."""
@@ -2080,8 +2151,6 @@ class Notebook(BaseNotebook):
         elif (tab_text == "Analyze"):
             logger.info("Analyze tab selected")
 
-        return
-    
     def do_Batch(self):
         """ Interpret values entered into simulate tab and prepare simulations 
             for each selected IC file
@@ -2106,25 +2175,28 @@ class Notebook(BaseNotebook):
             assert (self.hmax >= 0),"Error: Invalid solver stepsize"
             
             if self.dt > self.simtime / 10:
-                self.do_confirmation_popup("Warning: a very large time stepsize was entered. "
-                                           "Results may be less accurate with large stepsizes. "
-                                           "Are you sure you want to continue?")
+                self.do_confirmation_popup(
+                    "Warning: a very large time stepsize was entered. "
+                    "Results may be less accurate with large stepsizes. "
+                    "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: 
                     return
                 
             if self.hmax and self.hmax < 1e-3:
-                self.do_confirmation_popup("Warning: a very small solver stepsize was entered. "
-                                           "Results may be slow with small solver stepsizes. "
-                                           "Are you sure you want to continue?")
+                self.do_confirmation_popup(
+                    "Warning: a very small solver stepsize was entered. "
+                    "Results may be slow with small solver stepsizes. "
+                    "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: 
                     return
                 
             if (self.n > 1e5):
-                self.do_confirmation_popup("Warning: a very small time stepsize was entered. "
-                                           "Results may be slow with small time stepsizes. "
-                                           "Are you sure you want to continue?")
+                self.do_confirmation_popup(
+                    "Warning: a very small time stepsize was entered. "
+                    "Results may be slow with small time stepsizes. "
+                    "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: 
                     return
@@ -2159,8 +2231,8 @@ class Notebook(BaseNotebook):
 
         if len(self.sim_warning_msg) > 1:
             self.do_confirmation_popup("\n".join(self.sim_warning_msg), hide_cancel=True)
-        return
-    
+
+
     def do_Calculate(self):
         """ Setup initial condition using IC file and OneD_Model.calc_inits(), 
             simulate using OneD_Model.simulate(),
@@ -2343,8 +2415,8 @@ class Notebook(BaseNotebook):
             ofstream.write("t$ Time grid:\n")
             ofstream.write("Total-Time: {}\n".format(self.simtime))
             ofstream.write("dt: {}\n".format(self.dt))
-        return
-    
+
+
     def do_Integrate(self, bypass_inputs=False):
         """ Interpret values from series of integration popups to integrate datasets. """
         plot_ID = self.active_analysisplot_ID.get()
@@ -2607,8 +2679,6 @@ class Notebook(BaseNotebook):
                     self.do_timeseries_popup(i, td_gridt, td)
                 except Exception:
                     continue
-        return
-    
     ## Initial Condition Managers
 
     def reset_IC(self, force=False):
@@ -2663,7 +2733,6 @@ class Notebook(BaseNotebook):
         self.update_IC_plot(plot_ID="clearall")                             
         self.update_system_summary()                    
         self.write(self.ICtab_status, "Selected layers cleared")
-        return
 
 	## This is a patch of a consistency issue involving initial conditions - 
     ## we require different variables of a single initial condition
@@ -2681,8 +2750,6 @@ class Notebook(BaseNotebook):
         elif state =='unlock':
             self.thickness_entry.configure(state='normal')
             self.dx_entry.configure(state='normal')
-
-        return
 
     
     def set_init_x(self):
@@ -2705,18 +2772,20 @@ class Notebook(BaseNotebook):
         assert (int(0.5 + thickness / dx) <= 1e6), "Error: too many space steps"
 
         if dx > thickness / 10:
-            self.do_confirmation_popup("Warning: a very large space stepsize was entered. "
-                                       "Results may be less accurate with large stepsizes. "
-                                       "Are you sure you want to continue?")
+            self.do_confirmation_popup(
+                "Warning: a very large space stepsize was entered. "
+                "Results may be less accurate with large stepsizes. "
+                "Are you sure you want to continue?")
             self.root.wait_window(self.confirmation_popup)
             if not self.confirmed: 
                 return
             
         if abs(thickness / dx - int(thickness / dx)) > 1e-10:
-            self.do_confirmation_popup("Warning: the selected thickness cannot be "
-                                       "partitioned evenly into the selected stepsize. "
-                                       "Integration may lose accuracy as a result. "
-                                       "Are you sure you want to continue?")
+            self.do_confirmation_popup(
+                "Warning: the selected thickness cannot be "
+                "partitioned evenly into the selected stepsize. "
+                "Integration may lose accuracy as a result. "
+                "Are you sure you want to continue?")
             self.root.wait_window(self.confirmation_popup)
             if not self.confirmed: 
                 return
@@ -2727,8 +2796,8 @@ class Notebook(BaseNotebook):
         current_layer.grid_x_edges = np.linspace(0, thickness, int(0.5 + thickness / dx) + 1)
         current_layer.spacegrid_is_set = True
         self.set_thickness_and_dx_entryboxes(state='lock')
-        return
-    
+
+
     def add_LGC(self):
         """Calculate and store laser generation profile"""
         # Update current working layer
@@ -2957,8 +3026,6 @@ class Notebook(BaseNotebook):
         elif (self.LGC_options[self.current_layer_name]["power_mode"] == "total-gen"):
             self.LGC_values[self.current_layer_name]["Total_Gen"] = total_gen * ((1e7) ** 3)
         
-        return
-    
     ## Special functions for Parameter Toolkit:
     def add_paramrule(self):
         """ Add a new parameter rule to the selected parameter. """
@@ -3043,7 +3110,6 @@ class Notebook(BaseNotebook):
             if new_param_name == "delta_N" or new_param_name == "delta_P": 
                 self.using_LGC[self.current_layer_name] = False
         self.update_IC_plot(plot_ID="recent")
-        return
 
     def refresh_paramrule_listbox(self):
         """ Update the listbox to show rules for the selected param and display a snapshot of it"""
@@ -3054,68 +3120,66 @@ class Notebook(BaseNotebook):
     
     def update_paramrule_listbox(self, param_name):
         """ Grab current param's rules from module and show them in the param_rule listbox"""
-        if not param_name:
+        if param_name:
+            # 1. Clear the viewer
+            self.hideall_paramrules()
+
+            # 2. Write in the new rules
+            current_param_rules = \
+                self.module.layers[self.current_layer_name].params[param_name].param_rules
+            self.paramtoolkit_currentparam = param_name
+
+            for param_rule in current_param_rules:
+                self.active_paramrule_list.append(param_rule)
+                self.active_paramrule_listbox.insert(
+                    len(self.active_paramrule_list) - 1,
+                    param_rule.get())
+
+            self.write(self.ICtab_status, "")
+
+        else:
             self.write(self.ICtab_status, "Select a parameter")
-            return
 
-        # 1. Clear the viewer
-        self.hideall_paramrules()
-
-        # 2. Write in the new rules
-        current_param_rules = self.module.layers[self.current_layer_name].params[param_name].param_rules
-        self.paramtoolkit_currentparam = param_name
-
-        for param_rule in current_param_rules:
-            self.active_paramrule_list.append(param_rule)
-            self.active_paramrule_listbox.insert(len(self.active_paramrule_list) - 1,
-                                                 param_rule.get())
-
-        
-        self.write(self.ICtab_status, "")
-
-        return
 
     # These two reposition the order of param_rules
     def moveup_paramrule(self):
         """ Shift selected param rule upward. This changes order in which rules are used to generate a distribution. """
         try:
             currentSelectionIndex = self.active_paramrule_listbox.curselection()[0]
-        except IndexError:
-            return
-        
-        if (currentSelectionIndex > 0):
-            # Two things must be done here for a complete swap:
-            # 1. Change the order param rules appear in the box
-            self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
-            self.active_paramrule_listbox.delete(currentSelectionIndex)
-            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, 
-                                                 self.active_paramrule_list[currentSelectionIndex - 1].get())
-            self.active_paramrule_listbox.selection_set(currentSelectionIndex - 1)
+            if (currentSelectionIndex > 0):
+                # Two things must be done here for a complete swap:
+                # 1. Change the order param rules appear in the box
+                self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
+                self.active_paramrule_listbox.delete(currentSelectionIndex)
+                self.active_paramrule_listbox.insert(currentSelectionIndex - 1, 
+                                                    self.active_paramrule_list[currentSelectionIndex - 1].get())
+                self.active_paramrule_listbox.selection_set(currentSelectionIndex - 1)
 
-            # 2. Change the order param rules are applied when calculating Parameter's values
-            self.module.swap_param_rules(self.current_layer_name, self.paramtoolkit_currentparam, 
-                                           currentSelectionIndex)
-            self.update_IC_plot(plot_ID="recent")
-        return
+                # 2. Change the order param rules are applied when calculating Parameter's values
+                self.module.swap_param_rules(self.current_layer_name, self.paramtoolkit_currentparam, 
+                                            currentSelectionIndex)
+                self.update_IC_plot(plot_ID="recent")
+        except IndexError as e:
+            logger.error("Error moving up paramrule: %s", e)
+        
 
     def movedown_paramrule(self):
         """ Shift selected param rule downward. This changes order in which rules are used to generate a distribution. """
         try:
             currentSelectionIndex = self.active_paramrule_listbox.curselection()[0] + 1
-        except IndexError:
-            return
-        
-        if (currentSelectionIndex < len(self.active_paramrule_list)):
-            self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
-            self.active_paramrule_listbox.delete(currentSelectionIndex)
-            self.active_paramrule_listbox.insert(currentSelectionIndex - 1, 
-                                                 self.active_paramrule_list[currentSelectionIndex - 1].get())
-            self.active_paramrule_listbox.selection_set(currentSelectionIndex)
-            
-            self.module.swap_param_rules(self.current_layer_name, self.paramtoolkit_currentparam, 
-                                           currentSelectionIndex)
-            self.update_IC_plot(plot_ID="recent")
-        return
+            if (currentSelectionIndex < len(self.active_paramrule_list)):
+                self.active_paramrule_list[currentSelectionIndex], self.active_paramrule_list[currentSelectionIndex - 1] = self.active_paramrule_list[currentSelectionIndex - 1], self.active_paramrule_list[currentSelectionIndex]
+                self.active_paramrule_listbox.delete(currentSelectionIndex)
+                self.active_paramrule_listbox.insert(currentSelectionIndex - 1, 
+                                                    self.active_paramrule_list[currentSelectionIndex - 1].get())
+                self.active_paramrule_listbox.selection_set(currentSelectionIndex)
+                
+                self.module.swap_param_rules(self.current_layer_name, self.paramtoolkit_currentparam, 
+                                            currentSelectionIndex)
+                self.update_IC_plot(plot_ID="recent")
+        except IndexError as e:
+            logger.error("Error moving down paramrule: %s", e)
+
 
     def hideall_paramrules(self, doPlotUpdate=True):
         """ Wrapper - Call hide_paramrule() until listbox is empty"""
@@ -3123,16 +3187,17 @@ class Notebook(BaseNotebook):
             # These first two lines mimic user repeatedly selecting topmost paramrule in listbox
             self.active_paramrule_listbox.select_set(0)
             self.active_paramrule_listbox.event_generate("<<ListboxSelect>>")
-
             self.hide_paramrule()
-        return
+
 
     def hide_paramrule(self):
         """Remove user-selected param rule from box (but don't touch Module's saved info)"""
-        self.active_paramrule_list.pop(self.active_paramrule_listbox.curselection()[0])
-        self.active_paramrule_listbox.delete(self.active_paramrule_listbox.curselection()[0])
-        return
-    
+        self.active_paramrule_list.pop(
+            self.active_paramrule_listbox.curselection()[0])
+        self.active_paramrule_listbox.delete(
+            self.active_paramrule_listbox.curselection()[0])
+
+
     def deleteall_paramrule(self, doPlotUpdate=True):
         """ Deletes all rules for current param. 
             Use reset_IC instead to delete all rules for every param
@@ -3143,9 +3208,10 @@ class Notebook(BaseNotebook):
                 self.hideall_paramrules()
                 self.update_IC_plot(plot_ID="recent")
             
-        except KeyError:
-            return
+        except KeyError as e:
+            logger.error("Error deleting all paramrules: %s", e)
         return
+
 
     def delete_paramrule(self):
         """ Deletes selected rule for current param. """
@@ -3158,10 +3224,8 @@ class Notebook(BaseNotebook):
                     self.update_IC_plot(plot_ID="recent")
                 except IndexError:
                     self.write(self.ICtab_status, "No rule selected")
-                    return
-        except KeyError:
-            return
-        return
+        except KeyError as e:
+            logger.error("Error deleting paramrule: %s", e)
 
     
     def add_listupload(self):
@@ -3257,7 +3321,6 @@ class Notebook(BaseNotebook):
         if len(msg) > 1:
             self.do_confirmation_popup("\n".join(msg), hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
-        return
 
     def update_IC_plot(self, plot_ID):
         """ Plot selected parameter distribution on Initial Condition tab."""
@@ -3333,8 +3396,6 @@ class Notebook(BaseNotebook):
             self.listupload_fig.canvas.draw()
 
         self.write(self.ICtab_status, "Initial Condition Updated")
-        return
-    
     ## Initial Condition I/O
 
     def create_batch_init(self):
@@ -3420,17 +3481,18 @@ class Notebook(BaseNotebook):
             self.do_confirmation_popup("Batch {} created successfully".format(batch_dir_name), hide_cancel=True)
             
         self.root.wait_window(self.confirmation_popup)
-        return
-    
+
 
     def save_ICfile(self):
         """Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked"""
-    
         try:
             assert all([layer.spacegrid_is_set for name, layer in self.module.layers.items()]), "Error: set all space grids first"
-            new_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Initial"], 
-                                                           title="Save IC text file", 
-                                                           filetypes=[("Text files","*.txt")])
+
+            new_filename = \
+                tk.filedialog.asksaveasfilename(
+                    initialdir=self.default_dirs["Initial"], 
+                    title="Save IC text file", 
+                    filetypes=[("Text files","*.txt")])
             
             if not new_filename: 
                 return
@@ -3444,8 +3506,6 @@ class Notebook(BaseNotebook):
             
         except ValueError as uh_Oh:
             logger.error(uh_Oh)
-            
-        return
 
     def write_init_file(self, newFileName, dir_name=""):
         """ Write current state of module into an initial condition (IC) file."""
@@ -3499,19 +3559,19 @@ class Notebook(BaseNotebook):
             return
 
         self.write(self.ICtab_status, "IC file generated")
-        return
 
     
     def select_init_file(self):
         """Wrapper for load_ICfile with user selection from IC tab"""
-        self.IC_file_name = tk.filedialog.askopenfilename(initialdir=self.default_dirs["Initial"], 
-                                                          title="Select IC text files", 
-                                                          filetypes=[("Text files","*.txt")])
-        if not self.IC_file_name: 
-            return
+        self.IC_file_name = \
+            tk.filedialog.askopenfilename(
+                initialdir=self.default_dirs["Initial"], 
+                title="Select IC text files", 
+                filetypes=[("Text files","*.txt")])
 
-        self.load_ICfile()
-        return
+        if self.IC_file_name: 
+            self.load_ICfile()
+
 
     def load_ICfile(self, cycle_through_IC_plots=True):
         """Read parameters from IC file and store into module."""
@@ -3719,8 +3779,6 @@ class Notebook(BaseNotebook):
             self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
             self.do_confirmation_popup(warning_mssg, hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
-        return
-    
     # Data I/O
 
     def export_plot(self, from_integration):
@@ -3781,8 +3839,6 @@ class Notebook(BaseNotebook):
                 self.write(self.analysis_status, "Export complete")
             except PermissionError:
                 self.write(self.analysis_status, "Error: unable to access PL export destination")
-        
-        return
     
     def export_timeseries(self, tspopup_ID, tail=False):
         paired_data = list(self.active_timeseries[tspopup_ID])
@@ -3819,8 +3875,6 @@ class Notebook(BaseNotebook):
                 self.write(self.analysis_status, "Timeseries export complete")
             except PermissionError:
                 self.write(self.analysis_status, "Error: unable to access PL export destination")
-        
-        return
             
     def export_overview(self):
         try:

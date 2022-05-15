@@ -7,6 +7,9 @@ Created on Mon Feb 22 14:03:19 2021
 import tkinter as tk
 from tkinter import ttk
 import numpy as np
+from config import init_logging
+logger = init_logging(__name__)
+
 
 class Param_Rule:
     """The Parameter Toolkit uses these to build Parameter()'s values"""
@@ -152,7 +155,8 @@ class Raw_Data_Group(Data_Group):
         if (self.type == data.type):
             self.datasets[data.tag()] = data
         else:
-            print("Cannot plot selected data sets: type mismatch")
+            logger.info("Cannot plot selected data sets: type mismatch")
+
         return
     
     def build(self, convert_out_dict):
