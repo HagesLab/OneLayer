@@ -41,8 +41,10 @@ np.seterr(divide='raise', over='warn', under='warn', invalid='raise')
         
 class Notebook(BaseNotebook):
 
+
     def __init__(self, title: str, module_list: dict, cli_args: dict):
         """ Create main tkinter object and select module. """
+        self.module_list = module_list
         self.module = None
         self.module_list = module_list
         self.root = tk.Tk()
