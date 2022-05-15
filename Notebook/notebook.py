@@ -39,6 +39,11 @@ from io_utils import check_valid_filename
 from io_utils import get_split_and_clean_line
 
 from Notebook.base import BaseNotebook
+from Notebook.Tabs.inputs import add_tab_inputs
+from Notebook.Tabs.simulate import add_tab_simulate
+from Notebook.Tabs.analyze import add_tab_analyze
+from Notebook.Popups.popups import do_confirmation_popup
+from Notebook.Popups.popups import do_module_popup
 
 from config import init_logging
 logger = init_logging(__name__)
@@ -63,7 +68,7 @@ class Notebook(BaseNotebook):
             self.module.verify()
             self.verified=True
         else:
-            self.do_module_popup()
+            self = do_module_popup(self)
             self.root.wait_window(self.select_module_popup)
 
         if self.module is None or not self.verified: 
@@ -94,9 +99,9 @@ class Notebook(BaseNotebook):
         s = ttk.Style()
         s.theme_use('classic')
 
-        self.add_tab_inputs()
-        self.add_tab_simulate()
-        self.add_tab_analyze()
+        self = add_tab_inputs(self)
+        self = add_tab_simulate(self)
+        self = add_tab_analyze(self)
         self.notebook.bind("<<NotebookTabChanged>>", self.on_tab_selected)
         #self.tab_inputs.bind("<<NotebookTabChanged>>", self.on_input_subtab_selected)
         
@@ -121,8 +126,9 @@ class Notebook(BaseNotebook):
 
 
     def quit(self):
-        self.do_confirmation_popup("All unsaved data will be lost. "
-                                   "Are you sure you want to close TEDs?")
+        self = do_confirmation_popup(self,
+            "All unsaved data will be lost. "
+            "Are you sure you want to close TEDs?")
         self.root.wait_window(self.confirmation_popup)
         if self.confirmed: 
             self.root.destroy()
@@ -144,20 +150,20 @@ class Notebook(BaseNotebook):
 
 
     def change_module(self):
-        self.do_confirmation_popup("Warning: This will close the current instance "
-                                   "of TEDs (and all unsaved data). Are you sure "
-                                   "you want to select a new module?")
+        self = do_confirmation_popup(self, 
+                "Warning: This will close the current instance "
+                "of TEDs (and all unsaved data). Are you sure "
+                "you want to select a new module?")
         self.root.wait_window(self.confirmation_popup)
         if self.confirmed: 
             
         
             self.notebook.destroy()
-            self.do_module_popup()
+            self = do_module_popup(self)
             self.root.wait_window(self.select_module_popup)
             if self.module is None: 
                 return
             self.prep_notebook()
-
 
 
     def add_menus(self):
@@ -341,34 +347,9 @@ class Notebook(BaseNotebook):
             self.plotsummary_fig.tight_layout()
             self.plotsummary_fig.canvas.draw()
 
-    
-    ## Functions to create popups and manage
-    def do_module_popup(self):
-        """ Popup for selecting the active module (e.g. Nanowire) """
-        self.select_module_popup = tk.Toplevel(self.root)
-        tk.Label(self.select_module_popup, 
-                 text="The following TEDs modules were found; "
-                 "select one to continue: ").grid(row=0,column=0)
-        
-        self.module_names = list(self.module_list.keys())
-        self.module_listbox = tk.Listbox(self.select_module_popup, width=40, height=10)
-        self.module_listbox.grid(row=1,column=0)
-        self.module_listbox.delete(0,tk.END)
-        self.module_listbox.insert(0,*(self.module_names))
-        
-        tk.Button(self.select_module_popup, text="Continue", 
-                  command=partial(self.on_select_module_popup_close, True)).grid(row=2,column=0)
-        
-        self.select_module_popup.protocol("WM_DELETE_WINDOW", 
-                                          partial(self.on_select_module_popup_close, 
-                                                  continue_=False))
-        self.select_module_popup.attributes("-topmost", True)
-        self.select_module_popup.after_idle(self.select_module_popup.attributes,
-                                            '-topmost',False)
-        
-        self.select_module_popup.grab_set()
 
-
+        
+       
     def on_select_module_popup_close(self, continue_=False):
         """ Do basic verification checks defined by OneD_Model.verify() 
             and inform tkinter of selected module 
@@ -388,30 +369,7 @@ class Notebook(BaseNotebook):
             logger.error("Error: could not verify selected module")
             logger.error(str(oops))
             
-        return
-        
-    def do_confirmation_popup(self, text, hide_cancel=False):
-        """ General purpose popup for important operations (e.g. deleting something)
-            which should require user confirmation
-        """
-        self.confirmation_popup = tk.Toplevel(self.root)
-        
-        tk.Message(self.confirmation_popup, text=text, 
-                   width=(float(self.root.winfo_screenwidth()) / 4)).grid(row=0,column=0, columnspan=2)
-        
-        if not hide_cancel:
-            tk.Button(self.confirmation_popup, text="Cancel", 
-                      command=partial(self.on_confirmation_popup_close, 
-                                      continue_=False)).grid(row=1,column=0)
-        
-        tk.Button(self.confirmation_popup, text='Continue', 
-                  command=partial(self.on_confirmation_popup_close, 
-                                  continue_=True)).grid(row=1,column=1)
-        
-        self.confirmation_popup.protocol("WM_DELETE_WINDOW", 
-                                         self.on_confirmation_popup_close)
-        self.confirmation_popup.grab_set()        
-        return
+    
     
     def on_confirmation_popup_close(self, continue_=False):
         """ Inform caller of do_confirmation_popup of whether user confirmation 
@@ -628,15 +586,17 @@ class Notebook(BaseNotebook):
                     
                 if changed_params:
                     self.update_IC_plot(plot_ID="recent")
-                    self.do_confirmation_popup("Updated: {}".format(changed_params), 
-                                               hide_cancel=True)
+                    self = do_confirmation_popup(self,
+                            "Updated: {}".format(changed_params), 
+                            hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
                     
                 if "delta_N" in changed_params or "delta_P" in changed_params:
                     self.using_LGC[self.current_layer_name] = False
                     
                 if len(err_msg) > 1:
-                    self.do_confirmation_popup("\n".join(err_msg), hide_cancel=True)
+                    self = do_confirmation_popup(self,
+                        "\n".join(err_msg), hide_cancel=True)
                     self.root.wait_window(self.confirmation_popup)
             self.write(self.ICtab_status, "")
             self.sys_param_shortcut_popup.destroy()
@@ -1577,7 +1537,9 @@ class Notebook(BaseNotebook):
                 # If NO new files saved
                 if len(status_msg) == 1: 
                     status_msg.append("(none)")
-                self.do_confirmation_popup("\n".join(status_msg), hide_cancel=True)
+                self = do_confirmation_popup(self,
+                        "\n".join(status_msg), 
+                        hide_cancel=True)
                 self.root.wait_window(self.confirmation_popup)
 
             self.IC_carry_popup.destroy()
@@ -1816,12 +1778,14 @@ class Notebook(BaseNotebook):
                 tstep_list = np.array(np.array(extract_values(sample_ct, ' ')) / dt, dtype=int)
                 
         except AssertionError as oops:
-            self.do_confirmation_popup(str(oops), hide_cancel=True)
+            self = do_confirmation_popup(self, str(oops), hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
             return
         
         except ValueError:
-            self.do_confirmation_popup("Error: {} is missing or has unusual metadata.txt".format(data_filename), hide_cancel=True)
+            self = do_confirmation_popup(self,
+                    "Error: {} is missing or has unusual metadata.txt".format(data_filename),
+                    hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
             return
         
@@ -1881,7 +1845,9 @@ class Notebook(BaseNotebook):
                 self.overview_subplots[layer_name][output_name].legend().set_draggable(True)
                 break
         if len(warning_msg) > 1:
-            self.do_confirmation_popup("\n".join(warning_msg), hide_cancel=True)
+            self = do_confirmation_popup(self,
+                    "\n".join(warning_msg),
+                    hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
             
         self.analyze_overview_fig.tight_layout()
@@ -2051,8 +2017,9 @@ class Notebook(BaseNotebook):
                 active_plot.datagroup.add(new_data)
     
         if len(err_msg) > 1:
-            self.do_confirmation_popup("\n".join(err_msg), 
-                                       hide_cancel=True)
+            self = do_confirmation_popup(self,
+                    "\n".join(err_msg), 
+                    hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
         
         self.plot_analyze(plot_ID, force_axis_update=True)
@@ -2175,28 +2142,28 @@ class Notebook(BaseNotebook):
             assert (self.hmax >= 0),"Error: Invalid solver stepsize"
             
             if self.dt > self.simtime / 10:
-                self.do_confirmation_popup(
-                    "Warning: a very large time stepsize was entered. "
-                    "Results may be less accurate with large stepsizes. "
-                    "Are you sure you want to continue?")
+                self = do_confirmation_popup(self,
+                        "Warning: a very large time stepsize was entered. "
+                        "Results may be less accurate with large stepsizes. "
+                        "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: 
                     return
                 
             if self.hmax and self.hmax < 1e-3:
-                self.do_confirmation_popup(
-                    "Warning: a very small solver stepsize was entered. "
-                    "Results may be slow with small solver stepsizes. "
-                    "Are you sure you want to continue?")
+                self = do_confirmation_popup(self,
+                        "Warning: a very small solver stepsize was entered. "
+                        "Results may be slow with small solver stepsizes. "
+                        "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: 
                     return
                 
             if (self.n > 1e5):
-                self.do_confirmation_popup(
-                    "Warning: a very small time stepsize was entered. "
-                    "Results may be slow with small time stepsizes. "
-                    "Are you sure you want to continue?")
+                self = do_confirmation_popup(self,
+                        "Warning: a very small time stepsize was entered. "
+                        "Results may be slow with small time stepsizes. "
+                        "Are you sure you want to continue?")
                 self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: 
                     return
@@ -2230,7 +2197,9 @@ class Notebook(BaseNotebook):
         self.load_ICfile()
 
         if len(self.sim_warning_msg) > 1:
-            self.do_confirmation_popup("\n".join(self.sim_warning_msg), hide_cancel=True)
+            self = do_confirmation_popup(self,
+                    "\n".join(self.sim_warning_msg),
+                    hide_cancel=True)
 
 
     def do_Calculate(self):
@@ -2772,16 +2741,17 @@ class Notebook(BaseNotebook):
         assert (int(0.5 + thickness / dx) <= 1e6), "Error: too many space steps"
 
         if dx > thickness / 10:
-            self.do_confirmation_popup(
-                "Warning: a very large space stepsize was entered. "
-                "Results may be less accurate with large stepsizes. "
-                "Are you sure you want to continue?")
+            self = do_confirmation_popup(self,
+                    "Warning: a very large space stepsize was entered. "
+                    "Results may be less accurate with large stepsizes. "
+                    "Are you sure you want to continue?")
             self.root.wait_window(self.confirmation_popup)
             if not self.confirmed: 
                 return
             
         if abs(thickness / dx - int(thickness / dx)) > 1e-10:
-            self.do_confirmation_popup(
+            self = do_confirmation_popup(
+                            self,
                 "Warning: the selected thickness cannot be "
                 "partitioned evenly into the selected stepsize. "
                 "Integration may lose accuracy as a result. "
@@ -3271,7 +3241,8 @@ class Notebook(BaseNotebook):
         except Exception as e:
             msg.append("Error: Unable to read point list")
             msg.append(str(e))
-            self.do_confirmation_popup("\n".join(msg), hide_cancel=True)
+            self = do_confirmation_popup(
+                            self,"\n".join(msg), hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
             return
         
@@ -3319,7 +3290,7 @@ class Notebook(BaseNotebook):
         self.update_IC_plot(plot_ID="recent")
         
         if len(msg) > 1:
-            self.do_confirmation_popup("\n".join(msg), hide_cancel=True)
+            self = do_confirmation_popup(self, "\n".join(msg), hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
 
     def update_IC_plot(self, plot_ID):
@@ -3476,9 +3447,10 @@ class Notebook(BaseNotebook):
         
         
         if len(warning_mssg) > 1:
-            self.do_confirmation_popup("\n".join(warning_mssg), hide_cancel=True)
+            self = do_confirmation_popup(self, "\n".join(warning_mssg), hide_cancel=True)
         else:
-            self.do_confirmation_popup("Batch {} created successfully".format(batch_dir_name), hide_cancel=True)
+            self = do_confirmation_popup(self,
+                    "Batch {} created successfully".format(batch_dir_name), hide_cancel=True)
             
         self.root.wait_window(self.confirmation_popup)
 
@@ -3777,7 +3749,7 @@ class Notebook(BaseNotebook):
             self.write(self.ICtab_status, "IC file loaded successfully")
         else: 
             self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
-            self.do_confirmation_popup(warning_mssg, hide_cancel=True)
+            self = do_confirmation_popup(self, warning_mssg, hide_cancel=True)
             self.root.wait_window(self.confirmation_popup)
     # Data I/O
 
