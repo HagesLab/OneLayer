@@ -118,9 +118,9 @@ class Notebook(BaseNotebook):
             self.root.destroy()
             return
 
-        width, height = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
-
-        self.root.geometry('%dx%d+0+0' % (width,height))
+        self.APP_WIDTH, self.APP_HEIGHT = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
+        self.APP_DPI = self.root.winfo_fpixels('1i')
+        self.root.geometry('%dx%d+0+0' % (self.APP_WIDTH,self.APP_HEIGHT))
         self.root.attributes("-topmost", True)
         self.root.after_idle(self.root.attributes,'-topmost',False)
         self.root.mainloop()
@@ -388,17 +388,40 @@ class Notebook(BaseNotebook):
 
     def do_sys_plotsummary_popup(self):
         """ Display as series of plots the current parameter distributions. """
-        active_plotsummary_layers = {name for name in self.module.layers if self.module.layers[name].spacegrid_is_set}
+        active_plotsummary_layers = [name for name in self.module.layers if self.module.layers[name].spacegrid_is_set]
         if len(active_plotsummary_layers) == 0: 
             return
         
         if not self.sys_plotsummary_popup_isopen:
             self.sys_plotsummary_popup = tk.Toplevel(self.root)
+
+            self.sys_plotsummary_popup.geometry('%dx%d+0+0' % (self.APP_WIDTH, self.APP_HEIGHT))
             
-                
-            # Add buttons to select layer / all
-            # Determine which parameters are needed
-            # Update Function to draw the appropriate plots
+            self.sys_plotsummary_canvas = tk.Canvas(self.sys_plotsummary_popup)
+            self.sys_plotsummary_canvas.grid(row=0,column=0, sticky='nswe')
+            
+            # Draw everything on this frame
+            self.sys_plotsummary_frame = tk.Frame(self.sys_plotsummary_canvas)
+            
+            # Allocate room for and add scrollbars to overall notebook
+            self.plotsummary_scroll_y = tk.ttk.Scrollbar(self.sys_plotsummary_popup, orient="vertical", 
+                                                         command=self.sys_plotsummary_canvas.yview)
+            self.plotsummary_scroll_y.grid(row=0,column=1, sticky='ns')
+            self.plotsummary_scroll_x = tk.ttk.Scrollbar(self.sys_plotsummary_popup, orient="horizontal", 
+                                                         command=self.sys_plotsummary_canvas.xview)
+            self.plotsummary_scroll_x.grid(row=1,column=0,sticky='ew')
+            self.sys_plotsummary_canvas.configure(yscrollcommand=self.plotsummary_scroll_y.set, 
+                                                  xscrollcommand=self.plotsummary_scroll_x.set)
+            # Make area for scrollbars as narrow as possible without cutting off
+            self.sys_plotsummary_popup.rowconfigure(0,weight=100)
+            self.sys_plotsummary_popup.rowconfigure(1,weight=1, minsize=20) 
+            self.sys_plotsummary_popup.columnconfigure(0,weight=100)
+            self.sys_plotsummary_popup.columnconfigure(1,weight=1, minsize=20)
+            
+            self.sys_plotsummary_canvas.create_window((0,0), window=self.sys_plotsummary_frame, anchor="nw")
+            scroll_cmd = lambda e:self.sys_plotsummary_canvas.configure(scrollregion=self.sys_plotsummary_canvas.bbox('all'))
+            self.sys_plotsummary_frame.bind('<Configure>', scroll_cmd)                               
+            
             self.draw_sys_plotsummary_buttons(active_plotsummary_layers)
             self.update_sys_plotsummary_plots(active_plotsummary_layers)
             
@@ -411,7 +434,7 @@ class Notebook(BaseNotebook):
             self.sys_plotsummary_popup.grab_set()
             
     def draw_sys_plotsummary_buttons(self, active_plotsummary_layers):
-        self.sys_plotsummary_buttongrid = tk.Frame(self.sys_plotsummary_popup)
+        self.sys_plotsummary_buttongrid = tk.Frame(self.sys_plotsummary_frame)
         self.sys_plotsummary_buttongrid.grid(row=0,column=0)
         
         for i, s in enumerate(active_plotsummary_layers):
@@ -426,33 +449,51 @@ class Notebook(BaseNotebook):
         return
 
     def update_sys_plotsummary_plots(self, active_plotsummary_layers):
-        plot_count = sum([self.module.layers[layer_name].param_count
-                          for layer_name in active_plotsummary_layers])
-        count = 1
-        rdim = np.floor(np.sqrt(plot_count))
-        #rdim = 4
-        cdim = np.ceil(plot_count / rdim)
         
         if self.sys_flag_dict['symmetric_system'].value():
-            self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, 
+            self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_frame, 
                                                        text="Note: All distributions "
                                                             "are symmetric about x=0")
             self.plotsummary_symmetriclabel.grid(row=1,column=0)
 
-        self.plotsummary_fig = Figure(figsize=(20,10))
-        self.sys_param_summaryplots = {}
-        for layer_name in active_plotsummary_layers:
+        # Clear any previously drawn plots
+        if hasattr(self, "plotsummary_plotwidgets"):
+            for pw in self.plotsummary_plotwidgets:
+                pw.destroy()
+            for tb in self.plotsummary_toolbars:
+                tb.destroy()
+                
+        # Following Matplotlib (fig, axes) convention
+        self.plotsummary_figs = [None] * len(active_plotsummary_layers)
+        self.sys_param_summaryaxes = [{}] * len(active_plotsummary_layers)
+        self.plotsummary_canvases = [None] * len(active_plotsummary_layers)
+        self.plotsummary_plotwidgets = [None] * len(active_plotsummary_layers)
+        self.plotsummary_toolbars = [None] * len(active_plotsummary_layers)
+        for i, layer_name in enumerate(active_plotsummary_layers):
+            count = 1
+            plot_count = self.module.layers[layer_name].param_count
+
+            rdim = np.floor(np.sqrt(plot_count))
+            cdim = np.ceil(plot_count / rdim)
+            
+            self.plotsummary_figs[i] = Figure(figsize=(self.APP_WIDTH / self.APP_DPI,
+                                                       self.APP_HEIGHT / self.APP_DPI))
             layer = self.module.layers[layer_name]
             for param_name in layer.params:
                 if layer.params[param_name].is_space_dependent:
-                    self.sys_param_summaryplots[(layer_name,param_name)] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
-                    self.sys_param_summaryplots[(layer_name,param_name)].set_title("{}-{} {}".format(layer_name, param_name,layer.params[param_name].units))
+                    self.sys_param_summaryaxes[i][param_name] = self.plotsummary_figs[i].add_subplot(int(rdim), int(cdim), int(count))
+                    self.sys_param_summaryaxes[i][param_name].set_title("{}-{} {}".format(layer_name, param_name,layer.params[param_name].units))
                     count += 1
         
-        self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, 
-                                                          master=self.sys_plotsummary_popup)
-        self.plotsummary_plotwidget = self.plotsummary_canvas.get_tk_widget()
-        self.plotsummary_plotwidget.grid(row=2,column=0)
+            self.plotsummary_canvases[i] = tkagg.FigureCanvasTkAgg(self.plotsummary_figs[i], 
+                                                                   master=self.sys_plotsummary_frame)
+            self.plotsummary_plotwidgets[i] = self.plotsummary_canvases[i].get_tk_widget()
+            self.plotsummary_plotwidgets[i].grid(row=2+2*i,column=0)
+            
+            self.plotsummary_toolbars[i] = tk.Frame(self.sys_plotsummary_frame)
+            self.plotsummary_toolbars[i].grid(row=2+(2*i)+1)
+            tkagg.NavigationToolbar2Tk(self.plotsummary_canvases[i], 
+                                       self.plotsummary_toolbars[i])
 
         for layer_name in active_plotsummary_layers:
             layer = self.module.layers[layer_name]
@@ -462,11 +503,12 @@ class Notebook(BaseNotebook):
                     val = to_array(param.value, len(layer.grid_x_nodes), 
                                    param.is_edge)
                     grid_x = layer.grid_x_nodes if not param.is_edge else layer.grid_x_edges
-                    self.sys_param_summaryplots[(layer_name,param_name)].plot(grid_x, val)
-                    self.sys_param_summaryplots[(layer_name,param_name)].set_yscale(autoscale(val_array=val))
+                    self.sys_param_summaryaxes[i][param_name].plot(grid_x, val)
+                    self.sys_param_summaryaxes[i][param_name].set_yscale(autoscale(val_array=val))
             
-        self.plotsummary_fig.tight_layout()
-        self.plotsummary_fig.canvas.draw()
+        for fig in self.plotsummary_figs:
+            fig.tight_layout()
+            fig.canvas.draw()
         return
         
     def update_system_textsummary(self):
