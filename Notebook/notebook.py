@@ -324,34 +324,7 @@ class Notebook(BaseNotebook):
                         self.enter(box, str(self.LGC_values[self.current_layer_name][param_name]))
                     else:
                         self.enter(box, "")
-
-
-    def update_system_summary(self):
-        """ Transfer parameter values from the Initial Condition tab 
-            to the summary popup windows.
-        """
-        if self.sys_printsummary_popup_isopen:
-            self.write(self.printsummary_textbox, self.module.DEBUG_print())
-            
-        if self.sys_plotsummary_popup_isopen:
-            set_layers = {name for name in self.module.layers 
-                          if self.module.layers[name].spacegrid_is_set}
-            for layer_name in set_layers:
-                layer = self.module.layers[layer_name]
-                for param_name in layer.params:
-                    param = layer.params[param_name]
-                    if param.is_space_dependent:
-                        val = to_array(param.value, len(layer.grid_x_nodes), 
-                                       param.is_edge)
-                        grid_x = layer.grid_x_nodes if not param.is_edge else layer.grid_x_edges
-                        self.sys_param_summaryplots[(layer_name,param_name)].plot(grid_x, val)
-                        self.sys_param_summaryplots[(layer_name,param_name)].set_yscale(autoscale(val_array=val))
-                
-            self.plotsummary_fig.tight_layout()
-            self.plotsummary_fig.canvas.draw()
-
-
-        
+                        
        
     def on_select_module_popup_close(self, continue_=False):
         """ Do basic verification checks defined by OneD_Model.verify() 
@@ -373,13 +346,13 @@ class Notebook(BaseNotebook):
             logger.error(str(oops))
             
     
-    
     def on_confirmation_popup_close(self, continue_=False):
         """ Inform caller of do_confirmation_popup of whether user confirmation 
             was received 
         """
         self.confirmed = continue_
         self.confirmation_popup.destroy()
+
 
 
     def do_sys_printsummary_popup(self):
@@ -397,7 +370,7 @@ class Notebook(BaseNotebook):
             
             self.sys_printsummary_popup_isopen = True
             
-            self.update_system_summary()
+            self.update_system_textsummary()
             
             self.sys_printsummary_popup.protocol(
                 "WM_DELETE_WINDOW", 
@@ -415,49 +388,96 @@ class Notebook(BaseNotebook):
 
     def do_sys_plotsummary_popup(self):
         """ Display as series of plots the current parameter distributions. """
-        set_layers = {name for name in self.module.layers if self.module.layers[name].spacegrid_is_set}
-        if not set_layers: 
+        active_plotsummary_layers = {name for name in self.module.layers if self.module.layers[name].spacegrid_is_set}
+        if len(active_plotsummary_layers) == 0: 
             return
         
         if not self.sys_plotsummary_popup_isopen:
             self.sys_plotsummary_popup = tk.Toplevel(self.root)
-            plot_count = sum([self.module.layers[layer_name].param_count
-                              for layer_name in set_layers])
-            count = 1
-            rdim = np.floor(np.sqrt(plot_count))
-            #rdim = 4
-            cdim = np.ceil(plot_count / rdim)
             
-            if self.sys_flag_dict['symmetric_system'].value():
-                self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, 
-                                                           text="Note: All distributions "
-                                                                "are symmetric about x=0")
-                self.plotsummary_symmetriclabel.grid(row=0,column=0)
-
-            self.plotsummary_fig = Figure(figsize=(20,10))
-            self.sys_param_summaryplots = {}
-            for layer_name in set_layers:
-                layer = self.module.layers[layer_name]
-                for param_name in layer.params:
-                    if layer.params[param_name].is_space_dependent:
-                        self.sys_param_summaryplots[(layer_name,param_name)] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
-                        self.sys_param_summaryplots[(layer_name,param_name)].set_title("{}-{} {}".format(layer_name, param_name,layer.params[param_name].units))
-                        count += 1
-            
-            self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, 
-                                                              master=self.sys_plotsummary_popup)
-            self.plotsummary_plotwidget = self.plotsummary_canvas.get_tk_widget()
-            self.plotsummary_plotwidget.grid(row=1,column=0)
+                
+            # Add buttons to select layer / all
+            # Determine which parameters are needed
+            # Update Function to draw the appropriate plots
+            self.draw_sys_plotsummary_buttons(active_plotsummary_layers)
+            self.update_sys_plotsummary_plots(active_plotsummary_layers)
             
             self.sys_plotsummary_popup_isopen = True
-            self.update_system_summary()
+            
             
             self.sys_plotsummary_popup.protocol("WM_DELETE_WINDOW", 
                                                 self.on_sys_plotsummary_popup_close)
             ## Temporarily disable the main window while this popup is active
             self.sys_plotsummary_popup.grab_set()
-
+            
+    def draw_sys_plotsummary_buttons(self, active_plotsummary_layers):
+        self.sys_plotsummary_buttongrid = tk.Frame(self.sys_plotsummary_popup)
+        self.sys_plotsummary_buttongrid.grid(row=0,column=0)
         
+        for i, s in enumerate(active_plotsummary_layers):
+            tk.Button(self.sys_plotsummary_buttongrid,text=s, 
+                      command=partial(self.update_sys_plotsummary_plots, [s])
+                      ).grid(row=0,column=i)
+            
+        if len(active_plotsummary_layers) == len(self.module.layers): # if all layers set
+            tk.Button(self.sys_plotsummary_buttongrid,text="All", 
+                      command=partial(self.update_sys_plotsummary_plots, active_plotsummary_layers)
+                      ).grid(row=0,column=i+1)
+        return
+
+    def update_sys_plotsummary_plots(self, active_plotsummary_layers):
+        plot_count = sum([self.module.layers[layer_name].param_count
+                          for layer_name in active_plotsummary_layers])
+        count = 1
+        rdim = np.floor(np.sqrt(plot_count))
+        #rdim = 4
+        cdim = np.ceil(plot_count / rdim)
+        
+        if self.sys_flag_dict['symmetric_system'].value():
+            self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, 
+                                                       text="Note: All distributions "
+                                                            "are symmetric about x=0")
+            self.plotsummary_symmetriclabel.grid(row=1,column=0)
+
+        self.plotsummary_fig = Figure(figsize=(20,10))
+        self.sys_param_summaryplots = {}
+        for layer_name in active_plotsummary_layers:
+            layer = self.module.layers[layer_name]
+            for param_name in layer.params:
+                if layer.params[param_name].is_space_dependent:
+                    self.sys_param_summaryplots[(layer_name,param_name)] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
+                    self.sys_param_summaryplots[(layer_name,param_name)].set_title("{}-{} {}".format(layer_name, param_name,layer.params[param_name].units))
+                    count += 1
+        
+        self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, 
+                                                          master=self.sys_plotsummary_popup)
+        self.plotsummary_plotwidget = self.plotsummary_canvas.get_tk_widget()
+        self.plotsummary_plotwidget.grid(row=2,column=0)
+
+        for layer_name in active_plotsummary_layers:
+            layer = self.module.layers[layer_name]
+            for param_name in layer.params:
+                param = layer.params[param_name]
+                if param.is_space_dependent:
+                    val = to_array(param.value, len(layer.grid_x_nodes), 
+                                   param.is_edge)
+                    grid_x = layer.grid_x_nodes if not param.is_edge else layer.grid_x_edges
+                    self.sys_param_summaryplots[(layer_name,param_name)].plot(grid_x, val)
+                    self.sys_param_summaryplots[(layer_name,param_name)].set_yscale(autoscale(val_array=val))
+            
+        self.plotsummary_fig.tight_layout()
+        self.plotsummary_fig.canvas.draw()
+        return
+        
+    def update_system_textsummary(self):
+        """ Transfer parameter values from the Initial Condition tab 
+            to the summary popup windows.
+        """
+        if self.sys_printsummary_popup_isopen:
+            self.write(self.printsummary_textbox, self.module.DEBUG_print())
+        return
+
+    
     def on_sys_plotsummary_popup_close(self):
         try:
             self.sys_plotsummary_popup.destroy()
@@ -2705,7 +2725,7 @@ class Notebook(BaseNotebook):
 
 
         self.update_IC_plot(plot_ID="clearall")                             
-        self.update_system_summary()                    
+        self.update_system_textsummary()                    
         self.write(self.ICtab_status, "Selected layers cleared")
 
 	## This is a patch of a consistency issue involving initial conditions - 
@@ -3350,7 +3370,7 @@ class Notebook(BaseNotebook):
         plot.set_ylabel("{} {}".format(param_name, param_obj.units))
         
         if plot_ID=="recent": 
-            self.update_system_summary()
+            self.update_system_textsummary()
             
             plot.set_title("Recently Changed: {}".format(param_name))
             self.recent_param_fig.tight_layout()
