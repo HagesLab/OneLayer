@@ -38,7 +38,7 @@ class Nanowire(OneD_Model):
                  "Frac_Emitted":Parameter(units="", is_edge=False, valid_range=(0,1)),
                  "delta_N":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
                  "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                 "Ec":Parameter(units="[eV]", is_edge=True), 
+                 "Eg":Parameter(units="[eV]", is_edge=True), 
                  "electron_affinity":Parameter(units="[eV]", is_edge=True)}
 
         self.flags_dict = {"ignore_alpha":("Ignore Photon Recycle",1, 1),
@@ -72,7 +72,7 @@ class Nanowire(OneD_Model):
                     "Theta": 1e-7, "Alpha": 1e-7,                               # [cm^-1] to [nm^-1]
                     "Delta": 1, "Frac_Emitted": 1,
                     "delta_N": ((1e-7) ** 3), "delta_P": ((1e-7) ** 3),
-                    "Ec": 1, "electron_affinity": 1,
+                    "Eg": 1, "electron_affinity": 1,
                     "N": ((1e-7) ** 3), "P": ((1e-7) ** 3),                     # [cm^-3] to [nm^-3]
                     "E_field": 1, 
                     "tau_diff": 1}
@@ -279,7 +279,7 @@ def gen_weight_distribution(m, dx, alphaCof=0, thetaCof=0, delta_frac=1,
 def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, 
           eps, eps0, q, q_C, kB, recycle_photons=True, do_ss=False, 
           alphaCof=0, thetaCof=0, delta_frac=1, fracEmitted=0, 
-          combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_dN=0, init_dP=0):
+          combined_weight=0, E_field_ext=0, dEgdz=0, dChidz=0, init_dN=0, init_dP=0):
     """Derivative function for drift-diffusion-decay carrier model."""
     ## Initialize arrays to store intermediate quantities that do not need to be iteratively solved
     # These are calculated at node edges, of which there are m + 1
@@ -316,7 +316,7 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
                 + (mu_n[1:-1]*kB*T[1:-1]) * ((np.roll(N,-1)[:-1] - N[:-1]) / (dx)))
 
     ## Changed sign
-    Jp[1:-1] = (mu_p[1:-1] * (P_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEcdz[1:-1]) 
+    Jp[1:-1] = (mu_p[1:-1] * (P_edges) * (q * (E_field[1:-1] + E_field_ext[1:-1]) + dChidz[1:-1] + dEgdz[1:-1]) 
                 -(mu_p[1:-1]*kB*T[1:-1]) * ((np.roll(P, -1)[:-1] - P[:-1]) / (dx)))
 
         
@@ -423,7 +423,7 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     thetaCof = to_array(params["Theta"].value, m, False)
     delta_frac = to_array(params["Delta"].value, m, False)
     fracEmitted = to_array(params["Frac_Emitted"].value, m, False)
-    init_Ec = to_array(params["Ec"].value, m, True)
+    init_Eg = to_array(params["Eg"].value, m, True)
     init_Chi = to_array(params["electron_affinity"].value, m, True)
            
     ## Define constants
@@ -455,17 +455,17 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     else:
         combined_weight = np.zeros((m, m))
 
-    ## Generate space derivative of Ec and Chi
+    ## Generate space derivative of Eg and Chi
     # Note that for these two quantities the derivatives at node edges are being calculated by values at node edges
     # This is not recommended for N, P (their derivatives are calculated from node centers) because N, P are used to model discrete chunks of nanowire over time,
-    # but it is okay to use Ec, Chi because these are invariant with time.
+    # but it is okay to use Eg, Chi because these are invariant with time.
 
-    dEcdz = np.zeros(m+1)
+    dEgdz = np.zeros(m+1)
     dChidz = np.zeros(m+1)
 
-    dEcdz[1:-1] = (np.roll(init_Ec, -1)[1:-1] - np.roll(init_Ec, 1)[1:-1]) / (2 * dx)
-    dEcdz[0] = (init_Ec[1] - init_Ec[0]) / dx
-    dEcdz[m] = (init_Ec[m] - init_Ec[m-1]) / dx
+    dEgdz[1:-1] = (np.roll(init_Eg, -1)[1:-1] - np.roll(init_Eg, 1)[1:-1]) / (2 * dx)
+    dEgdz[0] = (init_Eg[1] - init_Eg[0]) / dx
+    dEgdz[m] = (init_Eg[m] - init_Eg[m-1]) / dx
 
     dChidz[1:-1] = (np.roll(init_Chi, -1)[1:-1] - np.roll(init_Chi, 1)[1:-1]) / (2 * dx)
     dChidz[0] = (init_Chi[1] - init_Chi[0]) / dx
@@ -477,7 +477,7 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
             tauN, tauP, B, eps, eps0, q, q_C, kB, 
             recycle_photons, do_ss, alphaCof, thetaCof, 
             delta_frac, fracEmitted, combined_weight, 
-            E_field_ext, dEcdz, dChidz, init_dN, 
+            E_field_ext, dEgdz, dChidz, init_dN, 
             init_dP)
     
     tSteps = np.linspace(0, n*dt, n+1)
