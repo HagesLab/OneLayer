@@ -47,19 +47,38 @@ def add_tab_simulate(nb):
     nb.enter(nb.dt_entry, "0.5")
     nb.enter(nb.hmax_entry, "0.25")
     
+    tk.ttk.Label(
+        nb.tab_simulate,
+        text="rtol"
+        ).grid(row=5,column=0)
+
+    nb.rtol_entry = tk.ttk.Entry(nb.tab_simulate, width=9)
+    nb.rtol_entry.grid(row=5,column=1)
+    
+    tk.ttk.Label(
+        nb.tab_simulate,
+        text="atol"
+        ).grid(row=6,column=0)
+    
+    nb.atol_entry = tk.ttk.Entry(nb.tab_simulate, width=9)
+    nb.atol_entry.grid(row=6,column=1)
+
+    nb.enter(nb.rtol_entry, "1e-5")
+    nb.enter(nb.atol_entry, "1e-8")
+    
     tk.ttk.Button(
         nb.tab_simulate,
         text="Start Simulation(s)", 
         command=nb.do_Batch
-        ).grid(row=6,column=0,columnspan=2,padx=(9,12))
+        ).grid(row=7,column=0,columnspan=2,padx=(9,12))
 
     tk.ttk.Label(
         nb.tab_simulate,
         text="Status"
-        ).grid(row=7, column=0, columnspan=2)
+        ).grid(row=8, column=0, columnspan=2)
 
     nb.status = tk.Text(nb.tab_simulate, width=28,height=4)
-    nb.status.grid(row=8, rowspan=2, column=0, columnspan=2)
+    nb.status.grid(row=9, rowspan=2, column=0, columnspan=2)
     nb.status.configure(state='disabled')
 
     tk.ttk.Separator(

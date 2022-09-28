@@ -10,6 +10,9 @@ import os
 import itertools
 import numpy as np
 import matplotlib
+matplotlib.rcParams.update({'font.size': 12})
+matplotlib.rcParams.update({'font.family':'STIXGeneral'})
+matplotlib.rcParams.update({'mathtext.fontset':'stix'})
 starting_backend = matplotlib.get_backend()
 matplotlib.use("TkAgg")
 import matplotlib.backends.backend_tkagg as tkagg
@@ -2128,6 +2131,8 @@ class Notebook(BaseNotebook):
             self.dt = float(self.dt_entry.get())           # [ns]
             self.hmax = self.hmax_entry.get()
             self.n = int(0.5 + self.simtime / self.dt)           # Number of time steps
+            self.rtol = float(self.rtol_entry.get())
+            self.atol = float(self.atol_entry.get())
 
             # Upper limit on number of time steps
             
@@ -2297,7 +2302,7 @@ class Notebook(BaseNotebook):
         try:
             self.module.simulate(os.path.join(dirname, data_file_name), 
                                    num_nodes, self.n, self.dt,
-                                   flag_values, self.hmax, init_conditions)
+                                   flag_values, self.hmax, self.rtol, self.atol, init_conditions)
             
         except FloatingPointError as e:
             print(e)
