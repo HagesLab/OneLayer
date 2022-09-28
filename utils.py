@@ -144,7 +144,7 @@ def correct_integral(integrand, l_bound, u_bound, dx, total_length):
             u_bound_correction += integrand[j-i+1] * ufrac2
         except Exception:
             u_bound_correction += integrand[j-i] * ufrac2
-            print("An index mismatch occured while calculating u_bound_correction\n"
+            logger.info("An index mismatch occured while calculating u_bound_correction\n"
                   "Values may differ slightly than expected")
 
     return u_bound_correction - l_bound_correction

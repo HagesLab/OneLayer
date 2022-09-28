@@ -12,6 +12,9 @@ from io_utils import u_read
 from utils import to_index, to_array, to_pos, new_integrate
 import tables
 from _OneD_Model import OneD_Model
+from config import init_logging
+logger = init_logging(__name__)
+
 
 class Std_SingleLayer(OneD_Model):
     # A Nanowire object stores all information regarding the initial state being edited in the IC tab
@@ -27,6 +30,8 @@ class Std_SingleLayer(OneD_Model):
                   "B":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)), 
                   "tau_N":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
                   "tau_P":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
+                  "CN": Parameter(units="[cm^6 / s]", is_edge=False, valid_range=(0,np.inf)),
+                  "CP": Parameter(units="[cm^6 / s]", is_edge=False, valid_range=(0,np.inf)),
                   "Sf":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                   "Sb":Parameter(units="[cm / s]", is_edge=False, is_space_dependent=False, valid_range=(0,np.inf)), 
                   "temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
@@ -65,6 +70,7 @@ class Std_SingleLayer(OneD_Model):
                              "delta_N":Output("delta_N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
                              "delta_P":Output("delta_P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
                              "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
+                             "Auger":Output("Auger Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
                              "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
                              "PL":Output("TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer"),
                              "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer", analysis_plotable=False)}
@@ -74,6 +80,8 @@ class Std_SingleLayer(OneD_Model):
         convert_in = {"mu_N": ((1e7) ** 2) / (1e9), "mu_P": ((1e7) ** 2) / (1e9), # [cm^2 / V s] to [nm^2 / V ns]
                       "N0": ((1e-7) ** 3), "P0": ((1e-7) ** 3),                   # [cm^-3] to [nm^-3]
                       "B": ((1e7) ** 3) / (1e9),                                  # [cm^3 / s] to [nm^3 / ns]
+                      "CN": ((1e7) ** 6) / (1e9),                                  # [cm^6 / s] to [nm^6 / ns]
+                      "CP": ((1e7) ** 6) / (1e9),                                  # [cm^6 / s] to [nm^6 / ns]
                       "tau_N": 1, "tau_P": 1,                                     # [ns]
                       "Sf": (1e7) / (1e9), "Sb": (1e7) / (1e9),                   # [cm / s] to [nm / ns]
                       "temperature": 1, "rel_permitivity": 1, 
@@ -98,12 +106,13 @@ class Std_SingleLayer(OneD_Model):
                       }
         
         convert_in["RR"] = convert_in["B"] * convert_in["N"] * convert_in["P"] # [cm^-3 s^-1] to [nm^-3 ns^-1]
+        convert_in["Auger"] = convert_in["CN"] * convert_in["N"] * (convert_in["N"] * convert_in["P"]) # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["NRR"] = convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["PL"] = convert_in["RR"]
         
         iconvert_in = {"N":1e7, "P":1e7, "delta_N":1e7, "delta_P":1e7, # cm to nm
                        "E_field":1, # nm to nm
-                       "RR": 1e7, "NRR": 1e7, "PL": 1e7, "dP-dN":1e7, "Jp+Jn":1e7,
+                       "RR": 1e7, "Auger":1e7, "NRR": 1e7, "PL": 1e7, "dP-dN":1e7, "Jp+Jn":1e7,
                        "Jn_drift":1e7,"Jn_diff":1e7,"Jp_drift":1e7,"Jp_diff":1e7, "Jn":1e7,"Jp":1e7}
 
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
@@ -129,7 +138,7 @@ class Std_SingleLayer(OneD_Model):
         
         return {"N":init_N, "P":init_P}
     
-    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, rtol, atol, init_conditions):
         """Calls ODE solver."""
         one_layer = self.layers["OneLayer"]
         for param_name, param in one_layer.params.items():
@@ -137,7 +146,7 @@ class Std_SingleLayer(OneD_Model):
 
         ode_onelayer(data_path, m["OneLayer"], n, one_layer.dx, dt, one_layer.params,
                      not flags['ignore_recycle'], 
-                     flags['check_do_ss'], hmax_, True,
+                     flags['check_do_ss'], hmax_, rtol, atol, True,
                      init_conditions["N"], init_conditions["P"])
     
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
@@ -168,6 +177,7 @@ class Std_SingleLayer(OneD_Model):
         data_dict["OneLayer"]["delta_N"] = delta_n(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["delta_P"] = delta_p(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["RR"] = radiative_recombination(data_dict["OneLayer"], params)
+        data_dict["OneLayer"]["Auger"] = auger_recombination(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["NRR"] = nonradiative_recombination(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["dP-dN"] = carrier_diff(data_dict["OneLayer"], params)
         data_dict["OneLayer"]["Jp+Jn"] = Jp_Jn(data_dict["OneLayer"], params)
@@ -219,6 +229,9 @@ class Std_SingleLayer(OneD_Model):
                 
             elif (datatype == "RR"):
                 data = radiative_recombination(sim_data, params)
+                
+            elif (datatype == "Auger"):
+                data = auger_recombination(sim_data, params)
 
             elif (datatype == "NRR"):
                 data = nonradiative_recombination(sim_data, params)
@@ -340,7 +353,7 @@ def gen_weight_distribution(m, dx, alpha=0, delta_frac=1,
             (direct_weight + front_refl_weight + back_refl_weight)
            )
 
-def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, 
+def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B, CN, CP,
           eps, eps0, q, q_C, kB, recycle_photons=True, do_ss=False, 
           alpha=0, back_refl_frac=1, delta_frac=1, frac_emitted=0, 
           combined_weight=0, E_field_ext=0, dEcdz=0, dChidz=0, init_dN=0, init_dP=0):
@@ -393,6 +406,8 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     ## Calculate recombination (consumption) terms
     rad_rec = B * (N * P - n0 * p0)
     non_rad_rec = (N * P - n0 * p0) / ((tauN * P) + (tauP * N))
+    
+    auger = (CN * N + CP * P) * (N * P - n0 * p0) 
         
     ## Calculate generation term from photon recycling, if photon recycling is being considered
     if recycle_photons:
@@ -410,7 +425,7 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
 
     ## N(t) = N(t-1) + dt * (dN/dt)
     #N_new = np.maximum(N_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
-    dNdt = ((1/q) * dJz - rad_rec - non_rad_rec + G_array)
+    dNdt = ((1/q) * dJz - rad_rec - auger - non_rad_rec + G_array)
     if do_ss: 
         dNdt += init_dN
 
@@ -419,7 +434,7 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
 
     ## P(t) = P(t-1) + dt * (dP/dt)
     #P_new = np.maximum(P_previous + dt * ((1/q) * dJz - rad_rec - non_rad_rec + G_array), 0)
-    dPdt = ((-1/q) * dJz - rad_rec - non_rad_rec + G_array)
+    dPdt = ((-1/q) * dJz - rad_rec - auger - non_rad_rec + G_array)
     if do_ss: 
         dPdt += init_dP
 
@@ -428,7 +443,7 @@ def dydt2(t, y, m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, tauN, tauP, B,
     return dydt
     
 def ode_onelayer(data_path_name, m, n, dx, dt, params, recycle_photons=True, 
-                 do_ss=False, hmax_=0, write_output=True, 
+                 do_ss=False, hmax_=0, rtol=1e-5, atol=1e-8, write_output=True, 
                  init_N=0, init_P=0):
     """
     Master function for Onelayer module simulation.
@@ -485,6 +500,8 @@ def ode_onelayer(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     tauN = to_array(params["tau_N"].value, m, False)
     tauP = to_array(params["tau_P"].value, m, False)
     B = to_array(params["B"].value, m, False)
+    CN = to_array(params["CN"].value, m, False)
+    CP = to_array(params["CP"].value, m, False)
     eps = to_array(params["rel_permitivity"].value, m, True)
     E_field_ext = to_array(params["Ext_E_Field"].value, m, True)
     alpha = to_array(params["alpha"].value, m, False)
@@ -540,7 +557,7 @@ def ode_onelayer(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     dChidz[m] = (init_Chi[m] - init_Chi[m-1]) / dx
 
     args=(m, dx, Sf, Sb, mu_n, mu_p, T, n0, p0, 
-            tauN, tauP, B, eps, eps0, q, q_C, kB, 
+            tauN, tauP, B, CN, CP, eps, eps0, q, q_C, kB, 
             recycle_photons, do_ss, alpha, back_refl_frac, 
             delta_frac, frac_emitted, combined_weight, 
             E_field_ext, dEcdz, dChidz, init_dN, 
@@ -548,12 +565,14 @@ def ode_onelayer(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     ## Do n time steps
     tSteps = np.linspace(0, n*dt, n+1)
     
-    sol = intg.solve_ivp(dydt2, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_)   #  Variable dt explicit
+    sol = intg.solve_ivp(dydt2, [0,n*dt], init_condition, args=args, t_eval=tSteps, method='BDF', max_step=hmax_, rtol=rtol, atol=atol)   #  Variable dt explicit
+
     data = sol.y.T
             
     if write_output:
         N = data[:,0:m]
         P = data[:,m:2*(m)]
+        
         ## Prep output files
         with tables.open_file(data_path_name + "-N.h5", mode='a') as ofstream_N, \
             tables.open_file(data_path_name + "-P.h5", mode='a') as ofstream_P:
@@ -734,6 +753,11 @@ def radiative_recombination(sim_outputs, params):
     """Calculate radiative recombination"""
     return params["B"] * (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"])
 
+def auger_recombination(sim_outputs, params):
+    """Calculate auger recombination"""
+    return ((params["CN"] * sim_outputs["N"] + params["CP"] * sim_outputs["P"]) * 
+            (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"]))
+
 def nonradiative_recombination(sim_outputs, params):
     """Calculate nonradiative recombination using SRH model
        Assumes quasi steady state trap level occupation
@@ -760,7 +784,7 @@ def tau_diff(PL, dt):
     try:
         ln_PL = np.log(PL)
     except Exception:
-        print("Error: could not calculate tau_diff from non-positive PL values")
+        logger.error("Error: could not calculate tau_diff from non-positive PL values")
         return np.zeros(len(PL))
     dln_PLdt = np.zeros(len(ln_PL))
     dln_PLdt[0] = (ln_PL[1] - ln_PL[0]) / dt
