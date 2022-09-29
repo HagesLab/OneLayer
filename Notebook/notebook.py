@@ -46,7 +46,7 @@ from Notebook.Tabs.inputs import add_tab_inputs
 from Notebook.Tabs.simulate import add_tab_simulate
 from Notebook.Tabs.analyze import add_tab_analyze
 from Notebook.Popups.confirmation_popup import ConfirmationPopup
-from Notebook.Popups.base_popup import do_module_popup
+from Notebook.Popups.module_select_popup import ModuleSelectPopup
 from Notebook.Popups.plotsummary_popup import PlotSummaryPopup
 
 from config import init_logging
@@ -72,9 +72,8 @@ class Notebook(BaseNotebook):
             self.module.verify()
             self.verified=True
         else:
-            self = do_module_popup(self)
-            self.root.wait_window(self.select_module_popup)
-
+            self.do_module_popup()
+            
         if self.module is None or not self.verified: 
             return
 
@@ -161,8 +160,7 @@ class Notebook(BaseNotebook):
         
         if self.confirmed: 
             self.notebook.destroy()
-            self = do_module_popup(self)
-            self.root.wait_window(self.select_module_popup)
+            self.do_module_popup()
             if self.module is None: 
                 return
             self.prep_notebook()
@@ -324,25 +322,11 @@ class Notebook(BaseNotebook):
                     else:
                         self.enter(box, "")
                         
-       
-    def on_select_module_popup_close(self, continue_=False):
-        """ Do basic verification checks defined by OneD_Model.verify() 
-            and inform tkinter of selected module 
-        """
-        try:
-            if continue_:
-                self.verified=False
-                self.module = self.module_list[self.module_names[self.module_listbox.curselection()[0]]]()
-                self.module.verify()
-                self.verified=True
-                
-            self.select_module_popup.destroy()
-
-        except IndexError:
-            logger.error("No module selected: Select a module from the list")
-        except AssertionError as oops:
-            logger.error("Error: could not verify selected module")
-            logger.error(str(oops))
+                    
+    def do_module_popup(self):
+        self.select_module_popup = ModuleSelectPopup(self, logger)
+        self.root.wait_window(self.select_module_popup.toplevel)
+        return
             
             
     def do_confirmation_popup(self, text, hide_cancel=False):
@@ -350,14 +334,6 @@ class Notebook(BaseNotebook):
         self.root.wait_window(self.confirmation_popup.toplevel)
         return
     
-    def on_confirmation_popup_close(self, continue_=False):
-        """ Inform caller of do_confirmation_popup of whether user confirmation 
-            was received 
-        """
-        self.confirmed = continue_
-        self.confirmation_popup.close()
-        return
-
 
     def do_sys_printsummary_popup(self):
         """ Display as text the current space grid and parameters. """
@@ -404,18 +380,8 @@ class Notebook(BaseNotebook):
         if len(active_plotsummary_layers) == 0: 
             return
         
-        self.sys_plotsummary_popup = PlotSummaryPopup(self)
+        self.sys_plotsummary_popup = PlotSummaryPopup(self, logger)
         self.sys_plotsummary_popup_isopen = True
-        return
-
-    
-    def on_sys_plotsummary_popup_close(self):
-        try:
-            self.sys_plotsummary_popup.close()
-            del self.sys_plotsummary_popup
-            self.sys_plotsummary_popup_isopen = False
-        except Exception:
-            logger.error("Error #2023: Failed to close plotsummary popup.")
         return
 
 

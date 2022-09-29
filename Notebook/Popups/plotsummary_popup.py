@@ -21,18 +21,16 @@ from functools import partial
 from utils import to_array
 from utils import autoscale
 
-class PlotSummaryPopup():
+from Notebook.Popups.base_popup import Popup
+class PlotSummaryPopup(Popup):
     
-    def __init__(self, nb):
+    def __init__(self, nb, logger):
         """ Draw basic and foundational GUI elements. """
-        
-        self.nb = nb # Parent notebook
-        
-        self.sys_plotsummary_popup = tk.Toplevel(self.nb.root)
+        super().__init__(nb, grab=True)
 
-        self.sys_plotsummary_popup.geometry('%dx%d+0+0' % (self.nb.APP_WIDTH, self.nb.APP_HEIGHT))
+        self.toplevel.geometry('%dx%d+0+0' % (self.nb.APP_WIDTH, self.nb.APP_HEIGHT))
         
-        self.sys_plotsummary_canvas = tk.Canvas(self.sys_plotsummary_popup)
+        self.sys_plotsummary_canvas = tk.Canvas(self.toplevel)
         self.sys_plotsummary_canvas.grid(row=0,column=0, sticky='nswe')
         
         # Draw everything on this frame
@@ -45,19 +43,19 @@ class PlotSummaryPopup():
             self.plotsummary_symmetriclabel.grid(row=1,column=0)
         
         # Allocate room for and add scrollbars to overall notebook
-        self.plotsummary_scroll_y = tk.ttk.Scrollbar(self.sys_plotsummary_popup, orient="vertical", 
+        self.plotsummary_scroll_y = tk.ttk.Scrollbar(self.toplevel, orient="vertical", 
                                                      command=self.sys_plotsummary_canvas.yview)
         self.plotsummary_scroll_y.grid(row=0,column=1, sticky='ns')
-        self.plotsummary_scroll_x = tk.ttk.Scrollbar(self.sys_plotsummary_popup, orient="horizontal", 
+        self.plotsummary_scroll_x = tk.ttk.Scrollbar(self.toplevel, orient="horizontal", 
                                                      command=self.sys_plotsummary_canvas.xview)
         self.plotsummary_scroll_x.grid(row=1,column=0,sticky='ew')
         self.sys_plotsummary_canvas.configure(yscrollcommand=self.plotsummary_scroll_y.set, 
                                               xscrollcommand=self.plotsummary_scroll_x.set)
         # Make area for scrollbars as narrow as possible without cutting off
-        self.sys_plotsummary_popup.rowconfigure(0,weight=100)
-        self.sys_plotsummary_popup.rowconfigure(1,weight=1, minsize=20) 
-        self.sys_plotsummary_popup.columnconfigure(0,weight=100)
-        self.sys_plotsummary_popup.columnconfigure(1,weight=1, minsize=20)
+        self.toplevel.rowconfigure(0,weight=100)
+        self.toplevel.rowconfigure(1,weight=1, minsize=20) 
+        self.toplevel.columnconfigure(0,weight=100)
+        self.toplevel.columnconfigure(1,weight=1, minsize=20)
         
         self.sys_plotsummary_canvas.create_window((0,0), window=self.sys_plotsummary_frame, anchor="nw")
         scroll_cmd = lambda e:self.sys_plotsummary_canvas.configure(scrollregion=self.sys_plotsummary_canvas.bbox('all'))
@@ -72,17 +70,19 @@ class PlotSummaryPopup():
         self.update_sys_plotsummary_plots(active_plotsummary_layers,
                                           all_layers)
         
-        self.sys_plotsummary_popup.protocol("WM_DELETE_WINDOW", 
-                                            self.close)
-        ## Temporarily disable the main window while this popup is active
-        self.sys_plotsummary_popup.grab_set()
+        self.toplevel.protocol("WM_DELETE_WINDOW", self.close)
             
         return
             
-    def close(self):
+    def close(self, logger=None):
         """ Delete this popup """
-        self.sys_plotsummary_popup.destroy()
+        try:
+            super().close()
+            self.nb.sys_plotsummary_popup_isopen = False
+        except Exception:
+            logger.error("Error #2023: Failed to close plotsummary popup.")
         return
+    
     
     def draw_sys_plotsummary_buttons(self, active_plotsummary_layers):
         """ One button per layer, plus a "Select All" button if all layers are
