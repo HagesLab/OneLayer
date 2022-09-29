@@ -423,7 +423,10 @@ class Notebook(BaseNotebook):
             self.sys_plotsummary_frame.bind('<Configure>', scroll_cmd)                               
             
             self.draw_sys_plotsummary_buttons(active_plotsummary_layers)
-            self.update_sys_plotsummary_plots(active_plotsummary_layers)
+            all_layers = (len(active_plotsummary_layers) > 1 and 
+                          len(active_plotsummary_layers) == len(self.module.layers))
+            self.update_sys_plotsummary_plots(active_plotsummary_layers,
+                                              all_layers)
             
             self.sys_plotsummary_popup_isopen = True
             
@@ -442,7 +445,8 @@ class Notebook(BaseNotebook):
                       command=partial(self.update_sys_plotsummary_plots, [s])
                       ).grid(row=0,column=i)
             
-        if len(active_plotsummary_layers) == len(self.module.layers): # if all layers set
+        if (len(active_plotsummary_layers) > 1 and 
+            len(active_plotsummary_layers) == len(self.module.layers)): # if all layers set
             tk.Button(self.sys_plotsummary_buttongrid,text="All", 
                       command=partial(self.update_sys_plotsummary_plots, active_plotsummary_layers, all_layers=True)
                       ).grid(row=0,column=i+1)
@@ -467,14 +471,6 @@ class Notebook(BaseNotebook):
             for gf in self.plotsummary_graphicframes:
                 gf.destroy()
                 
-        # Following Matplotlib (fig, axes) convention
-        self.plotsummary_figs = [None] * len(active_plotsummary_layers)
-        self.sys_param_summaryaxes = [{}] * len(active_plotsummary_layers)
-        self.plotsummary_canvases = [None] * len(active_plotsummary_layers)
-        self.plotsummary_plotwidgets = [None] * len(active_plotsummary_layers)
-        self.plotsummary_toolbars = [None] * len(active_plotsummary_layers)
-        self.plotsummary_graphicframes = [None] * len(active_plotsummary_layers)
-        
         
         width = 300
         h_offset = 10
@@ -493,9 +489,109 @@ class Notebook(BaseNotebook):
                          for l in layer_lengths]
         full_length = sum(layer_lengths)
         
-        for i, layer_name in enumerate(active_plotsummary_layers):
+        if all_layers:
+            shared_params = set.intersection(*[set(self.module.layers[layer].params.keys())
+                                              for layer in self.module.layers])
+
+        else:
+            shared_params = []
+            
+        num_figs = len(active_plotsummary_layers)
+        num_figs = num_figs + 1 if len(shared_params) > 0 else num_figs
+        # Following Matplotlib (fig, axes) convention
+        self.plotsummary_figs = [None] * num_figs
+        self.sys_param_summaryaxes = [{}] * num_figs
+        self.plotsummary_canvases = [None] * num_figs
+        self.plotsummary_plotwidgets = [None] * num_figs
+        self.plotsummary_toolbars = [None] * num_figs
+        self.plotsummary_graphicframes = [None] * num_figs
+            
+        if len(shared_params) > 0:
             count = 1
-            plot_count = self.module.layers[layer_name].param_count
+            plot_count = len(shared_params)
+
+            rdim = np.floor(np.sqrt(plot_count))
+            cdim = np.ceil(plot_count / rdim)
+            
+            self.plotsummary_figs[0] = Figure(figsize=(self.APP_WIDTH / self.APP_DPI,
+                                                       self.APP_HEIGHT / self.APP_DPI))
+            for param_name in shared_params:
+                if all((self.module.layers[layer_name].params[param_name].is_space_dependent for layer_name in self.module.layers)):
+                    self.sys_param_summaryaxes[0][param_name] = self.plotsummary_figs[0].add_subplot(int(rdim), int(cdim), int(count))
+                    self.sys_param_summaryaxes[0][param_name].set_title("{} {}".format(param_name, self.module.layers[next(iter(self.module.layers))].params[param_name].units))
+                    count += 1
+        
+            self.plotsummary_canvases[0] = tkagg.FigureCanvasTkAgg(self.plotsummary_figs[0], 
+                                                                   master=self.sys_plotsummary_frame)
+            self.plotsummary_plotwidgets[0] = self.plotsummary_canvases[0].get_tk_widget()
+            self.plotsummary_plotwidgets[0].grid(row=2,column=0)
+            
+            self.plotsummary_toolbars[0] = tk.Frame(self.sys_plotsummary_frame)
+            self.plotsummary_toolbars[0].grid(row=2+1, column=0)
+            tkagg.NavigationToolbar2Tk(self.plotsummary_canvases[0], 
+                                       self.plotsummary_toolbars[0])
+            
+            self.plotsummary_graphicframes[0] = tk.Frame(self.sys_plotsummary_frame)
+            self.plotsummary_graphicframes[0].grid(row=2+0, column=1)
+            
+            tk.Label(self.plotsummary_graphicframes[0], text="All layers").grid(row=0,column=0)
+            
+            graphic_canvas = tk.Canvas(self.plotsummary_graphicframes[0], width=width+4*h_offset,height=height,bg='white')
+            graphic_canvas.grid(row=1,column=0, padx=(20,20))
+            x1 = h_offset
+            x2 = h_offset
+            
+            for j, ll_name in enumerate(self.module.layers):
+                fillcolor = 'cornflowerblue'
+                
+                x2 += layer_lengths[j] / full_length * width
+                graphic_canvas.create_rectangle(x1, w_offset, x2, height - w_offset, fill=fillcolor)
+                
+                
+                graphic_canvas.create_line(x1, height - w_offset, x1, height, fill='black')
+                    
+                graphic_canvas.create_text(x1+0.75*h_offset, height, anchor='w', text="z≈{}".format(int((x1-h_offset) * full_length / width)), 
+                                           angle=90)
+                x1 = x2
+                
+            graphic_canvas.create_line(x2, height - w_offset, x2, height, fill='black')
+            graphic_canvas.create_text(x2+0.75*h_offset, height, anchor='w', 
+                                       text="z≈{}".format(int((x2-h_offset) * full_length / width)),
+                                       angle=90)
+            
+            # Join this shared parameter's values across all layers
+            for param_name in shared_params:
+                shared_x = []
+                shared_y = []
+                cml_total_length = 0
+                for layer_name in self.module.layers:
+                    layer = self.module.layers[layer_name]
+                    param = layer.params[param_name]
+                    if param.is_space_dependent:
+                        val = to_array(param.value, len(layer.grid_x_nodes), 
+                                       param.is_edge)
+                        shared_y.append(val)
+                        
+                        grid_x = layer.grid_x_nodes if not param.is_edge else layer.grid_x_edges
+                        shared_x.append(grid_x + cml_total_length)
+                        
+                        self.sys_param_summaryaxes[0][param_name].axvline(cml_total_length, color='black', linestyle='dashed', linewidth=0.2)
+                        cml_total_length += layer.total_length
+                        
+                self.sys_param_summaryaxes[0][param_name].axvline(cml_total_length, color='black', linestyle='dashed', linewidth=0.2)
+                shared_x = np.hstack(shared_x)
+                shared_y = np.hstack(shared_y)
+                self.sys_param_summaryaxes[0][param_name].plot(shared_x, shared_y)
+                self.sys_param_summaryaxes[0][param_name].set_yscale(autoscale(val_array=val))
+            
+            skip1 = True
+        else:
+            skip1 = False
+                
+        start = 1 if skip1 else 0
+        for i, layer_name in enumerate(active_plotsummary_layers, start=start):
+            count = 1
+            plot_count = self.module.layers[layer_name].param_count - len(shared_params)
 
             rdim = np.floor(np.sqrt(plot_count))
             cdim = np.ceil(plot_count / rdim)
@@ -504,6 +600,8 @@ class Notebook(BaseNotebook):
                                                        self.APP_HEIGHT / self.APP_DPI))
             layer = self.module.layers[layer_name]
             for param_name in layer.params:
+                if param_name in shared_params:
+                    continue
                 if layer.params[param_name].is_space_dependent:
                     self.sys_param_summaryaxes[i][param_name] = self.plotsummary_figs[i].add_subplot(int(rdim), int(cdim), int(count))
                     self.sys_param_summaryaxes[i][param_name].set_title("{} {}".format(param_name,layer.params[param_name].units))
@@ -529,6 +627,7 @@ class Notebook(BaseNotebook):
             x1 = h_offset
             x2 = h_offset
             
+            # Generate a diagram of the layer stack
             for j, ll_name in enumerate(self.module.layers):
                 do_nogrid_warning = False
                 if ll_name == layer_name:
@@ -555,10 +654,13 @@ class Notebook(BaseNotebook):
                                                text="z≈{}".format(int(layer_lengths[j])),
                                                angle=90)
                 x1 = x2
+            
+            # Actually plot the parameters
 
-        for layer_name in active_plotsummary_layers:
             layer = self.module.layers[layer_name]
             for param_name in layer.params:
+                if param_name in shared_params:
+                    continue
                 param = layer.params[param_name]
                 if param.is_space_dependent:
                     val = to_array(param.value, len(layer.grid_x_nodes), 
