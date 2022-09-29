@@ -11,30 +11,19 @@ from functools import partial
 from config import init_logging
 logger = init_logging(__name__)
 
+class Popup():
+    
+    def __init__(self, nb, grab=False):
+        self.toplevel = tk.Toplevel(nb.root)
+        
+        self.toplevel.protocol("WM_DELETE_WINDOW", self.close)
+        
+        if grab:
+            self.toplevel.grab_set()        
 
-def do_confirmation_popup(nb, text, hide_cancel=False):
-    """ General purpose popup for important operations (e.g. deleting something)
-        which should require user confirmation."""
-
-    nb.confirmation_popup = tk.Toplevel(nb.root)
-    
-    tk.Message(nb.confirmation_popup, text=text, 
-                width=(float(nb.root.winfo_screenwidth()) / 4)).grid(row=0,column=0, columnspan=2)
-    
-    if not hide_cancel:
-        tk.Button(nb.confirmation_popup, text="Cancel", 
-                    command=partial(nb.on_confirmation_popup_close, 
-                                    continue_=False)).grid(row=1,column=0)
-    
-    tk.Button(nb.confirmation_popup, text='Continue', 
-                command=partial(nb.on_confirmation_popup_close, 
-                                continue_=True)).grid(row=1,column=1)
-    
-    nb.confirmation_popup.protocol("WM_DELETE_WINDOW", 
-                                        nb.on_confirmation_popup_close)
-    nb.confirmation_popup.grab_set()        
-    
-    return nb
+    def close(self):
+        self.toplevel.destroy()
+        return
 
 
 ## Functions to create popups and manage
