@@ -444,11 +444,13 @@ class Notebook(BaseNotebook):
             
         if len(active_plotsummary_layers) == len(self.module.layers): # if all layers set
             tk.Button(self.sys_plotsummary_buttongrid,text="All", 
-                      command=partial(self.update_sys_plotsummary_plots, active_plotsummary_layers)
+                      command=partial(self.update_sys_plotsummary_plots, active_plotsummary_layers, all_layers=True)
                       ).grid(row=0,column=i+1)
         return
 
-    def update_sys_plotsummary_plots(self, active_plotsummary_layers):
+    def update_sys_plotsummary_plots(self, active_plotsummary_layers, all_layers=False):
+
+        # TODO: all_layers special mode
         
         if self.sys_flag_dict['symmetric_system'].value():
             self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_frame, 
@@ -462,6 +464,8 @@ class Notebook(BaseNotebook):
                 pw.destroy()
             for tb in self.plotsummary_toolbars:
                 tb.destroy()
+            for gf in self.plotsummary_graphicframes:
+                gf.destroy()
                 
         # Following Matplotlib (fig, axes) convention
         self.plotsummary_figs = [None] * len(active_plotsummary_layers)
@@ -469,6 +473,26 @@ class Notebook(BaseNotebook):
         self.plotsummary_canvases = [None] * len(active_plotsummary_layers)
         self.plotsummary_plotwidgets = [None] * len(active_plotsummary_layers)
         self.plotsummary_toolbars = [None] * len(active_plotsummary_layers)
+        self.plotsummary_graphicframes = [None] * len(active_plotsummary_layers)
+        
+        
+        width = 300
+        h_offset = 10
+        height = 200
+        w_offset = 50
+        DEFAULT_LENGTH = 0
+        layer_lengths = [self.module.layers[name].total_length 
+                         if self.module.layers[name].spacegrid_is_set else DEFAULT_LENGTH
+                         for name in self.module.layers]
+        
+        full_length = sum(layer_lengths)
+        
+        # Assign a default length to all layers without defined spacegrids,
+        # equal to the average of the lengths of layers that do have spacegrids
+        layer_lengths = [l if l != DEFAULT_LENGTH else full_length / len(layer_lengths)
+                         for l in layer_lengths]
+        full_length = sum(layer_lengths)
+        
         for i, layer_name in enumerate(active_plotsummary_layers):
             count = 1
             plot_count = self.module.layers[layer_name].param_count
@@ -482,7 +506,7 @@ class Notebook(BaseNotebook):
             for param_name in layer.params:
                 if layer.params[param_name].is_space_dependent:
                     self.sys_param_summaryaxes[i][param_name] = self.plotsummary_figs[i].add_subplot(int(rdim), int(cdim), int(count))
-                    self.sys_param_summaryaxes[i][param_name].set_title("{}-{} {}".format(layer_name, param_name,layer.params[param_name].units))
+                    self.sys_param_summaryaxes[i][param_name].set_title("{} {}".format(param_name,layer.params[param_name].units))
                     count += 1
         
             self.plotsummary_canvases[i] = tkagg.FigureCanvasTkAgg(self.plotsummary_figs[i], 
@@ -491,9 +515,46 @@ class Notebook(BaseNotebook):
             self.plotsummary_plotwidgets[i].grid(row=2+2*i,column=0)
             
             self.plotsummary_toolbars[i] = tk.Frame(self.sys_plotsummary_frame)
-            self.plotsummary_toolbars[i].grid(row=2+(2*i)+1)
+            self.plotsummary_toolbars[i].grid(row=2+(2*i)+1, column=0)
             tkagg.NavigationToolbar2Tk(self.plotsummary_canvases[i], 
                                        self.plotsummary_toolbars[i])
+            
+            self.plotsummary_graphicframes[i] = tk.Frame(self.sys_plotsummary_frame)
+            self.plotsummary_graphicframes[i].grid(row=2+2*i, column=1)
+            
+            tk.Label(self.plotsummary_graphicframes[i], text=layer_name).grid(row=0,column=0)
+            
+            graphic_canvas = tk.Canvas(self.plotsummary_graphicframes[i], width=width+4*h_offset,height=height,bg='white')
+            graphic_canvas.grid(row=1,column=0, padx=(20,20))
+            x1 = h_offset
+            x2 = h_offset
+            
+            for j, ll_name in enumerate(self.module.layers):
+                do_nogrid_warning = False
+                if ll_name == layer_name:
+                    fillcolor = 'cornflowerblue'
+                elif self.module.layers[ll_name].spacegrid_is_set:
+                    fillcolor= 'gray'
+                else:
+                    do_nogrid_warning = True
+                    fillcolor= 'white'
+                
+                x2 += layer_lengths[j] / full_length * width
+                graphic_canvas.create_rectangle(x1, w_offset, x2, height - w_offset, fill=fillcolor)
+                if do_nogrid_warning:
+                    graphic_canvas.create_line(x1, w_offset, x2, height - w_offset, fill='black', dash=(3,5))
+                    graphic_canvas.create_line(x1, height - w_offset, x2, w_offset, fill='black', dash=(3,5))
+                    graphic_canvas.create_text((x1+x2)/2, w_offset*2, text="Grid not set!")
+                    
+                if ll_name == layer_name:
+                    graphic_canvas.create_line(x1, height - w_offset, x1, height, fill='black')
+                    graphic_canvas.create_line(x2, height - w_offset, x2, height, fill='black')
+                    graphic_canvas.create_text(x1+0.75*h_offset, height, anchor='w', text="z=0", 
+                                               angle=90)
+                    graphic_canvas.create_text(x2+0.75*h_offset, height, anchor='w', 
+                                               text="z≈{}".format(int(layer_lengths[j])),
+                                               angle=90)
+                x1 = x2
 
         for layer_name in active_plotsummary_layers:
             layer = self.module.layers[layer_name]
