@@ -124,10 +124,11 @@ class BaseNotebook:
         # Add (e.g. for Nanowire) module-specific functionality
         # TODO: abstract the choices away from this code
         self.LGC_eligible_modules = ("Nanowire", "OneLayer", "MAPI_Rubrene")
-        if self.module.system_ID in self.LGC_eligible_modules:
-            self.using_LGC = {}
-            self.LGC_options = {}
-            self.LGC_values = {}
+        
+        # Default LGC values
+        self.using_LGC = {layer:False for layer in self.module.layers}
+        self.LGC_options = {layer:{} for layer in self.module.layers}
+        self.LGC_values = {layer:{} for layer in self.module.layers}
 
 
     def reset_popup_flags(self):

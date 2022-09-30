@@ -17,7 +17,7 @@ def init_logging(name=__name__):
             'console': {
                 'class': 'logging.StreamHandler',
                 'formatter': 'default',
-                'level': os.getenv('LOG_LEVEL', 'INFO'),
+                'level': os.getenv('LOG_LEVEL', 'DEBUG'),
             },
         },
         'loggers': {
