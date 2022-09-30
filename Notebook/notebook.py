@@ -45,8 +45,9 @@ from Notebook.base import BaseNotebook
 from Notebook.Tabs.inputs import add_tab_inputs
 from Notebook.Tabs.simulate import add_tab_simulate
 from Notebook.Tabs.analyze import add_tab_analyze
-from Notebook.Popups.popups import do_confirmation_popup
-from Notebook.Popups.popups import do_module_popup
+from Notebook.Popups.confirmation_popup import ConfirmationPopup
+from Notebook.Popups.module_select_popup import ModuleSelectPopup
+from Notebook.Popups.plotsummary_popup import PlotSummaryPopup
 
 from config import init_logging
 logger = init_logging(__name__)
@@ -71,9 +72,8 @@ class Notebook(BaseNotebook):
             self.module.verify()
             self.verified=True
         else:
-            self = do_module_popup(self)
-            self.root.wait_window(self.select_module_popup)
-
+            self.do_module_popup()
+            
         if self.module is None or not self.verified: 
             return
 
@@ -118,9 +118,9 @@ class Notebook(BaseNotebook):
             self.root.destroy()
             return
 
-        width, height = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
-
-        self.root.geometry('%dx%d+0+0' % (width,height))
+        self.APP_WIDTH, self.APP_HEIGHT = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
+        self.APP_DPI = self.root.winfo_fpixels('1i')
+        self.root.geometry('%dx%d+0+0' % (self.APP_WIDTH,self.APP_HEIGHT))
         self.root.attributes("-topmost", True)
         self.root.after_idle(self.root.attributes,'-topmost',False)
         self.root.mainloop()
@@ -129,10 +129,10 @@ class Notebook(BaseNotebook):
 
 
     def quit(self):
-        self = do_confirmation_popup(self,
+        self.do_confirmation_popup(
             "All unsaved data will be lost. "
             "Are you sure you want to close TEDs?")
-        self.root.wait_window(self.confirmation_popup)
+
         if self.confirmed: 
             self.root.destroy()
             logger.info("Closed TEDs")
@@ -153,17 +153,14 @@ class Notebook(BaseNotebook):
 
 
     def change_module(self):
-        self = do_confirmation_popup(self, 
+        self.do_confirmation_popup(
                 "Warning: This will close the current instance "
                 "of TEDs (and all unsaved data). Are you sure "
                 "you want to select a new module?")
-        self.root.wait_window(self.confirmation_popup)
-        if self.confirmed: 
-            
         
+        if self.confirmed: 
             self.notebook.destroy()
-            self = do_module_popup(self)
-            self.root.wait_window(self.select_module_popup)
+            self.do_module_popup()
             if self.module is None: 
                 return
             self.prep_notebook()
@@ -324,63 +321,19 @@ class Notebook(BaseNotebook):
                         self.enter(box, str(self.LGC_values[self.current_layer_name][param_name]))
                     else:
                         self.enter(box, "")
-
-
-    def update_system_summary(self):
-        """ Transfer parameter values from the Initial Condition tab 
-            to the summary popup windows.
-        """
-        if self.sys_printsummary_popup_isopen:
-            self.write(self.printsummary_textbox, self.module.DEBUG_print())
+                        
+                    
+    def do_module_popup(self):
+        self.select_module_popup = ModuleSelectPopup(self, logger)
+        self.root.wait_window(self.select_module_popup.toplevel)
+        return
             
-        if self.sys_plotsummary_popup_isopen:
-            set_layers = {name for name in self.module.layers 
-                          if self.module.layers[name].spacegrid_is_set}
-            for layer_name in set_layers:
-                layer = self.module.layers[layer_name]
-                for param_name in layer.params:
-                    param = layer.params[param_name]
-                    if param.is_space_dependent:
-                        val = to_array(param.value, len(layer.grid_x_nodes), 
-                                       param.is_edge)
-                        grid_x = layer.grid_x_nodes if not param.is_edge else layer.grid_x_edges
-                        self.sys_param_summaryplots[(layer_name,param_name)].plot(grid_x, val)
-                        self.sys_param_summaryplots[(layer_name,param_name)].set_yscale(autoscale(val_array=val))
-                
-            self.plotsummary_fig.tight_layout()
-            self.plotsummary_fig.canvas.draw()
-
-
-        
-       
-    def on_select_module_popup_close(self, continue_=False):
-        """ Do basic verification checks defined by OneD_Model.verify() 
-            and inform tkinter of selected module 
-        """
-        try:
-            if continue_:
-                self.verified=False
-                self.module = self.module_list[self.module_names[self.module_listbox.curselection()[0]]]()
-                self.module.verify()
-                self.verified=True
-                
-            self.select_module_popup.destroy()
-
-        except IndexError:
-            logger.error("No module selected: Select a module from the list")
-        except AssertionError as oops:
-            logger.error("Error: could not verify selected module")
-            logger.error(str(oops))
             
+    def do_confirmation_popup(self, text, hide_cancel=False):
+        self.confirmation_popup = ConfirmationPopup(self, text, hide_cancel)
+        self.root.wait_window(self.confirmation_popup.toplevel)
+        return
     
-    
-    def on_confirmation_popup_close(self, continue_=False):
-        """ Inform caller of do_confirmation_popup of whether user confirmation 
-            was received 
-        """
-        self.confirmed = continue_
-        self.confirmation_popup.destroy()
-
 
     def do_sys_printsummary_popup(self):
         """ Display as text the current space grid and parameters. """
@@ -397,7 +350,7 @@ class Notebook(BaseNotebook):
             
             self.sys_printsummary_popup_isopen = True
             
-            self.update_system_summary()
+            self.update_system_textsummary()
             
             self.sys_printsummary_popup.protocol(
                 "WM_DELETE_WINDOW", 
@@ -412,58 +365,23 @@ class Notebook(BaseNotebook):
             logger.error("Error #2022: Failed to close shortcut popup.")
         return
 
-
+    
+    def update_system_textsummary(self):
+        """ Transfer parameter values from the Initial Condition tab 
+            to the summary popup windows.
+        """
+        if self.sys_printsummary_popup_isopen:
+            self.write(self.printsummary_textbox, self.module.DEBUG_print())
+        return
+    
     def do_sys_plotsummary_popup(self):
-        """ Display as series of plots the current parameter distributions. """
-        set_layers = {name for name in self.module.layers if self.module.layers[name].spacegrid_is_set}
-        if not set_layers: 
+        """ Create a Plot summary of the initial parameters """
+        active_plotsummary_layers = [name for name in self.module.layers if self.module.layers[name].spacegrid_is_set]
+        if len(active_plotsummary_layers) == 0: 
             return
         
-        if not self.sys_plotsummary_popup_isopen:
-            self.sys_plotsummary_popup = tk.Toplevel(self.root)
-            plot_count = sum([self.module.layers[layer_name].param_count
-                              for layer_name in set_layers])
-            count = 1
-            rdim = np.floor(np.sqrt(plot_count))
-            #rdim = 4
-            cdim = np.ceil(plot_count / rdim)
-            
-            if self.sys_flag_dict['symmetric_system'].value():
-                self.plotsummary_symmetriclabel = tk.Label(self.sys_plotsummary_popup, 
-                                                           text="Note: All distributions "
-                                                                "are symmetric about x=0")
-                self.plotsummary_symmetriclabel.grid(row=0,column=0)
-
-            self.plotsummary_fig = Figure(figsize=(20,10))
-            self.sys_param_summaryplots = {}
-            for layer_name in set_layers:
-                layer = self.module.layers[layer_name]
-                for param_name in layer.params:
-                    if layer.params[param_name].is_space_dependent:
-                        self.sys_param_summaryplots[(layer_name,param_name)] = self.plotsummary_fig.add_subplot(int(rdim), int(cdim), int(count))
-                        self.sys_param_summaryplots[(layer_name,param_name)].set_title("{}-{} {}".format(layer_name, param_name,layer.params[param_name].units))
-                        count += 1
-            
-            self.plotsummary_canvas = tkagg.FigureCanvasTkAgg(self.plotsummary_fig, 
-                                                              master=self.sys_plotsummary_popup)
-            self.plotsummary_plotwidget = self.plotsummary_canvas.get_tk_widget()
-            self.plotsummary_plotwidget.grid(row=1,column=0)
-            
-            self.sys_plotsummary_popup_isopen = True
-            self.update_system_summary()
-            
-            self.sys_plotsummary_popup.protocol("WM_DELETE_WINDOW", 
-                                                self.on_sys_plotsummary_popup_close)
-            ## Temporarily disable the main window while this popup is active
-            self.sys_plotsummary_popup.grab_set()
-
-        
-    def on_sys_plotsummary_popup_close(self):
-        try:
-            self.sys_plotsummary_popup.destroy()
-            self.sys_plotsummary_popup_isopen = False
-        except Exception:
-            logger.error("Error #2023: Failed to close plotsummary popup.")
+        self.sys_plotsummary_popup = PlotSummaryPopup(self, logger)
+        self.sys_plotsummary_popup_isopen = True
         return
 
 
@@ -589,18 +507,15 @@ class Notebook(BaseNotebook):
                     
                 if changed_params:
                     self.update_IC_plot(plot_ID="recent")
-                    self = do_confirmation_popup(self,
-                            "Updated: {}".format(changed_params), 
+                    self.do_confirmation_popup("Updated: {}".format(changed_params), 
                             hide_cancel=True)
-                    self.root.wait_window(self.confirmation_popup)
                     
                 if "delta_N" in changed_params or "delta_P" in changed_params:
                     self.using_LGC[self.current_layer_name] = False
                     
                 if len(err_msg) > 1:
-                    self = do_confirmation_popup(self,
-                        "\n".join(err_msg), hide_cancel=True)
-                    self.root.wait_window(self.confirmation_popup)
+                    self.do_confirmation_popup("\n".join(err_msg), hide_cancel=True)
+                    
             self.write(self.ICtab_status, "")
             self.sys_param_shortcut_popup.destroy()
             self.sys_param_shortcut_popup_isopen = False
@@ -1540,10 +1455,7 @@ class Notebook(BaseNotebook):
                 # If NO new files saved
                 if len(status_msg) == 1: 
                     status_msg.append("(none)")
-                self = do_confirmation_popup(self,
-                        "\n".join(status_msg), 
-                        hide_cancel=True)
-                self.root.wait_window(self.confirmation_popup)
+                self.do_confirmation_popup("\n".join(status_msg),hide_cancel=True)
 
             self.IC_carry_popup.destroy()
             self.IC_carry_popup_isopen = False
@@ -1781,15 +1693,13 @@ class Notebook(BaseNotebook):
                 tstep_list = np.array(np.array(extract_values(sample_ct, ' ')) / dt, dtype=int)
                 
         except AssertionError as oops:
-            self = do_confirmation_popup(self, str(oops), hide_cancel=True)
-            self.root.wait_window(self.confirmation_popup)
+            self.do_confirmation_popup(str(oops), hide_cancel=True)
             return
         
         except ValueError:
-            self = do_confirmation_popup(self,
+            self.do_confirmation_popup(
                     "Error: {} is missing or has unusual metadata.txt".format(data_filename),
                     hide_cancel=True)
-            self.root.wait_window(self.confirmation_popup)
             return
         
         for layer_name, layer in self.overview_subplots.items():
@@ -1848,10 +1758,7 @@ class Notebook(BaseNotebook):
                 self.overview_subplots[layer_name][output_name].legend().set_draggable(True)
                 break
         if len(warning_msg) > 1:
-            self = do_confirmation_popup(self,
-                    "\n".join(warning_msg),
-                    hide_cancel=True)
-            self.root.wait_window(self.confirmation_popup)
+            self.do_confirmation_popup("\n".join(warning_msg),hide_cancel=True)
             
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
@@ -2020,10 +1927,7 @@ class Notebook(BaseNotebook):
                 active_plot.datagroup.add(new_data)
     
         if len(err_msg) > 1:
-            self = do_confirmation_popup(self,
-                    "\n".join(err_msg), 
-                    hide_cancel=True)
-            self.root.wait_window(self.confirmation_popup)
+            self.do_confirmation_popup("\n".join(err_msg),hide_cancel=True)
         
         self.plot_analyze(plot_ID, force_axis_update=True)
         
@@ -2147,29 +2051,27 @@ class Notebook(BaseNotebook):
             assert (self.hmax >= 0),"Error: Invalid solver stepsize"
             
             if self.dt > self.simtime / 10:
-                self = do_confirmation_popup(self,
+                self.do_confirmation_popup(
                         "Warning: a very large time stepsize was entered. "
                         "Results may be less accurate with large stepsizes. "
                         "Are you sure you want to continue?")
-                self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: 
                     return
                 
             if self.hmax and self.hmax < 1e-3:
-                self = do_confirmation_popup(self,
+                self.do_confirmation_popup(
                         "Warning: a very small solver stepsize was entered. "
                         "Results may be slow with small solver stepsizes. "
                         "Are you sure you want to continue?")
-                self.root.wait_window(self.confirmation_popup)
                 if not self.confirmed: 
                     return
                 
             if (self.n > 1e5):
-                self = do_confirmation_popup(self,
+                self.do_confirmation_popup(
                         "Warning: a very small time stepsize was entered. "
                         "Results may be slow with small time stepsizes. "
                         "Are you sure you want to continue?")
-                self.root.wait_window(self.confirmation_popup)
+                
                 if not self.confirmed: 
                     return
             
@@ -2202,9 +2104,7 @@ class Notebook(BaseNotebook):
         self.load_ICfile()
 
         if len(self.sim_warning_msg) > 1:
-            self = do_confirmation_popup(self,
-                    "\n".join(self.sim_warning_msg),
-                    hide_cancel=True)
+            self.do_confirmation_popup("\n".join(self.sim_warning_msg), hide_cancel=True)
 
 
     def do_Calculate(self):
@@ -2705,7 +2605,7 @@ class Notebook(BaseNotebook):
 
 
         self.update_IC_plot(plot_ID="clearall")                             
-        self.update_system_summary()                    
+        self.update_system_textsummary()                    
         self.write(self.ICtab_status, "Selected layers cleared")
 
 	## This is a patch of a consistency issue involving initial conditions - 
@@ -2746,22 +2646,19 @@ class Notebook(BaseNotebook):
         assert (int(0.5 + thickness / dx) <= 1e6), "Error: too many space steps"
 
         if dx > thickness / 10:
-            self = do_confirmation_popup(self,
+            self.do_confirmation_popup(
                     "Warning: a very large space stepsize was entered. "
                     "Results may be less accurate with large stepsizes. "
                     "Are you sure you want to continue?")
-            self.root.wait_window(self.confirmation_popup)
             if not self.confirmed: 
                 return
             
         if abs(thickness / dx - int(thickness / dx)) > 1e-10:
-            self = do_confirmation_popup(
-                            self,
+            self.do_confirmation_popup(
                 "Warning: the selected thickness cannot be "
                 "partitioned evenly into the selected stepsize. "
                 "Integration may lose accuracy as a result. "
                 "Are you sure you want to continue?")
-            self.root.wait_window(self.confirmation_popup)
             if not self.confirmed: 
                 return
             
@@ -3246,9 +3143,7 @@ class Notebook(BaseNotebook):
         except Exception as e:
             msg.append("Error: Unable to read point list")
             msg.append(str(e))
-            self = do_confirmation_popup(
-                            self,"\n".join(msg), hide_cancel=True)
-            self.root.wait_window(self.confirmation_popup)
+            self.do_confirmation_popup("\n".join(msg), hide_cancel=True)
             return
         
     
@@ -3295,8 +3190,7 @@ class Notebook(BaseNotebook):
         self.update_IC_plot(plot_ID="recent")
         
         if len(msg) > 1:
-            self = do_confirmation_popup(self, "\n".join(msg), hide_cancel=True)
-            self.root.wait_window(self.confirmation_popup)
+            self.do_confirmation_popup("\n".join(msg), hide_cancel=True)
 
     def update_IC_plot(self, plot_ID):
         """ Plot selected parameter distribution on Initial Condition tab."""
@@ -3350,7 +3244,7 @@ class Notebook(BaseNotebook):
         plot.set_ylabel("{} {}".format(param_name, param_obj.units))
         
         if plot_ID=="recent": 
-            self.update_system_summary()
+            self.update_system_textsummary()
             
             plot.set_title("Recently Changed: {}".format(param_name))
             self.recent_param_fig.tight_layout()
@@ -3452,13 +3346,10 @@ class Notebook(BaseNotebook):
         
         
         if len(warning_mssg) > 1:
-            self = do_confirmation_popup(self, "\n".join(warning_mssg), hide_cancel=True)
+            self.do_confirmation_popup("\n".join(warning_mssg), hide_cancel=True)
         else:
-            self = do_confirmation_popup(self,
-                    "Batch {} created successfully".format(batch_dir_name), hide_cancel=True)
-            
-        self.root.wait_window(self.confirmation_popup)
-
+            self.do_confirmation_popup("Batch {} created successfully".format(batch_dir_name), 
+                                       hide_cancel=True)
 
     def save_ICfile(self):
         """Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked"""
@@ -3754,8 +3645,7 @@ class Notebook(BaseNotebook):
             self.write(self.ICtab_status, "IC file loaded successfully")
         else: 
             self.write(self.ICtab_status, "IC file loaded with {} issue(s); see console".format(warning_flag))
-            self = do_confirmation_popup(self, warning_mssg, hide_cancel=True)
-            self.root.wait_window(self.confirmation_popup)
+            self.do_confirmation_popup(warning_mssg, hide_cancel=True)
     # Data I/O
 
     def export_plot(self, from_integration):
