@@ -22,15 +22,12 @@ def define_ntype_params():
         "delta_P":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)), 
     }
 
-    return define_ntype_params()
 
 def define_ntype_simulation_outputs(layer):
     return {
         "N":Output("N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer=layer, yscale='symlog', yfactors=(1e-4,1e1)), 
         "P":Output("P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer=layer, yscale='symlog', yfactors=(1e-4,1e1)),
     }
-
-    return define_ntype_simulation_outputs()
 
 def define_ntype_calculated_outputs(layer):
     return {
@@ -45,17 +42,6 @@ def define_ntype_calculated_outputs(layer):
         
     }
 
-    return {
-        "E_field":Output("Electric Field", units="[V/nm]", integrated_units="[V]", xlabel="nm", xvar="position",is_edge=True, layer="ptype"),
-        "delta_N":Output("delta_N", units="[cm^-3]", integrated_units="[cm^-2]", xlabel="nm", xvar="position", is_edge=False, layer="ptype"),
-        "delta_P":Output("delta_P", units="[cm^-3]", integrated_units="[cm^-2]", xlabel="nm", xvar="position", is_edge=False, layer="ptype"),
-        "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",is_edge=False, layer="ptype"),
-        "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position", is_edge=False, layer="ptype"),
-        "PL":Output("TRPL", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]", xlabel="ns", xvar="time", is_edge=False, layer="ptype"),
-        "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="ptype", analysis_plotable=False),
-        "avg_delta_N":Output("avg_delta_N", units="[cm^-3]", xlabel="ns", xvar="time", is_edge=False, layer="ptype", analysis_plotable=False),
-        
-    }
 def define_ntype_convert_in():
     ntype_convert_in = {
         "mu_N": ((1e7) ** 2) / (1e9),
@@ -86,7 +72,6 @@ def define_ntype_convert_in():
 
     return ntype_convert_in
 
-    return define_ntype_convert_in()
 def define_ntype_iconvert_in():
     return {
         "N": 1e7,
@@ -112,7 +97,7 @@ def define_layers():
     # we can now initialize the 2 layers with the previously defined components
     layers = {
         "N-type": Layer(
-                params,
+                dict(params),
                 define_ntype_simulation_outputs("N-type"),
                 define_ntype_calculated_outputs("N-type"),
                 "[nm]",
@@ -120,7 +105,7 @@ def define_layers():
                 iconvert_in
             ),
         "buffer": Layer(
-                params,
+                dict(params),
                 define_ntype_simulation_outputs("buffer"),
                 define_ntype_calculated_outputs("buffer"),
                 "[nm]",
@@ -128,7 +113,7 @@ def define_layers():
                 iconvert_in
             ),
         "P-type": Layer(
-                params,
+                dict(params),
                 define_ntype_simulation_outputs("P-type"),
                 define_ntype_calculated_outputs("P-type"),
                 "[nm]",
