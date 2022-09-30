@@ -106,11 +106,11 @@ class PlotSummaryPopup(Popup):
         """ Clear any previously drawn plots. """
         if hasattr(self, "plotsummary_plotwidgets"):
             for pw in self.plotsummary_plotwidgets:
-                pw.destroy()
+                if pw is not None: pw.destroy()
             for tb in self.plotsummary_toolbars:
-                tb.destroy()
+                if tb is not None: tb.destroy()
             for gf in self.plotsummary_graphicframes:
-                gf.destroy()
+                if gf is not None: gf.destroy()
                 
     def determine_layer_lengths(self):
         """ Collect total_length of each layer. """
@@ -151,6 +151,8 @@ class PlotSummaryPopup(Popup):
         """ Attempt to arrange plot_count subplots into a nice looking rectangle """
         rdim = np.floor(np.sqrt(plot_count))
         cdim = np.ceil(plot_count / rdim)
+        rdim = max(rdim, 1)
+        cdim = max(cdim, 1)
         return rdim, cdim
     
     def setup_figures(self, i,rdim, cdim, share_special=False, shared_params=[], layer_name=None):
@@ -274,11 +276,12 @@ class PlotSummaryPopup(Popup):
                         self.plotsummary_axes[0][param_name].axvline(cml_total_length, color='black', linestyle='dashed', linewidth=0.2)
                         cml_total_length += layer.total_length
                         
-                self.plotsummary_axes[0][param_name].axvline(cml_total_length, color='black', linestyle='dashed', linewidth=0.2)
-                shared_x = np.hstack(shared_x)
-                shared_y = np.hstack(shared_y)
-                self.plotsummary_axes[0][param_name].plot(shared_x, shared_y)
-                self.plotsummary_axes[0][param_name].set_yscale(autoscale(val_array=val))
+                if all((self.nb.module.layers[layer_name].params[param_name].is_space_dependent for layer_name in self.nb.module.layers)):
+                    self.plotsummary_axes[0][param_name].axvline(cml_total_length, color='black', linestyle='dashed', linewidth=0.2)
+                    shared_x = np.hstack(shared_x)
+                    shared_y = np.hstack(shared_y)
+                    self.plotsummary_axes[0][param_name].plot(shared_x, shared_y)
+                    self.plotsummary_axes[0][param_name].set_yscale(autoscale(val_array=val))
             
         # Actually plot the parameters
         else:
@@ -312,9 +315,9 @@ class PlotSummaryPopup(Popup):
         if len(shared_params) > 0:
             rdim, cdim = self.guess_plot_dims(len(shared_params))
             
-            self.setup_figures(0, rdim, cdim, share_special=True, shared_params=shared_params)
-            
             self.draw_graphic(0, layer_lengths, full_length, share_special=True)
+            
+            self.setup_figures(0, rdim, cdim, share_special=True, shared_params=shared_params)
             
             self.plot_on_figures(0, share_special=True, shared_params=shared_params)
             skip1 = True
@@ -323,16 +326,20 @@ class PlotSummaryPopup(Popup):
                 
         start = 1 if skip1 else 0
         for i, layer_name in enumerate(active_plotsummary_layers, start=start):
-            
-            rdim, cdim = self.guess_plot_dims(self.nb.module.layers[layer_name].param_count - len(shared_params))
-            
-            self.setup_figures(i, rdim, cdim, shared_params=shared_params, layer_name=layer_name)
+            num_unshared_params = self.nb.module.layers[layer_name].param_count - len(shared_params)
+            if num_unshared_params == 0: # We don't need to draw this figure after all
+                self.plotsummary_figs[i] = None
+                break
+            rdim, cdim = self.guess_plot_dims(num_unshared_params)
             
             self.draw_graphic(i, layer_lengths, full_length, layer_name=layer_name)
+            
+            self.setup_figures(i, rdim, cdim, shared_params=shared_params, layer_name=layer_name)
             
             self.plot_on_figures(i, shared_params=shared_params, layer_name=layer_name)
             
         for fig in self.plotsummary_figs:
-            fig.tight_layout()
-            fig.canvas.draw()
+            if fig is not None:
+                fig.tight_layout()
+                fig.canvas.draw()
         return
