@@ -5,14 +5,14 @@ Created on Wed May 12 18:01:07 2021
 @author: cfai2
 """
 from _OneD_Model import OneD_Model
-from Modules.module_MAPI_Rubrene_DBP.definitions import define_layers
-from Modules.module_MAPI_Rubrene_DBP.definitions import define_flags
-from Modules.module_MAPI_Rubrene_DBP.initializations import MAPI_Rubrene_Initial_Conditions
-from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_overview_analysis
-from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_prep_dataset
-from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_timeseries
-from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_IC_carry
-from Modules.module_MAPI_Rubrene_DBP.simulations import OdeTwoLayerSimulation
+from Modules.module_pnJunction.definitions import define_layers
+from Modules.module_pnJunction.definitions import define_flags
+from Modules.module_pnJunction.initializations import PN_Junction_Initial_Conditions
+from Modules.module_pnJunction.analysis import submodule_get_overview_analysis
+from Modules.module_pnJunction.analysis import submodule_prep_dataset
+from Modules.module_pnJunction.analysis import submodule_get_timeseries
+from Modules.module_pnJunction.analysis import submodule_get_IC_carry
+from Modules.module_pnJunction.simulations import OdeTwoLayerSimulation
 
 
 
@@ -22,12 +22,12 @@ kB = 8.61773e-5             #[eV / K]
 eps0 = 8.854e-12 * 1e-9     #[C/V-m] to [C/V-nm]
 
 
-class MAPI_Rubrene(OneD_Model):
+class PN_Junction(OneD_Model):
     # A Nanowire object stores all information regarding the initial state being edited in the IC tab
     # And functions for managing other previously simulated nanowire data as they are loaded in
     def __init__(self):
         super().__init__()
-        self.system_ID = "MAPI_Rubrene"
+        self.system_ID = "PN_Junction"
         self.time_unit = "[ns]"
         self.flags_dict = define_flags()
         self.layers = define_layers()
@@ -38,12 +38,13 @@ class MAPI_Rubrene(OneD_Model):
     def calc_inits(self):
         """Calculate initial electron and hole density distribution"""
         
-        mapi = self.layers["MAPI"]
-        rubrene = self.layers["Rubrene"]
+        ntype = self.layers["N-type"]
+        buffer = self.layers["buffer"]
+        ptype = self.layers["P-type"]
 
-        mapi_rubrene_inits = MAPI_Rubrene_Initial_Conditions(mapi, rubrene)
+        pnjunction_inits = PN_Junction_Initial_Conditions(ntype, buffer, ptype)
 
-        return mapi_rubrene_inits.format_inits_to_dict()
+        return pnjunction_inits.format_inits_to_dict()
 
 
     def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):

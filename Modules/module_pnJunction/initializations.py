@@ -2,13 +2,14 @@ import numpy as np
 from utils import to_array
 
 
-class MAPI_Rubrene_Initial_Conditions():
-    def __init__(self, mapi, rubrene):
+class PN_Junction_Initial_Conditions():
+    def __init__(self, ntype, buffer, ptype):
         """Taking information from MAPI and Rubrene 'Layer' types
         we generate and return initial conditions in a dictionary."""
 
-        self.mapi = mapi
-        self.rubrene = rubrene
+        self.ntype = ntype
+        self.buffer = buffer
+        self.ptype = ptype
         
         self.calc_inits_from_layers()
         
@@ -18,25 +19,29 @@ class MAPI_Rubrene_Initial_Conditions():
     def calc_inits_from_layers(self):
         """ Physical calculations of initial distributions."""
 
-        self.init_N = (
-            self.mapi.params["N0"].value + self.mapi.params["delta_N"].value
-            ) * self.mapi.convert_in["N"]
+        self.ntype_init_N = (
+            self.ntype.params["N0"].value + self.ntype.params["delta_N"].value
+            ) * self.ntype.convert_in["N"]
 
-        self.init_P = (
-            self.mapi.params["P0"].value + self.mapi.params["delta_P"].value
-            ) * self.mapi.convert_in["P"]
+        self.ntype_init_P = (
+            self.ntype.params["P0"].value + self.ntype.params["delta_P"].value
+            ) * self.ntype.convert_in["P"]
+        
+        self.buffer_init_N = (
+            self.buffer.params["N0"].value + self.buffer.params["delta_N"].value
+            ) * self.buffer.convert_in["N"]
 
-        self.init_T = (
-            self.rubrene.params["T0"].value + self.rubrene.params["delta_T"].value
-            ) * self.rubrene.convert_in["T"]
+        self.buffer_init_P = (
+            self.buffer.params["P0"].value + self.buffer.params["delta_P"].value
+            ) * self.buffer.convert_in["P"]
+        
+        self.ptype_init_N = (
+            self.ptype.params["N0"].value + self.ptype.params["delta_N"].value
+            ) * self.ptype.convert_in["N"]
 
-        self.init_S = self.rubrene.params["delta_S"].value * self.rubrene.convert_in["S"]
-
-        self.init_D = self.rubrene.params["delta_D"].value * self.rubrene.convert_in["D"]
-
-        self.init_P_up = 0
-
-
+        self.ptype_init_P = (
+            self.ptype.params["P0"].value + self.ptype.params["delta_P"].value
+            ) * self.ptype.convert_in["P"]
     
 
     def uniformize_inits_to_arrays(self):
@@ -48,25 +53,22 @@ class MAPI_Rubrene_Initial_Conditions():
 
             return array_to_check
 
-        mapi_length = len(self.mapi.grid_x_nodes)
-        rubrene_length = len(self.rubrene.grid_x_nodes)
+        ntype_length = len(self.ntype.grid_x_nodes)
+        buffer_length = len(self.buffer.grid_x_nodes)
+        ptype_length = len(self.ptype.grid_x_nodes)
 
-        self.init_N = generate_array_if_not_yet(self.init_N, mapi_length)
-        self.init_P = generate_array_if_not_yet(self.init_P, mapi_length)
-        self.init_T = generate_array_if_not_yet(self.init_T, rubrene_length)
-        self.init_S = generate_array_if_not_yet(self.init_S, rubrene_length)
-        self.init_D = generate_array_if_not_yet(self.init_D, rubrene_length)
-        self.init_P_up = generate_array_if_not_yet(self.init_P_up, rubrene_length)
+        self.ntype_init_N = generate_array_if_not_yet(self.ntype_init_N, ntype_length)
+        self.ntype_init_P = generate_array_if_not_yet(self.ntype_init_P, ntype_length)
+        self.buffer_init_N = generate_array_if_not_yet(self.buffer_init_N, buffer_length)
+        self.buffer_init_P = generate_array_if_not_yet(self.buffer_init_P, buffer_length)
+        self.ptype_init_N = generate_array_if_not_yet(self.ptype_init_N, ptype_length)
+        self.ptype_init_P = generate_array_if_not_yet(self.ptype_init_P, ptype_length)
 
 
     def format_inits_to_dict(self):
         """Returning the calculated initial arrays
         organized in a dictionary as per contract."""
         return {
-            "N": self.init_N,
-            "P": self.init_P,
-            "T": self.init_T,
-            "delta_S": self.init_S,
-            "delta_D": self.init_D,
-            "P_up": self.init_P_up
+            "N": np.hstack([self.ntype_init_N, self.buffer_init_N, self.ptype_init_N]),
+            "P": np.hstack([self.ntype_init_P, self.buffer_init_P, self.ptype_init_P]),
         }
