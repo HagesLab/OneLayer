@@ -88,7 +88,6 @@ def define_ntype_iconvert_in():
     }
 
 def define_layers():
-    params = define_ntype_params()
     
     # Lists of conversions into and out of TEDs units (e.g. nm/s)
     # from common units (e.g. cm/s)
@@ -100,7 +99,7 @@ def define_layers():
     # we can now initialize the 2 layers with the previously defined components
     layers = {
         "N-type": Layer(
-                dict(params),
+                define_ntype_params(),
                 define_ntype_simulation_outputs("N-type"),
                 define_ntype_calculated_outputs("N-type"),
                 "[nm]",
@@ -108,7 +107,7 @@ def define_layers():
                 iconvert_in
             ),
         "buffer": Layer(
-                dict(params),
+                define_ntype_params(),
                 define_ntype_simulation_outputs("buffer"),
                 define_ntype_calculated_outputs("buffer"),
                 "[nm]",
@@ -116,7 +115,7 @@ def define_layers():
                 iconvert_in
             ),
         "P-type": Layer(
-                dict(params),
+                define_ntype_params(),
                 define_ntype_simulation_outputs("P-type"),
                 define_ntype_calculated_outputs("P-type"),
                 "[nm]",
