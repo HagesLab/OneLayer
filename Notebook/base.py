@@ -353,14 +353,14 @@ class BaseNotebook:
         
         self.LGC_layer_rbtns = {}
         self.LGC_layer_frame_title = tk.Label(self.LGC_layer_frame, text="Apply to layer: ")
-        self.LGC_layer_frame_title.grid(row=0,column=0,columnspan=2)
+        self.LGC_layer_frame_title.grid(row=0,column=0,columnspan=99)
         for i, layer_name in enumerate(LGC_eligible_layers):
             self.LGC_layer_rbtns[layer_name] = tk.ttk.Radiobutton(self.LGC_layer_frame, 
                                                       variable=self.LGC_layer, 
                                                       value=layer_name)
-            self.LGC_layer_rbtns[layer_name].grid(row=i+1,column=0)
+            self.LGC_layer_rbtns[layer_name].grid(row=2,column=i, padx=(10,10))
             layer_rbtn_label = tk.ttk.Label(self.LGC_layer_frame, text=layer_name)
-            layer_rbtn_label.grid(row=i+1,column=1)
+            layer_rbtn_label.grid(row=1,column=i, padx=(10,10))
 
         self.LGC_direction_frame = tk.Frame(self.LGC_frame)
         self.LGC_direction_frame.grid(row=3,column=0,columnspan=3)
