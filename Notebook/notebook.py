@@ -259,9 +259,11 @@ class Notebook(BaseNotebook):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        logger.debug("Using LGC {}".format(self.using_LGC))
-        logger.debug("LGC Options {}".format(self.LGC_options))
-        logger.debug("LGC Values {}".format(self.LGC_values))
+        # logger.debug("Using LGC {}".format(self.using_LGC))
+        # logger.debug("LGC Options {}".format(self.LGC_options))
+        # logger.debug("LGC Values {}".format(self.LGC_values))
+        for layer_name in self.module.layers:
+            logger.info(self.module.layers[layer_name].params)
         return
     
     def change_layer(self, clear=True, update_LGC_display=True):

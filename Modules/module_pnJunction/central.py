@@ -12,7 +12,7 @@ from Modules.module_pnJunction.analysis import submodule_get_overview_analysis
 from Modules.module_pnJunction.analysis import submodule_prep_dataset
 from Modules.module_pnJunction.analysis import submodule_get_timeseries
 from Modules.module_pnJunction.analysis import submodule_get_IC_carry
-from Modules.module_pnJunction.simulations import OdeTwoLayerSimulation
+from Modules.module_pnJunction.simulations import OdePNJunctionSimulation
 
 
 
@@ -47,18 +47,15 @@ class PN_Junction(OneD_Model):
         return pnjunction_inits.format_inits_to_dict()
 
 
-    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, rtol, atol, init_conditions):
         """Calls ODEINT solver."""
-        mapi = self.layers["MAPI"]
-        rubrene = self.layers["Rubrene"]
-        for param_name, param in mapi.params.items():
-            param.value *= mapi.convert_in[param_name]
-            
-        for param_name, param in rubrene.params.items():
-            param.value *= rubrene.convert_in[param_name]
-
-        ode_two_layer = OdeTwoLayerSimulation(mapi, rubrene, m, flags, init_conditions)
-        ode_two_layer.simulate(data_path, n, dt, hmax_)
+        for layer_name in self.layers:
+            layer = self.layers[layer_name]
+            for param_name, param in layer.params.items():
+                param.value *= layer.convert_in[param_name]
+        
+        ode_junction = OdePNJunctionSimulation(self.layers, m, flags, init_conditions)
+        ode_junction.simulate(data_path, n, dt, hmax_, rtol, atol)
 
 
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):

@@ -17,11 +17,11 @@ def define_ntype_params():
         "Cn":Parameter(units="[cm^6 / s]", is_edge=False, valid_range=(0,np.inf)),
         "Cp":Parameter(units="[cm^6 / s]", is_edge=False, valid_range=(0,np.inf)),
         "temperature":Parameter(units="[K]", is_edge=True, valid_range=(0,np.inf)), 
-        "rel_permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
+        "rel_permitivity":Parameter(units="", is_edge=False, valid_range=(0,np.inf)), 
         "delta_N":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)), 
         "delta_P":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)), 
-        "Eg":Parameter(units="[eV]", is_edge=True), 
-        "electron_affinity":Parameter(units="[eV]", is_edge=True)
+        "Eg":Parameter(units="[eV]", is_edge=False), 
+        "electron_affinity":Parameter(units="[eV]", is_edge=False)
     }
 
 
