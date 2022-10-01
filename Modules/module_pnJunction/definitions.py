@@ -20,6 +20,8 @@ def define_ntype_params():
         "rel_permitivity":Parameter(units="", is_edge=True, valid_range=(0,np.inf)), 
         "delta_N":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)), 
         "delta_P":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)), 
+        "Eg":Parameter(units="[eV]", is_edge=True), 
+        "electron_affinity":Parameter(units="[eV]", is_edge=True)
     }
 
 
@@ -58,6 +60,7 @@ def define_ntype_convert_in():
         "rel_permitivity":1,
         "delta_N": ((1e-7) ** 3),
         "delta_P": ((1e-7) ** 3),
+        "Eg": 1, "electron_affinity": 1,
         "avg_delta_N": ((1e-7) ** 3),
         "N": ((1e-7) ** 3),
         "P": ((1e-7) ** 3),           # [cm^-3] to [nm^-3]
