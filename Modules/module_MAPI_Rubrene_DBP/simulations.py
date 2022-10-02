@@ -90,7 +90,8 @@ class OdeTwoLayerSimulation():
         if self.do_seq_charge_transfer: self.init_P_up = init_conditions.get("P_up", 0)
 
 
-    def simulate(self, data_path: str, time_step_number: int, time_step_size: float, hmax_ = 0):
+    def simulate(self, data_path: str, time_step_number: int, time_step_size: float, hmax_ = 0,
+                 rtol_=1e-5, atol_=1e-8):
         """
         Master function for MAPI_Rubrene_DBP module simulation.
         Problem statement:
