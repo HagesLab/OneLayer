@@ -131,8 +131,7 @@ class PlotSummaryPopup(Popup):
     def determine_shared_params(self, all_layers):
         """ Shared parameters are treated specially by the all_layers option. """
         if all_layers:
-            shared_params = set.intersection(*[set(self.nb.module.layers[layer].params.keys())
-                                              for layer in self.nb.module.layers])
+            shared_params = self.nb.module.report_shared_params()
         else:
             shared_params = []
             

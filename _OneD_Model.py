@@ -240,6 +240,42 @@ class OneD_Model:
             mssg.append("#########")
         return "\n".join(mssg)
     
+    def report_shared_params(self):
+        """
+        A shared parameter is one that is tracked in every layer defined by a module.
+        An example would be mu_N in the PN-junction, in which the n-type, buffer, and p-type
+        layers all have this parameter defined.
+        
+        This function returns a list of all such shared parameters.
+
+        Returns
+        -------
+        set
+            List of shared parameters (see above definition).
+
+        """
+        
+        return set.intersection(*[set(self.layers[layer].params.keys())
+                                          for layer in self.layers])
+    
+    def report_shared_s_outputs(self):
+        """
+        Same as report_shared_params, but for s_outputs.
+
+        """
+        
+        return set.intersection(*[set(self.layers[layer].s_outputs.keys())
+                                          for layer in self.layers])
+    
+    def report_shared_c_outputs(self):
+        """
+        Same as report_shared_params, but for c_outputs.
+
+        """
+        
+        return set.intersection(*[set(self.layers[layer].c_outputs.keys())
+                                          for layer in self.layers])
+    
     def calc_inits(self):
         """
         Uses the self.param_dict to calculate initial conditions for ODEINT.
