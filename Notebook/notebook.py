@@ -1537,12 +1537,55 @@ class Notebook(BaseNotebook):
     ## Plotter for simulation tab    
     def update_sim_plots(self, index, failed_vars, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
+        # TODO: 
+        shared_outputs = self.module.report_shared_s_outputs()
+        any_layer_name = next(iter(self.module.layers))
+        convert_out = self.module.layers[any_layer_name].convert_out
+        for variable in shared_outputs:
+            output_obj = self.module.layers[any_layer_name].s_outputs[variable]
+            plot = self.sim_subplots[variable]
+            
+            if do_clear_plots: 
+                plot.cla()
+
+                ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
+                ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
+                plot.set_ylim(ymin * convert_out[variable], 
+                              ymax * convert_out[variable])
+                
+            plot.set_yscale(output_obj.yscale)
+            shared_x = []
+            cml_total_length = 0
+            for layer_name in self.module.layers:
+                layer = self.module.layers[layer_name]
+                
+                if output_obj.is_edge:
+                    grid_x = layer.grid_x_edges
+                    if cml_total_length == 0:
+                        grid_x = grid_x[:-1]
+                else:
+                    grid_x = layer.grid_x_nodes
+                    
+                shared_x.append(grid_x + cml_total_length)
+    
+                cml_total_length += layer.total_length
+            shared_x = np.hstack(shared_x)
+                
+            if not failed_vars[variable]:
+                plot.plot(shared_x, self.sim_data[variable] * convert_out[variable])
+
+            plot.set_xlabel("x {}".format(self.module.layers[any_layer_name].length_unit))
+            plot.set_ylabel("{} {}".format(variable, output_obj.units))
+
+            plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
+                
         
         for layer_name, layer in self.module.layers.items():
             convert_out = layer.convert_out
             for variable, output_obj in layer.s_outputs.items():
-                
-                plot = self.sim_subplots[layer_name][variable]
+                if variable in shared_outputs:
+                    continue
+                plot = self.sim_subplots[variable]
                 
                 if do_clear_plots: 
                     plot.cla()
