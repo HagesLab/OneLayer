@@ -3849,33 +3849,41 @@ class Notebook(BaseNotebook):
         # TODO: Handle shared params
         try:
             # Has an overview been calculated?
-            self.overview_values
+            if not hasattr(self, "overview_values"): raise AttributeError
         except AttributeError:
             return
         
         output_name = self.overview_var_selection.get()
         
-        layer_name, output_name = output_name.split(": ")
+        is_shared = ":" not in output_name
+        if is_shared:
+            layer_name = "__SHARED__"
+        else:
+            layer_name, output_name = output_name.split(": ")
+        
         paired_data = self.overview_values[layer_name][output_name]
-
         if not isinstance(paired_data, np.ndarray):
             logger.info("No data found for export")
             return
         
         # Grab x axis from matplotlib by force
-        grid_x = self.overview_subplots[layer_name][output_name].lines[0]._xorig
+        if is_shared:
+            grid_x = self.shared_overview_subplots[output_name].lines[0]._xorig
+        else:
+            grid_x = self.overview_subplots[layer_name][output_name].lines[0]._xorig
         paired_data = np.vstack((grid_x, paired_data)).T
         
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
                                                           title="Save data", 
                                                           filetypes=[("csv (comma-separated-values)","*.csv")])
+        header = ["z"] + [f"t{i+1}" for i in range(len(paired_data[0]) - 1)]
         # Export to .csv
         if export_filename:
             try:
                 if export_filename.endswith(".csv"): 
                     export_filename = export_filename[:-4]
                 np.savetxt("{}.csv".format(export_filename), paired_data, 
-                           delimiter=',')
+                           delimiter=',', header=",".join(header))
                 logger.info("Export from overview complete")
             except PermissionError:
                 logger.error("Error: unable to access export destination")
