@@ -32,7 +32,7 @@ from GUI_structs import Raw_Data_Set
 from GUI_structs import Integrated_Data_Set
 from utils import to_index
 from utils import to_pos
-from utils import to_array
+from utils import to_array, generate_shared_x_array
 from utils import get_all_combinations
 from utils import autoscale
 from utils import new_integrate       
@@ -262,8 +262,8 @@ class Notebook(BaseNotebook):
         # logger.debug("Using LGC {}".format(self.using_LGC))
         # logger.debug("LGC Options {}".format(self.LGC_options))
         # logger.debug("LGC Values {}".format(self.LGC_values))
-        for layer_name in self.module.layers:
-            logger.info(self.module.layers[layer_name].params)
+        logger.info(self.module.report_shared_s_outputs())
+        logger.info(self.module.report_shared_c_outputs())
         return
     
     def change_layer(self, clear=True, update_LGC_display=True):
@@ -1537,39 +1537,35 @@ class Notebook(BaseNotebook):
     ## Plotter for simulation tab    
     def update_sim_plots(self, index, failed_vars, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
-        # TODO: 
+
         shared_outputs = self.module.report_shared_s_outputs()
-        any_layer_name = next(iter(self.module.layers))
-        convert_out = self.module.layers[any_layer_name].convert_out
+        if len(shared_outputs) > 0:
+            any_layer_name = next(iter(self.module.layers))
+            convert_out = self.module.layers[any_layer_name].convert_out
+            total_lengths = [self.module.layers[layer_name].total_length
+                             for layer_name in self.module.layers]
+        
         for variable in shared_outputs:
             output_obj = self.module.layers[any_layer_name].s_outputs[variable]
             plot = self.sim_subplots[variable]
             
             if do_clear_plots: 
                 plot.cla()
-
                 ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
                 ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
                 plot.set_ylim(ymin * convert_out[variable], 
                               ymax * convert_out[variable])
                 
             plot.set_yscale(output_obj.yscale)
-            shared_x = []
-            cml_total_length = 0
-            for layer_name in self.module.layers:
-                layer = self.module.layers[layer_name]
+            if output_obj.is_edge:
+                grids_x = [self.module.layers[layer_name].grid_x_edges
+                           for layer_name in self.module.layers]
+            else:
+                grids_x = [self.module.layers[layer_name].grid_x_nodes
+                           for layer_name in self.module.layers]
                 
-                if output_obj.is_edge:
-                    grid_x = layer.grid_x_edges
-                    if cml_total_length == 0:
-                        grid_x = grid_x[:-1]
-                else:
-                    grid_x = layer.grid_x_nodes
-                    
-                shared_x.append(grid_x + cml_total_length)
-    
-                cml_total_length += layer.total_length
-            shared_x = np.hstack(shared_x)
+            shared_x = generate_shared_x_array(output_obj.is_edge,
+                                               grids_x, total_lengths)
                 
             if not failed_vars[variable]:
                 plot.plot(shared_x, self.sim_data[variable] * convert_out[variable])
@@ -1619,7 +1615,7 @@ class Notebook(BaseNotebook):
         with open(path, "r") as ifstream:
             param_values_dict = {}
             flag_values_dict = {}
-
+            layer_names = []
             read_flag = 0
         
             if not ("$$ METADATA") in next(ifstream):
@@ -1639,6 +1635,7 @@ class Notebook(BaseNotebook):
                 elif "L$" in line:
                     layer_name = line[line.find(":")+1:].strip(' \n')
                     param_values_dict[layer_name] = {}
+                    layer_names.append(layer_name)
                     continue
                 
                 elif "p$ Space Grid" in line:
@@ -1684,7 +1681,7 @@ class Notebook(BaseNotebook):
 
         for layer_name, layer in param_values_dict.items():
             assert set(self.module.layers[layer_name].params.keys()).issubset(set(param_values_dict[layer_name].keys())), "Error: metadata is missing params"
-        return param_values_dict, flag_values_dict, total_time, dt
+        return layer_names, param_values_dict, flag_values_dict, total_time, dt
 
 
     def plot_overview_analysis(self):
@@ -1700,7 +1697,7 @@ class Notebook(BaseNotebook):
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
         
         try:
-            param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
+            layer_names, param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
                  
             data_n = int(0.5 + total_time / dt)
             data_m = {}
@@ -1747,6 +1744,17 @@ class Notebook(BaseNotebook):
                     hide_cancel=True)
             return
         
+        for output_name, plot_obj in self.shared_overview_subplots.items():
+            output_info_obj = self.module.layers[layer_names[0]].outputs[output_name]
+            plot_obj.cla()
+            plot_obj.set_yscale(output_info_obj.yscale)
+            plot_obj.set_xlabel(output_info_obj.xlabel)
+            if output_info_obj.xvar == "time":
+                plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.integrated_units))
+            else:
+                plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
+
+        
         for layer_name, layer in self.overview_subplots.items():
             for subplot in layer:
                 plot_obj = layer[subplot]
@@ -1758,7 +1766,7 @@ class Notebook(BaseNotebook):
                     plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.integrated_units))
                 else:
                     plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
-
+        
         self.overview_values = \
             self.module.get_overview_analysis(
                 param_values_dict,
@@ -1770,8 +1778,56 @@ class Notebook(BaseNotebook):
                 data_filename)
         
         warning_msg = ["Error: the following occured while generating the overview"]
+
+        # Handle shared outputs
+        if "__SHARED__" in self.overview_values:
+            any_layer = next(iter(self.module.layers))
+            any_layer = self.module.layers[any_layer]
+            for output_name, output_info in any_layer.outputs.items():
+                try:
+                    values = self.overview_values["__SHARED__"][output_name]
+                    if not isinstance(values, np.ndarray): 
+                        raise KeyError
+                except KeyError:
+                    warning_msg.append("Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.module.system_ID, output_name))
+                    continue
+                except Exception:
+                    warning_msg.append("Error: could not calculate {}".format(output_name))
+                    continue
+                
+                if output_info.xvar == "time":
+                    grid_x = data_node_t
+                elif output_info.xvar == "position":
+                    total_lengths = [param_values_dict[layer_name]["Total_length"]
+                                     for layer_name in layer_names]
+                    
+                    if output_info.is_edge:
+                        grids_x = [data_edge_x[layer_name] for layer_name in layer_names]
+                    else:
+                        grids_x = [data_node_x[layer_name] for layer_name in layer_names]
+
+                    grid_x = generate_shared_x_array(output_info.is_edge,
+                                                     grids_x, total_lengths)
+                else:
+                    warning_msg.append("Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name))
+                    continue
+                
+                if values.ndim == 2: # time/space variant outputs
+                    for i in range(len(values)):
+                        self.shared_overview_subplots[output_name].plot(grid_x, values[i], 
+                                                                             label="{:.3f} ns".format(tstep_list[i] * dt))
+                else: # Time variant only
+                    self.shared_overview_subplots[output_name].plot(grid_x, values)
+                    
+            for output_name in any_layer.s_outputs:
+                self.shared_overview_subplots[output_name].legend().set_draggable(True)
+                break
+                
         for layer_name, layer in self.module.layers.items():
             for output_name, output_info in layer.outputs.items():
+                if output_name in self.shared_overview_subplots:
+                    continue
+                
                 try:
                     values = self.overview_values[layer_name][output_name]
                     if not isinstance(values, np.ndarray): 
@@ -1800,8 +1856,9 @@ class Notebook(BaseNotebook):
 
         for layer_name, layer in self.module.layers.items():
             for output_name in layer.s_outputs:
-                self.overview_subplots[layer_name][output_name].legend().set_draggable(True)
-                break
+                if output_name not in self.shared_overview_subplots:
+                    self.overview_subplots[layer_name][output_name].legend().set_draggable(True)
+                    break
         if len(warning_msg) > 1:
             self.do_confirmation_popup("\n".join(warning_msg),hide_cancel=True)
             
@@ -1873,7 +1930,7 @@ class Notebook(BaseNotebook):
         active_plot = self.analysis_plots[plot_ID]
 
         try:
-            param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
+            layer_names, param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
             data_m = {}
             data_edge_x = {}
             data_node_x = {}
@@ -3789,6 +3846,7 @@ class Notebook(BaseNotebook):
                 self.write(self.analysis_status, "Error: unable to access PL export destination")
             
     def export_overview(self):
+        # TODO: Handle shared params
         try:
             # Has an overview been calculated?
             self.overview_values

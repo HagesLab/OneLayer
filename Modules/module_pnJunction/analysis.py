@@ -4,12 +4,12 @@ import tables
 from scipy import integrate as intg
 from io_utils import u_read
 from utils import to_index, new_integrate
-from Modules.module_MAPI_Rubrene_DBP.calculations import radiative_recombination
-from Modules.module_MAPI_Rubrene_DBP.calculations import prep_PL
-from Modules.module_MAPI_Rubrene_DBP.calculations import tau_diff
-from Modules.module_MAPI_Rubrene_DBP.calculations import E_field_r
-from Modules.module_MAPI_Rubrene_DBP.calculations import TTA
-from Modules.module_MAPI_Rubrene_DBP.calculations import CalculatedOutputs
+# from Modules.module_pnJunction.calculations import radiative_recombination
+# from Modules.module_pnJunction.calculations import prep_PL
+# from Modules.module_pnJunction.calculations import tau_diff
+# from Modules.module_pnJunction.calculations import E_field_r
+# from Modules.module_pnJunction.calculations import TTA
+from Modules.module_pnJunction.calculations import CalculatedOutputs
 
 
 def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
@@ -20,34 +20,30 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
     non-radiative (SRH model) recombination,
     
     Integrates over nanowire length: PL due to
-    radiative recombination, waveguiding, and carrier regeneration."""
-    # Must return: a dict indexed by output names in self.output_dict containing 1- or 2D numpy arrays
-
-    mapi = layers["MAPI"]
-    mapi_params = params["MAPI"]
-    mapi_length = mapi_params["Total_length"]
-    dm = mapi_params["Node_width"]
+    radiative recombination, waveguiding, and carrier regeneration.
     
-    ru = layers["Rubrene"]
-    ru_params = params["Rubrene"]
-    ru_length = ru_params["Total_length"]
-    df = ru_params["Node_width"]
+    Since all outputs are shared in this module, we will plot all layers on single plots
+    and integrals will be over all three layers.
+    """
 
-    data_dict = {"MAPI":{}, "Rubrene":{}}
+
+    data_dict = {"__SHARED__":{}}
+    
+    any_layer = next(iter(layers))
+    any_layer = layers[any_layer]
+    
+    convert_out = any_layer.convert_out
+    for raw_output_name in any_layer.s_outputs:
         
-    for layer_name, layer in layers.items():
-        for raw_output_name in layer.s_outputs:
-            if not flags.get("do_sct") and raw_output_name == "P_up": continue # Skip, SRH model doesn't have P_up
-            
-            data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
-                                                    raw_output_name)
-            data = []
-            for tstep in tsteps:
-                data.append(u_read(data_filename, t0=tstep, single_tstep=True))
-            
-            data_dict[layer_name][raw_output_name] = np.array(data)
+        data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base, 
+                                                raw_output_name)
+        data = []
+        for tstep in tsteps:
+            data.append(u_read(data_filename, t0=tstep, single_tstep=True))
+        
+        data_dict["__SHARED__"][raw_output_name] = np.array(data)
                 
-
+    """
     calculated_outputs = CalculatedOutputs(data_dict["MAPI"], data_dict["Rubrene"],
                                            mapi_params, ru_params)
     data_dict["MAPI"]["E_field"] = calculated_outputs.E_field()
@@ -94,56 +90,15 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
         
     data_dict["Rubrene"]["TTA"] = calculated_outputs.TTA(temp_T)
     ##################
-    
-    #### Efficiencies ####
-    with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
-            tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
-        temp_N = np.array(ifstream_N.root.data[:,-1])
-        temp_init_N = np.array(ifstream_N.root.data[0,:])
-        temp_P = np.array(ifstream_P.root.data[:,-1])
-            
-        temp_init_N = intg.trapz(temp_init_N, dx=dm)
-        
-    if flags.get("do_sct"):
-        with tables.open_file(os.path.join(data_dirname, file_name_base + "-P_up.h5"), mode='r') as ifstream_Q:
-            temp_P_up = np.array(ifstream_Q.root.data[:, 0])
-        
-        
-    tail_n0 = mapi_params["N0"]
-    if isinstance(tail_n0, np.ndarray):
-        tail_n0 = tail_n0[-1]
-        
-    tail_p0 = mapi_params["P0"]
-    if isinstance(tail_p0, np.ndarray):
-        tail_p0 = tail_p0[-1]
 
-    if flags.get("no_upconverter"):
-        t_form = temp_N * 0
-    else:
-        if flags.get("do_sct"):
-            # TODO: Verify this is correct for the seq charge transfer
-            t_form = ru_params["Ssct"] * (temp_N * temp_P_up)
-        else:
-            t_form = ru_params["St"] * ((temp_N * temp_P - tail_n0 * tail_p0)
-                                        / (temp_N + temp_P))
-    
-    with np.errstate(invalid='ignore', divide='ignore'):
-        data_dict["Rubrene"]["T_form_eff"] =  np.where(temp_init_N==0, 0, t_form / temp_init_N)
-        data_dict["Rubrene"]["T_anni_eff"] = np.where(t_form==0, 0, data_dict["Rubrene"]["TTA"] / t_form)
-        data_dict["Rubrene"]["S_up_eff"] = data_dict["Rubrene"]["T_anni_eff"] * data_dict["Rubrene"]["T_form_eff"]
-        data_dict["MAPI"]["eta_MAPI"] = np.where(temp_init_N==0, 0, data_dict["MAPI"]["mapi_PL"] / temp_init_N)
-        data_dict["Rubrene"]["eta_UC"] = np.where(temp_init_N==0, 0, data_dict["Rubrene"]["dbp_PL"] / temp_init_N)
-    
+    """
+    for data in data_dict["__SHARED__"]:
+        data_dict["__SHARED__"][data] *= convert_out[data]
         
-    for data in data_dict["MAPI"]:
-        data_dict["MAPI"][data] *= mapi.convert_out[data]
         
-    for data in data_dict["Rubrene"]:
-        data_dict["Rubrene"][data] *= ru.convert_out[data]
-        
-    data_dict["MAPI"]["mapi_PL"] *= mapi.iconvert_out["mapi_PL"]
-    data_dict["Rubrene"]["dbp_PL"] *= ru.iconvert_out["dbp_PL"]
-    data_dict["Rubrene"]["TTA"] *= ru.iconvert_out["TTA"]
+    # data_dict["MAPI"]["mapi_PL"] *= mapi.iconvert_out["mapi_PL"]
+    # data_dict["Rubrene"]["dbp_PL"] *= ru.iconvert_out["dbp_PL"]
+    # data_dict["Rubrene"]["TTA"] *= ru.iconvert_out["TTA"]
         
     return data_dict
 
