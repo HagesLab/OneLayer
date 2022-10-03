@@ -43,12 +43,13 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
         
         data_dict["__SHARED__"][raw_output_name] = np.array(data)
                 
+    
+    calculated_outputs = CalculatedOutputs(data_dict["__SHARED__"], params, any_layer)
+    
+    #data_dict["MAPI"]["E_field"] = calculated_outputs.E_field()
+    data_dict["__SHARED__"]["delta_N"] = calculated_outputs.delta_n()
+    data_dict["__SHARED__"]["delta_P"] = calculated_outputs.delta_p()
     """
-    calculated_outputs = CalculatedOutputs(data_dict["MAPI"], data_dict["Rubrene"],
-                                           mapi_params, ru_params)
-    data_dict["MAPI"]["E_field"] = calculated_outputs.E_field()
-    data_dict["MAPI"]["delta_N"] = calculated_outputs.delta_n()
-    data_dict["MAPI"]["delta_P"] = calculated_outputs.delta_p()
     data_dict["MAPI"]["RR"] = calculated_outputs.radiative_recombination()
     data_dict["MAPI"]["NRR"] = calculated_outputs.nonradiative_recombination()
             

@@ -1,5 +1,5 @@
 import numpy as np
-from utils import to_pos, to_index, new_integrate
+from utils import to_pos, to_index, new_integrate, to_array, generate_shared_x_array
 from scipy import integrate as intg
 
 q = 1.0                     #[e]
@@ -78,14 +78,14 @@ def E_field_r(sim_outputs, params):
     return E_field
 
 
-def delta_n(sim_outputs, params):
+def delta_n(N, n0):
     """Calculate above-equilibrium electron density from N, n0"""
-    return sim_outputs["N"] - params["N0"]
+    return N - n0
 
 
-def delta_p(sim_outputs, params):
+def delta_p(P, p0):
     """Calculate above-equilibrium hole density from P, p0"""
-    return sim_outputs["P"] - params["P0"]
+    return P - p0
 
 
 def delta_T(sim_outputs, params):
@@ -194,25 +194,33 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
 
 class CalculatedOutputs():
     
-    def __init__(self, mapi_sim_outputs, ru_sim_outputs, mapi_params, rubrene_params):
-        self.mapi_sim_outputs = mapi_sim_outputs
-        self.mapi_params = mapi_params
-        self.rubrene_sim_outputs = ru_sim_outputs
-        self.rubrene_params = rubrene_params
+    def __init__(self, sim_outputs, params, layer_info):
+        self.sim_outputs = sim_outputs
+        
+        self.layer_names = ["N-type", "buffer", "P-type"]
+        total_lengths = [params[layer_name]["Total_length"]
+                         for layer_name in self.layer_names]
+        
+        self.grid_x_edges = [params[layer_name]['edge_x'] for layer_name in self.layer_names]
+        self.grid_x_nodes = [params[layer_name]['node_x'] for layer_name in self.layer_names]
+
+        # self.grid_x_edges = generate_shared_x_array(True, self.grid_x_edges, total_lengths)
+        # self.grid_x_nodes = generate_shared_x_array(False, self.grid_x_nodes, total_lengths)
+        
+        self.params = params
         
     def E_field(self):
         """Calculate electric field from N, P"""
         return E_field(self.mapi_sim_outputs, self.mapi_params)
 
 
-    def E_field_r(self):
-        """Calculate electric field from T+S+D, Q"""
-        return E_field_r(self.rubrene_sim_outputs, self.rubrene_params)
-
-
     def delta_n(self):
         """Calculate above-equilibrium electron density from N, n0"""
-        return delta_n(self.mapi_sim_outputs, self.mapi_params)
+        n0 = [to_array(self.params[layer_name]['N0'], len(self.grid_x_nodes[i]),
+                       is_edge=False)
+              for i, layer_name in enumerate(self.layer_names)]
+        n0 = generate_shared_x_array(False, n0, total_lengths=None)
+        return delta_n(self.sim_outputs['N'], n0)
     
     def average_delta_n(self, temp_N):
         temp_dN = delta_n({"N":temp_N}, self.mapi_params)
@@ -224,7 +232,11 @@ class CalculatedOutputs():
 
     def delta_p(self):
         """Calculate above-equilibrium hole density from P, p0"""
-        return delta_p(self.mapi_sim_outputs, self.mapi_params)
+        p0 = [to_array(self.params[layer_name]['P0'], len(self.grid_x_nodes[i]),
+                       is_edge=False)
+              for i, layer_name in enumerate(self.layer_names)]
+        p0 = generate_shared_x_array(False, p0, total_lengths=None)
+        return delta_n(self.sim_outputs['P'], p0)
 
 
     def delta_T(self):
