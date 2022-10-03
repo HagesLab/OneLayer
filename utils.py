@@ -38,6 +38,38 @@ def to_array(value, m, is_edge):
     else:
         return value
     
+def generate_shared_x_array(is_edge, grids_x, total_lengths):
+    """
+    Join the grid_x of all layers into a single grid
+
+    Parameters
+    ----------
+    is_edge : bool
+        The is_edge attribute of a Characteristic object.
+    grids_x : list of 1d arrays
+        grid_x for each layer
+    total_lengths : list of floats
+        total lengths of each layer
+
+    Returns
+    -------
+    shared_x : 1d array
+        Concatenated list of position values.
+
+    """
+    shared_x = []
+    cml_total_length = 0
+    for total_length, grid_x in zip(total_lengths, grids_x):
+        if is_edge:
+            if cml_total_length == 0:
+                grid_x = grid_x[:-1]
+            
+        shared_x.append(grid_x + cml_total_length)
+
+        cml_total_length += total_length
+    shared_x = np.hstack(shared_x)
+    return shared_x
+    
 def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node):
     """
     General purpose integration function using scipy.trapz()
