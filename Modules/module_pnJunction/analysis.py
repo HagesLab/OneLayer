@@ -54,6 +54,7 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
     data_dict["__SHARED__"]["NRR"] = calculated_outputs.nonradiative_recombination()
     
     data_dict["__SHARED__"]["voltage"] = calculated_outputs.voltage()
+    data_dict["__SHARED__"]["E_field"] = calculated_outputs.E_field()
     """        
     #### MAPI PL ####
     with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \

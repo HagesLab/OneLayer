@@ -44,51 +44,14 @@ def V_poisson(dx, N, P, n0, p0, eps, V0=0, VL=0):
     # rhs[-1] = rhs[-2]
     return solve_banded((1,1), coef_matrix, rhs)
 
-def E_field(sim_outputs, params):
-    """Calculate electric field from N, P"""
-    eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
-    q_C = 1.602e-19 # [C per carrier]
-    if isinstance(params["rel_permitivity"], np.ndarray):
-        averaged_rel_permitivity = (params["rel_permitivity"][:-1] + np.roll(params["rel_permitivity"], -1)[:-1]) / 2
-    else:
-        averaged_rel_permitivity = params["rel_permitivity"]
-    
-    dEdx = q_C * (
-        delta_p(sim_outputs, params) - delta_n(sim_outputs, params)
-        ) / (eps0 * averaged_rel_permitivity)
-
-    if dEdx.ndim == 1:
-        E_field = np.concatenate(([0], np.cumsum(dEdx) * params["Node_width"])) #[V/nm]
-        #E_field[-1] = 0
-
-    else:
-        E_field = np.concatenate(
-            (np.zeros(len(dEdx)).reshape((len(dEdx), 1)),
-            np.cumsum(dEdx, axis=1) * params["Node_width"])
-            , axis=1) #[V/nm]
-        #E_field[:,-1] = 0
-
-    return E_field
-
-
-def E_field_r(sim_outputs, params):
-    """Calculate electric field from T+S+D, Q"""
-    eps0 = 8.854 * 1e-12 * 1e-9 # [C / V m] to {C / V nm}
-    q_C = 1.602e-19 # [C per carrier]
-    if isinstance(params["uc_permitivity"], np.ndarray):
-        averaged_rel_permitivity = (params["uc_permitivity"][:-1] + np.roll(params["uc_permitivity"], -1)[:-1]) / 2
-    else:
-        averaged_rel_permitivity = params["uc_permitivity"]
-    
-    dEdx = q_C * (sim_outputs["P_up"] - (sim_outputs["T"] - params["T0"] + sim_outputs["delta_S"] + sim_outputs["delta_D"])) / (eps0 * averaged_rel_permitivity)
-    if dEdx.ndim == 1:
-        E_field = np.concatenate(([0], -np.cumsum(dEdx[::-1]) * params["Node_width"]))[::-1] #[V/nm]
-        #E_field[-1] = 0
-    else:
-        E_field = np.concatenate((np.zeros(len(dEdx)).reshape((len(dEdx), 1)), -np.cumsum(dEdx[:, ::-1], axis=1) * params["Node_width"]), axis=1)[:, ::-1] #[V/nm]
-        #E_field[:,-1] = 0
-    return E_field
-
+def E_field_from_V(V, dx):
+    if V.ndim == 2:
+        E = -np.diff(V, axis=1) / dx
+        E = np.concatenate([E[:,:1], E, E[:,-1:]], axis=1)
+    elif V.ndim == 1:
+        E = -np.diff(V) / dx
+        E = np.hstack([E[0], E, E[-1]])
+    return E
 
 def delta_n(N, n0):
     """Calculate above-equilibrium electron density from N, n0"""
@@ -215,7 +178,7 @@ class CalculatedOutputs():
         self.grid_x_edges = [params[layer_name]['edge_x'] for layer_name in self.layer_names]
         self.grid_x_nodes = [params[layer_name]['node_x'] for layer_name in self.layer_names]
         self.dx = np.diff(generate_shared_x_array(True, self.grid_x_edges, total_lengths))
-
+        self.inter_dx = ((self.dx + np.roll(self.dx,-1))/2)[:-1]
         # self.grid_x_edges = generate_shared_x_array(True, self.grid_x_edges, total_lengths)
         # self.grid_x_nodes = generate_shared_x_array(False, self.grid_x_nodes, total_lengths)
         
@@ -239,7 +202,9 @@ class CalculatedOutputs():
         
     def E_field(self):
         """Calculate electric field from N, P"""
-        return E_field(self.mapi_sim_outputs, self.mapi_params)
+        V = self.voltage()
+        
+        return E_field_from_V(V, self.inter_dx)
 
 
     def delta_n(self):
