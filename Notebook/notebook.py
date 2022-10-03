@@ -1701,15 +1701,13 @@ class Notebook(BaseNotebook):
                  
             data_n = int(0.5 + total_time / dt)
             data_m = {}
-            data_edge_x = {}
-            data_node_x = {}
             for layer_name in param_values_dict:
                 total_length = param_values_dict[layer_name]["Total_length"]
                 dx = param_values_dict[layer_name]["Node_width"]
                 data_m[layer_name] = int(0.5 + total_length / dx)
-                data_edge_x[layer_name] = np.linspace(0,  total_length,
+                param_values_dict[layer_name]['edge_x'] = np.linspace(0,  total_length,
                                                       data_m[layer_name]+1)
-                data_node_x[layer_name] = np.linspace(dx / 2, total_length - dx / 2, 
+                param_values_dict[layer_name]['node_x'] = np.linspace(dx / 2, total_length - dx / 2, 
                                                       data_m[layer_name])
             data_node_t = np.linspace(0, total_time, data_n + 1)
             
@@ -1802,9 +1800,9 @@ class Notebook(BaseNotebook):
                                      for layer_name in layer_names]
                     
                     if output_info.is_edge:
-                        grids_x = [data_edge_x[layer_name] for layer_name in layer_names]
+                        grids_x = [param_values_dict[layer_name]['edge_x'] for layer_name in layer_names]
                     else:
-                        grids_x = [data_node_x[layer_name] for layer_name in layer_names]
+                        grids_x = [param_values_dict[layer_name]['node_x'] for layer_name in layer_names]
 
                     grid_x = generate_shared_x_array(output_info.is_edge,
                                                      grids_x, total_lengths)
@@ -1842,7 +1840,7 @@ class Notebook(BaseNotebook):
                 if output_info.xvar == "time":
                     grid_x = data_node_t
                 elif output_info.xvar == "position":
-                    grid_x = data_node_x[layer_name] if not output_info.is_edge else data_edge_x[layer_name]
+                    grid_x = param_values_dict[layer_name]['node_x'] if not output_info.is_edge else param_values_dict[layer_name]['edge_x']
                 else:
                     warning_msg.append("Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name))
                     continue
@@ -1932,15 +1930,14 @@ class Notebook(BaseNotebook):
         try:
             layer_names, param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
             data_m = {}
-            data_edge_x = {}
-            data_node_x = {}
+
             for layer_name in param_values_dict:
                 total_length = param_values_dict[layer_name]["Total_length"]
                 dx = param_values_dict[layer_name]["Node_width"]
                 data_m[layer_name] = int(0.5 + total_length / dx)
-                data_edge_x[layer_name] = \
+                param_values_dict[layer_name]['edge_x'] = \
                     np.linspace(0, total_length, data_m[layer_name]+1)
-                data_node_x[layer_name] = \
+                param_values_dict[layer_name]['node_x'] = \
                     np.linspace(dx/2, total_length-dx/2, data_m[layer_name])
         except AssertionError as oops:
             return str(oops)
@@ -1983,8 +1980,8 @@ class Notebook(BaseNotebook):
         if self.module.layers[where_layer].outputs[datatype].is_edge: 
             return Raw_Data_Set(
                 values,
-                data_edge_x[where_layer],
-                data_node_x[where_layer],
+                param_values_dict[where_layer]['edge_x'],
+                param_values_dict[where_layer]['node_x'],
                 total_time,
                 dt,
                 param_values_dict,
@@ -1995,8 +1992,8 @@ class Notebook(BaseNotebook):
         else:
             return Raw_Data_Set(
                 values,
-                data_node_x[where_layer],
-                data_node_x[where_layer],
+                param_values_dict[where_layer]['node_x'],
+                param_values_dict[where_layer]['node_x'],
                 total_time,
                 dt,
                 param_values_dict,
