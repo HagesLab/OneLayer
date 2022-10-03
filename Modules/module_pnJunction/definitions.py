@@ -33,6 +33,7 @@ def define_ntype_simulation_outputs(layer):
 
 def define_ntype_calculated_outputs(layer):
     return {
+        "voltage":Output("Voltage", units="[V]", integrated_units="[V nm]", xlabel="nm", xvar="position", is_edge=False, layer=layer),
         "E_field":Output("Electric Field", units="[V/nm]", integrated_units="[V]", xlabel="nm", xvar="position",is_edge=True, layer=layer),
         "delta_N":Output("delta_N", units="[cm^-3]", integrated_units="[cm^-2]", xlabel="nm", xvar="position", is_edge=False, layer=layer),
         "delta_P":Output("delta_P", units="[cm^-3]", integrated_units="[cm^-2]", xlabel="nm", xvar="position", is_edge=False, layer=layer),
@@ -64,6 +65,7 @@ def define_ntype_convert_in():
         "avg_delta_N": ((1e-7) ** 3),
         "N": ((1e-7) ** 3),
         "P": ((1e-7) ** 3),           # [cm^-3] to [nm^-3]
+        "voltage": 1,
         "E_field": 1,
         "tau_diff": 1,
     }
@@ -81,6 +83,7 @@ def define_ntype_iconvert_in():
         "P": 1e7,
         "delta_N": 1e7,
         "delta_P": 1e7, # cm to nm
+        "voltage": 1,
         "E_field": 1, # nm to nm
         "RR": 1e7,
         "NRR": 1e7,

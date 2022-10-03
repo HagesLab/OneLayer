@@ -7,8 +7,20 @@ q_C = 1.602e-19             #[C]
 kB = 8.61773e-5             #[eV / K]
 eps0 = 8.854e-12 * 1e-9     #[C/V-m] to [C/V-nm]
 from scipy.linalg import solve_banded
+def V_poisson_2D(dx, N, P, n0, p0, eps, V0=0, VL=0):
+    if N.ndim == 2:
+        num_xsteps = len(N[0])
+        num_tsteps = len(N)
+        V = np.zeros((num_tsteps, num_xsteps))
+        for i in range(len(V)): # For each timestep
+            V[i] = V_poisson(dx, N[i], P[i], n0, p0, eps, V0, VL)
+        return V
+    elif N.ndim == 1:
+        num_xsteps = len(N)
+        V = V_poisson(dx, N, P, n0, p0, eps, V0, VL)
+        return V
 
-def V_poisson(N, P, p, dx):
+def V_poisson(dx, N, P, n0, p0, eps, V0=0, VL=0):
     if N.ndim == 2:
         raise NotImplementedError("Only works with one time step at a time")
     elif N.ndim == 1:
@@ -22,12 +34,12 @@ def V_poisson(N, P, p, dx):
     coef_matrix[1, 1:-1] = -2
     coef_matrix[2, :-2] = 1
     
-    alpha = -(q_C * dx**2) / (p.eps * eps0) # [V nm^3]
+    alpha = -(q_C * dx**2) / (eps * eps0) # [V nm^3]
     
     rhs = np.zeros(num_xsteps)
-    rhs[:] = alpha * ((P - p.p0) - (N - p.n0))
-    rhs[0] = p.V0 # [V]
-    rhs[-1] = p.VL
+    rhs[:] = alpha * ((P - p0) - (N - n0))
+    rhs[0] = V0 # [V]
+    rhs[-1] = VL
     # rhs[0] = rhs[1]
     # rhs[-1] = rhs[-2]
     return solve_banded((1,1), coef_matrix, rhs)
@@ -95,14 +107,13 @@ def delta_T(sim_outputs, params):
 
 def radiative_recombination(sim_outputs, params):
     """Calculate radiative recombination"""
-    return params["B"] * (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"])
-
+    return params['B'] * (sim_outputs['N'] * sim_outputs['P'] - params['N0'] * params['P0'])
 
 def nonradiative_recombination(sim_outputs, params):
     """Calculate nonradiative recombination using SRH model
     Assumes quasi steady state trap level occupation
     """
-    return (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"]) / ((params["tau_N"] * sim_outputs["P"]) + (params["tau_P"] * sim_outputs["N"]))
+    return (sim_outputs['N'] * sim_outputs['P'] - params['N0'] * params['P0']) / ((params['tau_N'] * sim_outputs['P']) + (params['tau_P'] * sim_outputs['N']))
 
 
 def tau_diff(PL, dt):
@@ -203,11 +214,28 @@ class CalculatedOutputs():
         
         self.grid_x_edges = [params[layer_name]['edge_x'] for layer_name in self.layer_names]
         self.grid_x_nodes = [params[layer_name]['node_x'] for layer_name in self.layer_names]
+        self.dx = np.diff(generate_shared_x_array(True, self.grid_x_edges, total_lengths))
 
         # self.grid_x_edges = generate_shared_x_array(True, self.grid_x_edges, total_lengths)
         # self.grid_x_nodes = generate_shared_x_array(False, self.grid_x_nodes, total_lengths)
         
         self.params = params
+        
+    def voltage(self):
+        """Calculate voltage from N, P"""
+        
+        get_these_params = ['N0', 'P0', 'rel_permitivity']
+        these_params = {}
+        
+        for p in get_these_params:
+            these_params[p] = [to_array(self.params[layer_name][p], len(self.grid_x_nodes[i]),
+                                        is_edge=False)
+                               for i, layer_name in enumerate(self.layer_names)]
+            these_params[p] = generate_shared_x_array(False, these_params[p], total_lengths=None)
+        
+        return V_poisson_2D(self.dx, self.sim_outputs['N'], self.sim_outputs['P'], 
+                         these_params['N0'], these_params['P0'], these_params['rel_permitivity'],
+                         V0=0, VL=0)
         
     def E_field(self):
         """Calculate electric field from N, P"""
@@ -239,19 +267,33 @@ class CalculatedOutputs():
         return delta_n(self.sim_outputs['P'], p0)
 
 
-    def delta_T(self):
-        """Calculate above-equilibrium triplet density from T, T0"""
-        return delta_T(self.mapi_sim_outputs, self.mapi_params)
-
-
     def radiative_recombination(self):
         """Calculate radiative recombination."""
-        return radiative_recombination(self.mapi_sim_outputs, self.mapi_params)
+        get_these_params = ['B', 'N0', 'P0']
+        these_params = {}
+        
+        for p in get_these_params:
+            these_params[p] = [to_array(self.params[layer_name][p], len(self.grid_x_nodes[i]),
+                                        is_edge=False)
+                               for i, layer_name in enumerate(self.layer_names)]
+            these_params[p] = generate_shared_x_array(False, these_params[p], total_lengths=None)
+
+
+        return radiative_recombination(self.sim_outputs, these_params)
 
     def nonradiative_recombination(self):
         """Calculate nonradiative recombination using SRH model
         Assumes quasi steady state trap level occupation."""
-        return nonradiative_recombination(self.mapi_sim_outputs, self.mapi_params)
+        get_these_params = ['N0', 'P0', 'tau_N', 'tau_P']
+        these_params = {}
+        
+        for p in get_these_params:
+            these_params[p] = [to_array(self.params[layer_name][p], len(self.grid_x_nodes[i]),
+                                        is_edge=False)
+                               for i, layer_name in enumerate(self.layer_names)]
+            these_params[p] = generate_shared_x_array(False, these_params[p], total_lengths=None)
+
+        return nonradiative_recombination(self.sim_outputs, these_params)
     
     def mapi_PL(self, temp_N, temp_P):
         temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, self.mapi_params)

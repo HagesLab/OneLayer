@@ -49,10 +49,12 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
     #data_dict["MAPI"]["E_field"] = calculated_outputs.E_field()
     data_dict["__SHARED__"]["delta_N"] = calculated_outputs.delta_n()
     data_dict["__SHARED__"]["delta_P"] = calculated_outputs.delta_p()
-    """
-    data_dict["MAPI"]["RR"] = calculated_outputs.radiative_recombination()
-    data_dict["MAPI"]["NRR"] = calculated_outputs.nonradiative_recombination()
-            
+    
+    data_dict["__SHARED__"]["RR"] = calculated_outputs.radiative_recombination()
+    data_dict["__SHARED__"]["NRR"] = calculated_outputs.nonradiative_recombination()
+    
+    data_dict["__SHARED__"]["voltage"] = calculated_outputs.voltage()
+    """        
     #### MAPI PL ####
     with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
         tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
