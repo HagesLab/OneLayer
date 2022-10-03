@@ -46,7 +46,7 @@ class MAPI_Rubrene(OneD_Model):
         return mapi_rubrene_inits.format_inits_to_dict()
 
 
-    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, rtol_, atol_, init_conditions):
         """Calls ODEINT solver."""
         mapi = self.layers["MAPI"]
         rubrene = self.layers["Rubrene"]
@@ -57,7 +57,7 @@ class MAPI_Rubrene(OneD_Model):
             param.value *= rubrene.convert_in[param_name]
 
         ode_two_layer = OdeTwoLayerSimulation(mapi, rubrene, m, flags, init_conditions)
-        ode_two_layer.simulate(data_path, n, dt, hmax_)
+        ode_two_layer.simulate(data_path, n, dt, hmax_, rtol_, atol_)
 
 
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
