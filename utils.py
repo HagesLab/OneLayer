@@ -38,9 +38,11 @@ def to_array(value, m, is_edge):
     else:
         return value
     
-def generate_shared_x_array(is_edge, grids_x, total_lengths):
+def generate_shared_x_array(is_edge, grids_x, total_lengths=None):
     """
     Join the grid_x of all layers into a single grid
+    This can also be used to join params and outputs without offseting each
+    layer by total_lengths - by passing total_lengths as None
 
     Parameters
     ----------
@@ -57,13 +59,17 @@ def generate_shared_x_array(is_edge, grids_x, total_lengths):
         Concatenated list of position values.
 
     """
+    if total_lengths is None:
+        total_lengths = np.zeros(len(grids_x))
+    
     shared_x = []
     cml_total_length = 0
+    first = True
     for total_length, grid_x in zip(total_lengths, grids_x):
         if is_edge:
-            if cml_total_length == 0:
+            if first:
                 grid_x = grid_x[:-1]
-            
+                first = False
         shared_x.append(grid_x + cml_total_length)
 
         cml_total_length += total_length
