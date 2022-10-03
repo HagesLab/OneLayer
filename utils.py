@@ -68,8 +68,10 @@ def generate_shared_x_array(is_edge, grids_x, total_lengths=None):
     for total_length, grid_x in zip(total_lengths, grids_x):
         if is_edge:
             if first:
-                grid_x = grid_x[:-1]
                 first = False
+            else:
+                grid_x = grid_x[1:]
+
         shared_x.append(grid_x + cml_total_length)
 
         cml_total_length += total_length
