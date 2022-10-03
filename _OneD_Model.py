@@ -254,6 +254,8 @@ class OneD_Model:
             List of shared parameters (see above definition).
 
         """
+        if len(self.layers) == 1:
+            return {}
         
         return set.intersection(*[set(self.layers[layer].params.keys())
                                           for layer in self.layers])
@@ -263,6 +265,8 @@ class OneD_Model:
         Same as report_shared_params, but for s_outputs.
 
         """
+        if len(self.layers) == 1:
+            return {}
         
         return set.intersection(*[set(self.layers[layer].s_outputs.keys())
                                           for layer in self.layers])
@@ -272,10 +276,12 @@ class OneD_Model:
         Same as report_shared_params, but for c_outputs.
 
         """
+        if len(self.layers) == 1:
+            return {}
         
         return set.intersection(*[set(self.layers[layer].c_outputs.keys())
                                           for layer in self.layers])
-    
+        
     def calc_inits(self):
         """
         Uses the self.param_dict to calculate initial conditions for ODEINT.
@@ -350,10 +356,15 @@ class OneD_Model:
 
         Returns
         -------
-        data_dict : dict {"output name": 1D or 2D numpy array}
+        data_dict : dict {"layer_name" :{"output name": 1D or 2D numpy array}}
             Collection of output data. 1D array if calculated once (e.g. an integral over space) and 2D if calculated at multiple times
             First dimension is time, second dimension is space
-            Must return one entry per output in self.output_dict
+            Must return one dict per layer, each dict with one entry per 
+            simulated or calculated output defined in the layer.
+            
+            Shared outputs (see report_shared_params()) should go into an additional
+            dict with "layer_name" = "__SHARED__".
+            See the PN-Junction module for an example of this.
         """
         data_dict = {}
 
