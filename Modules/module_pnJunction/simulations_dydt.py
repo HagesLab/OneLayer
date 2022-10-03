@@ -27,7 +27,7 @@ def dydt_multi_volts(t,y,G,PA, s, do_ss):
     Jn = np.zeros(G.n_total+1)
     Jp = np.zeros(G.n_total+1)
     
-    V = V_poisson(n, p, PA, G.dx)
+    V = V_poisson(G.dx, n, p, PA.n0, PA.p0, PA.eps, PA.V0, PA.VL)
     
     dVdx = (np.roll(V,-1) - V)[:-1] / G.inter_dx
 
