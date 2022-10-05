@@ -9,7 +9,7 @@ from utils import to_index, new_integrate
 # from Modules.module_pnJunction.calculations import tau_diff
 # from Modules.module_pnJunction.calculations import E_field_r
 # from Modules.module_pnJunction.calculations import TTA
-from Modules.module_pnJunction.calculations import CalculatedOutputs
+from Modules.module_pnJunction.calculations import CalculatedOutputs, tau_diff
 
 
 def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
@@ -55,47 +55,24 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
     
     data_dict["__SHARED__"]["voltage"] = calculated_outputs.voltage()
     data_dict["__SHARED__"]["E_field"] = calculated_outputs.E_field()
-    """        
-    #### MAPI PL ####
+          
+    #### PL ####
     with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
         tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
         temp_N = np.array(ifstream_N.root.data)
         temp_P = np.array(ifstream_P.root.data)
 
-    data_dict["MAPI"]["mapi_PL"] = calculated_outputs.mapi_PL(temp_N, temp_P)
+    data_dict["__SHARED__"]["PL"] = calculated_outputs.PL(temp_N, temp_P)
     
-    data_dict["MAPI"]["avg_delta_N"] = calculated_outputs.average_delta_n(temp_N)
+    data_dict["__SHARED__"]["avg_delta_N"] = calculated_outputs.average_delta_n(temp_N)
     
-    try:
-        data_dict["MAPI"]["tau_diff"] = tau_diff(data_dict["MAPI"]["mapi_PL"], dt)
-    except Exception:
-        print("Error: failed to calculate tau_diff")
-        data_dict["MAPI"]["tau_diff"] = 0
+    #try:
+    data_dict["__SHARED__"]["tau_diff"] = tau_diff(data_dict["__SHARED__"]["PL"], dt)
+    # except Exception:
+    #     print("Error: failed to calculate tau_diff")
+    #     data_dict["__SHARED__"]["tau_diff"] = 0
     #################
-    
-    if flags.get("do_sct"):
-        data_dict["Rubrene"]["E_upc"] = calculated_outputs.E_field_r()
-        
-    # else:
-    #     data_dict["Rubrene"]["E_upc"] = np.zeros_like(data_dict["Rubrene"]["T"])
-    
-    #### DBP PL ####
-    with tables.open_file(os.path.join(data_dirname, file_name_base + "-delta_D.h5"), mode='r') as ifstream_D:
-        temp_D = np.array(ifstream_D.root.data)
-        
-    data_dict["Rubrene"]["dbp_PL"] = calculated_outputs.dbp_PL(temp_D)
-        
-    ################
-    
-    #### TTA Rate ####
-    # "Triplet-Triplet Annihilation"
-    with tables.open_file(os.path.join(data_dirname, file_name_base + "-T.h5"), mode='r') as ifstream_T:
-        temp_T = np.array(ifstream_T.root.data)
-        
-    data_dict["Rubrene"]["TTA"] = calculated_outputs.TTA(temp_T)
-    ##################
 
-    """
     for data in data_dict["__SHARED__"]:
         data_dict["__SHARED__"][data] *= convert_out[data]
         

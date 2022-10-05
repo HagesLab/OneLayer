@@ -108,33 +108,30 @@ def tau_diff(PL, dt):
         dln_PLdt = np.where(dln_PLdt <= 0, 0, -(dln_PLdt ** -1))
     return dln_PLdt
 
-def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
+def prep_PL(rad_rec, i, j, dx, need_extra_node):
     """
     Calculates PL(x,t) given radiative recombination data plus propogation contributions.
 
     Parameters
     ----------
     radRec : 1D or 2D ndarray
-        Radiative Recombination(x,t) values. These can be MAPI carriers or DBP doublets.
+        Radiative Recombination(x,t) values.
     i : int
         Leftmost node index to calculate for.
     j : int
         Rightmost node index to calculate for.
+    dx : int
+        Node width.
     need_extra_node : bool
         Whether the 'j+1'th node should be considered.
         Most slices involving the index j should include j+1 too
-    params : dict {"param name":float or 1D ndarray}
-        Collection of parameters from metadata
-    layer : str
-        Whether to calculate for layer MAPI or layer DBP.
     Returns
     -------
     PL_base : 2D ndarray
         PL(x,t)
 
     """
-    
-    dx = params["Node_width"]
+
     
     lbound = to_pos(i, dx)
     if need_extra_node:
@@ -157,11 +154,8 @@ def prep_PL(rad_rec, i, j, need_extra_node, params, layer):
         if len(distance) > len(rad_rec[0]):
             distance = distance[:len(rad_rec[0])]
             
-    if layer == "MAPI":
-        PL_base = (rad_rec)
-        
-    elif layer == "Rubrene":
-        PL_base = rad_rec / params["tau_D"]
+    PL_base = (rad_rec)
+
     
     return PL_base
 
@@ -172,22 +166,19 @@ class CalculatedOutputs():
         self.sim_outputs = sim_outputs
         
         self.layer_names = ["N-type", "buffer", "P-type"]
-        total_lengths = [params[layer_name]["Total_length"]
-                         for layer_name in self.layer_names]
+        self.total_lengths = [params[layer_name]["Total_length"]
+                              for layer_name in self.layer_names]
         
         self.grid_x_edges = [params[layer_name]['edge_x'] for layer_name in self.layer_names]
         self.grid_x_nodes = [params[layer_name]['node_x'] for layer_name in self.layer_names]
-        self.dx = np.diff(generate_shared_x_array(True, self.grid_x_edges, total_lengths))
+        self.dx = np.diff(generate_shared_x_array(True, self.grid_x_edges, self.total_lengths))
         self.inter_dx = ((self.dx + np.roll(self.dx,-1))/2)[:-1]
         # self.grid_x_edges = generate_shared_x_array(True, self.grid_x_edges, total_lengths)
         # self.grid_x_nodes = generate_shared_x_array(False, self.grid_x_nodes, total_lengths)
         
         self.params = params
         
-    def voltage(self):
-        """Calculate voltage from N, P"""
-        
-        get_these_params = ['N0', 'P0', 'rel_permitivity']
+    def get_stitched_params(self, get_these_params):
         these_params = {}
         
         for p in get_these_params:
@@ -195,6 +186,13 @@ class CalculatedOutputs():
                                         is_edge=False)
                                for i, layer_name in enumerate(self.layer_names)]
             these_params[p] = generate_shared_x_array(False, these_params[p], total_lengths=None)
+        
+        return these_params
+    
+    def voltage(self):
+        """Calculate voltage from N, P"""
+        get_these_params = ['N0', 'P0', 'rel_permitivity']
+        these_params = self.get_stitched_params(get_these_params)
         
         return V_poisson_2D(self.dx, self.sim_outputs['N'], self.sim_outputs['P'], 
                          these_params['N0'], these_params['P0'], these_params['rel_permitivity'],
@@ -209,40 +207,34 @@ class CalculatedOutputs():
 
     def delta_n(self):
         """Calculate above-equilibrium electron density from N, n0"""
-        n0 = [to_array(self.params[layer_name]['N0'], len(self.grid_x_nodes[i]),
-                       is_edge=False)
-              for i, layer_name in enumerate(self.layer_names)]
-        n0 = generate_shared_x_array(False, n0, total_lengths=None)
-        return delta_n(self.sim_outputs['N'], n0)
+        get_these_params = ['N0']
+        these_params = self.get_stitched_params(get_these_params)
+
+        return delta_n(self.sim_outputs['N'], these_params['N0'])
     
     def average_delta_n(self, temp_N):
-        temp_dN = delta_n({"N":temp_N}, self.mapi_params)
-        temp_dN = intg.trapz(temp_dN, dx=self.mapi_params["Node_width"], axis=1)
-        temp_dN /= self.mapi_params["Total_length"]
+        get_these_params = ['N0']
+        these_params = self.get_stitched_params(get_these_params)
+        node_list = generate_shared_x_array(False, self.grid_x_nodes, self.total_lengths)
+        
+        temp_dN = delta_n(temp_N, these_params['N0'])
+        temp_dN = intg.trapz(temp_dN, x=node_list, axis=1)
+        temp_dN /= sum(self.total_lengths)
         
         return temp_dN
 
 
     def delta_p(self):
         """Calculate above-equilibrium hole density from P, p0"""
-        p0 = [to_array(self.params[layer_name]['P0'], len(self.grid_x_nodes[i]),
-                       is_edge=False)
-              for i, layer_name in enumerate(self.layer_names)]
-        p0 = generate_shared_x_array(False, p0, total_lengths=None)
-        return delta_n(self.sim_outputs['P'], p0)
+        get_these_params = ['P0']
+        these_params = self.get_stitched_params(get_these_params)
+        return delta_p(self.sim_outputs['P'], these_params['P0'])
 
 
     def radiative_recombination(self):
         """Calculate radiative recombination."""
         get_these_params = ['B', 'N0', 'P0']
-        these_params = {}
-        
-        for p in get_these_params:
-            these_params[p] = [to_array(self.params[layer_name][p], len(self.grid_x_nodes[i]),
-                                        is_edge=False)
-                               for i, layer_name in enumerate(self.layer_names)]
-            these_params[p] = generate_shared_x_array(False, these_params[p], total_lengths=None)
-
+        these_params = self.get_stitched_params(get_these_params)
 
         return radiative_recombination(self.sim_outputs, these_params)
 
@@ -250,38 +242,30 @@ class CalculatedOutputs():
         """Calculate nonradiative recombination using SRH model
         Assumes quasi steady state trap level occupation."""
         get_these_params = ['N0', 'P0', 'tau_N', 'tau_P']
-        these_params = {}
+        these_params = self.get_stitched_params(get_these_params)
         
-        for p in get_these_params:
-            these_params[p] = [to_array(self.params[layer_name][p], len(self.grid_x_nodes[i]),
-                                        is_edge=False)
-                               for i, layer_name in enumerate(self.layer_names)]
-            these_params[p] = generate_shared_x_array(False, these_params[p], total_lengths=None)
-
         return nonradiative_recombination(self.sim_outputs, these_params)
     
-    def mapi_PL(self, temp_N, temp_P):
-        temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, self.mapi_params)
-        mapi_thickness = self.mapi_params["Total_length"]
-        dm = self.mapi_params["Node_width"]
-        PL_base = prep_PL(temp_RR, 0, to_index(mapi_thickness, dm, mapi_thickness), 
-                            False, self.mapi_params, "MAPI")
+    def PL(self, temp_N, temp_P):
+        get_these_params = ['B', 'N0', 'P0']
+        these_params = self.get_stitched_params(get_these_params)
         
-        return new_integrate(PL_base, 0, mapi_thickness, dm, mapi_thickness, False)
-    
-    def dbp_PL(self, temp_D):
-        ru_thickness = self.rubrene_params["Total_length"]
-        df = self.rubrene_params["Node_width"]
+        temp_RR = radiative_recombination({"N":temp_N, "P":temp_P}, these_params)
         
-        temp_D = prep_PL(temp_D, 0, to_index(ru_thickness, df, ru_thickness), 
-                            False, self.rubrene_params, "Rubrene")
-
-        return new_integrate(temp_D, 0, ru_thickness, df, ru_thickness, False)
-
-    def TTA(self, temp_T):
-        ru_thickness = self.rubrene_params["Total_length"]
-        df = self.rubrene_params["Node_width"]
-        temp_T = TTA(temp_T, 0, to_index(ru_thickness, df, ru_thickness), 
-                        False, self.rubrene_params)
-
-        return new_integrate(temp_T, 0, ru_thickness, df, ru_thickness, False)
+        # Integrate PL separately for each layer
+        # TODO: This for all layers at once using the variable dx grid,
+        # so we don't have to awkwardly break RR into individual layer contributions
+        # by calculating indices l and r
+        l = 0
+        r = 0
+        integral_PL = np.zeros_like(temp_RR[:, 0])
+        for i in range(len(self.layer_names)):
+            r += len(self.grid_x_nodes[i])
+            thickness = self.total_lengths[i]
+            dx_len = self.grid_x_edges[i][1] - self.grid_x_edges[i][0]
+            PL_base = prep_PL(temp_RR[:, l:r+1], 0, to_index(thickness, dx_len, thickness),
+                              dx_len, False)
+            l = r
+            integral_PL += new_integrate(PL_base, 0, thickness, dx_len, thickness, False)
+            
+        return integral_PL
