@@ -1817,7 +1817,7 @@ class Notebook(BaseNotebook):
             logger.error("Error #106: Plot failed")
 
 
-    def make_rawdataset(self, data_filename, plot_ID, datatype):
+    def make_rawdataset(self, data_filename, plot_ID, datatype, target_layer):
         """Create a dataset object and prepare to plot on analysis tab."""
         # Select data type of incoming dataset from existing datasets
         active_plot = self.analysis_plots[plot_ID]
@@ -1838,7 +1838,20 @@ class Notebook(BaseNotebook):
             return str(oops)
         except Exception:
             return "Error: missing or has unusual metadata.txt"
-
+        
+        if target_layer == "__SHARED__":
+            any_layer = next(iter(self.module.layers))
+            is_edge = self.module.layers[any_layer].outputs[datatype].is_edge
+        else:
+            is_edge = self.module.layers[target_layer].outputs[datatype].is_edge
+            
+        if target_layer == "__SHARED__":
+            edges_x = [param_values_dict[layer_name]['edge_x'] for layer_name in layer_names]
+            nodes_x = [param_values_dict[layer_name]['node_x'] for layer_name in layer_names]
+            total_lengths = [param_values_dict[layer_name]['Total_length'] for layer_name in layer_names]
+            param_values_dict["__SHARED__"]["edge_x"] = generate_shared_x_array(True, edges_x, total_lengths)
+            param_values_dict["__SHARED__"]["node_x"] = generate_shared_x_array(False, nodes_x, total_lengths)
+            
 		# Now that we have the parameters from metadata, fetch the data itself
         sim_data = {}
         for layer_name, layer in self.module.layers.items():
@@ -1854,10 +1867,11 @@ class Notebook(BaseNotebook):
                         u_read(path_name, t0=0, single_tstep=True)
                 except OSError:
                     continue
-        where_layer = self.module.find_layer(datatype)
+        
         try:
             values = self.module.prep_dataset(
                 datatype,
+                target_layer,
                 sim_data,
                 param_values_dict,
                 flag_values_dict)
@@ -1872,11 +1886,11 @@ class Notebook(BaseNotebook):
             return ("Error: Unable to calculate {} using prep_dataset\n"
                     "prep_dataset did not return a 1D array".format(datatype))
 
-        if self.module.layers[where_layer].outputs[datatype].is_edge: 
+        if is_edge: 
             return Raw_Data_Set(
                 values,
-                param_values_dict[where_layer]['edge_x'],
-                param_values_dict[where_layer]['node_x'],
+                param_values_dict[target_layer]['edge_x'],
+                param_values_dict[target_layer]['node_x'],
                 total_time,
                 dt,
                 param_values_dict,
@@ -1887,8 +1901,8 @@ class Notebook(BaseNotebook):
         else:
             return Raw_Data_Set(
                 values,
-                param_values_dict[where_layer]['node_x'],
-                param_values_dict[where_layer]['node_x'],
+                param_values_dict[target_layer]['node_x'],
+                param_values_dict[target_layer]['node_x'],
                 total_time,
                 dt,
                 param_values_dict,
@@ -1919,7 +1933,7 @@ class Notebook(BaseNotebook):
         for i in range(0, len(active_plot.data_filenames)):
             data_filename = active_plot.data_filenames[i]
             short_filename = data_filename[data_filename.rfind('/') + 1:]
-            new_data = self.make_rawdataset(short_filename, plot_ID, datatype)
+            new_data = self.make_rawdataset(short_filename, plot_ID, datatype, layer_name)
 
             if isinstance(new_data, str):
                 err_msg.append("{}: {}".format(short_filename, new_data))
@@ -1984,7 +1998,7 @@ class Notebook(BaseNotebook):
             if over_time:
                 dataset.data = interpolated_step
             else:
-                dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
+                dataset.data = self.module.prep_dataset(active_datagroup.type, self.module.find_layer(active_datagroup.type), sim_data,
                                                           dataset.params_dict, dataset.flags)
             dataset.current_time = active_plot.time
             
@@ -2466,7 +2480,7 @@ class Notebook(BaseNotebook):
                                     extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
                                                                                   t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
             
-                    data = self.module.prep_dataset(datatype, sim_data, 
+                    data = self.module.prep_dataset(datatype, where_layer, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
                                                       active_datagroup.datasets[tag].flags,
                                                       True, s[0], s[1], s[2], extra_data)

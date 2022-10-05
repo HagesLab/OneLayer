@@ -206,7 +206,7 @@ class Std_SingleLayer(OneD_Model):
         
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, flags, for_integrate=False, 
+    def prep_dataset(self, datatype, target_layer, sim_data, params, flags, for_integrate=False, 
                      i=0, j=0, nen=False, extra_data = None):
         """ Provides delta_N, delta_P, electric field, recombination, 
             and spatial PL values on demand.

@@ -84,7 +84,7 @@ class HeatPlate(OneD_Model):
             
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, for_integrate=False, i=0, j=0,
+    def prep_dataset(self, datatype, target_layer, sim_data, params, for_integrate=False, i=0, j=0,
                      nen=False, extra_data = None):
         """ Calculate heat flux (or read in temperature) on demand"""
         if (datatype in self.simulation_outputs_dict):

@@ -370,7 +370,7 @@ class OneD_Model:
 
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, flags, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
+    def prep_dataset(self, datatype, target_layer, sim_data, params, flags, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
         """
         Use the raw data in sim_data to calculate quantities in self.outputs_dict.
         If datatype is in self.simulated_outputs dict this just needs to return the correct item from sim_data
@@ -379,6 +379,8 @@ class OneD_Model:
         ----------
         datatype : str
             The item we need to calculate.
+        target_layer : str
+            The name of the layer "datatype" is found in.
         sim_data : dict {"datatype": 1D or 2D numpy array}
             Collection of raw data read from .h5 files. 1D if single time step or 2D if time and space range.
         params : dict {"param name": 1D numpy array}

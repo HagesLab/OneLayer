@@ -65,13 +65,12 @@ class PN_Junction(OneD_Model):
         return data_dict
 
 
-    def prep_dataset(self, datatype, sim_data, params, flags, for_integrate=False,
+    def prep_dataset(self, datatype, target_layer, sim_data, params, flags, for_integrate=False,
                      i=0, j=0, nen=False, extra_data=None):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        where_layer = self.find_layer(datatype)
-        layer = self.layers[where_layer]
-        data = submodule_prep_dataset(where_layer, layer, datatype, sim_data, params,
+        layer = self.layers[target_layer]
+        data = submodule_prep_dataset(target_layer, layer, datatype, sim_data, params,
                     for_integrate, i, j, nen, extra_data)
         return data
 
