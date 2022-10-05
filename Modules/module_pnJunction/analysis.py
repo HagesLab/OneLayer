@@ -76,11 +76,6 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
     for data in data_dict["__SHARED__"]:
         data_dict["__SHARED__"][data] *= convert_out[data]
         
-        
-    # data_dict["MAPI"]["mapi_PL"] *= mapi.iconvert_out["mapi_PL"]
-    # data_dict["Rubrene"]["dbp_PL"] *= ru.iconvert_out["dbp_PL"]
-    # data_dict["Rubrene"]["TTA"] *= ru.iconvert_out["TTA"]
-        
     return data_dict
 
 
@@ -88,7 +83,7 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
                      i, j, nen, extra_data):
     """ Provides delta_N, delta_P, electric field,
     recombination, and spatial PL values on demand."""
-    # For N, P, E-field this is just reading the data but for others we'll calculate it in situ
+    # For N, P this is just reading the data but for others we'll calculate it in situ
     layer_params = params[where_layer]
     layer_sim_data = sim_data[where_layer]
     data = None
@@ -124,31 +119,7 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
                 rad_rec = calculated_outputs.radiative_recombination()
                 data = prep_PL(rad_rec, 0, len(rad_rec)-1, False, 
                                 layer_params, where_layer).flatten()
-                
-        elif (datatype == "E_upc"):
-            data = calculated_outputs.E_field_r()
-                
-        elif (datatype == "dbp_PL"):
-
-            if for_integrate:
-                delta_D = extra_data[where_layer]["delta_D"]
-                data = prep_PL(delta_D, i, j, nen, layer_params, where_layer)
-            else:
-                delta_D = layer_sim_data["delta_D"]
-                data = prep_PL(delta_D, 0, len(delta_D)-1, False, 
-                                layer_params, where_layer).flatten()
-                
-        elif (datatype == "TTA"):
-
-            if for_integrate:
-                T = extra_data[where_layer]["T"]
-                data = TTA(T, i, j, nen, layer_params)
-            else:
-                T = layer_sim_data["T"]
-                data = TTA(T, 0, len(T)-1, False, 
-                            layer_params).flatten()
-                
-        
+                        
         else:
             raise ValueError
             

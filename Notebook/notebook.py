@@ -1846,6 +1846,7 @@ class Notebook(BaseNotebook):
             is_edge = self.module.layers[target_layer].outputs[datatype].is_edge
             
         if target_layer == "__SHARED__":
+            param_values_dict["__SHARED__"] = {}
             edges_x = [param_values_dict[layer_name]['edge_x'] for layer_name in layer_names]
             nodes_x = [param_values_dict[layer_name]['node_x'] for layer_name in layer_names]
             total_lengths = [param_values_dict[layer_name]['Total_length'] for layer_name in layer_names]
@@ -1854,19 +1855,33 @@ class Notebook(BaseNotebook):
             
 		# Now that we have the parameters from metadata, fetch the data itself
         sim_data = {}
-        for layer_name, layer in self.module.layers.items():
-            sim_data[layer_name] = {}
-            for sim_datatype in layer.s_outputs:
+        if target_layer == "__SHARED__":
+            sim_data["__SHARED__"] = {}
+            for sim_datatype in self.module.layers[any_layer].s_outputs:
                 path_name = os.path.join(
                     self.default_dirs["Data"], 
                     self.module.system_ID,
                     data_filename,
                     "{}-{}.h5".format(data_filename, sim_datatype))
                 try:
-                    sim_data[layer_name][sim_datatype] = \
+                    sim_data[target_layer][sim_datatype] = \
                         u_read(path_name, t0=0, single_tstep=True)
                 except OSError:
                     continue
+        else:
+            for layer_name, layer in self.module.layers.items():
+                sim_data[layer_name] = {}
+                for sim_datatype in layer.s_outputs:
+                    path_name = os.path.join(
+                        self.default_dirs["Data"], 
+                        self.module.system_ID,
+                        data_filename,
+                        "{}-{}.h5".format(data_filename, sim_datatype))
+                    try:
+                        sim_data[layer_name][sim_datatype] = \
+                            u_read(path_name, t0=0, single_tstep=True)
+                    except OSError:
+                        continue
         
         try:
             values = self.module.prep_dataset(
