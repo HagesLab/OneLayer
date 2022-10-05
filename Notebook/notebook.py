@@ -1906,7 +1906,13 @@ class Notebook(BaseNotebook):
             return
         active_plot = self.analysis_plots[plot_ID]
         datatype = self.data_var.get()
-
+        
+        is_shared = ":" not in datatype
+        if is_shared:
+            layer_name = "__SHARED__"
+        else:
+            layer_name, datatype = datatype.split(": ")
+            
         active_plot.time = 0
         active_plot.datagroup.clear()
         err_msg = ["Error: the following data could not be plotted"]
