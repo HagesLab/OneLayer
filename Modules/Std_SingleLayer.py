@@ -25,8 +25,8 @@ class Std_SingleLayer(OneD_Model):
         self.time_unit = "[ns]"
         params = {"mu_N":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
                   "mu_P":Parameter(units="[cm^2 / V s]", is_edge=True, valid_range=(0,np.inf)), 
-                  "N0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                  "P0":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                  "N0":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)), 
+                  "P0":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)), 
                   "B":Parameter(units="[cm^3 / s]", is_edge=False, valid_range=(0,np.inf)), 
                   "tau_N":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
                   "tau_P":Parameter(units="[ns]", is_edge=False, valid_range=(0,np.inf)), 
@@ -41,8 +41,8 @@ class Std_SingleLayer(OneD_Model):
                   "alpha":Parameter(units="[cm^-1]", is_edge=False, valid_range=(0,np.inf)), 
                   "delta":Parameter(units="", is_edge=False, valid_range=(0,1)), 
                   "frac_emitted":Parameter(units="", is_edge=False, is_space_dependent=False, valid_range=(0,1)),
-                  "delta_N":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
-                  "delta_P":Parameter(units="[carr / cm^3]", is_edge=False, valid_range=(0,np.inf)), 
+                  "delta_N":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)), 
+                  "delta_P":Parameter(units="[cm^-3]", is_edge=False, valid_range=(0,np.inf)), 
                   "Eg":Parameter(units="[eV]", is_edge=True), 
                   "electron_affinity":Parameter(units="[eV]", is_edge=True)}
                 
@@ -52,8 +52,8 @@ class Std_SingleLayer(OneD_Model):
 
         # List of all variables active during the finite difference simulating        
         # calc_inits() must return values for each of these or an error will be raised!
-        simulation_outputs = {"N":Output("N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)), 
-                              "P":Output("P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)),
+        simulation_outputs = {"N":Output("N", units="[cm^-3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)), 
+                              "P":Output("P", units="[cm^-3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer", yscale='symlog', yfactors=(1e-4,1e1)),
                              }
         
         # List of all variables calculated from those in simulation_outputs_dict
@@ -67,12 +67,12 @@ class Std_SingleLayer(OneD_Model):
                               "Jn_diff":Output("Jn_diffusion", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer", yscale='linear'),
                               "Jp_drift":Output("Jp_drift", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer", yscale='linear'),
                               "Jp_diff":Output("Jp_diffusion", units="[cm^-2 s^-1]", integrated_units="[cm^-1 s^-1]", xlabel='nm', xvar='position', is_edge=True, layer="Onelayer", yscale='linear'),
-                             "delta_N":Output("delta_N", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
-                             "delta_P":Output("delta_P", units="[carr / cm^3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
-                             "RR":Output("Radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
-                             "Auger":Output("Auger Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
-                             "NRR":Output("Non-radiative Recombination", units="[carr / cm^3 s]", integrated_units="[carr / cm^2 s]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
-                             "PL":Output("TRPL", units="[phot / cm^3 s]", integrated_units="[phot / cm^2 s]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer"),
+                             "delta_N":Output("delta_N", units="[cm^-3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
+                             "delta_P":Output("delta_P", units="[cm^-3]", integrated_units="[carr / cm^2]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
+                             "RR":Output("Radiative Recombination", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
+                             "Auger":Output("Auger Recombination", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
+                             "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
+                             "PL":Output("TRPL", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer"),
                              "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer", analysis_plotable=False)}
         
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
