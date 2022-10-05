@@ -762,7 +762,6 @@ class Notebook(BaseNotebook):
             logger.error("Error #601: Failed to close Bayesim popup")
         
 
-
     def do_plotter_popup(self, plot_ID):
         """ Select datasets for plotting on Analyze tab. """
         self.plotter_popup = PlotterPopup(plot_ID, self, logger)

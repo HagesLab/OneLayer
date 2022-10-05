@@ -65,9 +65,25 @@ class PlotterPopup(Popup):
         
         plotter_options_frame = tk.Frame(self.toplevel)
         plotter_options_frame.grid(row=2,column=1)
+        
+        if len(self.nb.module.layers) > 1:
+            shared_outputs = set.union(*[self.nb.module.report_shared_s_outputs(), self.nb.module.report_shared_c_outputs()])
+        else:
+            shared_outputs = {}
+        any_layer_name = next(iter(self.nb.module.layers))
+            
         all_outputs = []
+        for shared_output in shared_outputs:
+            if self.nb.module.layers[any_layer_name].outputs[shared_output].analysis_plotable:
+                all_outputs.append("{}".format(shared_output))
+            
         for layer_name, layer in self.nb.module.layers.items():
-            all_outputs += [output for output in layer.outputs if layer.outputs[output].analysis_plotable]
+            for output in self.nb.module.layers[layer_name].outputs:
+                if output not in shared_outputs and layer.outputs[output].analysis_plotable:
+                    all_outputs.append("{}: {}".format(layer_name, output))
+        
+        # for layer_name, layer in self.nb.module.layers.items():
+        #     all_outputs += [output for output in layer.outputs if layer.outputs[output].analysis_plotable]
         tk.OptionMenu(plotter_options_frame, self.nb.data_var, 
                       *all_outputs).grid(row=0,column=0)
 
