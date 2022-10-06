@@ -2393,9 +2393,7 @@ class Notebook(BaseNotebook):
             # A "default integration behavior": integrate the present data over all time and space steps
             self.PL_mode = "All time steps"
             self.integration_plots[ip_ID].x_param = "Time"
-            where_layer = self.module.find_layer(active_datagroup.type)
-            is_edge = self.module.layers[where_layer].outputs[active_datagroup.type].is_edge
-            self.integration_bounds = [[0,active_datagroup.get_max_x(is_edge)]]
+            self.integration_bounds = [[0, np.inf]]
             
         # Clean up the I_plot and prepare to integrate given selections
         # A lot of the following is a data transfer between the 
@@ -2413,12 +2411,10 @@ class Notebook(BaseNotebook):
         for tag in active_datagroup.datasets:
             data_filename = active_datagroup.datasets[tag].filename
             datatype = active_datagroup.datasets[tag].type
-            where_layer = self.module.find_layer(datatype)
+            where_layer = active_datagroup.datasets[tag].layer_name
             logger.info("Now integrating {}".format(data_filename))
 
             # Unpack needed params from the dictionaries of params
-            dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
-            total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
             total_time = active_datagroup.datasets[tag].total_time
             current_time = active_datagroup.datasets[tag].current_time
             dt = active_datagroup.datasets[tag].dt
@@ -2437,131 +2433,180 @@ class Notebook(BaseNotebook):
             # Clean up any bounds that extend past the confines of the system
             # The system usually exists from x=0 to x=total_length, 
             # but can accept x=-total_length to x=total_length if symmetric
-
-            for bounds in self.integration_bounds:
-                l_bound = bounds[0]
-                u_bound = bounds[1]
-               
-                if (u_bound > total_length):
-                    u_bound = total_length
+            
+            # This works fine for an unshared single layer integral,
+            # but if shared we need to work with the stitched arrays
+            if where_layer == "__SHARED__":
+                edge_x = active_datagroup.datasets[tag].params_dict[where_layer]["edge_x"]
+                node_x = active_datagroup.datasets[tag].params_dict[where_layer]["node_x"]
+                dx = np.diff(edge_x)
+                total_length = edge_x[-1]
+                for bounds in self.integration_bounds:
+                    l_bound = bounds[0]
+                    u_bound = bounds[1]
+                   
+                    if (u_bound > total_length):
+                        u_bound = total_length
+                        
+                    if (l_bound > total_length):
+                        l_bound = total_length
+    
+                    if symmetric_flag:
+    
+                        if (l_bound < -total_length):
+                            l_bound = -total_length
+                    else:
+                        if (l_bound < 0):
+                            l_bound = 0
+                        
+                    include_negative = symmetric_flag and (l_bound < 0)
+    
+                    logger.info("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
+    
+                    # Searching is worse than calculating with to_index, but dx is not constant
+                    # But still much less time consuming than the actual integral, so okay for now
+                    j = np.searchsorted(node_x[1:], u_bound, side='right')
+                    i = np.searchsorted(node_x[1:], abs(l_bound), side='right')
                     
-                if (l_bound > total_length):
-                    l_bound = total_length
-
-                if symmetric_flag:
-
-                    if (l_bound < -total_length):
-                        l_bound = -total_length
-                else:
-                    if (l_bound < 0):
-                        l_bound = 0
-
-                include_negative = symmetric_flag and (l_bound < 0)
-
-                logger.info("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
-
-                j = to_index(u_bound, dx, total_length)
-                i = to_index(abs(l_bound), dx, total_length)
-                if include_negative:  
-                    nen = [-l_bound > to_pos(i, dx) + dx / 2,
-                                       u_bound > to_pos(j, dx) + dx / 2]
+                    if include_negative:  
+                        nen = [-l_bound > node_x[i] + dx[i] / 2,
+                                           u_bound > node_x[j] + dx[j] / 2]
+                        
+                        space_bounds = [(0,i,nen[0], 0, -l_bound), (0,j,nen[1], 0, u_bound)]
+                    else:
+                        nen = u_bound > node_x[j] + dx[j] / 2 or l_bound == u_bound
+                        space_bounds = [(i,j,nen, l_bound, u_bound)]
+                        
+                return
+    
+            else:
+                dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
+                total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
+                
+                for bounds in self.integration_bounds:
+                    l_bound = bounds[0]
+                    u_bound = bounds[1]
+                   
+                    if (u_bound > total_length):
+                        u_bound = total_length
+                        
+                    if (l_bound > total_length):
+                        l_bound = total_length
+    
+                    if symmetric_flag:
+    
+                        if (l_bound < -total_length):
+                            l_bound = -total_length
+                    else:
+                        if (l_bound < 0):
+                            l_bound = 0
+    
+                    include_negative = symmetric_flag and (l_bound < 0)
+    
+                    logger.info("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
+    
+                    j = to_index(u_bound, dx, total_length)
+                    i = to_index(abs(l_bound), dx, total_length)
+                    if include_negative:  
+                        nen = [-l_bound > to_pos(i, dx) + dx / 2,
+                                           u_bound > to_pos(j, dx) + dx / 2]
+                        
+                        space_bounds = [(0,i,nen[0], 0, -l_bound), (0,j,nen[1], 0, u_bound)]
+                    else:
+                        nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
+                        space_bounds = [(i,j,nen, l_bound, u_bound)]
+    
+                    do_curr_t = self.PL_mode == "Current time step"
                     
-                    space_bounds = [(0,i,nen[0], 0, -l_bound), (0,j,nen[1], 0, u_bound)]
-                else:
-                    nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
-                    space_bounds = [(i,j,nen, l_bound, u_bound)]
-
-                do_curr_t = self.PL_mode == "Current time step"
-                
-                pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
-                
-                extra_data = {}
-                for c, s in enumerate(space_bounds):
-                    sim_data = {}
-                    for layer_name, layer in self.module.layers.items():
-                        sim_data[layer_name] = {}
-                        extra_data[layer_name] = {}
-                        for sim_datatype in layer.s_outputs:
-
-                            if do_curr_t:
-                                try:
-                                    interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                               t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
-                                                               single_tstep=False, need_extra_node=s[2], 
-                                                               force_1D=False)
-                                except OSError:
-                                    continue
-                                if current_time == total_time:
-                                    pass
-                                else:
-                                    floor_tstep = int(current_time / dt)
-                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
-                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
-                                
-                                sim_data[layer_name][sim_datatype] = np.array(interpolated_step)
-                                
-                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                             t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
-                                if current_time == total_time:
-                                    pass
-                                else:
-                                    floor_tstep = int(current_time / dt)
-                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
-                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                    pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
+                    
+                    extra_data = {}
+                    for c, s in enumerate(space_bounds):
+                        sim_data = {}
+                        for layer_name, layer in self.module.layers.items():
+                            sim_data[layer_name] = {}
+                            extra_data[layer_name] = {}
+                            for sim_datatype in layer.s_outputs:
+    
+                                if do_curr_t:
+                                    try:
+                                        interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                   t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                   single_tstep=False, need_extra_node=s[2], 
+                                                                   force_1D=False)
+                                    except OSError:
+                                        continue
+                                    if current_time == total_time:
+                                        pass
+                                    else:
+                                        floor_tstep = int(current_time / dt)
+                                        slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                        interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
                                     
-                                extra_data[layer_name][sim_datatype] = np.array(interpolated_step)
-                            
-                            else:
-                                try:
-                                    sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                                t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
-                                                                                single_tstep=False, need_extra_node=s[2], 
-                                                                                force_1D=False) 
-                                except OSError:
-                                    continue
+                                    sim_data[layer_name][sim_datatype] = np.array(interpolated_step)
+                                    
+                                    interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                 t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+                                    if current_time == total_time:
+                                        pass
+                                    else:
+                                        floor_tstep = int(current_time / dt)
+                                        slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                        interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                                        
+                                    extra_data[layer_name][sim_datatype] = np.array(interpolated_step)
                                 
-                                if c == 0:
-                                    extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                                  t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
-            
-                    data = self.module.prep_dataset(datatype, where_layer, sim_data, 
-                                                      active_datagroup.datasets[tag].params_dict, 
-                                                      active_datagroup.datasets[tag].flags,
-                                                      True, s[0], s[1], s[2], extra_data)
-                    
-                    if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2])
-                    else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2])
+                                else:
+                                    try:
+                                        sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                    t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                                    single_tstep=False, need_extra_node=s[2], 
+                                                                                    force_1D=False) 
+                                    except OSError:
+                                        continue
+                                    
+                                    if c == 0:
+                                        extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                      t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+                
+                        data = self.module.prep_dataset(datatype, where_layer, sim_data, 
+                                                          active_datagroup.datasets[tag].params_dict, 
+                                                          active_datagroup.datasets[tag].flags,
+                                                          True, s[0], s[1], s[2], extra_data)
+                        
+                        if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2])
+                        else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2])
+                                
+                    if self.PL_mode == "Current time step":
+                        # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
+                        grid_xaxis = float(active_datagroup.datasets[tag].params_dict[where_layer][self.xaxis_param]
+                                           * self.module.layers[where_layer].convert_out[self.xaxis_param])
+                        xaxis_label = self.xaxis_param + " [WIP]"
+    
+                    elif self.PL_mode == "All time steps":
+                        grid_xaxis = np.linspace(0, total_time, n + 1)
+                        xaxis_label = "Time [ns]"
+    
+                    ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
+                    self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, total_time, dt,
+                                                                                    active_datagroup.datasets[tag].params_dict, 
+                                                                                    active_datagroup.datasets[tag].flags,
+                                                                                    active_datagroup.datasets[tag].type, 
+                                                                                    ext_tag))
+                
+                    if self.PL_mode == "All time steps":
+                        try:
+                            td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
+                                                                     active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].flags)
+                        except Exception:
+                            logger.error("Error: failed to calculate time series")
+                            td[ext_tag] = None
                             
-                if self.PL_mode == "Current time step":
-                    # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
-                    grid_xaxis = float(active_datagroup.datasets[tag].params_dict[where_layer][self.xaxis_param]
-                                       * self.module.layers[where_layer].convert_out[self.xaxis_param])
-                    xaxis_label = self.xaxis_param + " [WIP]"
-
-                elif self.PL_mode == "All time steps":
-                    grid_xaxis = np.linspace(0, total_time, n + 1)
-                    xaxis_label = "Time [ns]"
-
-                ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
-                self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, total_time, dt,
-                                                                                active_datagroup.datasets[tag].params_dict, 
-                                                                                active_datagroup.datasets[tag].flags,
-                                                                                active_datagroup.datasets[tag].type, 
-                                                                                ext_tag))
-            
-                if self.PL_mode == "All time steps":
-                    try:
-                        td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
-                                                                 active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].flags)
-                    except Exception:
-                        logger.error("Error: failed to calculate time series")
-                        td[ext_tag] = None
-                        
-                    if td[ext_tag] is not None:
-                        td_gridt[ext_tag] = np.linspace(0, total_time, n + 1)
-                        
-                counter += 1
-                logger.info("Integration: {} of {} complete".format(counter, active_datagroup.size() * len(self.integration_bounds)))
+                        if td[ext_tag] is not None:
+                            td_gridt[ext_tag] = np.linspace(0, total_time, n + 1)
+                            
+                    counter += 1
+                    logger.info("Integration: {} of {} complete".format(counter, active_datagroup.size() * len(self.integration_bounds)))
 
         subplot = self.integration_plots[ip_ID].plot_obj
         datagroup = self.integration_plots[ip_ID].datagroup
