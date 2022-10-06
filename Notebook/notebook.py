@@ -1911,6 +1911,7 @@ class Notebook(BaseNotebook):
                 param_values_dict,
                 flag_values_dict,
                 datatype,
+                target_layer,
                 data_filename, 
                 active_plot.time)
         else:
@@ -1923,6 +1924,7 @@ class Notebook(BaseNotebook):
                 param_values_dict,
                 flag_values_dict,
                 datatype,
+                target_layer,
                 data_filename, 
                 active_plot.time)
 
@@ -1983,14 +1985,15 @@ class Notebook(BaseNotebook):
         # Interpolate if necessary
         for tag, dataset in active_datagroup.datasets.items():
             sim_data = {}
-            for layer_name, layer in self.module.layers.items():
-                sim_data[layer_name] = {}
-                for sim_datatype in layer.s_outputs:
-                    path_name = os.path.join(self.default_dirs["Data"], 
-                                                self.module.system_ID,
-                                                dataset.filename,
-                                                "{}-{}.h5".format(dataset.filename, sim_datatype))
-                    
+            if dataset.layer_name == "__SHARED__":
+                sim_data["__SHARED__"] = {}
+                any_layer = next(iter(self.module.layers))
+                for sim_datatype in self.module.layers[any_layer].s_outputs:
+                    path_name = os.path.join(
+                        self.default_dirs["Data"], 
+                        self.module.system_ID,
+                        dataset.filename,
+                        "{}-{}.h5".format(dataset.filename, sim_datatype))
                     floor_tstep = int(active_plot.time / dataset.dt)
                     try:
                         interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
@@ -2008,16 +2011,42 @@ class Notebook(BaseNotebook):
                         slope = (interpolated_step[1] - interpolated_step[0]) / (dataset.dt)
                         interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * dataset.dt)
                     
-                    sim_data[layer_name][sim_datatype] = interpolated_step
+                    sim_data["__SHARED__"][sim_datatype] = interpolated_step
+            else:
+                for layer_name, layer in self.module.layers.items():
+                    sim_data[layer_name] = {}
+                    for sim_datatype in layer.s_outputs:
+                        path_name = os.path.join(self.default_dirs["Data"], 
+                                                    self.module.system_ID,
+                                                    dataset.filename,
+                                                    "{}-{}.h5".format(dataset.filename, sim_datatype))
+                        
+                        floor_tstep = int(active_plot.time / dataset.dt)
+                        try:
+                            interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                        except OSError:
+                            continue
+                        over_time = False
+                        
+                        if active_plot.time > dataset.total_time:
+                            interpolated_step = np.zeros_like(dataset.node_x)
+                            over_time = True
+                            
+                        elif active_plot.time == dataset.total_time:
+                            pass
+                        else:
+                            slope = (interpolated_step[1] - interpolated_step[0]) / (dataset.dt)
+                            interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * dataset.dt)
+                        
+                        sim_data[layer_name][sim_datatype] = interpolated_step
         
             if over_time:
                 dataset.data = interpolated_step
             else:
-                dataset.data = self.module.prep_dataset(active_datagroup.type, self.module.find_layer(active_datagroup.type), sim_data,
+                dataset.data = self.module.prep_dataset(active_datagroup.type, dataset.layer_name, sim_data,
                                                           dataset.params_dict, dataset.flags)
             dataset.current_time = active_plot.time
-            
-            
+                        
         self.plot_analyze(plot_ID, force_axis_update=False)
         self.write(self.analysis_status, "")
 
