@@ -114,10 +114,12 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
     """
     if node_x is None:
         i = to_index(l_bound, dx, total_length)
+        j = to_index(u_bound, dx, total_length)
         if isinstance(dx, (list, np.ndarray)):
             raise TypeError("Expected scalar dx")
     else:
         i = np.searchsorted(node_x[1:], l_bound, side='right')
+        j = np.searchsorted(node_x[1:], u_bound, side='right')
         if isinstance(dx, (float, int)):
             dx = np.ones_like(node_x) * dx
         
@@ -148,11 +150,11 @@ def new_integrate(base_data, l_bound, u_bound, dx, total_length, need_extra_node
             # node_x takes precedence over dx unless node_x is None, in which
             # dx is used
             # How convenient
-            I_data = intg.trapz(I_base[:, :-1], x=node_x, dx=dx, axis=1)
+            I_data = intg.trapz(I_base[:, :-1], x=node_x[i:j+1], dx=dx, axis=1)
             
         else:
             I_base = base_data
-            I_data = intg.trapz(I_base, x=node_x, dx=dx, axis=1)
+            I_data = intg.trapz(I_base, x=node_x[i:j+1], dx=dx, axis=1)
 
         I_data += correct_integral(I_base.T, l_bound, u_bound, dx, total_length,
                                    node_x)
