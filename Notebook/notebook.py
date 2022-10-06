@@ -2422,8 +2422,8 @@ class Notebook(BaseNotebook):
             symmetric_flag = active_datagroup.datasets[tag].flags["symmetric_system"]
 
             if current_time > total_time: continue
-
-            if self.PL_mode == "Current time step":
+            do_curr_t = self.PL_mode == "Current time step"
+            if do_curr_t:
                 show_index = int(current_time / dt)
                 end_index = show_index+2
             else:
@@ -2477,6 +2477,65 @@ class Notebook(BaseNotebook):
                         nen = u_bound > node_x[j] + dx[j] / 2 or l_bound == u_bound
                         space_bounds = [(i,j,nen, l_bound, u_bound)]
                         
+                    pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
+                    
+                    extra_data = {}
+                    for c, s in enumerate(space_bounds):
+                        sim_data = {}
+                        sim_data[where_layer] = {}
+                        extra_data[where_layer] = {}
+                        any_layer = next(iter(self.module.layers))
+                        for sim_datatype in self.module.layers[any_layer].s_outputs:
+    
+                            if do_curr_t:
+                                try:
+                                    interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                               t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                               single_tstep=False, need_extra_node=s[2], 
+                                                               force_1D=False)
+                                except OSError:
+                                    continue
+                                if current_time == total_time:
+                                    pass
+                                else:
+                                    floor_tstep = int(current_time / dt)
+                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                                
+                                sim_data[where_layer][sim_datatype] = np.array(interpolated_step)
+                                
+                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                             t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+                                if current_time == total_time:
+                                    pass
+                                else:
+                                    floor_tstep = int(current_time / dt)
+                                    slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
+                                    interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
+                                    
+                                extra_data[where_layer][sim_datatype] = np.array(interpolated_step)
+                            
+                            else:
+                                try:
+                                    sim_data[where_layer][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                                single_tstep=False, need_extra_node=s[2], 
+                                                                                force_1D=False) 
+                                except OSError:
+                                    continue
+                                
+                                if c == 0:
+                                    extra_data[where_layer][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                                                                      t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+                
+                        data = self.module.prep_dataset(datatype, where_layer, sim_data, 
+                                                          active_datagroup.datasets[tag].params_dict, 
+                                                          active_datagroup.datasets[tag].flags,
+                                                          True, s[0], s[1], s[2], extra_data)
+                        
+                        # if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2])
+                        # else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2])
+                                
                 return
     
             else:
@@ -2516,8 +2575,6 @@ class Notebook(BaseNotebook):
                         nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
                         space_bounds = [(i,j,nen, l_bound, u_bound)]
     
-                    do_curr_t = self.PL_mode == "Current time step"
-                    
                     pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
                     
                     extra_data = {}

@@ -69,6 +69,7 @@ class PN_Junction(OneD_Model):
                      i=0, j=0, nen=False, extra_data=None):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
+        # Since target_layer is always __SHARED__, we can't use it to lookup a layer object
         layer = self.layers[next(iter(self.layers))]
         data = submodule_prep_dataset(target_layer, layer, datatype, sim_data, params,
                     for_integrate, i, j, nen, extra_data)
