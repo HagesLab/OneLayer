@@ -128,7 +128,7 @@ class PlotterPopup(Popup):
             self.plotter_popup_isopen = False
             
         except AssertionError as oops:
-            self.write(self.plotter_status, str(oops))
+            self.nb.write(self.plotter_status, str(oops))
             logger.error("Error: %s", oops)
         except Exception:
             logger.error("Error #502: Failed to close plotter popup.")
