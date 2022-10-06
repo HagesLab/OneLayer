@@ -4,8 +4,8 @@ import tables
 from scipy import integrate as intg
 from io_utils import u_read
 from utils import to_index, new_integrate
-# from Modules.module_pnJunction.calculations import radiative_recombination
-# from Modules.module_pnJunction.calculations import prep_PL
+from Modules.module_pnJunction.calculations import radiative_recombination
+from Modules.module_pnJunction.calculations import prep_PL
 # from Modules.module_pnJunction.calculations import tau_diff
 # from Modules.module_pnJunction.calculations import E_field_r
 # from Modules.module_pnJunction.calculations import TTA
@@ -62,7 +62,7 @@ def submodule_get_overview_analysis(layers, params, flags, total_time, dt, tstep
         temp_N = np.array(ifstream_N.root.data)
         temp_P = np.array(ifstream_P.root.data)
 
-    data_dict["__SHARED__"]["PL"] = calculated_outputs.PL(temp_N, temp_P)
+    data_dict["__SHARED__"]["PL"] = calculated_outputs.PL(temp_N, temp_P, do_integrate=True)
     
     data_dict["__SHARED__"]["avg_delta_N"] = calculated_outputs.average_delta_n(temp_N)
     
@@ -91,7 +91,7 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
         data = layer_sim_data[datatype]
     
     else:
-        calculated_outputs = CalculatedOutputs(sim_data["MAPI"], sim_data["Rubrene"], params["MAPI"], params["Rubrene"])
+        calculated_outputs = CalculatedOutputs(sim_data[where_layer], params, layer)
         if (datatype == "delta_N"):
             data = calculated_outputs.delta_n()
             
@@ -107,18 +107,19 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
         elif (datatype == "NRR"):
             data = calculated_outputs.nonradiative_recombination()
             
+        elif (datatype == "voltage"):
+            data = calculated_outputs.voltage()
+            
         elif (datatype == "E_field"):
             data = calculated_outputs.E_field()
 
-        elif (datatype == "mapi_PL"):
+        elif (datatype == "PL"):
 
             if for_integrate:
                 rad_rec = radiative_recombination(extra_data[where_layer], layer_params)
                 data = prep_PL(rad_rec, i, j, nen, layer_params, where_layer)
             else:
-                rad_rec = calculated_outputs.radiative_recombination()
-                data = prep_PL(rad_rec, 0, len(rad_rec)-1, False, 
-                                layer_params, where_layer).flatten()
+                data = calculated_outputs.PL(sim_data[where_layer]['N'], sim_data[where_layer]['P'], do_integrate=False).flatten()
                         
         else:
             raise ValueError
