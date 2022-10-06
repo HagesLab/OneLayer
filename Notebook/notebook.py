@@ -40,6 +40,7 @@ from io_utils import extract_values
 from io_utils import u_read
 from io_utils import check_valid_filename
 from io_utils import get_split_and_clean_line
+from io_utils import export_ICfile
 
 from Notebook.base import BaseNotebook
 from Notebook.Tabs.inputs import add_tab_inputs
@@ -3567,49 +3568,8 @@ class Notebook(BaseNotebook):
     def write_init_file(self, newFileName, dir_name=""):
         """ Write current state of module into an initial condition (IC) file."""
         try:
-            with open(newFileName, "w+") as ofstream:
-                logger.info(dir_name + newFileName + " opened successfully")
-
-                # We don't really need to note down the time of creation, but it could be useful for interaction with other programs.
-                ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
-                ofstream.write("System_class: {}\n".format(self.module.system_ID))
-                ofstream.write("f$ System Flags:\n")
-                
-                for flag in self.module.flags_dict:
-                    ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
-                      
-                for layer_name, layer in self.module.layers.items():
-                    ofstream.write("L$: {}\n".format(layer_name))
-                    ofstream.write("p$ Space Grid:\n")
-                    ofstream.write("Total_length: {}\n".format(layer.total_length))
-                    ofstream.write("Node_width: {}\n".format(layer.dx))
-                
-                    ofstream.write("p$ System Parameters:\n")
-                
-                    # Saves occur as-is: any missing parameters are saved with whatever default value module gives them
-                    for param in layer.params:
-                        param_values = layer.params[param].value
-                        if isinstance(param_values, np.ndarray):
-                            # Write the array in a more convenient format
-                            ofstream.write("{}: {:.8e}".format(param, param_values[0]))
-                            for value in param_values[1:]:
-                                ofstream.write("\t{:.8e}".format(value))
-                                
-                            ofstream.write('\n')
-                        else:
-                            # The param value is just a single constant
-                            ofstream.write("{}: {}\n".format(param, param_values))
-                      
-                    if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC[layer_name]:
-                        ofstream.write("p$ Laser Parameters\n")
-                        for laser_param in self.LGC_values[layer_name]:
-                            ofstream.write("{}: {}\n".format(laser_param,
-                                                             self.LGC_values[layer_name][laser_param]))
-    
-                        ofstream.write("p$ Laser Options\n")
-                        for laser_option in self.LGC_options[layer_name]:
-                            ofstream.write("{}: {}\n".format(laser_option, 
-                                                             self.LGC_options[layer_name][laser_option]))
+            flags = {flag:self.sys_flag_dict[flag].value() for flag in self.sys_flag_dict}
+            export_ICfile(newFileName, self, flags, self.module.layers, allow_write_LGC=True)
                 
         except OSError:
             self.write(self.ICtab_status, "Error: failed to create IC file")
