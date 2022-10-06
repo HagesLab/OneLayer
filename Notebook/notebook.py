@@ -1316,38 +1316,14 @@ class Notebook(BaseNotebook):
 
                     self.module.get_IC_carry(sim_data, param_dict_copy, 
                                                include_flags, grid_x)
-                    
-                    with open(new_filename + ".txt", "w+") as ofstream:
-                        ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " 
-                                       + str(datetime.datetime.now().date()) 
-                                       + " AT " + str(datetime.datetime.now().time()) 
-                                       + "\n")
-                        ofstream.write("System_class: {}\n".format(self.module.system_ID))
-                        ofstream.write("f$ System Flags:\n")
-                        for flag in self.module.flags_dict:
-                            ofstream.write("{}: {}\n".format(flag, active_sets[key].flags[flag]))
-                        for layer_name, layer_params in param_dict_copy.items():
-                            ofstream.write("L$: {}\n".format(layer_name))
-                            ofstream.write("p$ Space Grid:\n")
-                            ofstream.write("Total_length: {}\n".format(layer_params["Total_length"]))
-                            ofstream.write("Node_width: {}\n".format(layer_params["Node_width"]))
-                            ofstream.write("p$ System Parameters:\n")
+                    for layer_name, layer_params in param_dict_copy.items():
+                        for param in layer_params:
+                            param_values = layer_params[param]
+                            param_values *= self.module.layers[layer_name].convert_out[param]
                             
-                            for param in layer.params:
-                                if not (param == "Total_length" or param == "Node_width"):
-                                    param_values = layer_params[param]
-                                    param_values *= self.module.layers[layer_name].convert_out[param]
-                                    if isinstance(param_values, np.ndarray):
-                                        # Write the array in a more convenient format
-                                        ofstream.write("{}: {:.8e}".format(param, param_values[0]))
-                                        for value in param_values[1:]:
-                                            ofstream.write("\t{:.8e}".format(value))
-                                            
-                                        ofstream.write('\n')
-                                    else:
-                                        # The param value is just a single constant
-                                        ofstream.write("{}: {}\n".format(param, param_values))
-
+                    export_ICfile(new_filename, self, active_sets[key].flags, 
+                                  param_dict_copy, allow_write_LGC=False)
+                    
                     status_msg.append("{}-->{}".format(filename, new_filename))
                     
                 # If NO new files saved
