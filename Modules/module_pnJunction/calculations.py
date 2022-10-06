@@ -108,7 +108,7 @@ def tau_diff(PL, dt):
         dln_PLdt = np.where(dln_PLdt <= 0, 0, -(dln_PLdt ** -1))
     return dln_PLdt
 
-def prep_PL(rad_rec, i, j, dx, need_extra_node):
+def prep_PL(rad_rec, i, j, need_extra_node):
     """
     Calculates PL(x,t) given radiative recombination data plus propogation contributions.
 
@@ -120,39 +120,21 @@ def prep_PL(rad_rec, i, j, dx, need_extra_node):
         Leftmost node index to calculate for.
     j : int
         Rightmost node index to calculate for.
-    dx : int
-        Node width.
     need_extra_node : bool
         Whether the 'j+1'th node should be considered.
         Most slices involving the index j should include j+1 too
     Returns
     -------
     PL_base : 2D ndarray
-        PL(x,t)
+        PL(t,x)
 
     """
-
-    
-    lbound = to_pos(i, dx)
-    if need_extra_node:
-        ubound = to_pos(j+1, dx)
-    else:
-        ubound = to_pos(j, dx)
         
-    distance = np.arange(lbound, ubound+dx, dx)
-    
     if rad_rec.ndim == 2: # for integrals of partial thickness
         if need_extra_node:
             rad_rec = rad_rec[:,i:j+2]
         else:
             rad_rec = rad_rec[:,i:j+1]
-            
-        # If the nodes are not equally sized, the need_extra_node and 
-        # to_pos mess up and make the distance array one too long. 
-        # The user is discouraged from creating such nodes but if they do anyway,
-        # Patch here and figure it out later.
-        if len(distance) > len(rad_rec[0]):
-            distance = distance[:len(rad_rec[0])]
             
     PL_base = (rad_rec)
 
@@ -266,7 +248,7 @@ class CalculatedOutputs():
             thickness = self.total_lengths[i]
             dx_len = self.grid_x_edges[i][1] - self.grid_x_edges[i][0]
             PL_base[:, l:r] = prep_PL(temp_RR[:, l:r+1], 0, to_index(thickness, dx_len, thickness),
-                                        dx_len, False)
+                                      False)
             
             if do_integrate:
                 integral_PL += new_integrate(PL_base[:,l:r], 0, thickness, dx_len, thickness, False)

@@ -116,8 +116,10 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
         elif (datatype == "PL"):
 
             if for_integrate:
-                rad_rec = radiative_recombination(extra_data[where_layer], layer_params)
-                data = prep_PL(rad_rec, i, j, nen, layer_params, where_layer)
+                get_these_params = ['B', 'N0', 'P0']
+                these_params = calculated_outputs.get_stitched_params(get_these_params)
+                rad_rec = radiative_recombination(extra_data[where_layer], these_params)
+                data = prep_PL(rad_rec, i, j,nen)
             else:
                 data = calculated_outputs.PL(sim_data[where_layer]['N'], sim_data[where_layer]['P'], do_integrate=False).flatten()
                         

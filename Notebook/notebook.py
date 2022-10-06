@@ -2533,10 +2533,39 @@ class Notebook(BaseNotebook):
                                                           active_datagroup.datasets[tag].flags,
                                                           True, s[0], s[1], s[2], extra_data)
                         
-                        # if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2])
-                        # else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2])
+                        if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2], node_x)
+                        else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2], node_x)
                                 
-                return
+                    if self.PL_mode == "Current time step":
+                        # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
+                        grid_xaxis = float(active_datagroup.datasets[tag].params_dict[where_layer][self.xaxis_param]
+                                           * self.module.layers[where_layer].convert_out[self.xaxis_param])
+                        xaxis_label = self.xaxis_param + " [WIP]"
+    
+                    elif self.PL_mode == "All time steps":
+                        grid_xaxis = np.linspace(0, total_time, n + 1)
+                        xaxis_label = "Time [ns]"
+    
+                    ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
+                    self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, total_time, dt,
+                                                                                    active_datagroup.datasets[tag].params_dict, 
+                                                                                    active_datagroup.datasets[tag].flags,
+                                                                                    active_datagroup.datasets[tag].type, 
+                                                                                    ext_tag))
+                
+                    if self.PL_mode == "All time steps":
+                        try:
+                            td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
+                                                                     active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].flags)
+                        except Exception:
+                            logger.error("Error: failed to calculate time series")
+                            td[ext_tag] = None
+                            
+                        if td[ext_tag] is not None:
+                            td_gridt[ext_tag] = np.linspace(0, total_time, n + 1)
+                            
+                    counter += 1
+                    logger.info("Integration: {} of {} complete".format(counter, active_datagroup.size() * len(self.integration_bounds)))
     
             else:
                 dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
