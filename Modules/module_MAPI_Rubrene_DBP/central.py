@@ -11,7 +11,7 @@ from Modules.module_MAPI_Rubrene_DBP.initializations import MAPI_Rubrene_Initial
 from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_overview_analysis
 from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_prep_dataset
 from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_timeseries
-from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_IC_carry
+from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_IC_regen
 from Modules.module_MAPI_Rubrene_DBP.simulations import OdeTwoLayerSimulation
 
 
@@ -84,8 +84,8 @@ class MAPI_Rubrene(OneD_Model):
         return timeseries
 
     
-    def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
+    def get_IC_regen(self, sim_data, param_dict, include_flags, grid_x):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        carry = submodule_get_IC_carry(sim_data, param_dict, include_flags, grid_x)
-        return carry
+        regen = submodule_get_IC_regen(sim_data, param_dict, include_flags, grid_x)
+        return regen

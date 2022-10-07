@@ -50,6 +50,7 @@ from Notebook.Popups.confirmation_popup import ConfirmationPopup
 from Notebook.Popups.module_select_popup import ModuleSelectPopup
 from Notebook.Popups.plotsummary_popup import PlotSummaryPopup
 from Notebook.Popups.plotter_popup import PlotterPopup
+from Notebook.Popups.IC_regeneration_popup import ICRegenPopup
 
 from config import init_logging
 logger = init_logging(__name__)
@@ -1208,161 +1209,12 @@ class Notebook(BaseNotebook):
 
 
 
-    def do_IC_carry_popup(self):
+    def do_IC_regen_popup(self):
         """ Open a tool to regenerate IC files based on current state of analysis plots. """
-        plot_ID = self.active_analysisplot_ID.get()
+        self.IC_regen_popup = ICRegenPopup(self, logger)
+        self.IC_regen_popup_isopen = True
+        return
 
-        if not self.analysis_plots[plot_ID].datagroup.size(): 
-            return
-
-        if not self.IC_carry_popup_isopen:
-            self.IC_carry_popup = tk.Toplevel(self.root)
-
-            tk.ttk.Label(self.IC_carry_popup, 
-                         text="Select data to include in new IC",
-                         style="Header.TLabel").grid(row=0,column=0,columnspan=2)
-            
-            self.carry_checkbuttons = {}
-            rcount = 1
-
-                    
-            if len(self.module.layers) > 1:
-                shared_outputs = self.module.report_shared_s_outputs()
-                self.carry_checkbuttons["__SHARED__"] = {}
-                self.carryover_include_flags["__SHARED__"] = {}
-            else:
-                shared_outputs = {}
-                
-            for var in shared_outputs:
-                self.carryover_include_flags["__SHARED__"][var] = tk.IntVar()
-                self.carry_checkbuttons["__SHARED__"][var] = \
-                    tk.Checkbutton(
-                        self.IC_carry_popup,
-                        text=var,
-                        variable=self.carryover_include_flags["__SHARED__"][var])
-                self.carry_checkbuttons["__SHARED__"][var].grid(row=rcount, column=0)
-                rcount += 1
-            
-            for layer_name, layer in self.module.layers.items():
-                self.carry_checkbuttons[layer_name] = {}
-                self.carryover_include_flags[layer_name] = {}
-                for var in layer.s_outputs:
-                    if var in shared_outputs: continue
-                    self.carryover_include_flags[layer_name][var] = tk.IntVar()
-                    self.carry_checkbuttons[layer_name][var] = \
-                        tk.Checkbutton(
-                            self.IC_carry_popup,
-                            text="{}: {}".format(layer_name, var),
-                            variable=self.carryover_include_flags[layer_name][var])
-                    self.carry_checkbuttons[layer_name][var].grid(row=rcount, column=0)
-                    rcount += 1
-
-            self.carry_IC_listbox = \
-                tk.Listbox(
-                    self.IC_carry_popup,
-                    width=30,
-                    height=10, 
-                    selectmode='extended')
-            self.carry_IC_listbox.grid(row=4,column=0,columnspan=2)
-            for key, dataset in self.analysis_plots[plot_ID].datagroup.datasets.items():
-                over_time = (self.analysis_plots[plot_ID].time > dataset.total_time)
-                if over_time: continue
-                self.carry_IC_listbox.insert(tk.END, key)
-
-            tk.Button(
-                self.IC_carry_popup,
-                text="Continue", 
-                command=partial(self.on_IC_carry_popup_close, continue_=True)
-                ).grid(row=5,column=0,columnspan=2)
-
-            self.IC_carry_popup.protocol(
-                "WM_DELETE_WINDOW", 
-                partial(self.on_IC_carry_popup_close, continue_=False))
-            self.IC_carry_popup.grab_set()
-            self.IC_carry_popup_isopen = True
-            
-        else:
-            logger.error("Error #510: Opened more than one IC carryover popup at a time")
-
-
-    def on_IC_carry_popup_close(self, continue_=False):
-        try:
-            if continue_:
-                plot_ID = self.active_analysisplot_ID.get()
-                active_plot = self.analysis_plots[plot_ID]
-                active_sets = active_plot.datagroup.datasets
-                datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
-                if not datasets: 
-                    return
-                
-                include_flags = {}
-                for layer_name in self.carryover_include_flags:
-                    include_flags[layer_name] = {}
-                    for iflag in self.carryover_include_flags[layer_name]:
-                        include_flags[layer_name][iflag] = self.carryover_include_flags[layer_name][iflag].get()
-                    
-                status_msg = ["Files generated:"]
-                for key in datasets:
-                    new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], 
-                                                                   title="Save IC text file for {}".format(key), 
-                                                                   filetypes=[("Text files","*.txt")])
-                    if not new_filename: 
-                        continue
-
-                    if not new_filename.endswith(".txt"): 
-                        new_filename = new_filename + ".txt"
-                    
-                    param_dict_copy = dict(active_sets[key].params_dict)
-
-                    grid_x = active_sets[key].grid_x
-                    
-                    filename = active_sets[key].filename
-                    sim_data = {}
-                    for layer_name, layer in self.module.layers.items():
-                        sim_data[layer_name] = {}
-                        for var in layer.s_outputs:
-                            path_name = os.path.join(self.default_dirs["Data"], 
-                                                        self.module.system_ID,
-                                                        filename,
-                                                        "{}-{}.h5".format(filename, var))
-                            floor_tstep = int(active_plot.time / active_sets[key].dt)
-                            interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
-                            
-                            if active_plot.time == active_sets[key].total_time:
-                                pass
-                            else:
-                                slope = (interpolated_step[1] - interpolated_step[0]) / (active_sets[key].dt)
-                                interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * active_sets[key].dt)
-                            
-                            sim_data[layer_name][var] = interpolated_step
-
-                    self.module.get_IC_carry(sim_data, param_dict_copy, 
-                                               include_flags, grid_x)
-                    for layer_name, layer_params in param_dict_copy.items():
-                        for param in layer_params:
-                            layer_params[param] *= self.module.layers[layer_name].convert_out.get(param, 1)
-                            
-                    if "__SHARED__" in param_dict_copy:
-                        param_dict_copy.pop("__SHARED__")
-                    export_ICfile(new_filename, self, active_sets[key].flags, 
-                                  param_dict_copy, allow_write_LGC=False)
-                    
-                    status_msg.append("{}-->{}".format(filename, new_filename))
-                    
-                # If NO new files saved
-                if len(status_msg) == 1: 
-                    status_msg.append("(none)")
-                self.do_confirmation_popup("\n".join(status_msg),hide_cancel=True)
-
-            self.IC_carry_popup.destroy()
-            self.IC_carry_popup_isopen = False
-
-        except OSError:
-            self.write(self.analysis_status, "Error: failed to regenerate IC file")
-            logger.error("Error: failed to regenerate IC file")
-            
-        except Exception:
-            logger.error("Error #511: Failed to close IC carry popup.")
 
     def do_timeseries_popup(self, ts_ID, td_gridt, td):
         ts_popup = tk.Toplevel(self.root)

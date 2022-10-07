@@ -221,7 +221,7 @@ class Nanowire(OneD_Model):
         else:
             return
     
-    def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
+    def get_IC_regen(self, sim_data, param_dict, include_flags, grid_x):
         """ Set delta_N and delta_P of outgoing regenerated IC file."""
         param_dict = param_dict["Nanowire"]
         sim_data = sim_data["Nanowire"]

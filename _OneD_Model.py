@@ -453,7 +453,7 @@ class OneD_Model:
         else:
             return
     
-    def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
+    def get_IC_regen(self, sim_data, param_dict, include_flags, grid_x):
         """
         Overwrites param_dict with values from the current data analysis in preparation for generating
         a new initial state file.

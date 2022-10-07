@@ -173,7 +173,7 @@ def add_tab_analyze(nb):
 
     tk.ttk.Button(nb.analyze_toolbar_frame, 
                     text="Generate IC", 
-                    command=partial(nb.do_IC_carry_popup)).grid(row=1,column=6)
+                    command=partial(nb.do_IC_regen_popup)).grid(row=1,column=6)
 
     nb.integration_fig = Figure(figsize=(9,5))
     nb.integration_subplot = nb.integration_fig.add_subplot(111)

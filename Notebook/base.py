@@ -97,7 +97,7 @@ class BaseNotebook:
         self.paramtoolkit_currentparam = ""
         self.IC_file_list = None
         self.IC_file_name = ""
-        self.carryover_include_flags = {}
+        self.ICregen_include_flags = {}
         
             
         # Helpers, flags, and containers for analysis plots
@@ -142,7 +142,7 @@ class BaseNotebook:
         self.PL_xaxis_popup_isopen = False
         self.change_axis_popup_isopen = False
         self.plotter_popup_isopen = False
-        self.IC_carry_popup_isopen = False
+        self.IC_regen_popup_isopen = False
         self.bayesim_popup_isopen = False
     # Create GUI elements for each tab
     # Tkinter works a bit like a bulletin board:

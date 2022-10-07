@@ -298,7 +298,7 @@ def submodule_get_timeseries(pathname, datatype, parent_data, total_time, dt, pa
         return
 
 
-def submodule_get_IC_carry(sim_data, param_dict, include_flags, grid_x):
+def submodule_get_IC_regen(sim_data, param_dict, include_flags, grid_x):
     """ Set delta_N and delta_P of outgoing regenerated IC file."""
     param_dict["MAPI"]["delta_N"] = (sim_data["MAPI"]["N"] - param_dict["MAPI"]["N0"]) if include_flags["MAPI"]['N'] else np.zeros(len(grid_x))
     param_dict["MAPI"]["delta_P"] = (sim_data["MAPI"]["P"] - param_dict["MAPI"]["P0"]) if include_flags["MAPI"]['P'] else np.zeros(len(grid_x))
