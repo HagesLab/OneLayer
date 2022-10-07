@@ -70,9 +70,18 @@ def export_ICfile(newFileName, nb, flags, layers, allow_write_LGC=False):
             ofstream.write("p$ System Parameters:\n")
         
             # Saves occur as-is: any missing parameters are saved with whatever default value module gives them
-            for param in layer.params:
-                if param == "Total_length" or param == "Node_width": continue
-                param_values = layer.params[param].value
+            if isinstance(layer, dict):
+                pp = layer
+            else:
+                pp = layer.params
+            for param in pp:
+                if param in ["Total_length", "Node_width", "edge_x", "node_x"]: continue
+            
+                if isinstance(layer, dict):
+                    param_values = pp[param]
+                else:
+                    param_values = pp[param].value
+                    
                 if isinstance(param_values, np.ndarray):
                     # Write the array in a more convenient format
                     ofstream.write("{}: {:.8e}".format(param, param_values[0]))

@@ -1224,13 +1224,35 @@ class Notebook(BaseNotebook):
             
             self.carry_checkbuttons = {}
             rcount = 1
+
+                    
+            if len(self.module.layers) > 1:
+                shared_outputs = self.module.report_shared_s_outputs()
+                self.carry_checkbuttons["__SHARED__"] = {}
+                self.carryover_include_flags["__SHARED__"] = {}
+            else:
+                shared_outputs = {}
+                
+            for var in shared_outputs:
+                self.carryover_include_flags["__SHARED__"][var] = tk.IntVar()
+                self.carry_checkbuttons["__SHARED__"][var] = \
+                    tk.Checkbutton(
+                        self.IC_carry_popup,
+                        text=var,
+                        variable=self.carryover_include_flags["__SHARED__"][var])
+                self.carry_checkbuttons["__SHARED__"][var].grid(row=rcount, column=0)
+                rcount += 1
+            
             for layer_name, layer in self.module.layers.items():
                 self.carry_checkbuttons[layer_name] = {}
+                self.carryover_include_flags[layer_name] = {}
                 for var in layer.s_outputs:
+                    if var in shared_outputs: continue
+                    self.carryover_include_flags[layer_name][var] = tk.IntVar()
                     self.carry_checkbuttons[layer_name][var] = \
                         tk.Checkbutton(
                             self.IC_carry_popup,
-                            text=var,
+                            text="{}: {}".format(layer_name, var),
                             variable=self.carryover_include_flags[layer_name][var])
                     self.carry_checkbuttons[layer_name][var].grid(row=rcount, column=0)
                     rcount += 1
@@ -1274,7 +1296,7 @@ class Notebook(BaseNotebook):
                     return
                 
                 include_flags = {}
-                for layer_name in self.module.layers:
+                for layer_name in self.carryover_include_flags:
                     include_flags[layer_name] = {}
                     for iflag in self.carryover_include_flags[layer_name]:
                         include_flags[layer_name][iflag] = self.carryover_include_flags[layer_name][iflag].get()
@@ -1287,8 +1309,8 @@ class Notebook(BaseNotebook):
                     if not new_filename: 
                         continue
 
-                    if new_filename.endswith(".txt"): 
-                        new_filename = new_filename[:-4]
+                    if not new_filename.endswith(".txt"): 
+                        new_filename = new_filename + ".txt"
                     
                     param_dict_copy = dict(active_sets[key].params_dict)
 
@@ -1318,9 +1340,10 @@ class Notebook(BaseNotebook):
                                                include_flags, grid_x)
                     for layer_name, layer_params in param_dict_copy.items():
                         for param in layer_params:
-                            param_values = layer_params[param]
-                            param_values *= self.module.layers[layer_name].convert_out[param]
+                            layer_params[param] *= self.module.layers[layer_name].convert_out.get(param, 1)
                             
+                    if "__SHARED__" in param_dict_copy:
+                        param_dict_copy.pop("__SHARED__")
                     export_ICfile(new_filename, self, active_sets[key].flags, 
                                   param_dict_copy, allow_write_LGC=False)
                     

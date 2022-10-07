@@ -98,10 +98,7 @@ class BaseNotebook:
         self.IC_file_list = None
         self.IC_file_name = ""
         self.carryover_include_flags = {}
-        for layer_name, layer in self.module.layers.items():
-            self.carryover_include_flags[layer_name] = {}
-            for var in layer.s_outputs:
-                self.carryover_include_flags[layer_name][var] = tk.IntVar()
+        
             
         # Helpers, flags, and containers for analysis plots
         self.analysis_plots = [
