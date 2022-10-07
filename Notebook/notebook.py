@@ -1211,7 +1211,10 @@ class Notebook(BaseNotebook):
 
     def do_IC_regen_popup(self):
         """ Open a tool to regenerate IC files based on current state of analysis plots. """
-        self.IC_regen_popup = ICRegenPopup(self, logger)
+        plot_ID = self.active_analysisplot_ID.get()
+        if self.analysis_plots[plot_ID].datagroup.size() == 0: 
+            return
+        self.IC_regen_popup = ICRegenPopup(plot_ID, self, logger)
         self.IC_regen_popup_isopen = True
         return
 

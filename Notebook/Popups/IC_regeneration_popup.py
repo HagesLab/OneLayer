@@ -15,13 +15,9 @@ from Notebook.Popups.base_popup import Popup
 
 class ICRegenPopup(Popup):
     
-    def __init__(self, nb, logger):
+    def __init__(self, plot_ID, nb, logger):
         super().__init__(nb, grab=True)
         
-        plot_ID = self.nb.active_analysisplot_ID.get()
-
-        if self.nb.analysis_plots[plot_ID].datagroup.size() == 0: 
-            return
 
         tk.ttk.Label(self.toplevel, 
                      text="Select data to include in new IC",
@@ -40,6 +36,7 @@ class ICRegenPopup(Popup):
             
         for var in shared_outputs:
             self.nb.ICregen_include_flags["__SHARED__"][var] = tk.IntVar()
+            self.nb.ICregen_include_flags["__SHARED__"][var].set(1)
             self.regen_checkbuttons["__SHARED__"][var] = \
                 tk.Checkbutton(
                     self.toplevel,
@@ -54,11 +51,13 @@ class ICRegenPopup(Popup):
             for var in layer.s_outputs:
                 if var in shared_outputs: continue
                 self.nb.ICregen_include_flags[layer_name][var] = tk.IntVar()
+                self.nb.ICregen_include_flags[layer_name][var].set(1)
                 self.regen_checkbuttons[layer_name][var] = \
                     tk.Checkbutton(
                         self.toplevel,
                         text="{}: {}".format(layer_name, var),
-                        variable=self.nb.ICregen_include_flags[layer_name][var])
+                        variable=self.nb.ICregen_include_flags[layer_name][var],
+                        onvalue=1,offvalue=0)
                 self.regen_checkbuttons[layer_name][var].grid(row=rcount, column=0)
                 rcount += 1
 
@@ -118,9 +117,30 @@ class ICRegenPopup(Popup):
                     
                     filename = active_sets[key].filename
                     sim_data = {}
+                    if "__SHARED__" in include_flags:
+                        any_layer = next(iter(self.nb.module.layers))
+                        sim_data["__SHARED__"] = {}
+                        for var in self.nb.module.layers[any_layer].s_outputs:
+                            
+                            path_name = os.path.join(self.nb.default_dirs["Data"], 
+                                                        self.nb.module.system_ID,
+                                                        filename,
+                                                        "{}-{}.h5".format(filename, var))
+                            floor_tstep = int(active_plot.time / active_sets[key].dt)
+                            interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
+                            
+                            if active_plot.time == active_sets[key].total_time:
+                                pass
+                            else:
+                                slope = (interpolated_step[1] - interpolated_step[0]) / (active_sets[key].dt)
+                                interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * active_sets[key].dt)
+                            
+                            sim_data["__SHARED__"][var] = interpolated_step
+                    
                     for layer_name, layer in self.nb.module.layers.items():
                         sim_data[layer_name] = {}
                         for var in layer.s_outputs:
+                            if "__SHARED__" in sim_data and var in sim_data["__SHARED__"]: continue
                             path_name = os.path.join(self.nb.default_dirs["Data"], 
                                                         self.nb.module.system_ID,
                                                         filename,
@@ -138,12 +158,14 @@ class ICRegenPopup(Popup):
 
                     self.nb.module.get_IC_regen(sim_data, param_dict_copy, 
                                                include_flags, grid_x)
+                    if "__SHARED__" in param_dict_copy:
+                        param_dict_copy.pop("__SHARED__")
+                        
                     for layer_name, layer_params in param_dict_copy.items():
                         for param in layer_params:
                             layer_params[param] *= self.nb.module.layers[layer_name].convert_out.get(param, 1)
                             
-                    if "__SHARED__" in param_dict_copy:
-                        param_dict_copy.pop("__SHARED__")
+                    
                     export_ICfile(new_filename, self.nb, active_sets[key].flags, 
                                   param_dict_copy, allow_write_LGC=False)
                     
