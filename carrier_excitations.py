@@ -50,6 +50,18 @@ def pulse_laser_powerdensity(power_density, freq, wavelength,
     """
     return (power_density / (freq * hc / wavelength) * alpha * np.exp(-alpha * x_array))
 
+def pulse_laser_fluence(fluence, alpha, x_array, hc=6.626e-34*2.997e8):
+    """
+    Initial excitation profile.
+    Parameters
+    ----------
+    fluence : float
+        Laser fluence. This times alpha equals the amplitude.
+    See pulse_laser_power_spotsize for more details.
+
+    """
+    return (fluence * alpha * np.exp(-alpha * x_array))
+
 def pulse_laser_maxgen(max_gen, alpha, x_array, hc=6.626e-34*2.997e8):
     """
     Initial excitation profile.

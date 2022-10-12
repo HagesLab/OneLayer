@@ -333,6 +333,25 @@ class BaseNotebook:
         self.total_gen_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.total_gen_entry.grid(row=9,column=3)
         
+        
+        
+        tk.ttk.Separator(self.gen_power_param_frame, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=10,column=0,columnspan=30, pady=(5,5), sticky="ew")
+
+        tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                           variable=self.LGC_gen_power_mode, 
+                           value="fluence").grid(row=11,column=0)
+        
+        tk.Label(self.gen_power_param_frame, text="Option 5").grid(row=11,column=1)
+
+        tk.Label(self.gen_power_param_frame, 
+                 text="Fluence [phot/cm^2 pulse]").grid(row=11,column=2)
+
+        self.fluence_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
+        self.fluence_entry.grid(row=11,column=3)
+
+        
         self.LGC_layer_frame = tk.ttk.Frame(self.LGC_frame)
         self.LGC_layer_frame.grid(row=2,column=1,padx=(20,0))
         
@@ -401,7 +420,8 @@ class BaseNotebook:
                                     "Spotsize":self.spotsize_entry, 
                                     "Power_Density":self.power_density_entry,
                                     "Max_Gen":self.max_gen_entry, 
-                                    "Total_Gen":self.total_gen_entry}
+                                    "Total_Gen":self.total_gen_entry,
+                                    "Fluence":self.fluence_entry}
         self.enter(self.LGC_entryboxes_dict["A0"], "1240")
         self.LGC_optionboxes = {"long_expfactor":self.check_calculate_init_material_expfactor, 
                                 "incidence":self.LGC_stim_mode,

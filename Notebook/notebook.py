@@ -2887,7 +2887,13 @@ class Notebook(BaseNotebook):
 
             current_layer.params["delta_N"].value = carrier_excitations.pulse_laser_totalgen(total_gen, current_layer.total_length, 
                                                                                              alpha_nm, grid_x)
-        
+        elif (self.LGC_optionboxes["power_mode"].get() == "fluence"):
+            try: fluence = float(self.fluence_entry.get()) * ((1e-7) ** 2) # [cm^-2] to [nm^-2]
+            except Exception:
+                self.write(self.ICtab_status, "Error: missing fluence")
+                return
+            current_layer.params["delta_N"].value = carrier_excitations.pulse_laser_fluence(fluence, alpha_nm, 
+                                                                                            grid_x)
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
@@ -2941,6 +2947,9 @@ class Notebook(BaseNotebook):
 
         elif (self.LGC_options[self.current_layer_name]["power_mode"] == "total-gen"):
             self.LGC_values[self.current_layer_name]["Total_Gen"] = total_gen * ((1e7) ** 3)
+            
+        elif (self.LGC_options[self.current_layer_name]["power_mode"] == "fluence"):
+            self.LGC_values[self.current_layer_name]["Fluence"] = fluence * ((1e7) ** 2)
         
     ## Special functions for Parameter Toolkit:
     def add_paramrule(self):
