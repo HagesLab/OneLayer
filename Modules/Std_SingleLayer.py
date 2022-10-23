@@ -73,7 +73,8 @@ class Std_SingleLayer(OneD_Model):
                              "Auger":Output("Auger Recombination", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]", xlabel="nm", xvar="position",is_edge=False, layer="OneLayer"),
                              "NRR":Output("Non-radiative Recombination", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]", xlabel="nm", xvar="position", is_edge=False, layer="OneLayer"),
                              "PL":Output("TRPL", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer"),
-                             "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer", analysis_plotable=False)}
+                             "tau_diff":Output("tau_diff", units="[ns]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer", analysis_plotable=False),
+                             "TRTS":Output("TRTS", units="[a.u.]", xlabel="ns", xvar="time", is_edge=False, layer="OneLayer")}
         
         ## Lists of conversions into and out of TEDs units (e.g. nm/s) from common units (e.g. cm/s)
         # Multiply the parameter values the user enters in common units by the corresponding coefficient in this dictionary to convert into TEDs units
@@ -109,11 +110,13 @@ class Std_SingleLayer(OneD_Model):
         convert_in["Auger"] = convert_in["CN"] * convert_in["N"] * (convert_in["N"] * convert_in["P"]) # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["NRR"] = convert_in["N"] * 1e-9 # [cm^-3 s^-1] to [nm^-3 ns^-1]
         convert_in["PL"] = convert_in["RR"]
+        convert_in["TRTS"] = convert_in["N"] * convert_in["mu_N"]
         
         iconvert_in = {"N":1e7, "P":1e7, "delta_N":1e7, "delta_P":1e7, # cm to nm
                        "E_field":1, # nm to nm
                        "RR": 1e7, "Auger":1e7, "NRR": 1e7, "PL": 1e7, "dP-dN":1e7, "Jp+Jn":1e7,
-                       "Jn_drift":1e7,"Jn_diff":1e7,"Jp_drift":1e7,"Jp_diff":1e7, "Jn":1e7,"Jp":1e7}
+                       "Jn_drift":1e7,"Jn_diff":1e7,"Jp_drift":1e7,"Jp_diff":1e7, "Jn":1e7,"Jp":1e7,
+                       "TRTS":1e7}
 
         # Multiply the parameter values TEDs is using by the corresponding coefficient in this dictionary to convert back into common units
             
@@ -199,10 +202,14 @@ class Std_SingleLayer(OneD_Model):
                                                     dx, total_length, False)
         data_dict["OneLayer"]["tau_diff"] = tau_diff(data_dict["OneLayer"]["PL"], dt)
         
+        temp_TRTS = TRTS({"N":temp_N, "P":temp_P}, params)
+        data_dict["OneLayer"]["TRTS"] = new_integrate(temp_TRTS, 0, total_length, dx, total_length, False)
+        
         for data in data_dict["OneLayer"]:
             data_dict["OneLayer"][data] *= one_layer.convert_out[data]
             
         data_dict["OneLayer"]["PL"] *= one_layer.iconvert_out["PL"]
+        data_dict["OneLayer"]["TRTS"] *= one_layer.iconvert_out["TRTS"]
         
         return data_dict
     
@@ -272,6 +279,10 @@ class Std_SingleLayer(OneD_Model):
                     rad_rec = radiative_recombination(sim_data, params)
                     data = prep_PL(rad_rec, 0, len(rad_rec)-1, False, 
                                    params, ignore_recycle).flatten()
+                    
+            elif (datatype == "TRTS"):
+                data = TRTS(sim_data, params)
+                
             else:
                 raise ValueError
                 
@@ -763,6 +774,10 @@ def nonradiative_recombination(sim_outputs, params):
        Assumes quasi steady state trap level occupation
       """
     return (sim_outputs["N"] * sim_outputs["P"] - params["N0"] * params["P0"]) / ((params["tau_N"] * sim_outputs["P"]) + (params["tau_P"] * sim_outputs["N"]))
+
+def TRTS(sim_outputs, params):
+    """ThZ photoconductivity from Greg, thin film approx."""
+    return (params["mu_N"] * delta_n(sim_outputs, params) + params["mu_P"] * delta_p(sim_outputs, params))
 
 def tau_diff(PL, dt):
     """

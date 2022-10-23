@@ -3366,7 +3366,7 @@ class Notebook(BaseNotebook):
                 
         # Apply each combination to module, going through LGC if necessary
         for batch_set in batch_combinations:
-            filename = ""
+            filename = batch_dir_name
             for b in batch_set:
                 layer, param = b.split('-')
                 filename += str("__{}_{:.4e}".format(b, batch_set[b]))
