@@ -1290,13 +1290,12 @@ class Notebook(BaseNotebook):
 
         shared_outputs = self.module.report_shared_s_outputs()
         if len(shared_outputs) > 0:
-            any_layer_name = next(iter(self.module.layers))
-            convert_out = self.module.layers[any_layer_name].convert_out
+            convert_out = self.module.shared_layer.convert_out
             total_lengths = [self.module.layers[layer_name].total_length
                              for layer_name in self.module.layers]
         
         for variable in shared_outputs:
-            output_obj = self.module.layers[any_layer_name].s_outputs[variable]
+            output_obj = self.module.shared_layer.s_outputs[variable]
             plot = self.sim_subplots[variable]
             
             if do_clear_plots: 
@@ -1320,7 +1319,7 @@ class Notebook(BaseNotebook):
             if not failed_vars[variable]:
                 plot.plot(shared_x, self.sim_data[variable] * convert_out[variable])
 
-            plot.set_xlabel("x {}".format(self.module.layers[any_layer_name].length_unit))
+            plot.set_xlabel("x {}".format(self.module.shared_layer.length_unit))
             plot.set_ylabel("{} {}".format(variable, output_obj.units))
 
             plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
@@ -1493,7 +1492,7 @@ class Notebook(BaseNotebook):
             return
         
         for output_name, plot_obj in self.shared_overview_subplots.items():
-            output_info_obj = self.module.layers[layer_names[0]].outputs[output_name]
+            output_info_obj = self.module.shared_layer.outputs[output_name]
             plot_obj.cla()
             plot_obj.set_yscale(output_info_obj.yscale)
             plot_obj.set_xlabel(output_info_obj.xlabel)
@@ -1529,8 +1528,7 @@ class Notebook(BaseNotebook):
 
         # Handle shared outputs
         if "__SHARED__" in self.overview_values:
-            any_layer = next(iter(self.module.layers))
-            any_layer = self.module.layers[any_layer]
+            any_layer = self.module.shared_layer
             for output_name, output_info in any_layer.outputs.items():
                 try:
                     values = self.overview_values["__SHARED__"][output_name]
@@ -1695,8 +1693,7 @@ class Notebook(BaseNotebook):
             return "Error: missing or has unusual metadata.txt"
         
         if target_layer == "__SHARED__":
-            any_layer = next(iter(self.module.layers))
-            is_edge = self.module.layers[any_layer].outputs[datatype].is_edge
+            is_edge = self.module.shared_layer.outputs[datatype].is_edge
         else:
             is_edge = self.module.layers[target_layer].outputs[datatype].is_edge
             
@@ -1712,7 +1709,7 @@ class Notebook(BaseNotebook):
         sim_data = {}
         if target_layer == "__SHARED__":
             sim_data["__SHARED__"] = {}
-            for sim_datatype in self.module.layers[any_layer].s_outputs:
+            for sim_datatype in self.module.shared_layer.s_outputs:
                 path_name = os.path.join(
                     self.default_dirs["Data"], 
                     self.module.system_ID,
@@ -1842,8 +1839,7 @@ class Notebook(BaseNotebook):
             sim_data = {}
             if dataset.layer_name == "__SHARED__":
                 sim_data["__SHARED__"] = {}
-                any_layer = next(iter(self.module.layers))
-                for sim_datatype in self.module.layers[any_layer].s_outputs:
+                for sim_datatype in self.module.shared_layer.s_outputs:
                     path_name = os.path.join(
                         self.default_dirs["Data"], 
                         self.module.system_ID,
@@ -2339,8 +2335,7 @@ class Notebook(BaseNotebook):
                         sim_data = {}
                         sim_data[where_layer] = {}
                         extra_data[where_layer] = {}
-                        any_layer = next(iter(self.module.layers))
-                        for sim_datatype in self.module.layers[any_layer].s_outputs:
+                        for sim_datatype in self.module.shared_layer.s_outputs:
     
                             if do_curr_t:
                                 try:
