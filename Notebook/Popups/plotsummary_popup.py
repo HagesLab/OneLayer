@@ -161,9 +161,9 @@ class PlotSummaryPopup(Popup):
         count = 1
         if share_special:
             for param_name in shared_params:
-                if all((self.nb.module.layers[layer_name].params[param_name].is_space_dependent for layer_name in self.nb.module.layers)):
+                if self.nb.module.shared_layer.params[param_name].is_space_dependent:
                     self.plotsummary_axes[i][param_name] = self.plotsummary_figs[i].add_subplot(int(rdim), int(cdim), int(count))
-                    self.plotsummary_axes[i][param_name].set_title("{} {}".format(param_name, self.nb.module.layers[next(iter(self.nb.module.layers))].params[param_name].units))
+                    self.plotsummary_axes[i][param_name].set_title("{} {}".format(param_name, self.nb.module.shared_layer.params[param_name].units))
                     count += 1
         
         else:
@@ -275,7 +275,7 @@ class PlotSummaryPopup(Popup):
                         self.plotsummary_axes[0][param_name].axvline(cml_total_length, color='black', linestyle='dashed', linewidth=0.2)
                         cml_total_length += layer.total_length
                         
-                if all((self.nb.module.layers[layer_name].params[param_name].is_space_dependent for layer_name in self.nb.module.layers)):
+                if self.nb.module.shared_layer.params[param_name].is_space_dependent:
                     self.plotsummary_axes[0][param_name].axvline(cml_total_length, color='black', linestyle='dashed', linewidth=0.2)
                     shared_x = np.hstack(shared_x)
                     shared_y = np.hstack(shared_y)

@@ -118,9 +118,8 @@ class ICRegenPopup(Popup):
                     filename = active_sets[key].filename
                     sim_data = {}
                     if "__SHARED__" in include_flags:
-                        any_layer = next(iter(self.nb.module.layers))
                         sim_data["__SHARED__"] = {}
-                        for var in self.nb.module.layers[any_layer].s_outputs:
+                        for var in self.nb.module.shared_layer.s_outputs:
                             
                             path_name = os.path.join(self.nb.default_dirs["Data"], 
                                                         self.nb.module.system_ID,

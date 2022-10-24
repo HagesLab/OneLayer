@@ -70,11 +70,10 @@ class PlotterPopup(Popup):
             shared_outputs = set.union(*[self.nb.module.report_shared_s_outputs(), self.nb.module.report_shared_c_outputs()])
         else:
             shared_outputs = {}
-        any_layer_name = next(iter(self.nb.module.layers))
             
         all_outputs = []
         for shared_output in shared_outputs:
-            if self.nb.module.layers[any_layer_name].outputs[shared_output].analysis_plotable:
+            if self.nb.module.shared_layer.outputs[shared_output].analysis_plotable:
                 all_outputs.append("{}".format(shared_output))
             
         for layer_name, layer in self.nb.module.layers.items():
