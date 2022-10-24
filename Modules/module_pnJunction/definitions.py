@@ -129,6 +129,19 @@ def define_layers():
 
     return layers
 
+def define_shared_layer():
+    # Using n-type as the template layer
+    convert_in = define_ntype_convert_in()
+    iconvert_in = define_ntype_iconvert_in()
+    
+    return Layer(
+            define_ntype_params(),
+            define_ntype_simulation_outputs("__SHARED__"),
+            define_ntype_calculated_outputs("__SHARED__"),
+            "[nm]",
+            convert_in,
+            iconvert_in)
+
 
 def define_flags():
     return {

@@ -5,7 +5,7 @@ Created on Wed May 12 18:01:07 2021
 @author: cfai2
 """
 from _OneD_Model import OneD_Model
-from Modules.module_pnJunction.definitions import define_layers
+from Modules.module_pnJunction.definitions import define_layers, define_shared_layer
 from Modules.module_pnJunction.definitions import define_flags
 from Modules.module_pnJunction.initializations import PN_Junction_Initial_Conditions
 from Modules.module_pnJunction.analysis import submodule_get_overview_analysis
@@ -31,6 +31,8 @@ class PN_Junction(OneD_Model):
         self.time_unit = "[ns]"
         self.flags_dict = define_flags()
         self.layers = define_layers()
+        
+        self.shared_layer = define_shared_layer()
 
         return
 
@@ -61,7 +63,9 @@ class PN_Junction(OneD_Model):
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        data_dict = submodule_get_overview_analysis(self.layers, params, flags, total_time, dt, tsteps, data_dirname, file_name_base)
+        # We actually don't need info from any layer in particular, so use shared_layer
+        data_dict = submodule_get_overview_analysis(self.shared_layer, params, flags, total_time, 
+                                                    dt, tsteps, data_dirname, file_name_base)
         return data_dict
 
 
@@ -69,8 +73,7 @@ class PN_Junction(OneD_Model):
                      i=0, j=0, nen=False, extra_data=None):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        # Since target_layer is always __SHARED__, we can't use it to lookup a layer object
-        layer = self.layers[next(iter(self.layers))]
+        layer = self.shared_layer
         data = submodule_prep_dataset(target_layer, layer, datatype, sim_data, params,
                     for_integrate, i, j, nen, extra_data)
         return data

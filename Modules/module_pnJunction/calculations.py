@@ -163,7 +163,7 @@ def prep_PL(rad_rec, i, j, need_extra_node):
 
 class CalculatedOutputs():
     
-    def __init__(self, sim_outputs, params, layer_info):
+    def __init__(self, sim_outputs, params):
         self.sim_outputs = sim_outputs
         
         self.layer_names = ["N-type", "buffer", "P-type"]

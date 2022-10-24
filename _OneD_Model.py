@@ -19,7 +19,14 @@ class OneD_Model:
     This class stores information regarding a module's 
     Layers, Parameters, Outputs, and Flags.
     
-    All child modules must populate __init__'s fields and implement:
+    All child modules must, in  __init__, define:
+        system_ID
+        time_unit
+        flags_dict
+        layers
+        shared_layer
+        
+    and implement:
         calc_inits()
         simulate()
         get_overview_analysis()
@@ -59,7 +66,21 @@ class OneD_Model:
         
         self.layers["Example Layer"] = Layer(params, simulation_outputs, calculated_outputs, 
                                              "[nm]", convert_in, iconvert_in)
-
+        
+        # Modules may additionally define a dummy "__SHARED__" layer for systems in which
+        # multiple layers have identical lists of params and outputs 
+        # (see report_shared_params() for a programmatic def and the PN_Junction
+        # module for a physical example).
+        # The notebook handles these in a special way and will look for this
+        # entry in self.layers instead of each individual layer's entry.
+        
+        # Modules which do not share params and outputs should instead leave
+        # __SHARED__ as None.
+        
+        # Models with only one layer should also leave __SHARED__ as None.
+        
+        self.shared_layer = None
+        
 
         return
     
