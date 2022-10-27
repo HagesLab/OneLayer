@@ -1314,19 +1314,21 @@ class Notebook(BaseNotebook):
         """
         if do_clear_plots: 
             plot_handler.cla()
-            ymin = np.amin(y) * kwargs.get('yb_lower', 1)
-            ymax = np.amax(y) * kwargs.get('yb_upper', 1)
-            plot_handler.set_ylim(ymin, ymax)
+            if 'yb_lower' in kwargs and 'yb_upper' in kwargs:
+                ymin = np.amin(y) * kwargs.get('yb_lower', 1)
+                ymax = np.amax(y) * kwargs.get('yb_upper', 1)
+                plot_handler.set_ylim(ymin, ymax)
 
-        plot_handler.set_yscale(kwargs.get('yscale', "symlog"))
+        if 'yscale' in kwargs:
+            plot_handler.set_yscale(kwargs.get('yscale', "symlog"))
         
         if visible:
             label = kwargs.get('label', None)
             plot_handler.plot(x, y, label=label)
 
-        plot_handler.set_xlabel(kwargs.get('xlabel', ""))
-        plot_handler.set_ylabel(kwargs.get('ylabel', ""))
-        plot_handler.set_title(kwargs.get('title', ""))
+        if 'xlabel' in kwargs: plot_handler.set_xlabel(kwargs.get('xlabel', ""))
+        if 'ylabel' in kwargs: plot_handler.set_ylabel(kwargs.get('ylabel', ""))
+        if 'title' in kwargs:  plot_handler.set_title(kwargs.get('title', ""))
 
         if kwargs.get("do_legend", False):
             plot_handler.legend()
@@ -1509,7 +1511,7 @@ class Notebook(BaseNotebook):
                     
                 tstep_list = np.linspace(0, data_n, num=sample_ct)
                 
-            else:
+            else: # Custom, list of sample pts
                 sample_ct = self.overview_samplect_entry.get()
                 tstep_list = np.array(np.array(extract_values(sample_ct, ' ')) / dt, dtype=int)
                 
@@ -1523,30 +1525,6 @@ class Notebook(BaseNotebook):
                     hide_cancel=True)
             return
         
-        # TODO: Compress duplicate codeblock
-        for output_name, plot_obj in self.shared_overview_subplots.items():
-            output_info_obj = self.module.shared_layer.outputs[output_name]
-            plot_obj.cla()
-            plot_obj.set_yscale(output_info_obj.yscale)
-            plot_obj.set_xlabel(output_info_obj.xlabel)
-            if output_info_obj.xvar == "time":
-                plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.integrated_units))
-            else:
-                plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
-
-        
-        for layer_name, layer in self.overview_subplots.items():
-            for subplot in layer:
-                plot_obj = layer[subplot]
-                output_info_obj = self.module.layers[layer_name].outputs[subplot]
-                plot_obj.cla()
-                plot_obj.set_yscale(output_info_obj.yscale)
-                plot_obj.set_xlabel(output_info_obj.xlabel)
-                if output_info_obj.xvar == "time":
-                    plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.integrated_units))
-                else:
-                    plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
-        
         self.overview_values = \
             self.module.get_overview_analysis(
                 param_values_dict,
@@ -1558,14 +1536,21 @@ class Notebook(BaseNotebook):
                 data_filename)
         
         warning_msg = ["Error: the following occured while generating the overview"]
+                
+        done = {}
+        for layer_name, layer in self.module.layers.items():
+            for output_name, output_info in layer.outputs.items():
+                if done.get(output_name, False): continue
+            
+                # plot handlers and output data for SHARED parameters are stored
+                # separately
+                is_shared = output_name in self.shared_overview_subplots
 
-        # Handle shared outputs
-        # TODO: Compress duplicate codeblock
-        if "__SHARED__" in self.overview_values:
-            any_layer = self.module.shared_layer
-            for output_name, output_info in any_layer.outputs.items():
                 try:
-                    values = self.overview_values["__SHARED__"][output_name]
+                    if is_shared:
+                        values = self.overview_values["__SHARED__"][output_name]
+                    else:
+                        values = self.overview_values[layer_name][output_name]
                     if not isinstance(values, np.ndarray): 
                         raise KeyError
                 except KeyError:
@@ -1576,69 +1561,67 @@ class Notebook(BaseNotebook):
                     continue
                 
                 if output_info.xvar == "time":
-                    grid_x = data_node_t
-                elif output_info.xvar == "position":
-                    total_lengths = [param_values_dict[layer_name]["Total_length"]
-                                     for layer_name in layer_names]
-                    
-                    if output_info.is_edge:
-                        grids_x = [param_values_dict[layer_name]['edge_x'] for layer_name in layer_names]
-                    else:
-                        grids_x = [param_values_dict[layer_name]['node_x'] for layer_name in layer_names]
-
-                    grid_x = generate_shared_x_array(output_info.is_edge,
-                                                     grids_x, total_lengths)
+                    title = "{} {}".format(output_info.display_name, output_info.integrated_units)
                 else:
-                    warning_msg.append("Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name))
-                    continue
-                
-                if values.ndim == 2: # time/space variant outputs
-                    for i in range(len(values)):
-                        self.shared_overview_subplots[output_name].plot(grid_x, values[i], 
-                                                                             label="{:.3f} ns".format(tstep_list[i] * dt))
-                else: # Time variant only
-                    self.shared_overview_subplots[output_name].plot(grid_x, values)
-                    
-            for output_name in any_layer.s_outputs:
-                self.shared_overview_subplots[output_name].legend().set_draggable(True)
-                break
-                
-        for layer_name, layer in self.module.layers.items():
-            for output_name, output_info in layer.outputs.items():
-                if output_name in self.shared_overview_subplots:
-                    continue
-                
-                try:
-                    values = self.overview_values[layer_name][output_name]
-                    if not isinstance(values, np.ndarray): 
-                        raise KeyError
-                except KeyError:
-                    warning_msg.append("Warning: {}'s get_overview_analysis() did not return data for {}\n".format(self.module.system_ID, output_name))
-                    continue
-                except Exception:
-                    warning_msg.append("Error: could not calculate {}".format(output_name))
-                    continue
+                    title = "{} {}".format(output_info.display_name, output_info.units)
     
                 if output_info.xvar == "time":
                     grid_x = data_node_t
                 elif output_info.xvar == "position":
-                    grid_x = param_values_dict[layer_name]['node_x'] if not output_info.is_edge else param_values_dict[layer_name]['edge_x']
+                    if is_shared:
+                        total_lengths = [param_values_dict[layer_name]["Total_length"]
+                                         for layer_name in layer_names]
+                        
+                        if output_info.is_edge:
+                            grids_x = [param_values_dict[layer_name]['edge_x'] for layer_name in layer_names]
+                        else:
+                            grids_x = [param_values_dict[layer_name]['node_x'] for layer_name in layer_names]
+
+                        grid_x = generate_shared_x_array(output_info.is_edge,
+                                                         grids_x, total_lengths)
+                    else:
+                        grid_x = param_values_dict[layer_name]['node_x'] if not output_info.is_edge else param_values_dict[layer_name]['edge_x']
                 else:
                     warning_msg.append("Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name))
                     continue
                 
+                if is_shared:
+                    plot_obj = self.shared_overview_subplots[output_name]
+                else:
+                    plot_obj = self.overview_subplots[layer_name][output_name]
                 if values.ndim == 2: # time/space variant outputs
                     for i in range(len(values)):
-                        self.overview_subplots[layer_name][output_name].plot(grid_x, values[i], 
-                                                                             label="{:.3f} ns".format(tstep_list[i] * dt))
+                        self.format_sim_plots(grid_x, values[i], plot_obj, visible=True,
+                                              do_clear_plots=i==0,
+                                              xlabel=output_info.xlabel,
+                                              yscale=output_info.yscale,
+                                              title=title,
+                                              label="{:.3f} ns".format(tstep_list[i] * dt))
                 else: # Time variant only
-                    self.overview_subplots[layer_name][output_name].plot(grid_x, values)
+                    self.format_sim_plots(grid_x, values, plot_obj, visible=True,
+                                          do_clear_plots=True,
+                                          xlabel=output_info.xlabel,
+                                          yscale=output_info.yscale,
+                                          title=title,
+                                          label="{:.3f} ns".format(tstep_list[i] * dt))
+                    
+                done[output_name] = True
 
         for layer_name, layer in self.module.layers.items():
             for output_name in layer.s_outputs:
-                if output_name not in self.shared_overview_subplots:
+                try:
+                    self.shared_overview_subplots[output_name].legend().set_draggable(True)
+                    break
+                except KeyError:
+                    pass
+                    # Try looking in overview_subplots instead
+                try:
                     self.overview_subplots[layer_name][output_name].legend().set_draggable(True)
                     break
+                except KeyError:
+                    pass
+                
+                
         if len(warning_msg) > 1:
             self.do_confirmation_popup("\n".join(warning_msg),hide_cancel=True)
             
