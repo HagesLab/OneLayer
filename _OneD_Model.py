@@ -19,7 +19,14 @@ class OneD_Model:
     This class stores information regarding a module's 
     Layers, Parameters, Outputs, and Flags.
     
-    All child modules must populate __init__'s fields and implement:
+    All child modules must, in  __init__, define:
+        system_ID
+        time_unit
+        flags_dict
+        layers
+        shared_layer
+        
+    and implement:
         calc_inits()
         simulate()
         get_overview_analysis()
@@ -59,7 +66,21 @@ class OneD_Model:
         
         self.layers["Example Layer"] = Layer(params, simulation_outputs, calculated_outputs, 
                                              "[nm]", convert_in, iconvert_in)
-
+        
+        # Modules may additionally define a dummy "__SHARED__" layer for systems in which
+        # multiple layers have identical lists of params and outputs 
+        # (see report_shared_params() for a programmatic def and the PN_Junction
+        # module for a physical example).
+        # The notebook handles these in a special way and will look for this
+        # entry in self.layers instead of each individual layer's entry.
+        
+        # Modules which do not share params and outputs should instead leave
+        # __SHARED__ as None.
+        
+        # Models with only one layer should also leave __SHARED__ as None.
+        
+        self.shared_layer = None
+        
 
         return
     
@@ -240,6 +261,54 @@ class OneD_Model:
             mssg.append("#########")
         return "\n".join(mssg)
     
+    def report_shared_params(self):
+        """
+        A shared parameter is one that is tracked in every layer defined by a module.
+        An example would be mu_N in the PN-junction, in which the n-type, buffer, and p-type
+        layers all have this parameter defined.
+        
+        This function returns a list of all such shared parameters.
+        
+        For consistency, this and related functions should be the only methods
+        used to check whether shared values exist.
+
+        Returns
+        -------
+        set
+            List of shared parameters (see above definition).
+
+        """
+        if len(self.layers) == 1:
+            return set()
+        
+        return set.intersection(*[set(self.layers[layer].params.keys())
+                                          for layer in self.layers])
+    
+    def report_shared_s_outputs(self):
+        """
+        Same as report_shared_params, but for s_outputs.
+
+        """
+        if len(self.layers) == 1:
+            return set()
+        
+        return set.intersection(*[set(self.layers[layer].s_outputs.keys())
+                                          for layer in self.layers])
+    
+    def report_shared_c_outputs(self):
+        """
+        Same as report_shared_params, but for c_outputs.
+
+        """
+        if len(self.layers) == 1:
+            return set()
+        
+        return set.intersection(*[set(self.layers[layer].c_outputs.keys())
+                                          for layer in self.layers])
+    
+    def report_shared_outputs(self):
+        return set.union(*[self.report_shared_s_outputs(), self.report_shared_c_outputs()])
+        
     def calc_inits(self):
         """
         Uses the self.param_dict to calculate initial conditions for ODEINT.
@@ -314,16 +383,21 @@ class OneD_Model:
 
         Returns
         -------
-        data_dict : dict {"output name": 1D or 2D numpy array}
+        data_dict : dict {"layer_name" :{"output name": 1D or 2D numpy array}}
             Collection of output data. 1D array if calculated once (e.g. an integral over space) and 2D if calculated at multiple times
             First dimension is time, second dimension is space
-            Must return one entry per output in self.output_dict
+            Must return one dict per layer, each dict with one entry per 
+            simulated or calculated output defined in the layer.
+            
+            Shared outputs (see report_shared_params()) should go into an additional
+            dict with "layer_name" = "__SHARED__".
+            See the PN-Junction module for an example of this.
         """
         data_dict = {}
 
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, flags, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
+    def prep_dataset(self, datatype, target_layer, sim_data, params, flags, for_integrate=False, i=0, j=0, nen=False, extra_data = None):
         """
         Use the raw data in sim_data to calculate quantities in self.outputs_dict.
         If datatype is in self.simulated_outputs dict this just needs to return the correct item from sim_data
@@ -332,6 +406,8 @@ class OneD_Model:
         ----------
         datatype : str
             The item we need to calculate.
+        target_layer : str
+            The name of the layer "datatype" is found in.
         sim_data : dict {"datatype": 1D or 2D numpy array}
             Collection of raw data read from .h5 files. 1D if single time step or 2D if time and space range.
         params : dict {"param name": 1D numpy array}
@@ -404,7 +480,7 @@ class OneD_Model:
         else:
             return
     
-    def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
+    def get_IC_regen(self, sim_data, param_dict, include_flags, grid_x):
         """
         Overwrites param_dict with values from the current data analysis in preparation for generating
         a new initial state file.
@@ -444,6 +520,14 @@ class OneD_Model:
             for param in self.layers[layer].params:
                 if '-' in param:
                     errors.append("'-' not allowed in param names")
+                    break
+                if ':' in param:
+                    errors.append("':' not allowed in param names")
+                    break
+                
+            for param in self.layers[layer].outputs:
+                if ':' in param:
+                    errors.append("':' not allowed in output names")
                     break
                 
         if len(errors) > 1:

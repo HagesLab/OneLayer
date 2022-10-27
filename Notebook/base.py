@@ -97,11 +97,8 @@ class BaseNotebook:
         self.paramtoolkit_currentparam = ""
         self.IC_file_list = None
         self.IC_file_name = ""
-        self.carryover_include_flags = {}
-        for layer_name, layer in self.module.layers.items():
-            self.carryover_include_flags[layer_name] = {}
-            for var in layer.s_outputs:
-                self.carryover_include_flags[layer_name][var] = tk.IntVar()
+        self.ICregen_include_flags = {}
+        
             
         # Helpers, flags, and containers for analysis plots
         self.analysis_plots = [
@@ -123,11 +120,13 @@ class BaseNotebook:
     def prepare_eligible_modules(self):
         # Add (e.g. for Nanowire) module-specific functionality
         # TODO: abstract the choices away from this code
-        self.LGC_eligible_modules = ("Nanowire", "OneLayer", "MAPI_Rubrene")
-        if self.module.system_ID in self.LGC_eligible_modules:
-            self.using_LGC = {}
-            self.LGC_options = {}
-            self.LGC_values = {}
+        self.LGC_eligible_modules = ("Nanowire", "OneLayer", "MAPI_Rubrene",
+                                     "PN_Junction")
+        
+        # Default LGC values
+        self.using_LGC = {layer:False for layer in self.module.layers}
+        self.LGC_options = {layer:{} for layer in self.module.layers}
+        self.LGC_values = {layer:{} for layer in self.module.layers}
 
 
     def reset_popup_flags(self):
@@ -143,7 +142,7 @@ class BaseNotebook:
         self.PL_xaxis_popup_isopen = False
         self.change_axis_popup_isopen = False
         self.plotter_popup_isopen = False
-        self.IC_carry_popup_isopen = False
+        self.IC_regen_popup_isopen = False
         self.bayesim_popup_isopen = False
     # Create GUI elements for each tab
     # Tkinter works a bit like a bulletin board:
@@ -334,6 +333,25 @@ class BaseNotebook:
         self.total_gen_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
         self.total_gen_entry.grid(row=9,column=3)
         
+        
+        
+        tk.ttk.Separator(self.gen_power_param_frame, 
+                         orient="horizontal", 
+                         style="Grey Bar.TSeparator").grid(row=10,column=0,columnspan=30, pady=(5,5), sticky="ew")
+
+        tk.ttk.Radiobutton(self.gen_power_param_frame, 
+                           variable=self.LGC_gen_power_mode, 
+                           value="fluence").grid(row=11,column=0)
+        
+        tk.Label(self.gen_power_param_frame, text="Option 5").grid(row=11,column=1)
+
+        tk.Label(self.gen_power_param_frame, 
+                 text="Fluence [phot/cm^2 pulse]").grid(row=11,column=2)
+
+        self.fluence_entry = tk.ttk.Entry(self.gen_power_param_frame, width=9)
+        self.fluence_entry.grid(row=11,column=3)
+
+        
         self.LGC_layer_frame = tk.ttk.Frame(self.LGC_frame)
         self.LGC_layer_frame.grid(row=2,column=1,padx=(20,0))
         
@@ -351,14 +369,14 @@ class BaseNotebook:
         
         self.LGC_layer_rbtns = {}
         self.LGC_layer_frame_title = tk.Label(self.LGC_layer_frame, text="Apply to layer: ")
-        self.LGC_layer_frame_title.grid(row=0,column=0,columnspan=2)
+        self.LGC_layer_frame_title.grid(row=0,column=0,columnspan=99)
         for i, layer_name in enumerate(LGC_eligible_layers):
             self.LGC_layer_rbtns[layer_name] = tk.ttk.Radiobutton(self.LGC_layer_frame, 
                                                       variable=self.LGC_layer, 
                                                       value=layer_name)
-            self.LGC_layer_rbtns[layer_name].grid(row=i+1,column=0)
+            self.LGC_layer_rbtns[layer_name].grid(row=2,column=i, padx=(10,10))
             layer_rbtn_label = tk.ttk.Label(self.LGC_layer_frame, text=layer_name)
-            layer_rbtn_label.grid(row=i+1,column=1)
+            layer_rbtn_label.grid(row=1,column=i, padx=(10,10))
 
         self.LGC_direction_frame = tk.Frame(self.LGC_frame)
         self.LGC_direction_frame.grid(row=3,column=0,columnspan=3)
@@ -402,7 +420,8 @@ class BaseNotebook:
                                     "Spotsize":self.spotsize_entry, 
                                     "Power_Density":self.power_density_entry,
                                     "Max_Gen":self.max_gen_entry, 
-                                    "Total_Gen":self.total_gen_entry}
+                                    "Total_Gen":self.total_gen_entry,
+                                    "Fluence":self.fluence_entry}
         self.enter(self.LGC_entryboxes_dict["A0"], "1240")
         self.LGC_optionboxes = {"long_expfactor":self.check_calculate_init_material_expfactor, 
                                 "incidence":self.LGC_stim_mode,

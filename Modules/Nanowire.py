@@ -106,16 +106,16 @@ class Nanowire(OneD_Model):
         
         return {"N":init_N, "P":init_P}
     
-    def simulate(self, data_path, m, n, dt, flags, hmax_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, rtol_, atol_, init_conditions):
         """Calls ODEINT solver."""
         nanowire = self.layers["Nanowire"]
         for param_name, param in nanowire.params.items():
             param.value *= nanowire.convert_in[param_name]
             
         ode_nanowire(data_path, m["Nanowire"], n, nanowire.dx, dt, nanowire.params,
-                     not flags['ignore_alpha'].value(), 
-                     flags['symmetric_system'].value(), 
-                     flags['check_do_ss'].value(), hmax_, True,
+                     not flags['ignore_alpha'], 
+                     flags['symmetric_system'], 
+                     flags['check_do_ss'], hmax_, True,
                      init_conditions["N"], init_conditions["P"])
     
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
@@ -168,7 +168,7 @@ class Nanowire(OneD_Model):
         
         return data_dict
     
-    def prep_dataset(self, datatype, sim_data, params, flags, for_integrate=False, 
+    def prep_dataset(self, datatype, target_layer, sim_data, params, flags, for_integrate=False, 
                      i=0, j=0, nen=False, extra_data=None):
         """ Provides delta_N, delta_P, electric field, recombination, 
             and spatial PL values on demand.
@@ -221,7 +221,7 @@ class Nanowire(OneD_Model):
         else:
             return
     
-    def get_IC_carry(self, sim_data, param_dict, include_flags, grid_x):
+    def get_IC_regen(self, sim_data, param_dict, include_flags, grid_x):
         """ Set delta_N and delta_P of outgoing regenerated IC file."""
         param_dict = param_dict["Nanowire"]
         sim_data = sim_data["Nanowire"]
@@ -435,7 +435,7 @@ def ode_nanowire(data_path_name, m, n, dx, dt, params, recycle_photons=True,
     ## Package initial condition
     # An unfortunate workaround - create temporary dictionaries out of necessary values to match the call signature of E_field()
     init_E_field = E_field({"N":init_N, "P":init_P}, 
-                           {"Rel-Permitivity":eps, "N0":n0, "P0":p0, "Node_width":dx})
+                           {"Rel_Permitivity":eps, "N0":n0, "P0":p0, "Node_width":dx})
     #init_E_field = np.zeros(m+1)
     
     init_condition = np.concatenate([init_N, init_P, init_E_field], axis=None)

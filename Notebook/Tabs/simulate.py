@@ -97,17 +97,18 @@ def add_tab_simulate(nb):
     cdim = np.ceil(np.sqrt(nb.module.count_s_outputs()))
     
     rdim = np.ceil(nb.module.count_s_outputs() / cdim)
+    
     nb.sim_subplots = {}
     for layer_name, layer in nb.module.layers.items():
-        nb.sim_subplots[layer_name] = {}
-        for variable in layer.s_outputs:
-            nb.sim_subplots[layer_name][variable] = \
-                nb.sim_fig.add_subplot(
-                    int(rdim), 
-                    int(cdim), 
-                    int(count))
-            nb.sim_subplots[layer_name][variable].set_title(variable)
-            count += 1
+        for s_output in layer.s_outputs:
+            if s_output not in nb.sim_subplots:
+                nb.sim_subplots[s_output] = \
+                    nb.sim_fig.add_subplot(
+                        int(rdim), 
+                        int(cdim), 
+                        int(count))
+                nb.sim_subplots[s_output].set_title(s_output)
+                count += 1
 
     nb.sim_canvas = \
         tkagg.FigureCanvasTkAgg(nb.sim_fig, master=nb.tab_simulate)

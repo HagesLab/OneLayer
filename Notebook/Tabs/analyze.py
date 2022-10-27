@@ -20,17 +20,33 @@ def add_tab_analyze(nb):
     nb.overview_subplots = {}
     count = 1
     total_outputs_count = sum([nb.module.layers[layer].outputs_count for layer in nb.module.layers])
+    if len(nb.module.layers) > 1:
+        shared_outputs = nb.module.report_shared_outputs()
+    else:
+        shared_outputs = {}
+    
+    # Don't overcount shared outputs
+    shared_outputs_count = len(shared_outputs)
+    total_outputs_count -= shared_outputs_count * (len(nb.module.layers) - 1)
+    
     rdim = np.floor(np.sqrt(total_outputs_count))
     cdim = np.ceil(total_outputs_count / rdim)
     
     all_outputs = []
+    
+    nb.shared_overview_subplots = {}
+    for shared_output in shared_outputs:
+        nb.shared_overview_subplots[shared_output] = nb.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
+        all_outputs.append("{}".format(shared_output))
+        count += 1
+    
     for layer_name in nb.module.layers:
         nb.overview_subplots[layer_name] = {}
         for output in nb.module.layers[layer_name].outputs:
-            nb.overview_subplots[layer_name][output] = nb.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
-            all_outputs.append("{}: {}".format(layer_name, output))
-            count += 1
-                
+            if output not in shared_outputs:
+                nb.overview_subplots[layer_name][output] = nb.analyze_overview_fig.add_subplot(int(rdim), int(cdim), int(count))
+                all_outputs.append("{}: {}".format(layer_name, output))
+                count += 1
     nb.overview_setup_frame = tk.Frame(nb.tab_overview_analysis)
     nb.overview_setup_frame.grid(row=0,column=0, padx=(20,20))
     
@@ -157,7 +173,7 @@ def add_tab_analyze(nb):
 
     tk.ttk.Button(nb.analyze_toolbar_frame, 
                     text="Generate IC", 
-                    command=partial(nb.do_IC_carry_popup)).grid(row=1,column=6)
+                    command=partial(nb.do_IC_regen_popup)).grid(row=1,column=6)
 
     nb.integration_fig = Figure(figsize=(9,5))
     nb.integration_subplot = nb.integration_fig.add_subplot(111)

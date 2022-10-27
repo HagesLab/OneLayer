@@ -32,7 +32,7 @@ from GUI_structs import Raw_Data_Set
 from GUI_structs import Integrated_Data_Set
 from utils import to_index
 from utils import to_pos
-from utils import to_array
+from utils import to_array, generate_shared_x_array
 from utils import get_all_combinations
 from utils import autoscale
 from utils import new_integrate       
@@ -40,6 +40,7 @@ from io_utils import extract_values
 from io_utils import u_read
 from io_utils import check_valid_filename
 from io_utils import get_split_and_clean_line
+from io_utils import export_ICfile
 
 from Notebook.base import BaseNotebook
 from Notebook.Tabs.inputs import add_tab_inputs
@@ -48,6 +49,8 @@ from Notebook.Tabs.analyze import add_tab_analyze
 from Notebook.Popups.confirmation_popup import ConfirmationPopup
 from Notebook.Popups.module_select_popup import ModuleSelectPopup
 from Notebook.Popups.plotsummary_popup import PlotSummaryPopup
+from Notebook.Popups.plotter_popup import PlotterPopup
+from Notebook.Popups.IC_regeneration_popup import ICRegenPopup
 
 from config import init_logging
 logger = init_logging(__name__)
@@ -259,9 +262,11 @@ class Notebook(BaseNotebook):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        logger.debug(self.using_LGC)
-        logger.debug(self.LGC_options)
-        logger.debug(self.LGC_values)
+        # logger.debug("Using LGC {}".format(self.using_LGC))
+        # logger.debug("LGC Options {}".format(self.LGC_options))
+        # logger.debug("LGC Values {}".format(self.LGC_values))
+        logger.info(self.module.report_shared_s_outputs())
+        logger.info(self.module.report_shared_c_outputs())
         return
     
     def change_layer(self, clear=True, update_LGC_display=True):
@@ -759,118 +764,12 @@ class Notebook(BaseNotebook):
             logger.error("Error #601: Failed to close Bayesim popup")
         
 
-
     def do_plotter_popup(self, plot_ID):
         """ Select datasets for plotting on Analyze tab. """
-        if not self.plotter_popup_isopen:
+        self.plotter_popup = PlotterPopup(plot_ID, self, logger)
+        self.plotter_popup_isopen = True
+        return
     
-            self.plotter_popup = tk.Toplevel(self.root)
-
-            tk.ttk.Label(self.plotter_popup, 
-                         text="Select simulated data", 
-                         style="Header.TLabel").grid(row=0,column=0,columnspan=2)
-
-            def sims_sort_alpha():
-                self.data_listbox.delete(0,tk.END)
-                self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
-                                  if not file.endswith(".txt")]
-                
-                self.data_listbox.insert(0,*(self.data_list))
-                return
-                
-            def sims_sort_recent():
-                self.data_listbox.delete(0,tk.END)
-                self.data_list = [file for file in os.listdir(os.path.join(self.default_dirs["Data"], self.module.system_ID)) 
-                                  if not file.endswith(".txt")]
-                
-                self.data_list = sorted(self.data_list, key=lambda file: os.path.getmtime(os.path.join(self.default_dirs["Data"], self.module.system_ID, file)), reverse=True)
-                self.data_listbox.insert(0,*(self.data_list))
-                return
-            
-            sorting_frame = tk.Frame(self.plotter_popup)
-            sorting_frame.grid(row=1,column=0)
-            
-            tk.Button(sorting_frame, text='A-Z',
-                      command=sims_sort_alpha).grid(row=0,column=0)
-            
-            tk.Button(sorting_frame, text='Recent First',
-                      command=sims_sort_recent).grid(row=0,column=1)
-            
-            
-            data_listbox_frame = tk.Frame(self.plotter_popup)
-            data_listbox_frame.grid(row=2,column=0)
-            
-            self.data_listbox = tk.Listbox(data_listbox_frame, width=60, 
-                                           height=40, 
-                                           selectmode="extended")
-            self.data_listbox.grid(row=0,column=0)
-            
-
-            data_listbox_scrollbar = tk.ttk.Scrollbar(data_listbox_frame, orient="vertical",
-                                                           command=self.data_listbox.yview)
-            data_listbox_scrollbar.grid(row=0,column=1, sticky='ns')
-            
-            self.data_listbox.config(yscrollcommand=data_listbox_scrollbar.set)
-            sims_sort_alpha()
-            
-            plotter_options_frame = tk.Frame(self.plotter_popup)
-            plotter_options_frame.grid(row=2,column=1)
-            all_outputs = []
-            for layer_name, layer in self.module.layers.items():
-                all_outputs += [output for output in layer.outputs if layer.outputs[output].analysis_plotable]
-            tk.OptionMenu(plotter_options_frame, self.data_var, 
-                          *all_outputs).grid(row=0,column=0)
-
-            tk.Checkbutton(plotter_options_frame, text="Auto-integrate", 
-                           variable=self.check_autointegrate, 
-                           onvalue=1, offvalue=0).grid(row=0,column=1)
-            
-            tk.Button(plotter_options_frame, text="Continue", 
-                      command=partial(self.on_plotter_popup_close, 
-                                      plot_ID, continue_=True)).grid(row=1,column=0,columnspan=2)
-
-            self.plotter_status = tk.Text(plotter_options_frame, width=24,height=2)
-            self.plotter_status.grid(row=2,column=0,columnspan=2, padx=(20,20))
-            self.plotter_status.configure(state="disabled")
-
-            self.plotter_popup.protocol("WM_DELETE_WINDOW", partial(self.on_plotter_popup_close, 
-                                                                    plot_ID, continue_=False))
-            self.plotter_popup.grab_set()
-            self.plotter_popup_isopen = True
-
-        else:
-            logger.error("Error #501: Opened more than one plotter popup at a time")
-
-    def on_plotter_popup_close(self, plot_ID, continue_=False):
-        try:
-			# There are two ways for a popup to close: by the user pressing "Continue" or the user cancelling or pressing "X"
-			# We only interpret the input on the popup if the user wants to continue
-            self.confirmed = continue_
-            if continue_:
-                assert (self.data_var.get()), "Select a data type from the drop-down menu"
-                self.analysis_plots[plot_ID].data_filenames = []
-                # This year for Christmas, I want Santa to implement
-                # tk.filedialog.askdirectories()
-                # so we can select multiple directories like we can do with files
-                # LOL :)
-                dir_names = [self.data_list[i] for i in self.data_listbox.curselection()]
-                for next_dir in dir_names:
-                    self.analysis_plots[plot_ID].data_filenames.append(next_dir)
-
-                #self.analysis_plots[plot_ID].remove_duplicate_filenames()
-                
-                assert self.analysis_plots[plot_ID].data_filenames, "Select data files"
-
-            self.plotter_popup.destroy()
-            logger.info("Plotter popup closed")
-            self.plotter_popup_isopen = False
-
-        except AssertionError as oops:
-            self.write(self.plotter_status, str(oops))
-            logger.error("Error: %s", oops)
-        except Exception:
-            logger.error("Error #502: Failed to close plotter popup.")
-
 
     def do_integration_timemode_popup(self):
         """ Select which timesteps to integrate through. """
@@ -1310,162 +1209,15 @@ class Notebook(BaseNotebook):
 
 
 
-    def do_IC_carry_popup(self):
+    def do_IC_regen_popup(self):
         """ Open a tool to regenerate IC files based on current state of analysis plots. """
         plot_ID = self.active_analysisplot_ID.get()
-
-        if not self.analysis_plots[plot_ID].datagroup.size(): 
+        if self.analysis_plots[plot_ID].datagroup.size() == 0: 
             return
+        self.IC_regen_popup = ICRegenPopup(plot_ID, self, logger)
+        self.IC_regen_popup_isopen = True
+        return
 
-        if not self.IC_carry_popup_isopen:
-            self.IC_carry_popup = tk.Toplevel(self.root)
-
-            tk.ttk.Label(self.IC_carry_popup, 
-                         text="Select data to include in new IC",
-                         style="Header.TLabel").grid(row=0,column=0,columnspan=2)
-            
-            self.carry_checkbuttons = {}
-            rcount = 1
-            for layer_name, layer in self.module.layers.items():
-                self.carry_checkbuttons[layer_name] = {}
-                for var in layer.s_outputs:
-                    self.carry_checkbuttons[layer_name][var] = \
-                        tk.Checkbutton(
-                            self.IC_carry_popup,
-                            text=var,
-                            variable=self.carryover_include_flags[layer_name][var])
-                    self.carry_checkbuttons[layer_name][var].grid(row=rcount, column=0)
-                    rcount += 1
-
-            self.carry_IC_listbox = \
-                tk.Listbox(
-                    self.IC_carry_popup,
-                    width=30,
-                    height=10, 
-                    selectmode='extended')
-            self.carry_IC_listbox.grid(row=4,column=0,columnspan=2)
-            for key, dataset in self.analysis_plots[plot_ID].datagroup.datasets.items():
-                over_time = (self.analysis_plots[plot_ID].time > dataset.total_time)
-                if over_time: continue
-                self.carry_IC_listbox.insert(tk.END, key)
-
-            tk.Button(
-                self.IC_carry_popup,
-                text="Continue", 
-                command=partial(self.on_IC_carry_popup_close, continue_=True)
-                ).grid(row=5,column=0,columnspan=2)
-
-            self.IC_carry_popup.protocol(
-                "WM_DELETE_WINDOW", 
-                partial(self.on_IC_carry_popup_close, continue_=False))
-            self.IC_carry_popup.grab_set()
-            self.IC_carry_popup_isopen = True
-            
-        else:
-            logger.error("Error #510: Opened more than one IC carryover popup at a time")
-
-
-    def on_IC_carry_popup_close(self, continue_=False):
-        try:
-            if continue_:
-                plot_ID = self.active_analysisplot_ID.get()
-                active_plot = self.analysis_plots[plot_ID]
-                active_sets = active_plot.datagroup.datasets
-                datasets = [self.carry_IC_listbox.get(i) for i in self.carry_IC_listbox.curselection()]
-                if not datasets: 
-                    return
-                
-                include_flags = {}
-                for layer_name in self.module.layers:
-                    include_flags[layer_name] = {}
-                    for iflag in self.carryover_include_flags[layer_name]:
-                        include_flags[layer_name][iflag] = self.carryover_include_flags[layer_name][iflag].get()
-                    
-                status_msg = ["Files generated:"]
-                for key in datasets:
-                    new_filename = tk.filedialog.asksaveasfilename(initialdir = self.default_dirs["Initial"], 
-                                                                   title="Save IC text file for {}".format(key), 
-                                                                   filetypes=[("Text files","*.txt")])
-                    if not new_filename: 
-                        continue
-
-                    if new_filename.endswith(".txt"): 
-                        new_filename = new_filename[:-4]
-                    
-                    param_dict_copy = dict(active_sets[key].params_dict)
-
-                    grid_x = active_sets[key].grid_x
-                    
-                    filename = active_sets[key].filename
-                    sim_data = {}
-                    for layer_name, layer in self.module.layers.items():
-                        sim_data[layer_name] = {}
-                        for var in layer.s_outputs:
-                            path_name = os.path.join(self.default_dirs["Data"], 
-                                                        self.module.system_ID,
-                                                        filename,
-                                                        "{}-{}.h5".format(filename, var))
-                            floor_tstep = int(active_plot.time / active_sets[key].dt)
-                            interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
-                            
-                            if active_plot.time == active_sets[key].total_time:
-                                pass
-                            else:
-                                slope = (interpolated_step[1] - interpolated_step[0]) / (active_sets[key].dt)
-                                interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * active_sets[key].dt)
-                            
-                            sim_data[layer_name][var] = interpolated_step
-
-                    self.module.get_IC_carry(sim_data, param_dict_copy, 
-                                               include_flags, grid_x)
-                    
-                    with open(new_filename + ".txt", "w+") as ofstream:
-                        ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " 
-                                       + str(datetime.datetime.now().date()) 
-                                       + " AT " + str(datetime.datetime.now().time()) 
-                                       + "\n")
-                        ofstream.write("System_class: {}\n".format(self.module.system_ID))
-                        ofstream.write("f$ System Flags:\n")
-                        for flag in self.module.flags_dict:
-                            ofstream.write("{}: {}\n".format(flag, active_sets[key].flags[flag]))
-                        for layer_name, layer_params in param_dict_copy.items():
-                            ofstream.write("L$: {}\n".format(layer_name))
-                            ofstream.write("p$ Space Grid:\n")
-                            ofstream.write("Total_length: {}\n".format(layer_params["Total_length"]))
-                            ofstream.write("Node_width: {}\n".format(layer_params["Node_width"]))
-                            ofstream.write("p$ System Parameters:\n")
-                            
-                            for param in layer.params:
-                                if not (param == "Total_length" or param == "Node_width"):
-                                    param_values = layer_params[param]
-                                    param_values *= self.module.layers[layer_name].convert_out[param]
-                                    if isinstance(param_values, np.ndarray):
-                                        # Write the array in a more convenient format
-                                        ofstream.write("{}: {:.8e}".format(param, param_values[0]))
-                                        for value in param_values[1:]:
-                                            ofstream.write("\t{:.8e}".format(value))
-                                            
-                                        ofstream.write('\n')
-                                    else:
-                                        # The param value is just a single constant
-                                        ofstream.write("{}: {}\n".format(param, param_values))
-
-                    status_msg.append("{}-->{}".format(filename, new_filename))
-                    
-                # If NO new files saved
-                if len(status_msg) == 1: 
-                    status_msg.append("(none)")
-                self.do_confirmation_popup("\n".join(status_msg),hide_cancel=True)
-
-            self.IC_carry_popup.destroy()
-            self.IC_carry_popup_isopen = False
-
-        except OSError:
-            self.write(self.analysis_status, "Error: failed to regenerate IC file")
-            logger.error("Error: failed to regenerate IC file")
-            
-        except Exception:
-            logger.error("Error #511: Failed to close IC carry popup.")
 
     def do_timeseries_popup(self, ts_ID, td_gridt, td):
         ts_popup = tk.Toplevel(self.root)
@@ -1532,34 +1284,107 @@ class Notebook(BaseNotebook):
         ts_popup.destroy()
     
 
-    ## Plotter for simulation tab    
+    ## Plotter for simulation tab 
+    def format_sim_plots(self, x, y, plot_handler, visible=True, 
+                         do_clear_plots=True, **kwargs):
+        """
+        Sets up basic elements of a matplotlib Axes - data, labels, axis ranges
+        For plots that are "one and done" - and don't need to remember their state
+
+        Parameters
+        ----------
+        x : 1D ndarray
+            Horizontal coordinates.
+        y : 1D ndarray
+            Vertical coordinates.
+        plot_handler : matplotlib Axes object
+            The Axes or Figure to edit.
+        visible : bool, optional
+            Whether to plot the (x,y) curve. Sometimes we merely want to set up
+            the cosmetic elements and plot at a later time. The default is True.
+        do_clear_plots : bool, optional
+            Whether to clear all plotted curves. Generally True for the first in
+            a sequence of curves and then False for all others. The default is True.
+        **kwargs :
+            Various matplotlib formatting fields.
+
+        Returns
+        -------
+        None.
+
+        """
+        if do_clear_plots: 
+            plot_handler.cla()
+            if 'yb_lower' in kwargs and 'yb_upper' in kwargs:
+                ymin = np.amin(y) * kwargs.get('yb_lower', 1)
+                ymax = np.amax(y) * kwargs.get('yb_upper', 1)
+                plot_handler.set_ylim(ymin, ymax)
+
+        if 'yscale' in kwargs:
+            plot_handler.set_yscale(kwargs.get('yscale', "symlog"))
+        
+        if visible:
+            label = kwargs.get('label', None)
+            plot_handler.plot(x, y, label=label)
+
+        if 'xlabel' in kwargs: plot_handler.set_xlabel(kwargs.get('xlabel', ""))
+        if 'ylabel' in kwargs: plot_handler.set_ylabel(kwargs.get('ylabel', ""))
+        if 'title' in kwargs:  plot_handler.set_title(kwargs.get('title', ""))
+
+        if kwargs.get("do_legend", False):
+            plot_handler.legend()
+        
+        return
+    
     def update_sim_plots(self, index, failed_vars, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
+        shared_outputs = self.module.report_shared_s_outputs()
+        if len(shared_outputs) > 0:
+            convert_out = self.module.shared_layer.convert_out
+            total_lengths = [self.module.layers[layer_name].total_length
+                             for layer_name in self.module.layers]
+
+        for variable in shared_outputs:
+            output_obj = self.module.shared_layer.s_outputs[variable]            
+                
+            if output_obj.is_edge:
+                grids_x = [self.module.layers[layer_name].grid_x_edges
+                           for layer_name in self.module.layers]
+            else:
+                grids_x = [self.module.layers[layer_name].grid_x_nodes
+                           for layer_name in self.module.layers]
+                
+            shared_x = generate_shared_x_array(output_obj.is_edge,
+                                               grids_x, total_lengths)
+            
+            self.format_sim_plots(shared_x, self.sim_data[variable] * convert_out[variable], 
+                                  self.sim_subplots[variable], 
+                                  not failed_vars[variable],
+                                  do_clear_plots,
+                                  xlabel="x {}".format(self.module.shared_layer.length_unit),
+                                  ylabel="{} {}".format(variable, output_obj.units),
+                                  label="Time: {} ns".format(self.simtime * index / self.n),
+                                  do_legend=True,
+                                  yscale=output_obj.yscale,
+                                  yb_lower=output_obj.yfactors[0], yb_upper=output_obj.yfactors[1])
+
         
         for layer_name, layer in self.module.layers.items():
             convert_out = layer.convert_out
             for variable, output_obj in layer.s_outputs.items():
-                
-                plot = self.sim_subplots[layer_name][variable]
-                
-                if do_clear_plots: 
-                    plot.cla()
-    
-                    ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
-                    ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
-                    plot.set_ylim(ymin * convert_out[variable], 
-                                  ymax * convert_out[variable])
-    
-                plot.set_yscale(output_obj.yscale)
-                
+                if variable in shared_outputs:
+                    continue
                 grid_x = layer.grid_x_nodes if not output_obj.is_edge else layer.grid_x_edges
-                if not failed_vars[variable]:
-                    plot.plot(grid_x, self.sim_data[variable] * convert_out[variable])
-    
-                plot.set_xlabel("x {}".format(layer.length_unit))
-                plot.set_ylabel("{} {}".format(variable, output_obj.units))
-    
-                plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
+                self.format_sim_plots(grid_x, self.sim_data[variable] * convert_out[variable],
+                                      self.sim_subplots[variable],
+                                      not failed_vars[variable],
+                                      do_clear_plots,
+                                      xlabel="x {}".format(layer.length_unit),
+                                      ylabel="{} {}".format(variable, output_obj.units),
+                                      label="Time: {} ns".format(self.simtime * index / self.n),
+                                      do_legend=True,
+                                      yscale=output_obj.yscale,
+                                      yb_lower=output_obj.yfactors[0], yb_upper=output_obj.yfactors[1])
             
         self.sim_fig.tight_layout()
         self.sim_fig.canvas.draw()
@@ -1574,7 +1399,7 @@ class Notebook(BaseNotebook):
         with open(path, "r") as ifstream:
             param_values_dict = {}
             flag_values_dict = {}
-
+            layer_names = []
             read_flag = 0
         
             if not ("$$ METADATA") in next(ifstream):
@@ -1594,6 +1419,7 @@ class Notebook(BaseNotebook):
                 elif "L$" in line:
                     layer_name = line[line.find(":")+1:].strip(' \n')
                     param_values_dict[layer_name] = {}
+                    layer_names.append(layer_name)
                     continue
                 
                 elif "p$ Space Grid" in line:
@@ -1639,12 +1465,14 @@ class Notebook(BaseNotebook):
 
         for layer_name, layer in param_values_dict.items():
             assert set(self.module.layers[layer_name].params.keys()).issubset(set(param_values_dict[layer_name].keys())), "Error: metadata is missing params"
-        return param_values_dict, flag_values_dict, total_time, dt
+        return layer_names, param_values_dict, flag_values_dict, total_time, dt
 
 
     def plot_overview_analysis(self):
         """ Plot dataset and calculations from OneD_Model.get_overview_analysis() 
             on Overview tab. 
+            These plots are "one-and-done", while detailed analysis are much more
+            manipulable
         """
         data_dirname = tk.filedialog.askdirectory(title="Select a dataset", 
                                                   initialdir=self.default_dirs["Data"])
@@ -1655,19 +1483,17 @@ class Notebook(BaseNotebook):
         data_filename = data_dirname[data_dirname.rfind('/')+1:]
         
         try:
-            param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
+            layer_names, param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
                  
             data_n = int(0.5 + total_time / dt)
             data_m = {}
-            data_edge_x = {}
-            data_node_x = {}
             for layer_name in param_values_dict:
                 total_length = param_values_dict[layer_name]["Total_length"]
                 dx = param_values_dict[layer_name]["Node_width"]
                 data_m[layer_name] = int(0.5 + total_length / dx)
-                data_edge_x[layer_name] = np.linspace(0,  total_length,
+                param_values_dict[layer_name]['edge_x'] = np.linspace(0,  total_length,
                                                       data_m[layer_name]+1)
-                data_node_x[layer_name] = np.linspace(dx / 2, total_length - dx / 2, 
+                param_values_dict[layer_name]['node_x'] = np.linspace(dx / 2, total_length - dx / 2, 
                                                       data_m[layer_name])
             data_node_t = np.linspace(0, total_time, data_n + 1)
             
@@ -1688,7 +1514,7 @@ class Notebook(BaseNotebook):
                     
                 tstep_list = np.linspace(0, data_n, num=sample_ct)
                 
-            else:
+            else: # Custom, list of sample pts
                 sample_ct = self.overview_samplect_entry.get()
                 tstep_list = np.array(np.array(extract_values(sample_ct, ' ')) / dt, dtype=int)
                 
@@ -1702,18 +1528,6 @@ class Notebook(BaseNotebook):
                     hide_cancel=True)
             return
         
-        for layer_name, layer in self.overview_subplots.items():
-            for subplot in layer:
-                plot_obj = layer[subplot]
-                output_info_obj = self.module.layers[layer_name].outputs[subplot]
-                plot_obj.cla()
-                plot_obj.set_yscale(output_info_obj.yscale)
-                plot_obj.set_xlabel(output_info_obj.xlabel)
-                if output_info_obj.xvar == "time":
-                    plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.integrated_units))
-                else:
-                    plot_obj.set_title("{} {}".format(output_info_obj.display_name, output_info_obj.units))
-
         self.overview_values = \
             self.module.get_overview_analysis(
                 param_values_dict,
@@ -1725,10 +1539,20 @@ class Notebook(BaseNotebook):
                 data_filename)
         
         warning_msg = ["Error: the following occured while generating the overview"]
+                
+        shared_done = {}
+        shared_outputs = self.module.report_shared_outputs()
         for layer_name, layer in self.module.layers.items():
             for output_name, output_info in layer.outputs.items():
+                # plot handlers and output data for SHARED parameters are stored
+                # separately
+                is_shared = output_name in shared_outputs
+                # Don't repeat shared outputs
+                if is_shared and shared_done.get(output_name, False): continue
+
                 try:
-                    values = self.overview_values[layer_name][output_name]
+                    L = "__SHARED__" if is_shared else layer_name
+                    values = self.overview_values[L][output_name]
                     if not isinstance(values, np.ndarray): 
                         raise KeyError
                 except KeyError:
@@ -1737,32 +1561,75 @@ class Notebook(BaseNotebook):
                 except Exception:
                     warning_msg.append("Error: could not calculate {}".format(output_name))
                     continue
+                
+                if output_info.xvar == "time":
+                    title = "{} {}".format(output_info.display_name, output_info.integrated_units)
+                else:
+                    title = "{} {}".format(output_info.display_name, output_info.units)
     
                 if output_info.xvar == "time":
                     grid_x = data_node_t
                 elif output_info.xvar == "position":
-                    grid_x = data_node_x[layer_name] if not output_info.is_edge else data_edge_x[layer_name]
+                    if is_shared:
+                        total_lengths = [param_values_dict[layer_name]["Total_length"]
+                                         for layer_name in layer_names]
+                        
+                        if output_info.is_edge:
+                            grids_x = [param_values_dict[layer_name]['edge_x'] for layer_name in layer_names]
+                        else:
+                            grids_x = [param_values_dict[layer_name]['node_x'] for layer_name in layer_names]
+
+                        grid_x = generate_shared_x_array(output_info.is_edge,
+                                                         grids_x, total_lengths)
+                    else:
+                        grid_x = param_values_dict[layer_name]['node_x'] if not output_info.is_edge else param_values_dict[layer_name]['edge_x']
                 else:
                     warning_msg.append("Warning: invalid xvar {} in system class definition for output {}\n".format(output_info.xvar, output_name))
                     continue
                 
+                if is_shared:
+                    plot_obj = self.shared_overview_subplots[output_name]
+                else:
+                    plot_obj = self.overview_subplots[layer_name][output_name]
                 if values.ndim == 2: # time/space variant outputs
                     for i in range(len(values)):
-                        self.overview_subplots[layer_name][output_name].plot(grid_x, values[i], 
-                                                                             label="{:.3f} ns".format(tstep_list[i] * dt))
+                        self.format_sim_plots(grid_x, values[i], plot_obj, visible=True,
+                                              do_clear_plots=i==0,
+                                              xlabel=output_info.xlabel,
+                                              yscale=output_info.yscale,
+                                              title=title,
+                                              label="{:.3f} ns".format(tstep_list[i] * dt))
                 else: # Time variant only
-                    self.overview_subplots[layer_name][output_name].plot(grid_x, values)
+                    self.format_sim_plots(grid_x, values, plot_obj, visible=True,
+                                          do_clear_plots=True,
+                                          xlabel=output_info.xlabel,
+                                          yscale=output_info.yscale,
+                                          title=title,
+                                          label="{:.3f} ns".format(tstep_list[i] * dt))
+                    
+                if is_shared:
+                    shared_done[output_name] = True
 
         for layer_name, layer in self.module.layers.items():
             for output_name in layer.s_outputs:
-                self.overview_subplots[layer_name][output_name].legend().set_draggable(True)
-                break
+                try:
+                    self.shared_overview_subplots[output_name].legend().set_draggable(True)
+                    break
+                except KeyError:
+                    pass
+                    # Try looking in overview_subplots instead
+                try:
+                    self.overview_subplots[layer_name][output_name].legend().set_draggable(True)
+                    break
+                except KeyError:
+                    pass
+                
+                
         if len(warning_msg) > 1:
             self.do_confirmation_popup("\n".join(warning_msg),hide_cancel=True)
             
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
-
 
     ## Funcs for detailed analyze tab
     def plot_analyze(self, plot_ID, force_axis_update=False):
@@ -1821,49 +1688,73 @@ class Notebook(BaseNotebook):
             self.write(self.analysis_status, "Error #106: Plot failed")
             logger.error("Error #106: Plot failed")
 
-
-    def make_rawdataset(self, data_filename, plot_ID, datatype):
+    def make_rawdataset(self, data_filename, plot_ID, datatype, target_layer):
         """Create a dataset object and prepare to plot on analysis tab."""
         # Select data type of incoming dataset from existing datasets
         active_plot = self.analysis_plots[plot_ID]
 
         try:
-            param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
+            layer_names, param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
             data_m = {}
-            data_edge_x = {}
-            data_node_x = {}
+
             for layer_name in param_values_dict:
                 total_length = param_values_dict[layer_name]["Total_length"]
                 dx = param_values_dict[layer_name]["Node_width"]
                 data_m[layer_name] = int(0.5 + total_length / dx)
-                data_edge_x[layer_name] = \
+                param_values_dict[layer_name]['edge_x'] = \
                     np.linspace(0, total_length, data_m[layer_name]+1)
-                data_node_x[layer_name] = \
+                param_values_dict[layer_name]['node_x'] = \
                     np.linspace(dx/2, total_length-dx/2, data_m[layer_name])
         except AssertionError as oops:
             return str(oops)
         except Exception:
             return "Error: missing or has unusual metadata.txt"
-
+        
+        shared_outputs = self.module.report_shared_outputs()
+        is_shared = datatype in shared_outputs
+        if is_shared:
+            is_edge = self.module.shared_layer.outputs[datatype].is_edge
+        else:
+            is_edge = self.module.layers[target_layer].outputs[datatype].is_edge
+            
+        if is_shared:
+            param_values_dict["__SHARED__"] = {}
+            edges_x = [param_values_dict[layer_name]['edge_x'] for layer_name in layer_names]
+            nodes_x = [param_values_dict[layer_name]['node_x'] for layer_name in layer_names]
+            total_lengths = [param_values_dict[layer_name]['Total_length'] for layer_name in layer_names]
+            param_values_dict["__SHARED__"]["edge_x"] = generate_shared_x_array(True, edges_x, total_lengths)
+            param_values_dict["__SHARED__"]["node_x"] = generate_shared_x_array(False, nodes_x, total_lengths)
+            
 		# Now that we have the parameters from metadata, fetch the data itself
+        shared_done = {}
         sim_data = {}
+        if is_shared:
+            sim_data["__SHARED__"] = {}
+        
         for layer_name, layer in self.module.layers.items():
             sim_data[layer_name] = {}
             for sim_datatype in layer.s_outputs:
+                if is_shared and shared_done.get(sim_datatype, False): continue
+            
                 path_name = os.path.join(
                     self.default_dirs["Data"], 
                     self.module.system_ID,
                     data_filename,
                     "{}-{}.h5".format(data_filename, sim_datatype))
                 try:
-                    sim_data[layer_name][sim_datatype] = \
+                    L = "__SHARED__" if is_shared else layer_name
+                    sim_data[L][sim_datatype] = \
                         u_read(path_name, t0=0, single_tstep=True)
                 except OSError:
                     continue
-        where_layer = self.module.find_layer(datatype)
+                
+                if is_shared:
+                    shared_done[sim_datatype] = True
+
         try:
             values = self.module.prep_dataset(
                 datatype,
+                target_layer,
                 sim_data,
                 param_values_dict,
                 flag_values_dict)
@@ -1877,49 +1768,43 @@ class Notebook(BaseNotebook):
         except Exception:
             return ("Error: Unable to calculate {} using prep_dataset\n"
                     "prep_dataset did not return a 1D array".format(datatype))
-
-        if self.module.layers[where_layer].outputs[datatype].is_edge: 
-            return Raw_Data_Set(
-                values,
-                data_edge_x[where_layer],
-                data_node_x[where_layer],
-                total_time,
-                dt,
-                param_values_dict,
-                flag_values_dict,
-                datatype,
-                data_filename, 
-                active_plot.time)
-        else:
-            return Raw_Data_Set(
-                values,
-                data_node_x[where_layer],
-                data_node_x[where_layer],
-                total_time,
-                dt,
-                param_values_dict,
-                flag_values_dict,
-                datatype,
-                data_filename, 
-                active_plot.time)
+ 
+        return Raw_Data_Set(
+            values,
+            param_values_dict[target_layer]['edge_x' if is_edge else 'node_x'],
+            param_values_dict[target_layer]['node_x'],
+            total_time,
+            dt,
+            param_values_dict,
+            flag_values_dict,
+            datatype,
+            target_layer,
+            data_filename, 
+            active_plot.time)
 
     def load_datasets(self):
         """ Interpret selection from do_plotter_popup()."""
         plot_ID = self.active_analysisplot_ID.get()
         self.do_plotter_popup(plot_ID)
-        self.root.wait_window(self.plotter_popup)
+        self.root.wait_window(self.plotter_popup.toplevel)
         if not self.confirmed: 
             return
         active_plot = self.analysis_plots[plot_ID]
-        datatype = self.data_var.get()
-
+        datatype = self.data_var.get() # "OUTPUT" if shared else "LAYER": "OUTPUT"
+        
+        is_shared = datatype in self.module.report_shared_outputs()
+        if is_shared:
+            layer_name = "__SHARED__"
+        else:
+            layer_name, datatype = datatype.split(": ")
+            
         active_plot.time = 0
         active_plot.datagroup.clear()
         err_msg = ["Error: the following data could not be plotted"]
         for i in range(0, len(active_plot.data_filenames)):
             data_filename = active_plot.data_filenames[i]
             short_filename = data_filename[data_filename.rfind('/') + 1:]
-            new_data = self.make_rawdataset(short_filename, plot_ID, datatype)
+            new_data = self.make_rawdataset(short_filename, plot_ID, datatype, layer_name)
 
             if isinstance(new_data, str):
                 err_msg.append("{}: {}".format(short_filename, new_data))
@@ -1938,7 +1823,6 @@ class Notebook(BaseNotebook):
         else:
             self.write(self.analysis_status, "Data read finished")
 
-
     def plot_tstep(self):
         """ Step already plotted data forward (or backward) in time"""
         plot_ID = self.active_analysisplot_ID.get()
@@ -1952,11 +1836,20 @@ class Notebook(BaseNotebook):
         active_datagroup = active_plot.datagroup
         # Search data files for data at new time
         # Interpolate if necessary
+
+        is_shared = active_datagroup.type in self.module.report_shared_outputs()
+
         for tag, dataset in active_datagroup.datasets.items():
+            shared_done = {}
             sim_data = {}
+            if is_shared:
+                sim_data["__SHARED__"] = {}
+                
             for layer_name, layer in self.module.layers.items():
                 sim_data[layer_name] = {}
                 for sim_datatype in layer.s_outputs:
+                    if is_shared and shared_done.get(sim_datatype, False): continue
+                    
                     path_name = os.path.join(self.default_dirs["Data"], 
                                                 self.module.system_ID,
                                                 dataset.filename,
@@ -1979,19 +1872,21 @@ class Notebook(BaseNotebook):
                         slope = (interpolated_step[1] - interpolated_step[0]) / (dataset.dt)
                         interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * dataset.dt)
                     
-                    sim_data[layer_name][sim_datatype] = interpolated_step
-        
+                    L = "__SHARED__" if is_shared else layer_name
+                    sim_data[L][sim_datatype] = interpolated_step
+                    
+                    if is_shared:
+                        shared_done[sim_datatype] = True
+                        
             if over_time:
                 dataset.data = interpolated_step
             else:
-                dataset.data = self.module.prep_dataset(active_datagroup.type, sim_data, 
+                dataset.data = self.module.prep_dataset(active_datagroup.type, dataset.layer_name, sim_data,
                                                           dataset.params_dict, dataset.flags)
             dataset.current_time = active_plot.time
-            
-            
+                        
         self.plot_analyze(plot_ID, force_axis_update=False)
         self.write(self.analysis_status, "")
-
 
     ## Status box update helpers
     def write(self, textBox, text):
@@ -2030,6 +1925,7 @@ class Notebook(BaseNotebook):
             for each selected IC file
         """
         # Test for valid entry values
+        # TODO: Support logspaced timesteps for better early-time precision
         try:
             self.simtime = float(self.simtime_entry.get())      # [ns]
             self.dt = float(self.dt_entry.get())           # [ns]
@@ -2176,27 +2072,11 @@ class Notebook(BaseNotebook):
             return
 
 
-        ## Calculate!
-        #atom = tables.Float64Atom()
-
-        ## Create data files
-        # for layer_name, layer in self.module.layers.items():
-        #     for variable in layer.s_outputs:
-        #         path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
-        #         with tables.open_file(path, mode='w') as ofstream:
-        #             length = num_nodes[layer_name] 
-        #             if layer.s_outputs[variable].is_edge:
-        #                 length += 1
-    
-        #             # Important - "data" must be used as the array name here, as pytables will use the string "data" 
-        #             # to name the attribute earray.data, which is then used to access the array
-        #             earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
-        #             earray.append(np.reshape(init_conditions[variable], (1, length)))
-        
+        ## Calculate!        
         ## Setup simulation plots and plot initial
         
         self.sim_data = dict(init_conditions)
-        #self.update_sim_plots(0)
+
         flag_values = {f:flag.value() for f, flag in self.sys_flag_dict.items()}
 
         try:
@@ -2250,7 +2130,7 @@ class Notebook(BaseNotebook):
                     self.sim_data[var] = 0
                     failed_vars[var] = 1
             is_first = (i == 1)
-            self.update_sim_plots(self.n, failed_vars, do_clear_plots=is_first)
+            self.update_sim_plots(int(self.n * i / 5), failed_vars, do_clear_plots=is_first)
             
         failed_vars = [var for var, fail_state in failed_vars.items() if fail_state]
         if failed_vars:
@@ -2259,6 +2139,7 @@ class Notebook(BaseNotebook):
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
+        # TODO: Reuse the init file writer for this
         with open(os.path.join(dirname, "metadata.txt"), "w+") as ofstream:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON {} AT {}\n".format(datetime.datetime.now().date(),datetime.datetime.now().time()))
             ofstream.write("System_class: {}\n".format(self.module.system_ID))
@@ -2335,9 +2216,7 @@ class Notebook(BaseNotebook):
             # A "default integration behavior": integrate the present data over all time and space steps
             self.PL_mode = "All time steps"
             self.integration_plots[ip_ID].x_param = "Time"
-            where_layer = self.module.find_layer(active_datagroup.type)
-            is_edge = self.module.layers[where_layer].outputs[active_datagroup.type].is_edge
-            self.integration_bounds = [[0,active_datagroup.get_max_x(is_edge)]]
+            self.integration_bounds = [[0, np.inf]]
             
         # Clean up the I_plot and prepare to integrate given selections
         # A lot of the following is a data transfer between the 
@@ -2355,12 +2234,10 @@ class Notebook(BaseNotebook):
         for tag in active_datagroup.datasets:
             data_filename = active_datagroup.datasets[tag].filename
             datatype = active_datagroup.datasets[tag].type
-            where_layer = self.module.find_layer(datatype)
+            where_layer = active_datagroup.datasets[tag].layer_name
             logger.info("Now integrating {}".format(data_filename))
 
             # Unpack needed params from the dictionaries of params
-            dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
-            total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
             total_time = active_datagroup.datasets[tag].total_time
             current_time = active_datagroup.datasets[tag].current_time
             dt = active_datagroup.datasets[tag].dt
@@ -2368,8 +2245,8 @@ class Notebook(BaseNotebook):
             symmetric_flag = active_datagroup.datasets[tag].flags["symmetric_system"]
 
             if current_time > total_time: continue
-
-            if self.PL_mode == "Current time step":
+            do_curr_t = self.PL_mode == "Current time step"
+            if do_curr_t:
                 show_index = int(current_time / dt)
                 end_index = show_index+2
             else:
@@ -2379,7 +2256,20 @@ class Notebook(BaseNotebook):
             # Clean up any bounds that extend past the confines of the system
             # The system usually exists from x=0 to x=total_length, 
             # but can accept x=-total_length to x=total_length if symmetric
-
+            
+            # but if shared we need to work with the stitched arrays
+            is_shared = datatype in self.module.report_shared_outputs()
+            if is_shared:
+                edge_x = active_datagroup.datasets[tag].params_dict[where_layer]["edge_x"]
+                node_x = active_datagroup.datasets[tag].params_dict[where_layer]["node_x"]
+                dx = np.diff(edge_x)
+                total_length = edge_x[-1]
+            else:
+                edge_x = None
+                node_x = None
+                dx = active_datagroup.datasets[tag].params_dict[where_layer]["Node_width"]
+                total_length = active_datagroup.datasets[tag].params_dict[where_layer]["Total_length"]
+                
             for bounds in self.integration_bounds:
                 l_bound = bounds[0]
                 u_bound = bounds[1]
@@ -2401,30 +2291,53 @@ class Notebook(BaseNotebook):
                 include_negative = symmetric_flag and (l_bound < 0)
 
                 logger.info("Bounds after cleanup: {} to {}".format(l_bound, u_bound))
-
-                j = to_index(u_bound, dx, total_length)
-                i = to_index(abs(l_bound), dx, total_length)
-                if include_negative:  
-                    nen = [-l_bound > to_pos(i, dx) + dx / 2,
-                                       u_bound > to_pos(j, dx) + dx / 2]
+                
+                if is_shared:
+                    # Searching is worse than calculating with to_index, but dx is not constant
+                    # But still much less time consuming than the actual integral, so okay for now
+                    j = np.searchsorted(node_x[1:], u_bound, side='right')
+                    i = np.searchsorted(node_x[1:], abs(l_bound), side='right')
                     
-                    space_bounds = [(0,i,nen[0], 0, -l_bound), (0,j,nen[1], 0, u_bound)]
+                    if include_negative:  
+                        nen = [-l_bound > node_x[i] + dx[i] / 2,
+                                           u_bound > node_x[j] + dx[j] / 2]
+                        
+                        space_bounds = [(0,i,nen[0], 0, -l_bound), (0,j,nen[1], 0, u_bound)]
+                    else:
+                        nen = u_bound > node_x[j] + dx[j] / 2 or l_bound == u_bound
+                        space_bounds = [(i,j,nen, l_bound, u_bound)]
+                        
                 else:
-                    nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
-                    space_bounds = [(i,j,nen, l_bound, u_bound)]
-
-                do_curr_t = self.PL_mode == "Current time step"
-                
+                    j = to_index(u_bound, dx, total_length)
+                    i = to_index(abs(l_bound), dx, total_length)
+                    
+                    if include_negative:  
+                        nen = [-l_bound > to_pos(i, dx) + dx / 2,
+                                           u_bound > to_pos(j, dx) + dx / 2]
+                        
+                        space_bounds = [(0,i,nen[0], 0, -l_bound), (0,j,nen[1], 0, u_bound)]
+                    else:
+                        nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
+                        space_bounds = [(i,j,nen, l_bound, u_bound)]
+                    
                 pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
-                
                 extra_data = {}
+                if is_shared: 
+                    extra_data["__SHARED__"] = {}
+                
                 for c, s in enumerate(space_bounds):
                     sim_data = {}
+                    shared_done = {}
+                    if is_shared: 
+                        sim_data["__SHARED__"] = {}
+                    
                     for layer_name, layer in self.module.layers.items():
                         sim_data[layer_name] = {}
                         extra_data[layer_name] = {}
                         for sim_datatype in layer.s_outputs:
-
+                            if is_shared and shared_done.get(sim_datatype, False): continue
+                        
+                            L = "__SHARED__" if is_shared else layer_name
                             if do_curr_t:
                                 try:
                                     interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
@@ -2440,7 +2353,7 @@ class Notebook(BaseNotebook):
                                     slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
                                     interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
                                 
-                                sim_data[layer_name][sim_datatype] = np.array(interpolated_step)
+                                sim_data[L][sim_datatype] = np.array(interpolated_step)
                                 
                                 interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
                                                                              t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
@@ -2451,11 +2364,11 @@ class Notebook(BaseNotebook):
                                     slope = (interpolated_step[1] - interpolated_step[0]) / (dt)
                                     interpolated_step = interpolated_step[0] + slope * (current_time - floor_tstep * dt)
                                     
-                                extra_data[layer_name][sim_datatype] = np.array(interpolated_step)
+                                extra_data[L][sim_datatype] = np.array(interpolated_step)
                             
                             else:
                                 try:
-                                    sim_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                    sim_data[L][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
                                                                                 t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
                                                                                 single_tstep=False, need_extra_node=s[2], 
                                                                                 force_1D=False) 
@@ -2463,17 +2376,18 @@ class Notebook(BaseNotebook):
                                     continue
                                 
                                 if c == 0:
-                                    extra_data[layer_name][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                    extra_data[L][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
                                                                                   t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
-            
-                    data = self.module.prep_dataset(datatype, sim_data, 
+                            if is_shared: shared_done[sim_datatype] = True
+                            
+                    data = self.module.prep_dataset(datatype, where_layer, sim_data, 
                                                       active_datagroup.datasets[tag].params_dict, 
                                                       active_datagroup.datasets[tag].flags,
                                                       True, s[0], s[1], s[2], extra_data)
                     
-                    if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2])
-                    else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2])
-                            
+                    if c == 0: I_data = new_integrate(data, s[3], s[4], dx, total_length, s[2], node_x)
+                    else: I_data += new_integrate(data, s[3], s[4], dx, total_length, s[2], node_x)
+                
                 if self.PL_mode == "Current time step":
                     # Don't forget to change out of TEDs units, or the x axis won't match the parameters the user typed in
                     grid_xaxis = float(active_datagroup.datasets[tag].params_dict[where_layer][self.xaxis_param]
@@ -2483,14 +2397,13 @@ class Notebook(BaseNotebook):
                 elif self.PL_mode == "All time steps":
                     grid_xaxis = np.linspace(0, total_time, n + 1)
                     xaxis_label = "Time [ns]"
-
+                    
                 ext_tag = data_filename + "__" + str(l_bound) + "_to_" + str(u_bound)
                 self.integration_plots[ip_ID].datagroup.add(Integrated_Data_Set(I_data, grid_xaxis, total_time, dt,
                                                                                 active_datagroup.datasets[tag].params_dict, 
                                                                                 active_datagroup.datasets[tag].flags,
                                                                                 active_datagroup.datasets[tag].type, 
                                                                                 ext_tag))
-            
                 if self.PL_mode == "All time steps":
                     try:
                         td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
@@ -2555,6 +2468,7 @@ class Notebook(BaseNotebook):
                     continue
     ## Initial Condition Managers
 
+    # TODO: A routine for exchanging dx
     def reset_IC(self, force=False):
         """ On IC tab:
             For each selected layer with a set spacegrid 
@@ -2843,7 +2757,13 @@ class Notebook(BaseNotebook):
 
             current_layer.params["delta_N"].value = carrier_excitations.pulse_laser_totalgen(total_gen, current_layer.total_length, 
                                                                                              alpha_nm, grid_x)
-        
+        elif (self.LGC_optionboxes["power_mode"].get() == "fluence"):
+            try: fluence = float(self.fluence_entry.get()) * ((1e-7) ** 2) # [cm^-2] to [nm^-2]
+            except Exception:
+                self.write(self.ICtab_status, "Error: missing fluence")
+                return
+            current_layer.params["delta_N"].value = carrier_excitations.pulse_laser_fluence(fluence, alpha_nm, 
+                                                                                            grid_x)
         else:
             self.write(self.ICtab_status, "An unexpected error occurred while calculating the power generation params")
             return
@@ -2897,6 +2817,9 @@ class Notebook(BaseNotebook):
 
         elif (self.LGC_options[self.current_layer_name]["power_mode"] == "total-gen"):
             self.LGC_values[self.current_layer_name]["Total_Gen"] = total_gen * ((1e7) ** 3)
+            
+        elif (self.LGC_options[self.current_layer_name]["power_mode"] == "fluence"):
+            self.LGC_values[self.current_layer_name]["Fluence"] = fluence * ((1e7) ** 2)
         
     ## Special functions for Parameter Toolkit:
     def add_paramrule(self):
@@ -3313,7 +3236,7 @@ class Notebook(BaseNotebook):
                 
         # Apply each combination to module, going through LGC if necessary
         for batch_set in batch_combinations:
-            filename = ""
+            filename = batch_dir_name
             for b in batch_set:
                 layer, param = b.split('-')
                 filename += str("__{}_{:.4e}".format(b, batch_set[b]))
@@ -3378,49 +3301,8 @@ class Notebook(BaseNotebook):
     def write_init_file(self, newFileName, dir_name=""):
         """ Write current state of module into an initial condition (IC) file."""
         try:
-            with open(newFileName, "w+") as ofstream:
-                logger.info(dir_name + newFileName + " opened successfully")
-
-                # We don't really need to note down the time of creation, but it could be useful for interaction with other programs.
-                ofstream.write("$$ INITIAL CONDITION FILE CREATED ON " + str(datetime.datetime.now().date()) + " AT " + str(datetime.datetime.now().time()) + "\n")
-                ofstream.write("System_class: {}\n".format(self.module.system_ID))
-                ofstream.write("f$ System Flags:\n")
-                
-                for flag in self.module.flags_dict:
-                    ofstream.write("{}: {}\n".format(flag, self.sys_flag_dict[flag].value()))
-                      
-                for layer_name, layer in self.module.layers.items():
-                    ofstream.write("L$: {}\n".format(layer_name))
-                    ofstream.write("p$ Space Grid:\n")
-                    ofstream.write("Total_length: {}\n".format(layer.total_length))
-                    ofstream.write("Node_width: {}\n".format(layer.dx))
-                
-                    ofstream.write("p$ System Parameters:\n")
-                
-                    # Saves occur as-is: any missing parameters are saved with whatever default value module gives them
-                    for param in layer.params:
-                        param_values = layer.params[param].value
-                        if isinstance(param_values, np.ndarray):
-                            # Write the array in a more convenient format
-                            ofstream.write("{}: {:.8e}".format(param, param_values[0]))
-                            for value in param_values[1:]:
-                                ofstream.write("\t{:.8e}".format(value))
-                                
-                            ofstream.write('\n')
-                        else:
-                            # The param value is just a single constant
-                            ofstream.write("{}: {}\n".format(param, param_values))
-                      
-                    if self.module.system_ID in self.LGC_eligible_modules and self.using_LGC[layer_name]:
-                        ofstream.write("p$ Laser Parameters\n")
-                        for laser_param in self.LGC_values[layer_name]:
-                            ofstream.write("{}: {}\n".format(laser_param,
-                                                             self.LGC_values[layer_name][laser_param]))
-    
-                        ofstream.write("p$ Laser Options\n")
-                        for laser_option in self.LGC_options[layer_name]:
-                            ofstream.write("{}: {}\n".format(laser_option, 
-                                                             self.LGC_options[layer_name][laser_option]))
+            flags = {flag:self.sys_flag_dict[flag].value() for flag in self.sys_flag_dict}
+            export_ICfile(newFileName, self, flags, self.module.layers, allow_write_LGC=True)
                 
         except OSError:
             self.write(self.ICtab_status, "Error: failed to create IC file")
@@ -3746,33 +3628,41 @@ class Notebook(BaseNotebook):
     def export_overview(self):
         try:
             # Has an overview been calculated?
-            self.overview_values
+            if not hasattr(self, "overview_values"): raise AttributeError
         except AttributeError:
             return
         
         output_name = self.overview_var_selection.get()
         
-        layer_name, output_name = output_name.split(": ")
+        is_shared = output_name in self.module.report_shared_outputs()
+        if is_shared:
+            layer_name = "__SHARED__"
+        else:
+            layer_name, output_name = output_name.split(": ")
+        
         paired_data = self.overview_values[layer_name][output_name]
-
         if not isinstance(paired_data, np.ndarray):
             logger.info("No data found for export")
             return
         
         # Grab x axis from matplotlib by force
-        grid_x = self.overview_subplots[layer_name][output_name].lines[0]._xorig
+        if is_shared:
+            grid_x = self.shared_overview_subplots[output_name].lines[0]._xorig
+        else:
+            grid_x = self.overview_subplots[layer_name][output_name].lines[0]._xorig
         paired_data = np.vstack((grid_x, paired_data)).T
         
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
                                                           title="Save data", 
                                                           filetypes=[("csv (comma-separated-values)","*.csv")])
+        header = ["z"] + [f"t{i+1}" for i in range(len(paired_data[0]) - 1)]
         # Export to .csv
         if export_filename:
             try:
                 if export_filename.endswith(".csv"): 
                     export_filename = export_filename[:-4]
                 np.savetxt("{}.csv".format(export_filename), paired_data, 
-                           delimiter=',')
+                           delimiter=',', header=",".join(header))
                 logger.info("Export from overview complete")
             except PermissionError:
                 logger.error("Error: unable to access export destination")

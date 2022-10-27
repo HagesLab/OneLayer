@@ -5,14 +5,14 @@ Created on Wed May 12 18:01:07 2021
 @author: cfai2
 """
 from _OneD_Model import OneD_Model
-from Modules.module_MAPI_Rubrene_DBP.definitions import define_layers
-from Modules.module_MAPI_Rubrene_DBP.definitions import define_flags
-from Modules.module_MAPI_Rubrene_DBP.initializations import MAPI_Rubrene_Initial_Conditions
-from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_overview_analysis
-from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_prep_dataset
-from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_timeseries
-from Modules.module_MAPI_Rubrene_DBP.analysis import submodule_get_IC_regen
-from Modules.module_MAPI_Rubrene_DBP.simulations import OdeTwoLayerSimulation
+from Modules.module_pnJunction.definitions import define_layers, define_shared_layer
+from Modules.module_pnJunction.definitions import define_flags
+from Modules.module_pnJunction.initializations import PN_Junction_Initial_Conditions
+from Modules.module_pnJunction.analysis import submodule_get_overview_analysis
+from Modules.module_pnJunction.analysis import submodule_prep_dataset
+from Modules.module_pnJunction.analysis import submodule_get_timeseries
+from Modules.module_pnJunction.analysis import submodule_get_IC_regen
+from Modules.module_pnJunction.simulations import OdePNJunctionSimulation
 
 
 
@@ -22,15 +22,17 @@ kB = 8.61773e-5             #[eV / K]
 eps0 = 8.854e-12 * 1e-9     #[C/V-m] to [C/V-nm]
 
 
-class MAPI_Rubrene(OneD_Model):
+class PN_Junction(OneD_Model):
     # A Nanowire object stores all information regarding the initial state being edited in the IC tab
     # And functions for managing other previously simulated nanowire data as they are loaded in
     def __init__(self):
         super().__init__()
-        self.system_ID = "MAPI_Rubrene"
+        self.system_ID = "PN_Junction"
         self.time_unit = "[ns]"
         self.flags_dict = define_flags()
         self.layers = define_layers()
+        
+        self.shared_layer = define_shared_layer()
 
         return
 
@@ -38,32 +40,32 @@ class MAPI_Rubrene(OneD_Model):
     def calc_inits(self):
         """Calculate initial electron and hole density distribution"""
         
-        mapi = self.layers["MAPI"]
-        rubrene = self.layers["Rubrene"]
+        ntype = self.layers["N-type"]
+        buffer = self.layers["buffer"]
+        ptype = self.layers["P-type"]
 
-        mapi_rubrene_inits = MAPI_Rubrene_Initial_Conditions(mapi, rubrene)
+        pnjunction_inits = PN_Junction_Initial_Conditions(ntype, buffer, ptype)
 
-        return mapi_rubrene_inits.format_inits_to_dict()
+        return pnjunction_inits.format_inits_to_dict()
 
 
-    def simulate(self, data_path, m, n, dt, flags, hmax_, rtol_, atol_, init_conditions):
+    def simulate(self, data_path, m, n, dt, flags, hmax_, rtol, atol, init_conditions):
         """Calls ODEINT solver."""
-        mapi = self.layers["MAPI"]
-        rubrene = self.layers["Rubrene"]
-        for param_name, param in mapi.params.items():
-            param.value *= mapi.convert_in[param_name]
-            
-        for param_name, param in rubrene.params.items():
-            param.value *= rubrene.convert_in[param_name]
-
-        ode_two_layer = OdeTwoLayerSimulation(mapi, rubrene, m, flags, init_conditions)
-        ode_two_layer.simulate(data_path, n, dt, hmax_, rtol_, atol_)
+        for layer_name in self.layers:
+            layer = self.layers[layer_name]
+            for param_name, param in layer.params.items():
+                param.value *= layer.convert_in[param_name]
+        
+        ode_junction = OdePNJunctionSimulation(self.layers, m, flags, init_conditions)
+        ode_junction.simulate(data_path, n, dt, hmax_, rtol, atol)
 
 
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        data_dict = submodule_get_overview_analysis(self.layers, params, flags, total_time, dt, tsteps, data_dirname, file_name_base)
+        # We actually don't need info from any layer in particular, so use shared_layer
+        data_dict = submodule_get_overview_analysis(self.shared_layer, params, flags, total_time, 
+                                                    dt, tsteps, data_dirname, file_name_base)
         return data_dict
 
 
@@ -71,7 +73,7 @@ class MAPI_Rubrene(OneD_Model):
                      i=0, j=0, nen=False, extra_data=None):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        layer = self.layers[target_layer]
+        layer = self.shared_layer
         data = submodule_prep_dataset(target_layer, layer, datatype, sim_data, params,
                     for_integrate, i, j, nen, extra_data)
         return data

@@ -30,12 +30,14 @@ from Notebook.notebook import Notebook
 from Modules.Nanowire import Nanowire
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
+from Modules.module_pnJunction.central import PN_Junction
 
 # {"Display name of module": OneD_Model derived module class}.
 MODULE_LIST = {
     "Standard One-Layer": Std_SingleLayer,
     "Nanowire": Nanowire,
-    "MAPI-Rubrene/DBP": MAPI_Rubrene
+    "MAPI-Rubrene/DBP": MAPI_Rubrene,
+    "PN-Junction": PN_Junction
 }
 
 from docopt import docopt
