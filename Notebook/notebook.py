@@ -1792,7 +1792,7 @@ class Notebook(BaseNotebook):
         if not self.confirmed: 
             return
         active_plot = self.analysis_plots[plot_ID]
-        datatype = self.data_var.get()
+        datatype = self.data_var.get() # "OUTPUT" if shared else "LAYER": "OUTPUT"
         
         is_shared = datatype in self.module.report_shared_outputs()
         if is_shared:
@@ -3727,7 +3727,6 @@ class Notebook(BaseNotebook):
                 self.write(self.analysis_status, "Error: unable to access PL export destination")
             
     def export_overview(self):
-        # TODO: Handle shared params
         try:
             # Has an overview been calculated?
             if not hasattr(self, "overview_values"): raise AttributeError
@@ -3736,7 +3735,7 @@ class Notebook(BaseNotebook):
         
         output_name = self.overview_var_selection.get()
         
-        is_shared = ":" not in output_name
+        is_shared = output_name in self.module.report_shared_outputs()
         if is_shared:
             layer_name = "__SHARED__"
         else:
