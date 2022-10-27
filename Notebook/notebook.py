@@ -1633,7 +1633,6 @@ class Notebook(BaseNotebook):
         self.analyze_overview_fig.tight_layout()
         self.analyze_overview_fig.canvas.draw()
 
-
     ## Funcs for detailed analyze tab
     def plot_analyze(self, plot_ID, force_axis_update=False):
         """ Plot dataset object from make_rawdataset() on analysis tab. """
@@ -1690,7 +1689,6 @@ class Notebook(BaseNotebook):
         except Exception:
             self.write(self.analysis_status, "Error #106: Plot failed")
             logger.error("Error #106: Plot failed")
-
 
     def make_rawdataset(self, data_filename, plot_ID, datatype, target_layer):
         """Create a dataset object and prepare to plot on analysis tab."""
@@ -1796,7 +1794,7 @@ class Notebook(BaseNotebook):
         active_plot = self.analysis_plots[plot_ID]
         datatype = self.data_var.get()
         
-        is_shared = ":" not in datatype
+        is_shared = datatype in self.module.report_shared_outputs()
         if is_shared:
             layer_name = "__SHARED__"
         else:
@@ -1827,7 +1825,6 @@ class Notebook(BaseNotebook):
         else:
             self.write(self.analysis_status, "Data read finished")
 
-
     def plot_tstep(self):
         """ Step already plotted data forward (or backward) in time"""
         plot_ID = self.active_analysisplot_ID.get()
@@ -1841,17 +1838,25 @@ class Notebook(BaseNotebook):
         active_datagroup = active_plot.datagroup
         # Search data files for data at new time
         # Interpolate if necessary
-        # TODO: Compress duplicate codeblock
+
+        is_shared = active_datagroup.type in self.module.report_shared_outputs()
+
         for tag, dataset in active_datagroup.datasets.items():
+            shared_done = {}
             sim_data = {}
-            if dataset.layer_name == "__SHARED__":
+            if is_shared:
                 sim_data["__SHARED__"] = {}
-                for sim_datatype in self.module.shared_layer.s_outputs:
-                    path_name = os.path.join(
-                        self.default_dirs["Data"], 
-                        self.module.system_ID,
-                        dataset.filename,
-                        "{}-{}.h5".format(dataset.filename, sim_datatype))
+                
+            for layer_name, layer in self.module.layers.items():
+                sim_data[layer_name] = {}
+                for sim_datatype in layer.s_outputs:
+                    if is_shared and shared_done.get(sim_datatype, False): continue
+                    
+                    path_name = os.path.join(self.default_dirs["Data"], 
+                                                self.module.system_ID,
+                                                dataset.filename,
+                                                "{}-{}.h5".format(dataset.filename, sim_datatype))
+                    
                     floor_tstep = int(active_plot.time / dataset.dt)
                     try:
                         interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
@@ -1869,35 +1874,12 @@ class Notebook(BaseNotebook):
                         slope = (interpolated_step[1] - interpolated_step[0]) / (dataset.dt)
                         interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * dataset.dt)
                     
-                    sim_data["__SHARED__"][sim_datatype] = interpolated_step
-            else:
-                for layer_name, layer in self.module.layers.items():
-                    sim_data[layer_name] = {}
-                    for sim_datatype in layer.s_outputs:
-                        path_name = os.path.join(self.default_dirs["Data"], 
-                                                    self.module.system_ID,
-                                                    dataset.filename,
-                                                    "{}-{}.h5".format(dataset.filename, sim_datatype))
+                    L = "__SHARED__" if is_shared else layer_name
+                    sim_data[L][sim_datatype] = interpolated_step
+                    
+                    if is_shared:
+                        shared_done[sim_datatype] = True
                         
-                        floor_tstep = int(active_plot.time / dataset.dt)
-                        try:
-                            interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
-                        except OSError:
-                            continue
-                        over_time = False
-                        
-                        if active_plot.time > dataset.total_time:
-                            interpolated_step = np.zeros_like(dataset.node_x)
-                            over_time = True
-                            
-                        elif active_plot.time == dataset.total_time:
-                            pass
-                        else:
-                            slope = (interpolated_step[1] - interpolated_step[0]) / (dataset.dt)
-                            interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * dataset.dt)
-                        
-                        sim_data[layer_name][sim_datatype] = interpolated_step
-        
             if over_time:
                 dataset.data = interpolated_step
             else:
@@ -1907,7 +1889,6 @@ class Notebook(BaseNotebook):
                         
         self.plot_analyze(plot_ID, force_axis_update=False)
         self.write(self.analysis_status, "")
-
 
     ## Status box update helpers
     def write(self, textBox, text):
