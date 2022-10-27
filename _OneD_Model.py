@@ -521,6 +521,9 @@ class OneD_Model:
                 if '-' in param:
                     errors.append("'-' not allowed in param names")
                     break
+                if ':' in param:
+                    errors.append("':' not allowed in param names")
+                    break
                 
         if len(errors) > 1:
             logger.info("\n".join(errors))
