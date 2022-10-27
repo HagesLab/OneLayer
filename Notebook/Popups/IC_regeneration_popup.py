@@ -67,7 +67,7 @@ class ICRegenPopup(Popup):
                 width=30,
                 height=10, 
                 selectmode='extended')
-        self.regen_IC_listbox.grid(row=4,column=0,columnspan=2)
+        self.regen_IC_listbox.grid(row=rcount,column=0,columnspan=2)
         for key, dataset in self.nb.analysis_plots[plot_ID].datagroup.datasets.items():
             over_time = (self.nb.analysis_plots[plot_ID].time > dataset.total_time)
             if over_time: continue
@@ -77,7 +77,7 @@ class ICRegenPopup(Popup):
             self.toplevel,
             text="Continue", 
             command=partial(self.close, logger, continue_=True)
-            ).grid(row=5,column=0,columnspan=2)
+            ).grid(row=rcount+1,column=0,columnspan=2)
 
         self.toplevel.protocol(
             "WM_DELETE_WINDOW", 
@@ -116,30 +116,18 @@ class ICRegenPopup(Popup):
                     grid_x = active_sets[key].grid_x
                     
                     filename = active_sets[key].filename
-                    sim_data = {}
-                    if "__SHARED__" in include_flags:
-                        sim_data["__SHARED__"] = {}
-                        for var in self.nb.module.shared_layer.s_outputs:
-                            
-                            path_name = os.path.join(self.nb.default_dirs["Data"], 
-                                                        self.nb.module.system_ID,
-                                                        filename,
-                                                        "{}-{}.h5".format(filename, var))
-                            floor_tstep = int(active_plot.time / active_sets[key].dt)
-                            interpolated_step = u_read(path_name, t0=floor_tstep, t1=floor_tstep+2)
-                            
-                            if active_plot.time == active_sets[key].total_time:
-                                pass
-                            else:
-                                slope = (interpolated_step[1] - interpolated_step[0]) / (active_sets[key].dt)
-                                interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * active_sets[key].dt)
-                            
-                            sim_data["__SHARED__"][var] = interpolated_step
                     
+                    shared_outputs = self.nb.module.report_shared_outputs()
+                    shared_done = {}
+                    sim_data = {}
+                    sim_data["__SHARED__"] = {}
                     for layer_name, layer in self.nb.module.layers.items():
                         sim_data[layer_name] = {}
                         for var in layer.s_outputs:
-                            if "__SHARED__" in sim_data and var in sim_data["__SHARED__"]: continue
+                            is_shared = var in shared_outputs
+                            # Don't repeat shared outputs
+                            if is_shared and shared_done.get(var, False): continue
+                        
                             path_name = os.path.join(self.nb.default_dirs["Data"], 
                                                         self.nb.module.system_ID,
                                                         filename,
@@ -153,7 +141,10 @@ class ICRegenPopup(Popup):
                                 slope = (interpolated_step[1] - interpolated_step[0]) / (active_sets[key].dt)
                                 interpolated_step = interpolated_step[0] + slope * (active_plot.time - floor_tstep * active_sets[key].dt)
                             
-                            sim_data[layer_name][var] = interpolated_step
+                            L = "__SHARED__" if is_shared else layer_name
+                            sim_data[L][var] = interpolated_step
+                            if is_shared:
+                                shared_done[var] = True
 
                     self.nb.module.get_IC_regen(sim_data, param_dict_copy, 
                                                include_flags, grid_x)
