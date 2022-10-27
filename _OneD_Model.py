@@ -268,6 +268,9 @@ class OneD_Model:
         layers all have this parameter defined.
         
         This function returns a list of all such shared parameters.
+        
+        For consistency, this and related functions should be the only methods
+        used to check whether shared values exist.
 
         Returns
         -------
@@ -276,7 +279,7 @@ class OneD_Model:
 
         """
         if len(self.layers) == 1:
-            return {}
+            return set()
         
         return set.intersection(*[set(self.layers[layer].params.keys())
                                           for layer in self.layers])
@@ -287,7 +290,7 @@ class OneD_Model:
 
         """
         if len(self.layers) == 1:
-            return {}
+            return set()
         
         return set.intersection(*[set(self.layers[layer].s_outputs.keys())
                                           for layer in self.layers])
@@ -298,10 +301,13 @@ class OneD_Model:
 
         """
         if len(self.layers) == 1:
-            return {}
+            return set()
         
         return set.intersection(*[set(self.layers[layer].c_outputs.keys())
                                           for layer in self.layers])
+    
+    def report_shared_outputs(self):
+        return set.union(*[self.report_shared_s_outputs(), self.report_shared_c_outputs()])
         
     def calc_inits(self):
         """

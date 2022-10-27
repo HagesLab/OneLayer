@@ -21,7 +21,7 @@ def add_tab_analyze(nb):
     count = 1
     total_outputs_count = sum([nb.module.layers[layer].outputs_count for layer in nb.module.layers])
     if len(nb.module.layers) > 1:
-        shared_outputs = set.union(*[nb.module.report_shared_s_outputs(), nb.module.report_shared_c_outputs()])
+        shared_outputs = nb.module.report_shared_outputs()
     else:
         shared_outputs = {}
     
