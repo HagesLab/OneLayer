@@ -1289,6 +1289,7 @@ class Notebook(BaseNotebook):
                          do_clear_plots=True, **kwargs):
         """
         Sets up basic elements of a matplotlib Axes - data, labels, axis ranges
+        For plots that are "one and done" - and don't need to remember their state
 
         Parameters
         ----------
@@ -1470,6 +1471,8 @@ class Notebook(BaseNotebook):
     def plot_overview_analysis(self):
         """ Plot dataset and calculations from OneD_Model.get_overview_analysis() 
             on Overview tab. 
+            These plots are "one-and-done", while detailed analysis are much more
+            manipulable
         """
         data_dirname = tk.filedialog.askdirectory(title="Select a dataset", 
                                                   initialdir=self.default_dirs["Data"])
@@ -1537,14 +1540,15 @@ class Notebook(BaseNotebook):
         
         warning_msg = ["Error: the following occured while generating the overview"]
                 
-        done = {}
+        shared_done = {}
+        shared_outputs = self.module.report_shared_outputs()
         for layer_name, layer in self.module.layers.items():
             for output_name, output_info in layer.outputs.items():
-                if done.get(output_name, False): continue
-            
                 # plot handlers and output data for SHARED parameters are stored
                 # separately
-                is_shared = output_name in self.shared_overview_subplots
+                is_shared = output_name in shared_outputs
+                # Don't repeat shared outputs
+                if is_shared and shared_done.get(output_name, False): continue
 
                 try:
                     if is_shared:
@@ -1605,7 +1609,8 @@ class Notebook(BaseNotebook):
                                           title=title,
                                           label="{:.3f} ns".format(tstep_list[i] * dt))
                     
-                done[output_name] = True
+                if is_shared:
+                    shared_done[output_name] = True
 
         for layer_name, layer in self.module.layers.items():
             for output_name in layer.s_outputs:
@@ -1709,12 +1714,14 @@ class Notebook(BaseNotebook):
         except Exception:
             return "Error: missing or has unusual metadata.txt"
         
-        if target_layer == "__SHARED__":
+        shared_outputs = self.module.report_shared_outputs()
+        is_shared = datatype in shared_outputs
+        if is_shared:
             is_edge = self.module.shared_layer.outputs[datatype].is_edge
         else:
             is_edge = self.module.layers[target_layer].outputs[datatype].is_edge
             
-        if target_layer == "__SHARED__":
+        if is_shared:
             param_values_dict["__SHARED__"] = {}
             edges_x = [param_values_dict[layer_name]['edge_x'] for layer_name in layer_names]
             nodes_x = [param_values_dict[layer_name]['node_x'] for layer_name in layer_names]
@@ -1723,36 +1730,31 @@ class Notebook(BaseNotebook):
             param_values_dict["__SHARED__"]["node_x"] = generate_shared_x_array(False, nodes_x, total_lengths)
             
 		# Now that we have the parameters from metadata, fetch the data itself
-        # TODO: Compress duplicate codeblock
+        shared_done = {}
         sim_data = {}
-        if target_layer == "__SHARED__":
+        if is_shared:
             sim_data["__SHARED__"] = {}
-            for sim_datatype in self.module.shared_layer.s_outputs:
+        
+        for layer_name, layer in self.module.layers.items():
+            sim_data[layer_name] = {}
+            for sim_datatype in layer.s_outputs:
+                if is_shared and shared_done.get(sim_datatype, False): continue
+            
                 path_name = os.path.join(
                     self.default_dirs["Data"], 
                     self.module.system_ID,
                     data_filename,
                     "{}-{}.h5".format(data_filename, sim_datatype))
                 try:
-                    sim_data[target_layer][sim_datatype] = \
+                    L = "__SHARED__" if is_shared else layer_name
+                    sim_data[L][sim_datatype] = \
                         u_read(path_name, t0=0, single_tstep=True)
                 except OSError:
                     continue
-        else:
-            for layer_name, layer in self.module.layers.items():
-                sim_data[layer_name] = {}
-                for sim_datatype in layer.s_outputs:
-                    path_name = os.path.join(
-                        self.default_dirs["Data"], 
-                        self.module.system_ID,
-                        data_filename,
-                        "{}-{}.h5".format(data_filename, sim_datatype))
-                    try:
-                        sim_data[layer_name][sim_datatype] = \
-                            u_read(path_name, t0=0, single_tstep=True)
-                    except OSError:
-                        continue
-        
+                
+                if is_shared:
+                    shared_done[sim_datatype] = True
+
         try:
             values = self.module.prep_dataset(
                 datatype,
@@ -1770,33 +1772,19 @@ class Notebook(BaseNotebook):
         except Exception:
             return ("Error: Unable to calculate {} using prep_dataset\n"
                     "prep_dataset did not return a 1D array".format(datatype))
-
-        if is_edge: 
-            return Raw_Data_Set(
-                values,
-                param_values_dict[target_layer]['edge_x'],
-                param_values_dict[target_layer]['node_x'],
-                total_time,
-                dt,
-                param_values_dict,
-                flag_values_dict,
-                datatype,
-                target_layer,
-                data_filename, 
-                active_plot.time)
-        else:
-            return Raw_Data_Set(
-                values,
-                param_values_dict[target_layer]['node_x'],
-                param_values_dict[target_layer]['node_x'],
-                total_time,
-                dt,
-                param_values_dict,
-                flag_values_dict,
-                datatype,
-                target_layer,
-                data_filename, 
-                active_plot.time)
+ 
+        return Raw_Data_Set(
+            values,
+            param_values_dict[target_layer]['edge_x' if is_edge else 'node_x'],
+            param_values_dict[target_layer]['node_x'],
+            total_time,
+            dt,
+            param_values_dict,
+            flag_values_dict,
+            datatype,
+            target_layer,
+            data_filename, 
+            active_plot.time)
 
     def load_datasets(self):
         """ Interpret selection from do_plotter_popup()."""
