@@ -1284,28 +1284,66 @@ class Notebook(BaseNotebook):
         ts_popup.destroy()
     
 
-    ## Plotter for simulation tab    
+    ## Plotter for simulation tab 
+    def format_sim_plots(self, x, y, plot_handler, visible=True, 
+                         do_clear_plots=True, **kwargs):
+        """
+        Sets up basic elements of a matplotlib Axes - data, labels, axis ranges
+
+        Parameters
+        ----------
+        x : 1D ndarray
+            Horizontal coordinates.
+        y : 1D ndarray
+            Vertical coordinates.
+        plot_handler : matplotlib Axes object
+            The Axes or Figure to edit.
+        visible : bool, optional
+            Whether to plot the (x,y) curve. Sometimes we merely want to set up
+            the cosmetic elements and plot at a later time. The default is True.
+        do_clear_plots : bool, optional
+            Whether to clear all plotted curves. Generally True for the first in
+            a sequence of curves and then False for all others. The default is True.
+        **kwargs :
+            Various matplotlib formatting fields.
+
+        Returns
+        -------
+        None.
+
+        """
+        if do_clear_plots: 
+            plot_handler.cla()
+            ymin = np.amin(y) * kwargs.get('yb_lower', 1)
+            ymax = np.amax(y) * kwargs.get('yb_upper', 1)
+            plot_handler.set_ylim(ymin, ymax)
+
+        plot_handler.set_yscale(kwargs.get('yscale', "symlog"))
+        
+        if visible:
+            label = kwargs.get('label', None)
+            plot_handler.plot(x, y, label=label)
+
+        plot_handler.set_xlabel(kwargs.get('xlabel', ""))
+        plot_handler.set_ylabel(kwargs.get('ylabel', ""))
+        plot_handler.set_title(kwargs.get('title', ""))
+
+        if kwargs.get("do_legend", False):
+            plot_handler.legend()
+        
+        return
+    
     def update_sim_plots(self, index, failed_vars, do_clear_plots=True):
         """ Plot snapshots of simulated data on simulate tab at regular time intervals. """
-
         shared_outputs = self.module.report_shared_s_outputs()
         if len(shared_outputs) > 0:
             convert_out = self.module.shared_layer.convert_out
             total_lengths = [self.module.layers[layer_name].total_length
                              for layer_name in self.module.layers]
-        
+
         for variable in shared_outputs:
-            output_obj = self.module.shared_layer.s_outputs[variable]
-            plot = self.sim_subplots[variable]
-            
-            if do_clear_plots: 
-                plot.cla()
-                ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
-                ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
-                plot.set_ylim(ymin * convert_out[variable], 
-                              ymax * convert_out[variable])
+            output_obj = self.module.shared_layer.s_outputs[variable]            
                 
-            plot.set_yscale(output_obj.yscale)
             if output_obj.is_edge:
                 grids_x = [self.module.layers[layer_name].grid_x_edges
                            for layer_name in self.module.layers]
@@ -1315,41 +1353,35 @@ class Notebook(BaseNotebook):
                 
             shared_x = generate_shared_x_array(output_obj.is_edge,
                                                grids_x, total_lengths)
-                
-            if not failed_vars[variable]:
-                plot.plot(shared_x, self.sim_data[variable] * convert_out[variable])
+            
+            self.format_sim_plots(shared_x, self.sim_data[variable] * convert_out[variable], 
+                                  self.sim_subplots[variable], 
+                                  not failed_vars[variable],
+                                  do_clear_plots,
+                                  xlabel="x {}".format(self.module.shared_layer.length_unit),
+                                  ylabel="{} {}".format(variable, output_obj.units),
+                                  label="Time: {} ns".format(self.simtime * index / self.n),
+                                  do_legend=True,
+                                  yscale=output_obj.yscale,
+                                  yb_lower=output_obj.yfactors[0], yb_upper=output_obj.yfactors[1])
 
-            plot.set_xlabel("x {}".format(self.module.shared_layer.length_unit))
-            plot.set_ylabel("{} {}".format(variable, output_obj.units))
-
-            plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
-                
         
         for layer_name, layer in self.module.layers.items():
             convert_out = layer.convert_out
             for variable, output_obj in layer.s_outputs.items():
                 if variable in shared_outputs:
                     continue
-                plot = self.sim_subplots[variable]
-                
-                if do_clear_plots: 
-                    plot.cla()
-    
-                    ymin = np.amin(self.sim_data[variable]) * output_obj.yfactors[0]
-                    ymax = np.amax(self.sim_data[variable]) * output_obj.yfactors[1]
-                    plot.set_ylim(ymin * convert_out[variable], 
-                                  ymax * convert_out[variable])
-    
-                plot.set_yscale(output_obj.yscale)
-                
                 grid_x = layer.grid_x_nodes if not output_obj.is_edge else layer.grid_x_edges
-                if not failed_vars[variable]:
-                    plot.plot(grid_x, self.sim_data[variable] * convert_out[variable])
-    
-                plot.set_xlabel("x {}".format(layer.length_unit))
-                plot.set_ylabel("{} {}".format(variable, output_obj.units))
-    
-                plot.set_title("Time: {} ns".format(self.simtime * index / self.n))
+                self.format_sim_plots(grid_x, self.sim_data[variable] * convert_out[variable],
+                                      self.sim_subplots[variable],
+                                      not failed_vars[variable],
+                                      do_clear_plots,
+                                      xlabel="x {}".format(layer.length_unit),
+                                      ylabel="{} {}".format(variable, output_obj.units),
+                                      label="Time: {} ns".format(self.simtime * index / self.n),
+                                      do_legend=True,
+                                      yscale=output_obj.yscale,
+                                      yb_lower=output_obj.yfactors[0], yb_upper=output_obj.yfactors[1])
             
         self.sim_fig.tight_layout()
         self.sim_fig.canvas.draw()
@@ -1491,6 +1523,7 @@ class Notebook(BaseNotebook):
                     hide_cancel=True)
             return
         
+        # TODO: Compress duplicate codeblock
         for output_name, plot_obj in self.shared_overview_subplots.items():
             output_info_obj = self.module.shared_layer.outputs[output_name]
             plot_obj.cla()
@@ -1527,6 +1560,7 @@ class Notebook(BaseNotebook):
         warning_msg = ["Error: the following occured while generating the overview"]
 
         # Handle shared outputs
+        # TODO: Compress duplicate codeblock
         if "__SHARED__" in self.overview_values:
             any_layer = self.module.shared_layer
             for output_name, output_info in any_layer.outputs.items():
@@ -1706,6 +1740,7 @@ class Notebook(BaseNotebook):
             param_values_dict["__SHARED__"]["node_x"] = generate_shared_x_array(False, nodes_x, total_lengths)
             
 		# Now that we have the parameters from metadata, fetch the data itself
+        # TODO: Compress duplicate codeblock
         sim_data = {}
         if target_layer == "__SHARED__":
             sim_data["__SHARED__"] = {}
@@ -1835,6 +1870,7 @@ class Notebook(BaseNotebook):
         active_datagroup = active_plot.datagroup
         # Search data files for data at new time
         # Interpolate if necessary
+        # TODO: Compress duplicate codeblock
         for tag, dataset in active_datagroup.datasets.items():
             sim_data = {}
             if dataset.layer_name == "__SHARED__":
@@ -1939,6 +1975,7 @@ class Notebook(BaseNotebook):
             for each selected IC file
         """
         # Test for valid entry values
+        # TODO: Support logspaced timesteps for better early-time precision
         try:
             self.simtime = float(self.simtime_entry.get())      # [ns]
             self.dt = float(self.dt_entry.get())           # [ns]
@@ -2085,27 +2122,11 @@ class Notebook(BaseNotebook):
             return
 
 
-        ## Calculate!
-        #atom = tables.Float64Atom()
-
-        ## Create data files
-        # for layer_name, layer in self.module.layers.items():
-        #     for variable in layer.s_outputs:
-        #         path = os.path.join(dirname, "{}-{}.h5".format(data_file_name, variable))
-        #         with tables.open_file(path, mode='w') as ofstream:
-        #             length = num_nodes[layer_name] 
-        #             if layer.s_outputs[variable].is_edge:
-        #                 length += 1
-    
-        #             # Important - "data" must be used as the array name here, as pytables will use the string "data" 
-        #             # to name the attribute earray.data, which is then used to access the array
-        #             earray = ofstream.create_earray(ofstream.root, "data", atom, (0, length))
-        #             earray.append(np.reshape(init_conditions[variable], (1, length)))
-        
+        ## Calculate!        
         ## Setup simulation plots and plot initial
         
         self.sim_data = dict(init_conditions)
-        #self.update_sim_plots(0)
+
         flag_values = {f:flag.value() for f, flag in self.sys_flag_dict.items()}
 
         try:
@@ -2159,7 +2180,7 @@ class Notebook(BaseNotebook):
                     self.sim_data[var] = 0
                     failed_vars[var] = 1
             is_first = (i == 1)
-            self.update_sim_plots(self.n, failed_vars, do_clear_plots=is_first)
+            self.update_sim_plots(int(self.n * i / 5), failed_vars, do_clear_plots=is_first)
             
         failed_vars = [var for var, fail_state in failed_vars.items() if fail_state]
         if failed_vars:
@@ -2168,6 +2189,7 @@ class Notebook(BaseNotebook):
         
         # Save metadata: list of param values used for the simulation
         # Inverting the unit conversion between the inputted params and the calculation engine is also necessary to regain the originally inputted param values
+        # TODO: Reuse the init file writer for this
         with open(os.path.join(dirname, "metadata.txt"), "w+") as ofstream:
             ofstream.write("$$ METADATA FOR CALCULATIONS PERFORMED ON {} AT {}\n".format(datetime.datetime.now().date(),datetime.datetime.now().time()))
             ofstream.write("System_class: {}\n".format(self.module.system_ID))
@@ -2287,6 +2309,7 @@ class Notebook(BaseNotebook):
             
             # This works fine for an unshared single layer integral,
             # but if shared we need to work with the stitched arrays
+            # TODO: Compress duplicate codeblock
             if where_layer == "__SHARED__":
                 edge_x = active_datagroup.datasets[tag].params_dict[where_layer]["edge_x"]
                 node_x = active_datagroup.datasets[tag].params_dict[where_layer]["node_x"]
@@ -2594,6 +2617,7 @@ class Notebook(BaseNotebook):
                     continue
     ## Initial Condition Managers
 
+    # TODO: A routine for exchanging dx
     def reset_IC(self, force=False):
         """ On IC tab:
             For each selected layer with a set spacegrid 
