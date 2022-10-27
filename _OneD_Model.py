@@ -525,6 +525,11 @@ class OneD_Model:
                     errors.append("':' not allowed in param names")
                     break
                 
+            for param in self.layers[layer].outputs:
+                if ':' in param:
+                    errors.append("':' not allowed in output names")
+                    break
+                
         if len(errors) > 1:
             logger.info("\n".join(errors))
             raise NotImplementedError
