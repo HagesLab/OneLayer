@@ -1551,10 +1551,8 @@ class Notebook(BaseNotebook):
                 if is_shared and shared_done.get(output_name, False): continue
 
                 try:
-                    if is_shared:
-                        values = self.overview_values["__SHARED__"][output_name]
-                    else:
-                        values = self.overview_values[layer_name][output_name]
+                    L = "__SHARED__" if is_shared else layer_name
+                    values = self.overview_values[L][output_name]
                     if not isinstance(values, np.ndarray): 
                         raise KeyError
                 except KeyError:
