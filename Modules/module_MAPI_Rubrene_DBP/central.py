@@ -31,6 +31,7 @@ class MAPI_Rubrene(OneD_Model):
         self.time_unit = "[ns]"
         self.flags_dict = define_flags()
         self.layers = define_layers()
+        self.is_LGC_eligible = True
 
         return
 

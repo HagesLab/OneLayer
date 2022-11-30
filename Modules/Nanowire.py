@@ -88,6 +88,8 @@ class Nanowire(OneD_Model):
         self.layers = {"Nanowire":Layer(params, simulation_outputs, calculated_outputs,
                                         "[nm]", convert_in, iconvert_in),
                        }
+        
+        self.is_LGC_eligible = True
 
         return
     

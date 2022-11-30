@@ -81,6 +81,12 @@ class OneD_Model:
         
         self.shared_layer = None
         
+        # Modules may also declare themselves as LGC-eligible, which means they
+        # are compatible with the laser generation initial condition that sets
+        # values for parameters named delta_N and delta_P.
+        
+        self.is_LGC_eligible = False
+        
 
         return
     
