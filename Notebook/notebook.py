@@ -316,7 +316,7 @@ class Notebook(BaseNotebook):
         self.write(self.layer_statusbox, "On layer: {}".format(self.current_layer_name))
         
         if update_LGC_display:
-            if (self.module.system_ID in self.LGC_eligible_modules and 
+            if (self.module.is_LGC_eligible and 
                 self.using_LGC[self.current_layer_name]):
                 for option, val in self.LGC_options[self.current_layer_name].items():
                     self.LGC_optionboxes[option].set(val)
@@ -585,7 +585,7 @@ class Notebook(BaseNotebook):
             LGC_active = []
             batchable_params = []
             for layer in self.module.layers:
-                LGC_active.append(self.module.system_ID in self.LGC_eligible_modules 
+                LGC_active.append(self.module.is_LGC_eligible 
                                       and self.using_LGC[layer])
                 for param in self.module.layers[layer].params:
                     
@@ -2901,7 +2901,7 @@ class Notebook(BaseNotebook):
         self.paramtoolkit_viewer_selection.set(new_param_name)
         self.update_paramrule_listbox(new_param_name)
 
-        if self.module.system_ID in self.LGC_eligible_modules:
+        if self.module.is_LGC_eligible:
             if new_param_name == "delta_N" or new_param_name == "delta_P": 
                 self.using_LGC[self.current_layer_name] = False
         self.update_IC_plot(plot_ID="recent")
@@ -3102,7 +3102,7 @@ class Notebook(BaseNotebook):
                     msg.append(str(e))
                     temp_IC_values[j] = 0
                 
-        if self.module.system_ID in self.LGC_eligible_modules:
+        if self.module.is_LGC_eligible:
             if var == "delta_N" or var == "delta_P": 
                 self.using_LGC[self.current_layer_name] = False
         
@@ -3241,7 +3241,7 @@ class Notebook(BaseNotebook):
                 layer, param = b.split('-')
                 filename += str("__{}_{:.4e}".format(b, batch_set[b]))
                 
-                if (self.module.system_ID in self.LGC_eligible_modules 
+                if (self.module.is_LGC_eligible 
                     and layer in self.LGC_values
                     and param in self.LGC_values[layer]):
                     self.enter(self.LGC_entryboxes_dict[param], str(batch_set[b]))
@@ -3250,7 +3250,7 @@ class Notebook(BaseNotebook):
                     self.module.layers[layer].params[param].value = batch_set[b]
 
                 
-            if (self.module.system_ID in self.LGC_eligible_modules
+            if (self.module.is_LGC_eligible
                 and any(self.using_LGC.values())): 
                 self.add_LGC()
                 
@@ -3378,14 +3378,14 @@ class Notebook(BaseNotebook):
                         
                     elif "$ Laser Parameters" in line:
                         logger.info("Now searching for laser parameters...")
-                        if self.module.system_ID not in self.LGC_eligible_modules:
+                        if not self.module.is_LGC_eligible:
                             logger.warning("Warning: laser params found for unsupported module (these will be ignored)")
                         initFlag = 'l'
                         continue
                         
                     elif "$ Laser Options" in line:
                         logger.info("Now searching for laser options...")
-                        if self.module.system_ID not in self.LGC_eligible_modules:
+                        if not self.module.is_LGC_eligible:
                             logger.warning("Warning: laser options found for unsupported module (these will be ignored)")
                         initFlag = 'o'
                         continue
@@ -3439,7 +3439,7 @@ class Notebook(BaseNotebook):
             return
         
         # Clear values in any IC generation areas; this is done to minimize ambiguity between IC's that came from the recently loaded file and any other values that may exist on the GUI
-        if self.module.system_ID in self.LGC_eligible_modules:
+        if self.module.is_LGC_eligible:
             for key in self.LGC_entryboxes_dict:
                 self.enter(self.LGC_entryboxes_dict[key], "")
             
@@ -3504,7 +3504,7 @@ class Notebook(BaseNotebook):
                     warning_mssg += ("\nWarning: could not apply value for param: {}".format(param_name))
                     warning_flag += 1
                         
-            if self.module.system_ID in self.LGC_eligible_modules: 
+            if self.module.is_LGC_eligible: 
                 self.using_LGC[layer_name] = bool(LGC_values[layer_name])
                 if LGC_values[layer_name]:
                     for laser_param in LGC_values[layer_name]:

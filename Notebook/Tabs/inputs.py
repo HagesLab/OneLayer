@@ -328,7 +328,7 @@ def add_tab_inputs(nb):
                                 nb.listupload_toolbar_frame)
 
     ## Laser Generation Condition (LGC): extra input mtds for nanowire-specific applications
-    if nb.module.system_ID in nb.LGC_eligible_modules:
+    if nb.module.is_LGC_eligible:
         nb.create_LGC_frame()
         nb.tab_inputs.add(nb.tab_generation_init, 
                             text="Laser Generation Conditions")

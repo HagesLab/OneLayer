@@ -33,6 +33,8 @@ class PN_Junction(OneD_Model):
         self.layers = define_layers()
         
         self.shared_layer = define_shared_layer()
+        
+        self.is_LGC_eligible = True
 
         return
 

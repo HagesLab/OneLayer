@@ -124,6 +124,8 @@ class Std_SingleLayer(OneD_Model):
                                         "[nm]", convert_in, iconvert_in),
                        }
 
+        self.is_LGC_eligible = True
+        
         return
     
     def calc_inits(self):

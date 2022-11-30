@@ -118,11 +118,6 @@ class BaseNotebook:
 
 
     def prepare_eligible_modules(self):
-        # Add (e.g. for Nanowire) module-specific functionality
-        # TODO: abstract the choices away from this code
-        self.LGC_eligible_modules = ("Nanowire", "OneLayer", "MAPI_Rubrene",
-                                     "PN_Junction")
-        
         # Default LGC values
         self.using_LGC = {layer:False for layer in self.module.layers}
         self.LGC_options = {layer:{} for layer in self.module.layers}
