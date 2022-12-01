@@ -1988,7 +1988,7 @@ class Notebook(BaseNotebook):
             self.write(self.status, oops)
             return
 
-        IC_files = tk.filedialog.askopenfilenames(initialdir=self.default_dirs["Initial"], 
+        IC_files = tk.filedialog.askopenfilenames(initialdir=os.path.join(self.default_dirs["Initial"], self.module.system_ID),
                                                   title="Select IC text file", 
                                                   filetypes=[("Text files","*.txt")])
         if not IC_files: 
@@ -3227,7 +3227,9 @@ class Notebook(BaseNotebook):
             return
 
         try:
-            os.mkdir(os.path.join(self.default_dirs["Initial"], batch_dir_name))
+            os.mkdir(os.path.join(self.default_dirs["Initial"],
+                                  self.module.system_ID,
+                                  batch_dir_name))
         except FileExistsError:
             self.write(self.batch_status, 
                        "Error: {} folder already exists".format(batch_dir_name))
@@ -3265,8 +3267,9 @@ class Notebook(BaseNotebook):
                 
             try:
                 self.write_init_file(os.path.join(self.default_dirs["Initial"], 
-                                                    batch_dir_name,
-                                                    "{}.txt".format(filename)))
+                                                  self.module.system_ID,
+                                                  batch_dir_name,
+                                                  "{}.txt".format(filename)))
             except Exception as e:
                 warning_mssg.append("Error: failed to create batch file {}".format(filename))
                 warning_mssg.append(str(e))
@@ -3292,7 +3295,7 @@ class Notebook(BaseNotebook):
 
             new_filename = \
                 tk.filedialog.asksaveasfilename(
-                    initialdir=self.default_dirs["Initial"], 
+                    initialdir=os.path.join(self.default_dirs["Initial"], self.module.system_ID),
                     title="Save IC text file", 
                     filetypes=[("Text files","*.txt")])
             
@@ -3309,7 +3312,7 @@ class Notebook(BaseNotebook):
         except ValueError as uh_Oh:
             logger.error(uh_Oh)
 
-    def write_init_file(self, newFileName, dir_name=""):
+    def write_init_file(self, newFileName):
         """ Write current state of module into an initial condition (IC) file."""
         try:
             flags = {flag:self.sys_flag_dict[flag].value() for flag in self.sys_flag_dict}
@@ -3326,7 +3329,7 @@ class Notebook(BaseNotebook):
         """Wrapper for load_ICfile with user selection from IC tab"""
         self.IC_file_name = \
             tk.filedialog.askopenfilename(
-                initialdir=self.default_dirs["Initial"], 
+                initialdir=os.path.join(self.default_dirs["Initial"], self.module.system_ID),
                 title="Select IC text files", 
                 filetypes=[("Text files","*.txt")])
 
