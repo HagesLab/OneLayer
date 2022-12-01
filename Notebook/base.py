@@ -55,9 +55,6 @@ class BaseNotebook:
         self.notebook.bind('<Configure>', 
                            lambda e:self.main_canvas.configure(scrollregion=self.main_canvas.bbox('all')))
 
-        self.default_dirs = {"Initial":"Initial", "Data":"Data", "PL":"Analysis"}
-
-
     def prepare_radiobuttons_and_checkboxes(self):
         """Tkinter checkboxes and radiobuttons require special variables 
         to extract user input.

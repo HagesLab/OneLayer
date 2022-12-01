@@ -236,6 +236,15 @@ class Notebook(BaseNotebook):
             logger.info("No Initial Condition Directory detected; automatically creating...")
         except FileExistsError:
             logger.info("Initial Condition Directory detected")
+            
+        logger.info("Checking whether the current system class ({}) "
+              "has a dedicated initial subdirectory...".format(self.module.system_ID))
+        
+        try:
+            os.mkdir(os.path.join(self.default_dirs["Initial"], self.module.system_ID))
+            logger.info("No such subdirectory detected; automatically creating...")
+        except FileExistsError:
+            logger.info("Subdirectory detected")
         
         try:
             os.mkdir(self.default_dirs["Data"])
@@ -3276,6 +3285,8 @@ class Notebook(BaseNotebook):
 
     def save_ICfile(self):
         """Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked"""
+        # TODO: Separate init files by module
+        # We only need to modify all saves
         try:
             assert all([layer.spacegrid_is_set for name, layer in self.module.layers.items()]), "Error: set all space grids first"
 
