@@ -94,7 +94,7 @@ def export_ICfile(newFileName, nb, flags, layers, allow_write_LGC=False):
                     ofstream.write("{}: {}\n".format(param, param_values))
               
             if allow_write_LGC:
-                if nb.module.system_ID in nb.LGC_eligible_modules and nb.using_LGC[layer_name]:
+                if nb.module.is_LGC_eligible and nb.using_LGC[layer_name]:
                     ofstream.write("p$ Laser Parameters\n")
                     for laser_param in nb.LGC_values[layer_name]:
                         ofstream.write("{}: {}\n".format(laser_param,
