@@ -3288,8 +3288,7 @@ class Notebook(BaseNotebook):
 
     def save_ICfile(self):
         """Wrapper for write_init_file() - this one is for IC files user saves from the Initial tab and is called when the Save button is clicked"""
-        # TODO: Separate init files by module
-        # We only need to modify all saves
+
         try:
             assert all([layer.spacegrid_is_set for name, layer in self.module.layers.items()]), "Error: set all space grids first"
 
