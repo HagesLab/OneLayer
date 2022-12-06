@@ -3246,6 +3246,8 @@ class Notebook(BaseNotebook):
         batch_combinations = get_all_combinations(batch_values)        
                 
         # Apply each combination to module, going through LGC if necessary
+        # TODO: Less clunky batch file names
+        # Numerical code for each file, plus a text doc as a legend?
         for batch_set in batch_combinations:
             filename = batch_dir_name
             for b in batch_set:
