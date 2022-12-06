@@ -136,9 +136,3 @@ class BaseNotebook:
         self.plotter_popup_isopen = False
         self.IC_regen_popup_isopen = False
         self.bayesim_popup_isopen = False
-    # Create GUI elements for each tab
-    # Tkinter works a bit like a bulletin board:
-    # we declare an overall frame and
-    # pin things to it at specified locations
-    # This includes other frames, which is evident
-    # in how the tab_inputs has three sub-tabs pinned to itself
