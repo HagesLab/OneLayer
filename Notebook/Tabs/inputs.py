@@ -1,4 +1,3 @@
-import numpy as np
 import matplotlib
 starting_backend = matplotlib.get_backend()
 matplotlib.use("TkAgg")
@@ -6,12 +5,9 @@ import matplotlib.backends.backend_tkagg as tkagg
 from matplotlib.figure import Figure
 import tkinter as tk
 
-# This lets us pass params to functions called by tkinter buttons
-from functools import partial 
-from GUI_structs import Flag
-from GUI_structs import Analysis_Plot_State
-from GUI_structs import Integration_Plot_State
+from Notebook.Tabs.LGC_frame import create_LGC_frame
 
+from GUI_structs import Flag
 
 def add_tab_inputs(nb):
     """ Add the menu tab 'Inputs' to the main notebook
@@ -329,7 +325,7 @@ def add_tab_inputs(nb):
 
     ## Laser Generation Condition (LGC): extra input mtds for nanowire-specific applications
     if nb.module.is_LGC_eligible:
-        nb.create_LGC_frame()
+        create_LGC_frame(nb)
         nb.tab_inputs.add(nb.tab_generation_init, 
                             text="Laser Generation Conditions")
         
