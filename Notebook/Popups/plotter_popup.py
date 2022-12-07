@@ -111,6 +111,20 @@ class PlotterPopup(Popup):
                                                      initialdir=os.path.join(self.nb.default_dirs["Data"],
                                                                              self.nb.module.system_ID)
                                                      )
+        data_dirnames = list(data_dirnames)
+        
+        # Screen out dirs without data
+        for data_dirname in list(data_dirnames):
+            if any(map(lambda t: t.endswith(".h5"), os.listdir(data_dirname))):
+                continue
+            else:
+                data_dirnames.remove(data_dirname)
+            
+        # Screen duplicate dirs
+        for data_dirname in list(data_dirnames):
+            if data_dirname in self.data_list:
+                data_dirnames.remove(data_dirname)
+        
         self.data_list += data_dirnames
         self.data_listbox.delete(0,tk.END)
         self.data_listbox.insert(0,*(self.data_list))
