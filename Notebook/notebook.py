@@ -662,8 +662,8 @@ class Notebook(BaseNotebook):
             self.batch_status.grid(row=6,column=0)
             self.batch_status.configure(state='disabled')
 
-            self.batch_name_entry = tk.ttk.Entry(self.batch_popup, width=24)
-            self.enter(self.batch_name_entry, "Enter name for batch folder")
+            self.batch_name_entry = tk.ttk.Entry(self.batch_popup, width=32)
+            self.enter(self.batch_name_entry, "Enter Batch name")
             self.batch_name_entry.grid(row=6,column=1)
 
             tk.ttk.Button(self.batch_popup, 
@@ -3246,13 +3246,10 @@ class Notebook(BaseNotebook):
         batch_combinations = get_all_combinations(batch_values)        
                 
         # Apply each combination to module, going through LGC if necessary
-        # TODO: Less clunky batch file names
-        # Numerical code for each file, plus a text doc as a legend?
         for i, batch_set in enumerate(batch_combinations):
             filename = f"{batch_dir_name}_{i}"
             for b in batch_set:
                 layer, param = b.split(':')
-                #filename += str("__{}_{:.4e}".format(b, batch_set[b]))
                 
                 if (self.module.is_LGC_eligible 
                     and layer in self.LGC_values
