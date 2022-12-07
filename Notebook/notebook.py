@@ -1256,7 +1256,8 @@ class Notebook(BaseNotebook):
         self.active_timeseries[tspopup_ID] = []
         for tag in td:
             logger.debug(list(td[tag][ts_ID][1] * scale_f))
-            td_subplot.plot(td_gridt[tag], td[tag][ts_ID][1] * scale_f, label=tag.strip('_'))
+            dirname, header = os.path.split(tag.strip('_'))
+            td_subplot.plot(td_gridt[tag], td[tag][ts_ID][1] * scale_f, label=header)
             self.active_timeseries[tspopup_ID].append((tag, td_gridt[tag], td[tag][ts_ID][1] * scale_f))
     
         td_subplot.legend().set_draggable(True)
@@ -2467,11 +2468,13 @@ class Notebook(BaseNotebook):
                 f = subplot.scatter
             elif self.PL_mode == "All time steps":
                 f = subplot.plot
+                
+            dirname, header = os.path.split(datagroup.datasets[key].tag(for_matplotlib=True))
             f(datagroup.datasets[key].grid_x, 
                 datagroup.datasets[key].data * 
                 self.module.layers[where_layer].convert_out[datagroup.type] *
                 self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                label=datagroup.datasets[key].tag(for_matplotlib=True))
+                label=header)
 
             
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
