@@ -21,6 +21,7 @@ from matplotlib.figure import Figure
 import tkinter as tk
 from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText as tkScrolledText
+import tkfilebrowser
 
 # This lets us pass params to functions called by tkinter buttons
 from functools import partial 
@@ -271,11 +272,10 @@ class Notebook(BaseNotebook):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        # logger.debug("Using LGC {}".format(self.using_LGC))
-        # logger.debug("LGC Options {}".format(self.LGC_options))
-        # logger.debug("LGC Values {}".format(self.LGC_values))
-        logger.info(self.module.report_shared_s_outputs())
-        logger.info(self.module.report_shared_c_outputs())
+        data_dirname = tkfilebrowser.askopendirnames(title="Select a dataset", 
+                                                     initialdir=self.default_dirs["Data"],
+                                                      )
+        print(data_dirname)
         return
     
     def change_layer(self, clear=True, update_LGC_display=True):
@@ -3284,6 +3284,15 @@ class Notebook(BaseNotebook):
             ofstream.write("\n".join(map(lambda x: "({}) {}".format(x[0], x[1]),
                                          zip(np.arange(len(batch_combinations)), batch_combinations,
                                              ))))
+            
+        # Create a corresponding subdirectory in the Data directory
+        try:
+            os.mkdir(os.path.join(self.default_dirs["Data"],
+                                  self.module.system_ID,
+                                  batch_dir_name))
+        except FileExistsError:
+            warning_mssg.append("Note: {} Data subdirectory already exists".format(batch_dir_name))
+            
                 
         # Restore the original values of module
         for layer in self.module.layers:
