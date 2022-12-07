@@ -272,10 +272,10 @@ class Notebook(BaseNotebook):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        data_dirname = tkfilebrowser.askopendirnames(title="Select a dataset", 
+        dirname = tkfilebrowser.askopendirnames(title="Select a dataset", 
                                                      initialdir=self.default_dirs["Data"],
                                                       )
-        print(data_dirname)
+        print(dirname)
         return
     
     def change_layer(self, clear=True, update_LGC_display=True):
@@ -1400,9 +1400,9 @@ class Notebook(BaseNotebook):
 
 
     ## Func for overview analyze tab
-    def fetch_metadata(self, data_filename):
+    def fetch_metadata(self, data_pathname):
         """ Read and store parameters from a metadata.txt file """
-        path = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, "metadata.txt")
+        path = os.path.join(data_pathname, "metadata.txt")
         assert os.path.exists(path), "Error: Missing metadata for {}".format(self.module.system_ID)
         
         with open(path, "r") as ifstream:
@@ -1483,16 +1483,16 @@ class Notebook(BaseNotebook):
             These plots are "one-and-done", while detailed analysis are much more
             manipulable
         """
-        data_dirname = tk.filedialog.askdirectory(title="Select a dataset", 
+        data_pathname = tkfilebrowser.askopendirname(title="Select a dataset", 
                                                   initialdir=self.default_dirs["Data"])
-        if not data_dirname:
+        if not data_pathname:
             logger.info("No data set selected :(")
             return
 
-        data_filename = data_dirname[data_dirname.rfind('/')+1:]
+        dirname, header = os.path.split(data_pathname)
         
         try:
-            layer_names, param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
+            layer_names, param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_pathname)
                  
             data_n = int(0.5 + total_time / dt)
             data_m = {}
@@ -1533,7 +1533,7 @@ class Notebook(BaseNotebook):
         
         except ValueError:
             self.do_confirmation_popup(
-                    "Error: {} is missing or has unusual metadata.txt".format(data_filename),
+                    "Error: {} is missing or has unusual metadata.txt".format(header),
                     hide_cancel=True)
             return
         
@@ -1544,8 +1544,8 @@ class Notebook(BaseNotebook):
                 total_time,
                 dt,
                 tstep_list,
-                data_dirname,
-                data_filename)
+                data_pathname,
+                header)
         
         warning_msg = ["Error: the following occured while generating the overview"]
                 
@@ -1697,13 +1697,15 @@ class Notebook(BaseNotebook):
             self.write(self.analysis_status, "Error #106: Plot failed")
             logger.error("Error #106: Plot failed")
 
-    def make_rawdataset(self, data_filename, plot_ID, datatype, target_layer):
+    def make_rawdataset(self, data_pathname, plot_ID, datatype, target_layer):
         """Create a dataset object and prepare to plot on analysis tab."""
+        dirname, header = os.path.split(data_pathname)
+        
         # Select data type of incoming dataset from existing datasets
         active_plot = self.analysis_plots[plot_ID]
 
         try:
-            layer_names, param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_filename)
+            layer_names, param_values_dict, flag_values_dict, total_time, dt = self.fetch_metadata(data_pathname)
             data_m = {}
 
             for layer_name in param_values_dict:
@@ -1745,11 +1747,9 @@ class Notebook(BaseNotebook):
             for sim_datatype in layer.s_outputs:
                 if is_shared and shared_done.get(sim_datatype, False): continue
             
-                path_name = os.path.join(
-                    self.default_dirs["Data"], 
-                    self.module.system_ID,
-                    data_filename,
-                    "{}-{}.h5".format(data_filename, sim_datatype))
+                
+                path_name = os.path.join(data_pathname,
+                    "{}-{}.h5".format(header, sim_datatype))
                 try:
                     L = "__SHARED__" if is_shared else layer_name
                     sim_data[L][sim_datatype] = \
@@ -1788,7 +1788,7 @@ class Notebook(BaseNotebook):
             flag_values_dict,
             datatype,
             target_layer,
-            data_filename, 
+            data_pathname, 
             active_plot.time)
 
     def load_datasets(self):
@@ -1811,12 +1811,11 @@ class Notebook(BaseNotebook):
         active_plot.datagroup.clear()
         err_msg = ["Error: the following data could not be plotted"]
         for i in range(0, len(active_plot.data_filenames)):
-            data_filename = active_plot.data_filenames[i]
-            short_filename = data_filename[data_filename.rfind('/') + 1:]
-            new_data = self.make_rawdataset(short_filename, plot_ID, datatype, layer_name)
+            data_pathname = active_plot.data_filenames[i]
+            new_data = self.make_rawdataset(data_pathname, plot_ID, datatype, layer_name)
 
             if isinstance(new_data, str):
-                err_msg.append("{}: {}".format(short_filename, new_data))
+                err_msg.append("{}: {}".format(data_pathname, new_data))
             else:
                 active_plot.datagroup.add(new_data)
     
@@ -1849,6 +1848,7 @@ class Notebook(BaseNotebook):
         is_shared = active_datagroup.type in self.module.report_shared_outputs()
 
         for tag, dataset in active_datagroup.datasets.items():
+            dirname, header = os.path.split(dataset.filename)
             shared_done = {}
             sim_data = {}
             if is_shared:
@@ -1859,10 +1859,9 @@ class Notebook(BaseNotebook):
                 for sim_datatype in layer.s_outputs:
                     if is_shared and shared_done.get(sim_datatype, False): continue
                     
-                    path_name = os.path.join(self.default_dirs["Data"], 
-                                                self.module.system_ID,
-                                                dataset.filename,
-                                                "{}-{}.h5".format(dataset.filename, sim_datatype))
+                    
+                    path_name = os.path.join(dataset.filename,
+                                                "{}-{}.h5".format(header, sim_datatype))
                     
                     floor_tstep = int(active_plot.time / dataset.dt)
                     try:
@@ -2257,7 +2256,9 @@ class Notebook(BaseNotebook):
         counter = 0
         
         for tag in active_datagroup.datasets:
+            # TODO: Update this to be data_pathname
             data_filename = active_datagroup.datasets[tag].filename
+            dirname, header = os.path.split(data_filename)
             datatype = active_datagroup.datasets[tag].type
             where_layer = active_datagroup.datasets[tag].layer_name
             logger.info("Now integrating {}".format(data_filename))
@@ -2345,7 +2346,6 @@ class Notebook(BaseNotebook):
                         nen = u_bound > to_pos(j, dx) + dx / 2 or l_bound == u_bound
                         space_bounds = [(i,j,nen, l_bound, u_bound)]
                     
-                pathname = os.path.join(self.default_dirs["Data"], self.module.system_ID, data_filename, data_filename)
                 extra_data = {}
                 if is_shared: 
                     extra_data["__SHARED__"] = {}
@@ -2365,7 +2365,9 @@ class Notebook(BaseNotebook):
                             L = "__SHARED__" if is_shared else layer_name
                             if do_curr_t:
                                 try:
-                                    interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
+                                    path_name = os.path.join(data_filename,
+                                        "{}-{}.h5".format(header, sim_datatype))
+                                    interpolated_step = u_read(path_name, 
                                                                t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
                                                                single_tstep=False, need_extra_node=s[2], 
                                                                force_1D=False)
@@ -2380,8 +2382,9 @@ class Notebook(BaseNotebook):
                                 
                                 sim_data[L][sim_datatype] = np.array(interpolated_step)
                                 
-                                interpolated_step = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                             t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+                                path_name = os.path.join(data_filename,
+                                    "{}-{}.h5".format(header, sim_datatype))
+                                interpolated_step = u_read(path_name, t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
                                 if current_time == total_time:
                                     pass
                                 else:
@@ -2393,16 +2396,17 @@ class Notebook(BaseNotebook):
                             
                             else:
                                 try:
-                                    sim_data[L][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                                t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
-                                                                                single_tstep=False, need_extra_node=s[2], 
-                                                                                force_1D=False) 
+                                    path_name = os.path.join(data_filename,
+                                        "{}-{}.h5".format(header, sim_datatype))
+                                    sim_data[L][sim_datatype] = u_read(path_name, 
+                                                                        t0=show_index, t1=end_index, l=s[0], r=s[1]+1, 
+                                                                        single_tstep=False, need_extra_node=s[2], 
+                                                                        force_1D=False) 
                                 except OSError:
                                     continue
                                 
                                 if c == 0:
-                                    extra_data[L][sim_datatype] = u_read("{}-{}.h5".format(pathname, sim_datatype), 
-                                                                                  t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
+                                    extra_data[L][sim_datatype] = u_read(path_name, t0=show_index, t1=end_index, single_tstep=False, force_1D=False)
                             if is_shared: shared_done[sim_datatype] = True
                             
                     data = self.module.prep_dataset(datatype, where_layer, sim_data, 
@@ -2431,7 +2435,8 @@ class Notebook(BaseNotebook):
                                                                                 ext_tag))
                 if self.PL_mode == "All time steps":
                     try:
-                        td[ext_tag] = self.module.get_timeseries(pathname, active_datagroup.datasets[tag].type, I_data, total_time, dt,
+                        dirname, header = os.path.split(data_filename)
+                        td[ext_tag] = self.module.get_timeseries(os.path.join(data_filename, header), active_datagroup.datasets[tag].type, I_data, total_time, dt,
                                                                  active_datagroup.datasets[tag].params_dict, active_datagroup.datasets[tag].flags)
                     except Exception:
                         logger.error("Error: failed to calculate time series")
