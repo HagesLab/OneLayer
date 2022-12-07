@@ -1678,7 +1678,8 @@ class Notebook(BaseNotebook):
             for dataset in active_datagroup.datasets.values():
                 if active_plot_data.time <= dataset.total_time:
                     label = dataset.tag(for_matplotlib=True) + "*" if dataset.flags["symmetric_system"] else dataset.tag(for_matplotlib=True)
-                    subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=label)
+                    dirname, header = os.path.split(label)
+                    subplot.plot(dataset.grid_x, dataset.data * convert_out[active_datagroup.type], label=header)
                 else:
                     logger.warning("Warning: time out of range for dataset {}".format(dataset.tag()))
                     
