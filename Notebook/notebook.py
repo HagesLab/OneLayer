@@ -599,11 +599,11 @@ class Notebook(BaseNotebook):
                 for param in self.module.layers[layer].params:
                     
                     if not (LGC_active[-1] and (param == "delta_N" or param == "delta_P")):
-                        batchable_params.append("{}-{}".format(layer, param))
+                        batchable_params.append("{}:{}".format(layer, param))
                         
                 if LGC_active[-1]:
                     for param in self.LGC_values[layer]:
-                        batchable_params.append("{}-{}".format(layer, param))
+                        batchable_params.append("{}:{}".format(layer, param))
             
             if any(LGC_active):
                 
@@ -3248,11 +3248,11 @@ class Notebook(BaseNotebook):
         # Apply each combination to module, going through LGC if necessary
         # TODO: Less clunky batch file names
         # Numerical code for each file, plus a text doc as a legend?
-        for batch_set in batch_combinations:
-            filename = batch_dir_name
+        for i, batch_set in enumerate(batch_combinations):
+            filename = f"{batch_dir_name}_{i}"
             for b in batch_set:
-                layer, param = b.split('-')
-                filename += str("__{}_{:.4e}".format(b, batch_set[b]))
+                layer, param = b.split(':')
+                #filename += str("__{}_{:.4e}".format(b, batch_set[b]))
                 
                 if (self.module.is_LGC_eligible 
                     and layer in self.LGC_values
@@ -3275,6 +3275,18 @@ class Notebook(BaseNotebook):
             except Exception as e:
                 warning_mssg.append("Error: failed to create batch file {}".format(filename))
                 warning_mssg.append(str(e))
+            
+        # Write a note describing each member of a batch
+        # (0) {First batch combo}
+        # (1) {Second batch combo}
+        # ...
+        with open(os.path.join(self.default_dirs["Initial"], 
+                                self.module.system_ID,
+                                batch_dir_name,
+                                "param_legend.text"), "w+") as ofstream:
+            ofstream.write("\n".join(map(lambda x: "({}) {}".format(x[0], x[1]),
+                                         zip(np.arange(len(batch_combinations)), batch_combinations,
+                                             ))))
                 
         # Restore the original values of module
         for layer in self.module.layers:
