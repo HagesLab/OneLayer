@@ -54,8 +54,9 @@ class TestRDG(unittest.TestCase):
         params_dict = {}
         flags = {}
         type_ = "X"
+        layer_name = "Layer Name"
         filename = "f1"
-        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, filename, current_time=0)
+        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, layer_name,filename, current_time=0)
         
         self.data2 = 10 * np.linspace(0,100,101)
         self.grid_x2 = 10 * np.linspace(0,100,101)
@@ -65,7 +66,7 @@ class TestRDG(unittest.TestCase):
         flags = {}
         type_ = "X"
         filename = "f2"
-        ds2 = RDS(self.data2, self.grid_x2, self.grid_x2, total_time, dt, params_dict, flags, type_, filename, current_time=0)
+        ds2 = RDS(self.data2, self.grid_x2, self.grid_x2, total_time, dt, params_dict, flags, type_, layer_name,filename, current_time=0)
         
         data = 10 * np.linspace(0,100,101)
         grid_x = 10 * np.linspace(0,100,101)
@@ -75,7 +76,7 @@ class TestRDG(unittest.TestCase):
         flags = {}
         type_ = "wrong_type"
         filename = "f3"
-        ds3 = RDS(data, grid_x, grid_x, total_time, dt, params_dict, flags, type_, filename, current_time=0)
+        ds3 = RDS(data, grid_x, grid_x, total_time, dt, params_dict, flags, type_, layer_name,filename, current_time=0)
         
         self.rdg.add(ds1)
         self.rdg.add(ds2)
@@ -120,7 +121,8 @@ class TestIDG(unittest.TestCase):
         flags = {}
         type_ = "X"
         filename = "f1"
-        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, filename, current_time=0)
+        layer_name = "Layer"
+        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, layer_name, filename, current_time=0)
         
         self.data2 = 10 * np.linspace(0,100,101)
         self.grid_x2 = 10 * np.linspace(0,100,101)
@@ -130,7 +132,7 @@ class TestIDG(unittest.TestCase):
         flags = {}
         type_ = "X"
         filename = "f2"
-        ds2 = RDS(self.data2, self.grid_x2, self.grid_x2, total_time, dt, params_dict, flags, type_, filename, current_time=0)
+        ds2 = RDS(self.data2, self.grid_x2, self.grid_x2, total_time, dt, params_dict, flags, type_, layer_name,filename, current_time=0)
         
         data = 10 * np.linspace(0,100,101)
         grid_x = 10 * np.linspace(0,100,101)
@@ -140,7 +142,7 @@ class TestIDG(unittest.TestCase):
         flags = {}
         type_ = "wrong_type"
         filename = "f3"
-        ds3 = RDS(data, grid_x, grid_x, total_time, dt, params_dict, flags, type_, filename, current_time=0)
+        ds3 = RDS(data, grid_x, grid_x, total_time, dt, params_dict, flags, type_, layer_name, filename, current_time=0)
         
         self.idg.add(ds1)
         self.idg.add(ds2)

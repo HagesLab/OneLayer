@@ -87,8 +87,8 @@ class TestUtils(unittest.TestCase):
         flags = {}
         type_ = "X"
         filename = "__file__"
-        
-        ds = Data_Set(data, grid_x, total_time, dt, params_dict, flags, type_, filename)
+        layer_name = "layer name"
+        ds = Data_Set(data, grid_x, total_time, dt, params_dict, flags, type_, layer_name, filename)
         
         tag = ds.tag(for_matplotlib=False)
         self.assertEqual(tag, "__file___X")
@@ -101,7 +101,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(ds.params_dict, params_dict)
         self.assertEqual(ds.flags, flags)
         self.assertEqual(ds.type, type_)
-        self.assertEqual(ds.filename, filename)
+        self.assertEqual(ds.pathname, filename)
         return
     
     def test_RDS(self):
@@ -114,8 +114,9 @@ class TestUtils(unittest.TestCase):
         flags = {'f':1}
         type_ = "X"
         filename = "__file__"
+        layer_name = "Layer name"
         current_time = 0
-        rds = RDS(data, grid_x, node_x, total_time, dt, params_dict, flags, type_, filename, current_time)
+        rds = RDS(data, grid_x, node_x, total_time, dt, params_dict, flags, type_, layer_name, filename, current_time)
         
         np.testing.assert_equal(rds.node_x, node_x)
         self.assertEqual(rds.current_time, current_time)

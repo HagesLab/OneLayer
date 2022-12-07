@@ -49,13 +49,14 @@ class TestAPS(unittest.TestCase):
         params_dict = {}
         flags = {}
         type_ = "X"
+        layer_name = "Layer name"
         filename = "f1"
-        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, filename, current_time=0)
+        ds1 = RDS(self.data1, self.grid_x1, self.grid_x1, total_time, dt, params_dict, flags, type_, layer_name, filename, current_time=0)
         self.aps.datagroup.add(ds1)
     
     def test_init(self):
         
-        self.assertEqual(self.aps.data_filenames, [])
+        self.assertEqual(self.aps.data_pathnames, [])
         self.assertIsInstance(self.aps.datagroup, RDG)
         
         self.aps.add_time(2000)
