@@ -1993,6 +1993,24 @@ class Notebook(BaseNotebook):
                                                   filetypes=[("Text files","*.txt")])
         if not IC_files: 
             return
+        
+        if self.custom_sim_output_loc_flag.value() == 1:
+            output_loc = tkfilebrowser.askopendirname(initialdir=os.path.join(self.default_dirs["Data"], self.module.system_ID),
+                                                      title="Select an output location", 
+                                                      )
+        else:
+            # The default location data saves to
+            output_loc = os.path.join(self.default_dirs["Data"], self.module.system_ID)
+            
+        logger.info(f"Saving to: {output_loc}")
+        
+        try:
+            output_loc_occupied = any(map(lambda t: t.endswith(".h5"), os.listdir(output_loc)))
+            if output_loc_occupied:
+                raise FileExistsError
+        except FileExistsError:
+            self.write(self.status, f"Error: output location {output_loc} already contains data")
+            return
 
         batch_num = 0
         self.sim_warning_msg = ["The following occured while simulating:"]
@@ -2003,7 +2021,7 @@ class Notebook(BaseNotebook):
             self.write(self.status, 
                        "Now calculating {} : ({} of {})".format(self.IC_file_name[self.IC_file_name.rfind("/") + 1:self.IC_file_name.rfind(".txt")], 
                                                                 str(batch_num), str(len(IC_files))))
-            self.do_Calculate()
+            self.do_Calculate(output_loc)
             
         self.write(self.status, "Simulations complete")
         self.load_ICfile()
@@ -2012,7 +2030,7 @@ class Notebook(BaseNotebook):
             self.do_confirmation_popup("\n".join(self.sim_warning_msg), hide_cancel=True)
 
 
-    def do_Calculate(self):
+    def do_Calculate(self, output_loc):
         """ Setup initial condition using IC file and OneD_Model.calc_inits(), 
             simulate using OneD_Model.simulate(),
             and prepare output directory for results.
@@ -2052,9 +2070,7 @@ class Notebook(BaseNotebook):
     
         try:
             logger.info("Attempting to create {} data folder".format(data_file_name))
-            dirname = os.path.join(self.default_dirs["Data"], 
-                                    self.module.system_ID,
-                                    data_file_name)
+            dirname = os.path.join(output_loc, data_file_name)
             # Append a number to the end of the new directory's name if an overwrite would occur
             # This is what happens if you download my_file.txt twice and the second copy is saved as my_file(1).txt, for example
             assert "Data" in dirname
