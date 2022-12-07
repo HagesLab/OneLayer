@@ -1846,7 +1846,7 @@ class Notebook(BaseNotebook):
         is_shared = active_datagroup.type in self.module.report_shared_outputs()
 
         for tag, dataset in active_datagroup.datasets.items():
-            dirname, header = os.path.split(dataset.filename)
+            dirname, header = os.path.split(dataset.pathname)
             shared_done = {}
             sim_data = {}
             if is_shared:
@@ -1858,7 +1858,7 @@ class Notebook(BaseNotebook):
                     if is_shared and shared_done.get(sim_datatype, False): continue
                     
                     
-                    complete_path = os.path.join(dataset.filename, "{}-{}.h5".format(header, sim_datatype))
+                    complete_path = os.path.join(dataset.pathname, "{}-{}.h5".format(header, sim_datatype))
                     
                     floor_tstep = int(active_plot.time / dataset.dt)
                     try:
@@ -2253,7 +2253,7 @@ class Notebook(BaseNotebook):
         counter = 0
         
         for tag in active_datagroup.datasets:
-            data_pathname = active_datagroup.datasets[tag].filename
+            data_pathname = active_datagroup.datasets[tag].pathname
             dirname, header = os.path.split(data_pathname)
             datatype = active_datagroup.datasets[tag].type
             where_layer = active_datagroup.datasets[tag].layer_name
@@ -3606,7 +3606,7 @@ class Notebook(BaseNotebook):
                 paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
                 
                 header = "".join(["Time [ns]," + 
-                                  datagroup.datasets[key].filename + 
+                                  datagroup.datasets[key].pathname + 
                                   "," for key in datagroup.datasets])
                 
 
@@ -3621,7 +3621,7 @@ class Notebook(BaseNotebook):
             paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
             
             header = "".join(["x {},".format(self.module.layers[where_layer].length_unit) + 
-                              self.analysis_plots[plot_ID].datagroup.datasets[key].filename + 
+                              self.analysis_plots[plot_ID].datagroup.datasets[key].pathname + 
                               "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
         export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 

@@ -80,7 +80,7 @@ class Batchable:
         return
     
 class Data_Set:
-    def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type_, layer_name, filename):
+    def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type_, layer_name, pathname):
         self.data = data
         self.grid_x = grid_x
         self.total_time = total_time
@@ -89,16 +89,16 @@ class Data_Set:
         self.flags = dict(flags)
         self.type = type_
         self.layer_name = layer_name
-        self.filename = filename
+        self.pathname = pathname
         return
     
     def tag(self, for_matplotlib=False):
         """Return an identifier for a dataset using its originating filename and data type"""
         # For some reason, Matplotlib legends don't like leading underscores
         if not for_matplotlib:
-            return self.filename + "_" + self.type
+            return self.pathname + "_" + self.type
         else:
-            return (self.filename + "_" + self.type).strip('_')
+            return (self.pathname + "_" + self.type).strip('_')
         
     def build(self):
         """Concatenate (x,y) pairs for export"""
@@ -106,8 +106,8 @@ class Data_Set:
         
 class Raw_Data_Set(Data_Set):
     """Object containing all the metadata required to plot and integrate saved data sets"""
-    def __init__(self, data, grid_x, node_x, total_time, dt, params_dict, flags, type_, layer_name, filename, current_time):
-        super().__init__(data, grid_x, total_time, dt, params_dict, flags, type_, layer_name, filename)
+    def __init__(self, data, grid_x, node_x, total_time, dt, params_dict, flags, type_, layer_name, pathname, current_time):
+        super().__init__(data, grid_x, total_time, dt, params_dict, flags, type_, layer_name, pathname)
         self.node_x = node_x        # Array of x-coordinates corresponding to system nodes - needed to generate initial condition from data
 
         # node_x and grid_x will usually be identical, unless the data is a type (like E-field) that exists on edges
@@ -120,8 +120,8 @@ class Raw_Data_Set(Data_Set):
     
     
 class Integrated_Data_Set(Data_Set):
-    def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type_, filename):
-        super().__init__(data, grid_x, total_time, dt, params_dict, flags, type_, None, filename)
+    def __init__(self, data, grid_x, total_time, dt, params_dict, flags, type_, pathname):
+        super().__init__(data, grid_x, total_time, dt, params_dict, flags, type_, None, pathname)
         return
     
 class Data_Group:
