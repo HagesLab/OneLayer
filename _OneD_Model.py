@@ -382,10 +382,10 @@ class OneD_Model:
         data_dirname : str
             Name of output data directory e.g. .../Data/sim1.
         file_name_base : str
-            Name of simulation file e.g. mydata.
+            Name of simulation file e.g. mysimulation1.
             Used with data_dirname to locate file - files are written in format
             data_dirname/file_name_base-output_name.h5
-            e.g. .../Data/mysimulation1-y.h5
+            e.g. .../Data/sim1/mysimulation1-y.h5
 
         Returns
         -------

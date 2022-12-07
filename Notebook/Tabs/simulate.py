@@ -7,6 +7,7 @@ import matplotlib.backends.backend_tkagg as tkagg
 from matplotlib.figure import Figure
 import tkinter as tk
 
+from GUI_structs import Flag
 
 def add_tab_simulate(nb):
     """Method to add the menu tab 'Simulate'
@@ -44,8 +45,9 @@ def add_tab_simulate(nb):
     nb.hmax_entry = tk.ttk.Entry(nb.tab_simulate, width=9)
     nb.hmax_entry.grid(row=4,column=1)
 
+    nb.enter(nb.simtime_entry, "100")
     nb.enter(nb.dt_entry, "0.5")
-    nb.enter(nb.hmax_entry, "0.25")
+    nb.enter(nb.hmax_entry, "4")
     
     tk.ttk.Label(
         nb.tab_simulate,
@@ -66,19 +68,23 @@ def add_tab_simulate(nb):
     nb.enter(nb.rtol_entry, "1e-5")
     nb.enter(nb.atol_entry, "1e-8")
     
+    nb.custom_sim_output_loc_flag = Flag(nb.tab_simulate, "Save data to custom location")
+    nb.custom_sim_output_loc_flag.tk_element.grid(row=7, column=0,columnspan=2)
+    nb.custom_sim_output_loc_flag.set(1)
+    
     tk.ttk.Button(
         nb.tab_simulate,
         text="Start Simulation(s)", 
         command=nb.do_Batch
-        ).grid(row=7,column=0,columnspan=2,padx=(9,12))
+        ).grid(row=8,column=0,columnspan=2,padx=(9,12))
 
     tk.ttk.Label(
         nb.tab_simulate,
         text="Status"
-        ).grid(row=8, column=0, columnspan=2)
+        ).grid(row=9, column=0, columnspan=2)
 
-    nb.status = tk.Text(nb.tab_simulate, width=28,height=4)
-    nb.status.grid(row=9, rowspan=2, column=0, columnspan=2)
+    nb.status = tk.Text(nb.tab_simulate, width=28,height=6)
+    nb.status.grid(row=10, rowspan=2, column=0, columnspan=2)
     nb.status.configure(state='disabled')
 
     tk.ttk.Separator(
