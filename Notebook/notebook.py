@@ -1808,8 +1808,8 @@ class Notebook(BaseNotebook):
         active_plot.time = 0
         active_plot.datagroup.clear()
         err_msg = ["Error: the following data could not be plotted"]
-        for i in range(0, len(active_plot.data_filenames)):
-            data_pathname = active_plot.data_filenames[i]
+        for i in range(0, len(active_plot.data_pathnames)):
+            data_pathname = active_plot.data_pathnames[i]
             new_data = self.make_rawdataset(data_pathname, plot_ID, datatype, layer_name)
 
             if isinstance(new_data, str):

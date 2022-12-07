@@ -230,7 +230,7 @@ class Analysis_Plot_State(Scalable_Plot_State):
     def __init__(self):
         super().__init__()
         self.time = 0
-        self.data_filenames = []
+        self.data_pathnames = []
         self.datagroup = Raw_Data_Group()
         return
 

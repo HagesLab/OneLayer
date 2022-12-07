@@ -147,15 +147,15 @@ class PlotterPopup(Popup):
             if continue_:
                 if not self.nb.data_var.get():
                     raise ValueError("Select a data type from the drop-down menu")
-                self.nb.analysis_plots[plot_ID].data_filenames = []
+                self.nb.analysis_plots[plot_ID].data_pathnames = []
                 # A Christmas miracle - tk.askdirectories() has (sort of) been implemented!
 
                 for next_dir in self.data_list:
-                    self.nb.analysis_plots[plot_ID].data_filenames.append(next_dir)
+                    self.nb.analysis_plots[plot_ID].data_pathnames.append(next_dir)
 
                 #self.analysis_plots[plot_ID].remove_duplicate_filenames()
                 
-                if not self.nb.analysis_plots[plot_ID].data_filenames:
+                if not self.nb.analysis_plots[plot_ID].data_pathnames:
                     raise ValueError("Select data files")
 
             super().close()
