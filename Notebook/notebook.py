@@ -1699,6 +1699,48 @@ class Notebook(BaseNotebook):
             self.write(self.analysis_status, "Error #106: Plot failed")
             logger.error("Error #106: Plot failed")
 
+    def plot_integrate(self, ip_ID, **kwargs):
+        xaxis_label = kwargs.get("xlabel", "")
+        
+        subplot = self.integration_plots[ip_ID].plot_obj
+        datagroup = self.integration_plots[ip_ID].datagroup
+        subplot.cla()
+        
+        self.integration_plots[ip_ID].xaxis_type = 'linear'
+
+        self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), 
+                                                             max_val=datagroup.get_maxval())
+        where_layer = self.module.find_layer(datagroup.type)
+        
+        subplot.set_yscale(self.integration_plots[ip_ID].yaxis_type)
+        subplot.set_xlabel(xaxis_label)
+        subplot.set_ylabel(datagroup.type +  " " + self.module.layers[where_layer].outputs[datagroup.type].integrated_units)
+        subplot.set_title("Integrated {}".format(datagroup.type))
+
+        
+        for key in datagroup.datasets:
+            if self.PL_mode == "Current time step":
+                f = subplot.scatter
+            elif self.PL_mode == "All time steps":
+                f = subplot.plot
+                
+            dirname, header = os.path.split(datagroup.datasets[key].tag(for_matplotlib=True))
+            f(datagroup.datasets[key].grid_x, 
+                datagroup.datasets[key].data * 
+                self.module.layers[where_layer].convert_out[datagroup.type] *
+                self.module.layers[where_layer].iconvert_out[datagroup.type], 
+                label=header)
+
+            
+        self.integration_plots[ip_ID].xlim = subplot.get_xlim()
+        self.integration_plots[ip_ID].ylim = subplot.get_ylim()
+                
+        subplot.legend().set_draggable(True)
+
+        self.integration_fig.tight_layout()
+        self.integration_fig.canvas.draw()
+        return
+
     def make_rawdataset(self, data_pathname, plot_ID, datatype, target_layer):
         """Create a dataset object and prepare to plot on analysis tab."""
         dirname, header = os.path.split(data_pathname)
@@ -2445,45 +2487,7 @@ class Notebook(BaseNotebook):
                 counter += 1
                 logger.info("Integration: {} of {} complete".format(counter, active_datagroup.size() * len(self.integration_bounds)))
 
-        subplot = self.integration_plots[ip_ID].plot_obj
-        datagroup = self.integration_plots[ip_ID].datagroup
-        subplot.cla()
-        
-        self.integration_plots[ip_ID].xaxis_type = 'linear'
-
-        self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), 
-                                                             max_val=datagroup.get_maxval())
-        #self.integration_plots[ip_ID].ylim = max * 1e-12, max * 10
-        where_layer = self.module.find_layer(datagroup.type)
-        
-        subplot.set_yscale(self.integration_plots[ip_ID].yaxis_type)
-        #subplot.set_ylim(self.integration_plots[ip_ID].ylim)
-        subplot.set_xlabel(xaxis_label)
-        subplot.set_ylabel(datagroup.type +  " " + self.module.layers[where_layer].outputs[datagroup.type].integrated_units)
-        subplot.set_title("Integrated {}".format(datagroup.type))
-
-        
-        for key in datagroup.datasets:
-            if self.PL_mode == "Current time step":
-                f = subplot.scatter
-            elif self.PL_mode == "All time steps":
-                f = subplot.plot
-                
-            dirname, header = os.path.split(datagroup.datasets[key].tag(for_matplotlib=True))
-            f(datagroup.datasets[key].grid_x, 
-                datagroup.datasets[key].data * 
-                self.module.layers[where_layer].convert_out[datagroup.type] *
-                self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                label=header)
-
-            
-        self.integration_plots[ip_ID].xlim = subplot.get_xlim()
-        self.integration_plots[ip_ID].ylim = subplot.get_ylim()
-                
-        subplot.legend().set_draggable(True)
-
-        self.integration_fig.tight_layout()
-        self.integration_fig.canvas.draw()
+        self.plot_integrate(ip_ID, xlabel=xaxis_label)
         
         self.write(self.analysis_status, "Integration complete")
 
