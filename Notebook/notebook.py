@@ -1486,8 +1486,13 @@ class Notebook(BaseNotebook):
             These plots are "one-and-done", while detailed analysis are much more
             manipulable
         """
-        data_pathname = tkfilebrowser.askopendirname(parent=self.notebook, title="Select a dataset", 
-                                                     initialdir=self.default_dirs["Data"])
+
+        dialog = tkfilebrowser.FileBrowser(parent=self.notebook, mode="opendir", multiple_selection=False,
+                                           title="Select a dataset", initialdir=self.default_dirs["Data"])
+        dialog._sort_by_date(reverse=True)
+        dialog.wait_window(dialog)
+        data_pathname = dialog.get_result()
+        
         if not data_pathname:
             logger.info("No data set selected :(")
             return
@@ -1744,8 +1749,14 @@ class Notebook(BaseNotebook):
         return
 
     def upload_to_integrate_plot(self):
-        upload_these = tkfilebrowser.askopenfilenames(parent=self.notebook, initialdir=os.path.join(self.default_dirs["Analysis"]),
-                                                      title="Select other data to plot", )
+        # Deconstruct FileBrowser a little to have it launch with files already sorted by date
+        dialog = tkfilebrowser.FileBrowser(parent=self.notebook, mode="openfile", multiple_selection=True,
+                                           title="Select other data to plot", initialdir=os.path.join(self.default_dirs["Analysis"]))
+        dialog._sort_by_date(reverse=True)
+        dialog.wait_window(dialog)
+        upload_these = dialog.get_result()
+        if not upload_these:  # type consistency: always return a tuple
+            upload_these = ()
 
         if len(upload_these) == 0:
             logger.info("No uploads")
@@ -2048,9 +2059,13 @@ class Notebook(BaseNotebook):
             return
         
         if self.custom_sim_output_loc_flag.value() == 1:
-            output_loc = tkfilebrowser.askopendirname(parent=self.notebook, initialdir=os.path.join(self.default_dirs["Data"], self.module.system_ID),
-                                                      title="Select an output location", 
-                                                      )
+            dialog = tkfilebrowser.FileBrowser(parent=self.notebook, mode="opendir", multiple_selection=False,
+                                               title="Select an output location", 
+                                               initialdir=os.path.join(self.default_dirs["Data"], self.module.system_ID))
+            dialog._sort_by_date(reverse=True)
+            dialog.wait_window(dialog)
+            output_loc = dialog.get_result()
+        
         else:
             # The default location data saves to
             output_loc = os.path.join(self.default_dirs["Data"], self.module.system_ID)
