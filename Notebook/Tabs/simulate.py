@@ -98,7 +98,7 @@ def add_tab_simulate(nb):
         text="Simulation - {}".format(nb.module.system_ID)
         ).grid(row=0,column=3,columnspan=3)
     
-    nb.sim_fig = Figure(figsize=(14, 8))
+    nb.sim_fig = Figure(figsize=(0.65 * nb.APP_WIDTH / nb.APP_DPI, 0.65 * nb.APP_HEIGHT / nb.APP_DPI))
     count = 1
     cdim = np.ceil(np.sqrt(nb.module.count_s_outputs()))
     

@@ -260,7 +260,7 @@ def create_LGC_frame(nb):
                "distribution based on an applied "
                "laser excitation.", width=320).grid(row=5,column=0,columnspan=3)
     
-    nb.LGC_fig = Figure(figsize=(5,3.1))
+    nb.LGC_fig = Figure(figsize=(0.25 * nb.APP_WIDTH / nb.APP_DPI, 0.25 * nb.APP_HEIGHT / nb.APP_DPI))
     nb.LGC_subplot = nb.LGC_fig.add_subplot(111)
     nb.LGC_canvas = tkagg.FigureCanvasTkAgg(nb.LGC_fig, master=nb.LGC_frame)
     nb.LGC_canvas.get_tk_widget().grid(row=6, column=0, columnspan=3)

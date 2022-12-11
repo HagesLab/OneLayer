@@ -16,7 +16,8 @@ def add_tab_analyze(nb):
     nb.tab_overview_analysis = tk.ttk.Frame(nb.tab_analyze)
     nb.tab_detailed_analysis = tk.ttk.Frame(nb.tab_analyze)
     
-    nb.analyze_overview_fig = Figure(figsize=(21,8))
+    #nb.analyze_overview_fig = Figure(figsize=(21,8))
+    nb.analyze_overview_fig = Figure(figsize=(0.9 * nb.APP_WIDTH / nb.APP_DPI, 0.9 * nb.APP_HEIGHT / nb.APP_DPI))
     nb.overview_subplots = {}
     count = 1
     total_outputs_count = sum([nb.module.layers[layer].outputs_count for layer in nb.module.layers])
@@ -96,7 +97,7 @@ def add_tab_analyze(nb):
                     text="Plot and Integrate Saved Datasets", 
                     style="Header.TLabel").grid(row=0,column=0,columnspan=8)
     
-    nb.analyze_fig = Figure(figsize=(9.8,6))
+    nb.analyze_fig = Figure(figsize=(0.5 * nb.APP_WIDTH / nb.APP_DPI, 0.5 * nb.APP_HEIGHT / nb.APP_DPI))
     # add_subplot() starts counting indices with 1 instead of 0
     nb.analyze_subplot0 = nb.analyze_fig.add_subplot(221)
     nb.analyze_subplot1 = nb.analyze_fig.add_subplot(222)
@@ -175,7 +176,7 @@ def add_tab_analyze(nb):
                     text="Generate IC", 
                     command=partial(nb.do_IC_regen_popup)).grid(row=1,column=6)
 
-    nb.integration_fig = Figure(figsize=(9,5))
+    nb.integration_fig = Figure(figsize=(0.5 * nb.APP_WIDTH / nb.APP_DPI, 0.5 * nb.APP_HEIGHT / nb.APP_DPI))
     nb.integration_subplot = nb.integration_fig.add_subplot(111)
     nb.integration_plots[0].plot_obj = nb.integration_subplot
 

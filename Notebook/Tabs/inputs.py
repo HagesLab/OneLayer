@@ -251,7 +251,7 @@ def add_tab_inputs(nb):
     # These plots were previously attached to self.tab_inputs so that it was visible on all three IC tabs,
     # but it was hard to position them correctly.
     # Attaching to the Parameter Toolkit makes them easier to position
-    nb.custom_param_fig = Figure(figsize=(5,3.1))
+    nb.custom_param_fig = Figure(figsize=(0.25 * nb.APP_WIDTH / nb.APP_DPI, 0.25 * nb.APP_HEIGHT / nb.APP_DPI))
     nb.custom_param_subplot = nb.custom_param_fig.add_subplot(111)
     # Prevent coordinate values from appearing in the toolbar; this would sometimes jostle GUI elements around
     nb.custom_param_subplot.format_coord = lambda x, y: ""
@@ -264,7 +264,7 @@ def add_tab_inputs(nb):
     tkagg.NavigationToolbar2Tk(nb.custom_param_canvas, 
                                 nb.custom_param_toolbar_frame)
     
-    nb.recent_param_fig = Figure(figsize=(5,3.1))
+    nb.recent_param_fig = Figure(figsize=(0.25 * nb.APP_WIDTH / nb.APP_DPI, 0.25 * nb.APP_HEIGHT / nb.APP_DPI))
     nb.recent_param_subplot = nb.recent_param_fig.add_subplot(111)
     nb.recent_param_subplot.format_coord = lambda x, y: ""
     nb.recent_param_canvas = tkagg.FigureCanvasTkAgg(nb.recent_param_fig, 
@@ -312,7 +312,7 @@ def add_tab_inputs(nb):
                     text="Import", 
                     command=nb.add_listupload).grid(row=2,column=0)
     
-    nb.listupload_fig = Figure(figsize=(6,3.8))
+    nb.listupload_fig = Figure(figsize=(0.3 * nb.APP_WIDTH / nb.APP_DPI, 0.3 * nb.APP_HEIGHT / nb.APP_DPI))
     nb.listupload_subplot = nb.listupload_fig.add_subplot(111)
     nb.listupload_canvas = tkagg.FigureCanvasTkAgg(nb.listupload_fig, 
                                                         master=nb.listupload_frame)

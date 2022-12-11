@@ -101,6 +101,13 @@ class Notebook(BaseNotebook):
         self.reset_popup_flags()
 
         self.root.config(menu=self.menu_bar)
+        
+        # Specify window size
+        self.APP_WIDTH, self.APP_HEIGHT = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
+        self.APP_DPI = self.root.winfo_fpixels('1i')
+        self.root.geometry('%dx%d+0+0' % (self.APP_WIDTH,self.APP_HEIGHT))
+        self.root.attributes("-topmost", True)
+        self.root.after_idle(self.root.attributes,'-topmost',False)
 
         # Set a tkinter graphical theme
         s = ttk.Style()
@@ -122,11 +129,6 @@ class Notebook(BaseNotebook):
             self.root.destroy()
             return
 
-        self.APP_WIDTH, self.APP_HEIGHT = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
-        self.APP_DPI = self.root.winfo_fpixels('1i')
-        self.root.geometry('%dx%d+0+0' % (self.APP_WIDTH,self.APP_HEIGHT))
-        self.root.attributes("-topmost", True)
-        self.root.after_idle(self.root.attributes,'-topmost',False)
         self.root.mainloop()
         logger.info("Closed TEDs")
         matplotlib.use(starting_backend)
