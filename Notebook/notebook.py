@@ -91,7 +91,7 @@ class Notebook(BaseNotebook):
     def prep_notebook(self):
         """ Attach elements to notebook based on selected module. """
         
-        self.default_dirs = {"Initial":"Initial", "Data":"Data", "PL":"Analysis"}
+        self.default_dirs = {"Initial":"Initial", "Data":"Data", "Analysis":"Analysis"}
 
         self.prepare_main_canvas()
         self.prepare_radiobuttons_and_checkboxes()
@@ -198,7 +198,7 @@ class Notebook(BaseNotebook):
         command_export_files = partial(
             tk.filedialog.askopenfilenames, 
             title="This window does not open anything - Use this window to move or delete export files",
-            initialdir=self.default_dirs["PL"])
+            initialdir=self.default_dirs["Analysis"])
         self.file_menu.add_command(label="Manage Export Files", 
                                    command=command_export_files)
 
@@ -256,7 +256,7 @@ class Notebook(BaseNotebook):
             logger.info("Data Directory detected")
 
         try:
-            os.mkdir(self.default_dirs["PL"])
+            os.mkdir(self.default_dirs["Analysis"])
             logger.info("No PL Directory detected; automatically creating...")
         except FileExistsError:
             logger.info("PL Directory detected")
@@ -274,7 +274,7 @@ class Notebook(BaseNotebook):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        dirname = tkfilebrowser.askopendirnames(title="Select a dataset", 
+        dirname = tkfilebrowser.askopendirnames(parent=self.notebook, title="Select a dataset", 
                                                      initialdir=self.default_dirs["Data"],
                                                       )
         print(dirname)
@@ -1486,8 +1486,8 @@ class Notebook(BaseNotebook):
             These plots are "one-and-done", while detailed analysis are much more
             manipulable
         """
-        data_pathname = tkfilebrowser.askopendirname(title="Select a dataset", 
-                                                  initialdir=self.default_dirs["Data"])
+        data_pathname = tkfilebrowser.askopendirname(parent=self.notebook, title="Select a dataset", 
+                                                     initialdir=self.default_dirs["Data"])
         if not data_pathname:
             logger.info("No data set selected :(")
             return
@@ -1741,6 +1741,17 @@ class Notebook(BaseNotebook):
 
         self.integration_fig.tight_layout()
         self.integration_fig.canvas.draw()
+        return
+
+    def upload_to_integrate_plot(self):
+        upload_these = tkfilebrowser.askopenfilenames(parent=self.notebook, initialdir=os.path.join(self.default_dirs["Analysis"]),
+                                                      title="Select other data to plot", )
+
+        if len(upload_these) == 0:
+            logger.info("No uploads")
+            return
+        
+        
         return
 
     def make_rawdataset(self, data_pathname, plot_ID, datatype, target_layer):
@@ -2033,16 +2044,21 @@ class Notebook(BaseNotebook):
                                                   title="Select IC text file", 
                                                   filetypes=[("Text files","*.txt")])
         if not IC_files: 
+            self.write(self.status, "Simulations cancelled")
             return
         
         if self.custom_sim_output_loc_flag.value() == 1:
-            output_loc = tkfilebrowser.askopendirname(initialdir=os.path.join(self.default_dirs["Data"], self.module.system_ID),
+            output_loc = tkfilebrowser.askopendirname(parent=self.notebook, initialdir=os.path.join(self.default_dirs["Data"], self.module.system_ID),
                                                       title="Select an output location", 
                                                       )
         else:
             # The default location data saves to
             output_loc = os.path.join(self.default_dirs["Data"], self.module.system_ID)
             
+        if not output_loc:
+            self.write(self.status, "Simulations cancelled")
+            return
+        
         logger.info(f"Saving to: {output_loc}")
         
         try:
@@ -3633,7 +3649,7 @@ class Notebook(BaseNotebook):
                               self.analysis_plots[plot_ID].datagroup.datasets[key].pathname + 
                               "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
-        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
+        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Analysis"], 
                                                           title="Save data", 
                                                           filetypes=[("csv (comma-separated-values)","*.csv")])
         
@@ -3670,7 +3686,7 @@ class Notebook(BaseNotebook):
         paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
         
         
-        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
+        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Analysis"], 
                                                           title="Save data", 
                                                           filetypes=[("csv (comma-separated-values)","*.csv")])
         # Export to .csv
@@ -3711,7 +3727,7 @@ class Notebook(BaseNotebook):
             grid_x = self.overview_subplots[layer_name][output_name].lines[0]._xorig
         paired_data = np.vstack((grid_x, paired_data)).T
         
-        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
+        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Analysis"], 
                                                           title="Save data", 
                                                           filetypes=[("csv (comma-separated-values)","*.csv")])
         header = ["z"] + [f"t{i+1}" for i in range(len(paired_data[0]) - 1)]
