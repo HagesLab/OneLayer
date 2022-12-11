@@ -1748,10 +1748,12 @@ class Notebook(BaseNotebook):
         self.integration_fig.canvas.draw()
         return
 
-    def upload_to_integrate_plot(self):
+    def upload_to_integrate_plot(self, ip_ID=0):
         # Deconstruct FileBrowser a little to have it launch with files already sorted by date
         dialog = tkfilebrowser.FileBrowser(parent=self.notebook, mode="openfile", multiple_selection=True,
-                                           title="Select other data to plot", initialdir=os.path.join(self.default_dirs["Analysis"]))
+                                           title="Select other data to plot", 
+                                           initialdir=os.path.join(self.default_dirs["Analysis"]),
+                                           filetypes=[("Experimental data", "\*.csv|\*.txt|\*.xlsx|\*.xlsm"), ("All files", "\*")])
         dialog._sort_by_date(reverse=True)
         dialog.wait_window(dialog)
         upload_these = dialog.get_result()
@@ -1762,6 +1764,34 @@ class Notebook(BaseNotebook):
             logger.info("No uploads")
             return
         
+        
+        for fname in upload_these:
+            data = None
+            for d in ["\t", ","]: # Try these delimiters
+                try:
+                    data = np.loadtxt(fname, delimiter=d)
+                    break
+                except ValueError as e:
+                    logger.error(e)
+                    continue
+                except Exception as e:
+                    logger.error(e)
+                    break
+            
+            if data is None:
+                logger.error(f"Read {fname} failed; skipping")
+                continue
+            
+            if data.ndim != 2 or data.shape[1] != 2:
+                logger.error(f"Read {fname} failed; data must be two-column and comma or tab separated")
+                continue
+            
+            print(data)
+        
+        # For each filename, attempt to read the file (done!), validate(done...?), and store data to 
+        # self.integration_plots[ip_ID].uploaded_data
+        
+        # Then call plot_integrate, which should then plot stuff in uploaded_data as-is
         
         return
 
