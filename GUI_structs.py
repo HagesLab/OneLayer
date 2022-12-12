@@ -186,6 +186,7 @@ class Integrated_Data_Group(Data_Group):
     def __init__(self):
         super().__init__()
         self.uploaded_data = []
+        self.uploaded_fnames = []
         return
     
     def add(self, new_set):

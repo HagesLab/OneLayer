@@ -1724,20 +1724,23 @@ class Notebook(BaseNotebook):
         subplot.set_ylabel(datagroup.type +  " " + self.module.layers[where_layer].outputs[datagroup.type].integrated_units)
         subplot.set_title("Integrated {}".format(datagroup.type))
 
-        
+        if self.PL_mode == "Current time step":
+            f = subplot.scatter
+        elif self.PL_mode == "All time steps":
+            f = subplot.plot        
+
         for key in datagroup.datasets:
-            if self.PL_mode == "Current time step":
-                f = subplot.scatter
-            elif self.PL_mode == "All time steps":
-                f = subplot.plot
-                
             dirname, header = os.path.split(datagroup.datasets[key].tag(for_matplotlib=True))
             f(datagroup.datasets[key].grid_x, 
                 datagroup.datasets[key].data * 
                 self.module.layers[where_layer].convert_out[datagroup.type] *
                 self.module.layers[where_layer].iconvert_out[datagroup.type], 
                 label=header)
-
+            
+        for fname, t in zip(datagroup.uploaded_fnames,datagroup.uploaded_data):
+            x, y = t
+            dirname, header = os.path.split(fname)
+            subplot.plot(x, y, label=header)
             
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
         self.integration_plots[ip_ID].ylim = subplot.get_ylim()
@@ -1748,7 +1751,7 @@ class Notebook(BaseNotebook):
         self.integration_fig.canvas.draw()
         return
 
-    def upload_to_integrate_plot(self, ip_ID=0):
+    def upload_to_integrate_plot(self, ip_ID=0, allow_clear=True):
         # Deconstruct FileBrowser a little to have it launch with files already sorted by date
         dialog = tkfilebrowser.FileBrowser(parent=self.notebook, mode="openfile", multiple_selection=True,
                                            title="Select other data to plot", 
@@ -1764,7 +1767,12 @@ class Notebook(BaseNotebook):
             logger.info("No uploads")
             return
         
+        datagroup = self.integration_plots[ip_ID].datagroup
         
+        if allow_clear:
+            datagroup.uploaded_data = []
+            datagroup.uploaded_fnames = []
+            
         for fname in upload_these:
             data = None
             for d in ["\t", ","]: # Try these delimiters
@@ -1786,12 +1794,32 @@ class Notebook(BaseNotebook):
                 logger.error(f"Read {fname} failed; data must be two-column and comma or tab separated")
                 continue
             
-            print(data)
-        
+            if fname in datagroup.uploaded_fnames:
+                logger.warning(f"{fname} already in uploaded; skipping")
+                continue
+            
+            datagroup.uploaded_fnames.append(fname)
+            datagroup.uploaded_data.append((data[:,0], data[:,1]))
+
+        print(datagroup.uploaded_data)        
         # For each filename, attempt to read the file (done!), validate(done...?), and store data to 
         # self.integration_plots[ip_ID].uploaded_data
         
         # Then call plot_integrate, which should then plot stuff in uploaded_data as-is
+        subplot = self.integration_plots[ip_ID].plot_obj
+        
+        if not len(datagroup.datasets):
+            subplot.cla()
+        
+        for fname, t in zip(datagroup.uploaded_fnames,datagroup.uploaded_data):
+            x, y = t
+            dirname, header = os.path.split(fname)
+            subplot.plot(x, y, label=header)
+            
+        subplot.legend().set_draggable(True)
+
+        self.integration_fig.tight_layout()
+        self.integration_fig.canvas.draw()
         
         return
 
