@@ -57,6 +57,21 @@ class UploadsPopup(Popup):
         tk.Label(uploads_options_frame, text="Scale (Ord. Mag.)").grid(row=0,column=0)
         self.scale_entry = tk.ttk.Entry(uploads_options_frame, width=8)
         self.scale_entry.grid(row=0,column=1)
+        
+        # Refresh scale entry with selected upload's scale value
+        def onselect(evt):
+            # Note here that Tkinter passes an event object to onselect()
+            w = evt.widget
+            try:
+                i = int(w.curselection()[0])
+            except IndexError: # Nothing selected
+                self.nb.enter(self.scale_entry, "")
+                return
+            
+            self.nb.enter(self.scale_entry, self.uploads[i][2])
+            return
+        
+        self.uploads_listbox.bind('<<ListboxSelect>>', onselect)
 
         plotter_options_frame = tk.Frame(self.toplevel)
         plotter_options_frame.grid(row=3,column=1)
