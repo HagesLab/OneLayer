@@ -72,6 +72,9 @@ class UploadsPopup(Popup):
             return
         
         self.uploads_listbox.bind('<<ListboxSelect>>', onselect)
+        
+        tk.Button(uploads_options_frame, text="Rescale",
+                  command=self.rescale).grid(row=0,column=2)
 
         plotter_options_frame = tk.Frame(self.toplevel)
         plotter_options_frame.grid(row=3,column=1)
@@ -131,7 +134,7 @@ class UploadsPopup(Popup):
                 continue
             
             self.fnames.append(fname)
-            self.uploads.append((data[:,0], data[:,1], 1))
+            self.uploads.append([data[:,0], data[:,1], 1])
 
         #self.nb.plot_integrate(ip_ID)
         self.uploads_listbox.delete(0,tk.END)
@@ -146,6 +149,24 @@ class UploadsPopup(Popup):
         
         self.uploads_listbox.delete(0,tk.END)
         self.uploads_listbox.insert(0,*(self.fnames))
+        return
+    
+    def rescale(self):
+        try:
+            i = int(self.uploads_listbox.curselection()[0])
+        except IndexError: # Nothing selected - do nothing
+            return
+        
+        try:
+            new_scale_f = float(self.scale_entry.get())
+        except ValueError:
+            self.nb.write(self.plotter_status, "Invalid scale factor")
+            return
+        
+        self.uploads[i][2] = new_scale_f
+        
+        dirname, header = os.path.split(self.fnames[i])
+        self.nb.write(self.plotter_status, f"{header} Rescaled to {new_scale_f}")
         return
     
     def close(self, plot_ID, logger=None, continue_=False):

@@ -1756,7 +1756,7 @@ class Notebook(BaseNotebook):
         for fname, t in zip(datagroup.uploaded_fnames,datagroup.uploaded_data):
             x, y, scale = t
             dirname, header = os.path.split(fname)
-            subplot.plot(x, y*scale, label=header)
+            subplot.plot(x, y*10**scale, label=header)
             
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
         self.integration_plots[ip_ID].ylim = subplot.get_ylim()
