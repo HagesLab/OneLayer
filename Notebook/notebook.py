@@ -51,6 +51,7 @@ from Notebook.Popups.confirmation_popup import ConfirmationPopup
 from Notebook.Popups.module_select_popup import ModuleSelectPopup
 from Notebook.Popups.plotsummary_popup import PlotSummaryPopup
 from Notebook.Popups.plotter_popup import PlotterPopup
+from Notebook.Popups.manage_uploads_popup import UploadsPopup
 from Notebook.Popups.IC_regeneration_popup import ICRegenPopup
 
 from config import init_logging
@@ -774,6 +775,13 @@ class Notebook(BaseNotebook):
         except Exception:
             logger.error("Error #601: Failed to close Bayesim popup")
         
+    def do_manage_uploads_popup(self, plot_ID=0):
+        """ Select datasets for plotting on Analyze tab. """
+        if len(self.integration_plots[plot_ID].datagroup.uploaded_fnames) == 0:
+            return
+        self.uploads_popup = UploadsPopup(self, logger)
+        self.uploads_popup_isopen = True
+        return
 
     def do_plotter_popup(self, plot_ID):
         """ Select datasets for plotting on Analyze tab. """
@@ -1042,7 +1050,8 @@ class Notebook(BaseNotebook):
         # Don't open if no data plotted
         if from_integration:
             plot_ID = self.active_integrationplot_ID.get()
-            if self.integration_plots[plot_ID].datagroup.size() == 0: 
+            if (self.integration_plots[plot_ID].datagroup.size() == 0 and
+                len(self.integration_plots[plot_ID].datagroup.uploaded_fnames) == 0): 
                 return
 
         else:
@@ -1803,20 +1812,10 @@ class Notebook(BaseNotebook):
                 logger.error(f"Read {fname} failed; data must be two-column and comma or tab separated")
                 continue
             
-            # if fname in datagroup.uploaded_fnames:
-            #     logger.warning(f"{fname} already in uploaded; skipping")
-            #     continue
-            
             datagroup.uploaded_fnames.append(fname)
             datagroup.uploaded_data.append((data[:,0], data[:,1]))
 
-        print(datagroup.uploaded_data)        
-        # For each filename, attempt to read the file (done!), validate(done...?), and store data to 
-        # self.integration_plots[ip_ID].uploaded_data
-        
-        # Then call plot_integrate, which should then plot stuff in uploaded_data as-is
         self.plot_integrate(ip_ID)
-        
         return
 
     def make_rawdataset(self, data_pathname, plot_ID, datatype, target_layer):

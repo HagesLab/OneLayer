@@ -190,12 +190,18 @@ class Integrated_Data_Group(Data_Group):
         return
     
     def get_maxval(self):
-        return np.amax([np.amax(self.datasets[tag].data) for tag in self.datasets] +
-                       [np.amax(xy[1]) for xy in self.uploaded_data])
+        if self.size() == 0 and len(self.uploaded_fnames) == 0:
+            return 1
+        else:
+            return np.amax([np.amax(self.datasets[tag].data) for tag in self.datasets] +
+                           [np.amax(xy[1]) for xy in self.uploaded_data])
     
     def get_minval(self):
-        return np.amin([np.amin(self.datasets[tag].data) for tag in self.datasets] +
-                       [np.amin(xy[1]) for xy in self.uploaded_data])
+        if self.size() == 0 and len(self.uploaded_fnames) == 0:
+            return 0
+        else:
+            return np.amin([np.amin(self.datasets[tag].data) for tag in self.datasets] +
+                           [np.amin(xy[1]) for xy in self.uploaded_data])
     
     def add(self, new_set):
         if not self.datasets: 
