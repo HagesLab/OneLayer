@@ -54,9 +54,9 @@ class UploadsPopup(Popup):
         uploads_options_frame = tk.Frame(self.toplevel)
         uploads_options_frame.grid(row=2,column=1)
         
-        tk.Label(uploads_options_frame, text="Scale (Ord. Mag.)").grid(row=0,column=0)
+        tk.Label(uploads_options_frame, text="Scale (Ord. Mag.)").grid(row=1,column=0)
         self.scale_entry = tk.ttk.Entry(uploads_options_frame, width=8)
-        self.scale_entry.grid(row=0,column=1)
+        self.scale_entry.grid(row=1,column=1)
         
         # Refresh scale entry with selected upload's scale value
         def onselect(evt):
@@ -73,8 +73,14 @@ class UploadsPopup(Popup):
         
         self.uploads_listbox.bind('<<ListboxSelect>>', onselect)
         
+        tk.Button(uploads_options_frame, text="+",
+                  command=partial(self.increment_rescale, 1)).grid(row=0,column=2)
+        
         tk.Button(uploads_options_frame, text="Rescale",
-                  command=self.rescale).grid(row=0,column=2)
+                  command=self.rescale).grid(row=1,column=2)
+        
+        tk.Button(uploads_options_frame, text="-",
+                  command=partial(self.increment_rescale, -1)).grid(row=2,column=2)
 
         plotter_options_frame = tk.Frame(self.toplevel)
         plotter_options_frame.grid(row=3,column=1)
@@ -171,8 +177,24 @@ class UploadsPopup(Popup):
         
         self.uploads[i][2] = new_scale_f
         
+        self.nb.enter(self.scale_entry, self.uploads[i][2])
+        
         dirname, header = os.path.split(self.fnames[i])
         self.nb.write(self.plotter_status, f"{header} Rescaled to {new_scale_f}")
+        
+        self.nb.plot_integrate(plot_ID)
+        self.toplevel.grab_set()
+        return
+    
+    def increment_rescale(self, increment, plot_ID=0):
+        try:
+            i = int(self.uploads_listbox.curselection()[0])
+        except IndexError: # Nothing selected - do nothing
+            return
+        
+        self.uploads[i][2] = int(self.uploads[i][2]) + increment
+        
+        self.nb.enter(self.scale_entry, self.uploads[i][2])
         
         self.nb.plot_integrate(plot_ID)
         self.toplevel.grab_set()
