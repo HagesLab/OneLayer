@@ -116,7 +116,7 @@ class UploadsPopup(Popup):
                 continue
             
             self.fnames.append(fname)
-            self.uploads.append((data[:,0], data[:,1]))
+            self.uploads.append((data[:,0], data[:,1], 1))
 
         #self.nb.plot_integrate(ip_ID)
         self.uploads_listbox.delete(0,tk.END)
