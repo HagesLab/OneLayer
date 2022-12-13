@@ -139,9 +139,12 @@ class UploadsPopup(Popup):
         #self.nb.plot_integrate(ip_ID)
         self.uploads_listbox.delete(0,tk.END)
         self.uploads_listbox.insert(0,*(self.fnames))
+        
+        self.nb.plot_integrate(ip_ID)
+        self.toplevel.grab_set()
         return
             
-    def unstage_data(self):
+    def unstage_data(self, plot_ID=0):
         remove_these = [i for i in self.uploads_listbox.curselection()]
         for i in reversed(remove_these):
             self.fnames.pop(i)
@@ -149,9 +152,12 @@ class UploadsPopup(Popup):
         
         self.uploads_listbox.delete(0,tk.END)
         self.uploads_listbox.insert(0,*(self.fnames))
+        
+        self.nb.plot_integrate(plot_ID)
+        self.toplevel.grab_set()
         return
     
-    def rescale(self):
+    def rescale(self, plot_ID=0):
         try:
             i = int(self.uploads_listbox.curselection()[0])
         except IndexError: # Nothing selected - do nothing
@@ -167,11 +173,14 @@ class UploadsPopup(Popup):
         
         dirname, header = os.path.split(self.fnames[i])
         self.nb.write(self.plotter_status, f"{header} Rescaled to {new_scale_f}")
+        
+        self.nb.plot_integrate(plot_ID)
+        self.toplevel.grab_set()
         return
     
     def close(self, plot_ID, logger=None, continue_=False):
         try:
-            self.nb.plot_integrate(plot_ID)
+            #self.nb.plot_integrate(plot_ID)
 
             super().close()
             self.uploads_popup_isopen = False
