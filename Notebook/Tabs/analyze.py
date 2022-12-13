@@ -195,17 +195,13 @@ def add_tab_analyze(nb):
                                     from_integration=1)).grid(row=1,column=0)
 
     tk.ttk.Button(nb.integration_toolbar_frame, 
-                    text="Upload", 
-                    command=nb.upload_to_integrate_plot).grid(row=1,column=1)
-    
-    tk.ttk.Button(nb.integration_toolbar_frame, 
                     text="Manage Uploads", 
-                    command=nb.do_manage_uploads_popup).grid(row=1,column=2)
+                    command=nb.do_manage_uploads_popup).grid(row=1,column=1)
     
     tk.ttk.Button(nb.integration_toolbar_frame, 
                     text="Export", 
                     command=partial(nb.export_plot, 
-                                    from_integration=1)).grid(row=1,column=3)
+                                    from_integration=1)).grid(row=1,column=2)
 
     # self.integration_bayesim_button = tk.ttk.Button(self.integration_toolbar_frame, text="Bayesim", command=partial(self.do_bayesim_popup))
     # self.integration_bayesim_button.grid(row=1,column=2)

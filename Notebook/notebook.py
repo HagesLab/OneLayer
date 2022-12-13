@@ -777,8 +777,6 @@ class Notebook(BaseNotebook):
         
     def do_manage_uploads_popup(self, plot_ID=0):
         """ Select datasets for plotting on Analyze tab. """
-        if len(self.integration_plots[plot_ID].datagroup.uploaded_fnames) == 0:
-            return
         self.uploads_popup = UploadsPopup(self, logger)
         self.uploads_popup_isopen = True
         return
@@ -1767,55 +1765,6 @@ class Notebook(BaseNotebook):
 
         self.integration_fig.tight_layout()
         self.integration_fig.canvas.draw()
-        return
-
-    def upload_to_integrate_plot(self, ip_ID=0, allow_clear=True):
-        # Deconstruct FileBrowser a little to have it launch with files already sorted by date
-        dialog = tkfilebrowser.FileBrowser(parent=self.notebook, mode="openfile", multiple_selection=True,
-                                           title="Select other data to plot", 
-                                           initialdir=os.path.join(self.default_dirs["Analysis"]),
-                                           filetypes=[("Experimental data", "\*.csv|\*.txt|\*.xlsx|\*.xlsm"), ("All files", "\*")])
-        dialog._sort_by_date(reverse=True)
-        dialog.wait_window(dialog)
-        upload_these = dialog.get_result()
-        if not upload_these:  # type consistency: always return a tuple
-            upload_these = ()
-
-        if len(upload_these) == 0:
-            logger.info("No uploads")
-            return
-        
-        datagroup = self.integration_plots[ip_ID].datagroup
-        
-        if allow_clear:
-            datagroup.uploaded_data = []
-            datagroup.uploaded_fnames = []
-            
-        for fname in upload_these:
-            data = None
-            for d in ["\t", ","]: # Try these delimiters
-                try:
-                    data = np.loadtxt(fname, delimiter=d)
-                    break
-                except ValueError as e:
-                    logger.error(e)
-                    continue
-                except Exception as e:
-                    logger.error(e)
-                    break
-            
-            if data is None:
-                logger.error(f"Read {fname} failed; skipping")
-                continue
-            
-            if data.ndim != 2 or data.shape[1] != 2:
-                logger.error(f"Read {fname} failed; data must be two-column and comma or tab separated")
-                continue
-            
-            datagroup.uploaded_fnames.append(fname)
-            datagroup.uploaded_data.append((data[:,0], data[:,1]))
-
-        self.plot_integrate(ip_ID)
         return
 
     def make_rawdataset(self, data_pathname, plot_ID, datatype, target_layer):
