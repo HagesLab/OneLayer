@@ -35,7 +35,7 @@ class UploadsPopup(Popup):
                   command=self.unstage_data).grid(row=0,column=1)
         
         uploads_listbox_frame = tk.Frame(self.toplevel)
-        uploads_listbox_frame.grid(row=2,column=0)
+        uploads_listbox_frame.grid(row=2,column=0,rowspan=2)
         
         self.uploads_listbox = tk.Listbox(uploads_listbox_frame, width=80, 
                                            height=20, 
@@ -51,8 +51,15 @@ class UploadsPopup(Popup):
         
         self.uploads_listbox.config(yscrollcommand=uploads_listbox_scrollbar.set)
         
+        uploads_options_frame = tk.Frame(self.toplevel)
+        uploads_options_frame.grid(row=2,column=1)
+        
+        tk.Label(uploads_options_frame, text="Scale (Ord. Mag.)").grid(row=0,column=0)
+        self.scale_entry = tk.ttk.Entry(uploads_options_frame, width=8)
+        self.scale_entry.grid(row=0,column=1)
+
         plotter_options_frame = tk.Frame(self.toplevel)
-        plotter_options_frame.grid(row=2,column=1)
+        plotter_options_frame.grid(row=3,column=1)
         
         tk.Button(plotter_options_frame, text="Continue", 
                   command=partial(self.close, plot_ID, logger,
