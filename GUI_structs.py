@@ -126,7 +126,7 @@ class Integrated_Data_Set(Data_Set):
     
 class Data_Group:
     def __init__(self):
-        self.type = "None"
+        self.type = None
         self.datasets = {}
         return
     
@@ -188,6 +188,14 @@ class Integrated_Data_Group(Data_Group):
         self.uploaded_data = []
         self.uploaded_fnames = []
         return
+    
+    def get_maxval(self):
+        return np.amax([np.amax(self.datasets[tag].data) for tag in self.datasets] +
+                       [np.amax(xy[1]) for xy in self.uploaded_data])
+    
+    def get_minval(self):
+        return np.amin([np.amin(self.datasets[tag].data) for tag in self.datasets] +
+                       [np.amin(xy[1]) for xy in self.uploaded_data])
     
     def add(self, new_set):
         if not self.datasets: 

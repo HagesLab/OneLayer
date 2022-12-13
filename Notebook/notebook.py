@@ -1717,25 +1717,34 @@ class Notebook(BaseNotebook):
 
         self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), 
                                                              max_val=datagroup.get_maxval())
-        where_layer = self.module.find_layer(datagroup.type)
+        
+        if datagroup.type is None:
+            where_layer = None
+        else:
+            where_layer = self.module.find_layer(datagroup.type)
         
         subplot.set_yscale(self.integration_plots[ip_ID].yaxis_type)
         subplot.set_xlabel(xaxis_label)
-        subplot.set_ylabel(datagroup.type +  " " + self.module.layers[where_layer].outputs[datagroup.type].integrated_units)
-        subplot.set_title("Integrated {}".format(datagroup.type))
+        if datagroup.type is None:
+            subplot.set_ylabel("")
+            subplot.set_title("")
+        else:
+            subplot.set_ylabel(datagroup.type +  " " + self.module.layers[where_layer].outputs[datagroup.type].integrated_units)
+            subplot.set_title("Integrated {}".format(datagroup.type))
 
-        if self.PL_mode == "Current time step":
-            f = subplot.scatter
-        elif self.PL_mode == "All time steps":
-            f = subplot.plot        
-
-        for key in datagroup.datasets:
-            dirname, header = os.path.split(datagroup.datasets[key].tag(for_matplotlib=True))
-            f(datagroup.datasets[key].grid_x, 
-                datagroup.datasets[key].data * 
-                self.module.layers[where_layer].convert_out[datagroup.type] *
-                self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                label=header)
+        if datagroup.type is not None:
+            if self.PL_mode == "Current time step":
+                f = subplot.scatter
+            elif self.PL_mode == "All time steps":
+                f = subplot.plot        
+    
+            for key in datagroup.datasets:
+                dirname, header = os.path.split(datagroup.datasets[key].tag(for_matplotlib=True))
+                f(datagroup.datasets[key].grid_x, 
+                    datagroup.datasets[key].data * 
+                    self.module.layers[where_layer].convert_out[datagroup.type] *
+                    self.module.layers[where_layer].iconvert_out[datagroup.type], 
+                    label=header)
             
         for fname, t in zip(datagroup.uploaded_fnames,datagroup.uploaded_data):
             x, y = t
@@ -1794,9 +1803,9 @@ class Notebook(BaseNotebook):
                 logger.error(f"Read {fname} failed; data must be two-column and comma or tab separated")
                 continue
             
-            if fname in datagroup.uploaded_fnames:
-                logger.warning(f"{fname} already in uploaded; skipping")
-                continue
+            # if fname in datagroup.uploaded_fnames:
+            #     logger.warning(f"{fname} already in uploaded; skipping")
+            #     continue
             
             datagroup.uploaded_fnames.append(fname)
             datagroup.uploaded_data.append((data[:,0], data[:,1]))
@@ -1806,20 +1815,7 @@ class Notebook(BaseNotebook):
         # self.integration_plots[ip_ID].uploaded_data
         
         # Then call plot_integrate, which should then plot stuff in uploaded_data as-is
-        subplot = self.integration_plots[ip_ID].plot_obj
-        
-        if not len(datagroup.datasets):
-            subplot.cla()
-        
-        for fname, t in zip(datagroup.uploaded_fnames,datagroup.uploaded_data):
-            x, y = t
-            dirname, header = os.path.split(fname)
-            subplot.plot(x, y, label=header)
-            
-        subplot.legend().set_draggable(True)
-
-        self.integration_fig.tight_layout()
-        self.integration_fig.canvas.draw()
+        self.plot_integrate(ip_ID)
         
         return
 
