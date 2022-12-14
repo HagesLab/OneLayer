@@ -1738,6 +1738,11 @@ class Notebook(BaseNotebook):
         else:
             subplot.set_ylabel(datagroup.type +  " " + self.module.layers[where_layer].outputs[datagroup.type].integrated_units)
             subplot.set_title("Integrated {}".format(datagroup.type))
+            
+        for fname, t in zip(datagroup.uploaded_fnames,datagroup.uploaded_data):
+            x, y, scale = t
+            dirname, header = os.path.split(fname)
+            subplot.plot(x, y*10**scale, label=header)
 
         if datagroup.type is not None:
             if self.PL_mode == "Current time step":
@@ -1753,10 +1758,7 @@ class Notebook(BaseNotebook):
                     self.module.layers[where_layer].iconvert_out[datagroup.type], 
                     label=header)
             
-        for fname, t in zip(datagroup.uploaded_fnames,datagroup.uploaded_data):
-            x, y, scale = t
-            dirname, header = os.path.split(fname)
-            subplot.plot(x, y*10**scale, label=header)
+        
             
         self.integration_plots[ip_ID].xlim = subplot.get_xlim()
         self.integration_plots[ip_ID].ylim = subplot.get_ylim()

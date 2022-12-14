@@ -140,7 +140,7 @@ class UploadsPopup(Popup):
                 continue
             
             self.fnames.append(fname)
-            self.uploads.append([data[:,0], data[:,1], 1])
+            self.uploads.append([data[:,0], data[:,1], 0])
 
         #self.nb.plot_integrate(ip_ID)
         self.uploads_listbox.delete(0,tk.END)
@@ -192,7 +192,7 @@ class UploadsPopup(Popup):
         except IndexError: # Nothing selected - do nothing
             return
         
-        self.uploads[i][2] = int(self.uploads[i][2]) + increment
+        self.uploads[i][2] = self.uploads[i][2] + increment
         
         self.nb.enter(self.scale_entry, self.uploads[i][2])
         
