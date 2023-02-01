@@ -51,6 +51,7 @@ from Notebook.Popups.confirmation_popup import ConfirmationPopup
 from Notebook.Popups.module_select_popup import ModuleSelectPopup
 from Notebook.Popups.plotsummary_popup import PlotSummaryPopup
 from Notebook.Popups.plotter_popup import PlotterPopup
+from Notebook.Popups.manage_uploads_popup import UploadsPopup
 from Notebook.Popups.IC_regeneration_popup import ICRegenPopup
 
 from config import init_logging
@@ -91,7 +92,7 @@ class Notebook(BaseNotebook):
     def prep_notebook(self):
         """ Attach elements to notebook based on selected module. """
         
-        self.default_dirs = {"Initial":"Initial", "Data":"Data", "PL":"Analysis"}
+        self.default_dirs = {"Initial":"Initial", "Data":"Data", "Analysis":"Analysis"}
 
         self.prepare_main_canvas()
         self.prepare_radiobuttons_and_checkboxes()
@@ -101,6 +102,13 @@ class Notebook(BaseNotebook):
         self.reset_popup_flags()
 
         self.root.config(menu=self.menu_bar)
+        
+        # Specify window size
+        self.APP_WIDTH, self.APP_HEIGHT = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
+        self.APP_DPI = self.root.winfo_fpixels('1i')
+        self.root.geometry('%dx%d+0+0' % (self.APP_WIDTH,self.APP_HEIGHT))
+        self.root.attributes("-topmost", True)
+        self.root.after_idle(self.root.attributes,'-topmost',False)
 
         # Set a tkinter graphical theme
         s = ttk.Style()
@@ -122,11 +130,6 @@ class Notebook(BaseNotebook):
             self.root.destroy()
             return
 
-        self.APP_WIDTH, self.APP_HEIGHT = self.root.winfo_screenwidth() * 0.8, self.root.winfo_screenheight() * 0.8
-        self.APP_DPI = self.root.winfo_fpixels('1i')
-        self.root.geometry('%dx%d+0+0' % (self.APP_WIDTH,self.APP_HEIGHT))
-        self.root.attributes("-topmost", True)
-        self.root.after_idle(self.root.attributes,'-topmost',False)
         self.root.mainloop()
         logger.info("Closed TEDs")
         matplotlib.use(starting_backend)
@@ -196,7 +199,7 @@ class Notebook(BaseNotebook):
         command_export_files = partial(
             tk.filedialog.askopenfilenames, 
             title="This window does not open anything - Use this window to move or delete export files",
-            initialdir=self.default_dirs["PL"])
+            initialdir=self.default_dirs["Analysis"])
         self.file_menu.add_command(label="Manage Export Files", 
                                    command=command_export_files)
 
@@ -254,7 +257,7 @@ class Notebook(BaseNotebook):
             logger.info("Data Directory detected")
 
         try:
-            os.mkdir(self.default_dirs["PL"])
+            os.mkdir(self.default_dirs["Analysis"])
             logger.info("No PL Directory detected; automatically creating...")
         except FileExistsError:
             logger.info("PL Directory detected")
@@ -272,7 +275,7 @@ class Notebook(BaseNotebook):
         """ Print a custom message regarding the system state; 
             this changes often depending on what is being worked on
         """
-        dirname = tkfilebrowser.askopendirnames(title="Select a dataset", 
+        dirname = tkfilebrowser.askopendirnames(parent=self.notebook, title="Select a dataset", 
                                                      initialdir=self.default_dirs["Data"],
                                                       )
         print(dirname)
@@ -772,6 +775,11 @@ class Notebook(BaseNotebook):
         except Exception:
             logger.error("Error #601: Failed to close Bayesim popup")
         
+    def do_manage_uploads_popup(self, plot_ID=0):
+        """ Select datasets for plotting on Analyze tab. """
+        self.uploads_popup = UploadsPopup(self, logger)
+        self.uploads_popup_isopen = True
+        return
 
     def do_plotter_popup(self, plot_ID):
         """ Select datasets for plotting on Analyze tab. """
@@ -1040,7 +1048,8 @@ class Notebook(BaseNotebook):
         # Don't open if no data plotted
         if from_integration:
             plot_ID = self.active_integrationplot_ID.get()
-            if self.integration_plots[plot_ID].datagroup.size() == 0: 
+            if (self.integration_plots[plot_ID].datagroup.size() == 0 and
+                len(self.integration_plots[plot_ID].datagroup.uploaded_fnames) == 0): 
                 return
 
         else:
@@ -1484,8 +1493,13 @@ class Notebook(BaseNotebook):
             These plots are "one-and-done", while detailed analysis are much more
             manipulable
         """
-        data_pathname = tkfilebrowser.askopendirname(title="Select a dataset", 
-                                                  initialdir=self.default_dirs["Data"])
+
+        dialog = tkfilebrowser.FileBrowser(parent=self.notebook, mode="opendir", multiple_selection=False,
+                                           title="Select a dataset", initialdir=self.default_dirs["Data"])
+        dialog._sort_by_date(reverse=True)
+        dialog.wait_window(dialog)
+        data_pathname = dialog.get_result()
+        
         if not data_pathname:
             logger.info("No data set selected :(")
             return
@@ -1698,6 +1712,62 @@ class Notebook(BaseNotebook):
         except Exception:
             self.write(self.analysis_status, "Error #106: Plot failed")
             logger.error("Error #106: Plot failed")
+
+    def plot_integrate(self, ip_ID, **kwargs):
+        xaxis_label = kwargs.get("xlabel", "")
+        
+        subplot = self.integration_plots[ip_ID].plot_obj
+        datagroup = self.integration_plots[ip_ID].datagroup
+        subplot.cla()
+        
+        self.integration_plots[ip_ID].xaxis_type = 'linear'
+
+        self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), 
+                                                             max_val=datagroup.get_maxval())
+        
+        if datagroup.type is None:
+            where_layer = None
+        else:
+            where_layer = self.module.find_layer(datagroup.type)
+        
+        subplot.set_yscale(self.integration_plots[ip_ID].yaxis_type)
+        subplot.set_xlabel(xaxis_label)
+        if datagroup.type is None:
+            subplot.set_ylabel("")
+            subplot.set_title("")
+        else:
+            subplot.set_ylabel(datagroup.type +  " " + self.module.layers[where_layer].outputs[datagroup.type].integrated_units)
+            subplot.set_title("Integrated {}".format(datagroup.type))
+            
+        for fname, t in zip(datagroup.uploaded_fnames,datagroup.uploaded_data):
+            x, y, scale = t
+            dirname, header = os.path.split(fname)
+            subplot.plot(x, y*10**scale, label=header)
+
+        if datagroup.type is not None:
+            if self.PL_mode == "Current time step":
+                f = subplot.scatter
+            elif self.PL_mode == "All time steps":
+                f = subplot.plot        
+    
+            for key in datagroup.datasets:
+                dirname, header = os.path.split(datagroup.datasets[key].tag(for_matplotlib=True))
+                f(datagroup.datasets[key].grid_x, 
+                    datagroup.datasets[key].data * 
+                    self.module.layers[where_layer].convert_out[datagroup.type] *
+                    self.module.layers[where_layer].iconvert_out[datagroup.type], 
+                    label=header)
+            
+        
+            
+        self.integration_plots[ip_ID].xlim = subplot.get_xlim()
+        self.integration_plots[ip_ID].ylim = subplot.get_ylim()
+                
+        subplot.legend().set_draggable(True)
+
+        self.integration_fig.tight_layout()
+        self.integration_fig.canvas.draw()
+        return
 
     def make_rawdataset(self, data_pathname, plot_ID, datatype, target_layer):
         """Create a dataset object and prepare to plot on analysis tab."""
@@ -1989,16 +2059,25 @@ class Notebook(BaseNotebook):
                                                   title="Select IC text file", 
                                                   filetypes=[("Text files","*.txt")])
         if not IC_files: 
+            self.write(self.status, "Simulations cancelled")
             return
         
         if self.custom_sim_output_loc_flag.value() == 1:
-            output_loc = tkfilebrowser.askopendirname(initialdir=os.path.join(self.default_dirs["Data"], self.module.system_ID),
-                                                      title="Select an output location", 
-                                                      )
+            dialog = tkfilebrowser.FileBrowser(parent=self.notebook, mode="opendir", multiple_selection=False,
+                                               title="Select an output location", 
+                                               initialdir=os.path.join(self.default_dirs["Data"], self.module.system_ID))
+            dialog._sort_by_date(reverse=True)
+            dialog.wait_window(dialog)
+            output_loc = dialog.get_result()
+        
         else:
             # The default location data saves to
             output_loc = os.path.join(self.default_dirs["Data"], self.module.system_ID)
             
+        if not output_loc:
+            self.write(self.status, "Simulations cancelled")
+            return
+        
         logger.info(f"Saving to: {output_loc}")
         
         try:
@@ -2445,45 +2524,7 @@ class Notebook(BaseNotebook):
                 counter += 1
                 logger.info("Integration: {} of {} complete".format(counter, active_datagroup.size() * len(self.integration_bounds)))
 
-        subplot = self.integration_plots[ip_ID].plot_obj
-        datagroup = self.integration_plots[ip_ID].datagroup
-        subplot.cla()
-        
-        self.integration_plots[ip_ID].xaxis_type = 'linear'
-
-        self.integration_plots[ip_ID].yaxis_type = autoscale(min_val=datagroup.get_minval(), 
-                                                             max_val=datagroup.get_maxval())
-        #self.integration_plots[ip_ID].ylim = max * 1e-12, max * 10
-        where_layer = self.module.find_layer(datagroup.type)
-        
-        subplot.set_yscale(self.integration_plots[ip_ID].yaxis_type)
-        #subplot.set_ylim(self.integration_plots[ip_ID].ylim)
-        subplot.set_xlabel(xaxis_label)
-        subplot.set_ylabel(datagroup.type +  " " + self.module.layers[where_layer].outputs[datagroup.type].integrated_units)
-        subplot.set_title("Integrated {}".format(datagroup.type))
-
-        
-        for key in datagroup.datasets:
-            if self.PL_mode == "Current time step":
-                f = subplot.scatter
-            elif self.PL_mode == "All time steps":
-                f = subplot.plot
-                
-            dirname, header = os.path.split(datagroup.datasets[key].tag(for_matplotlib=True))
-            f(datagroup.datasets[key].grid_x, 
-                datagroup.datasets[key].data * 
-                self.module.layers[where_layer].convert_out[datagroup.type] *
-                self.module.layers[where_layer].iconvert_out[datagroup.type], 
-                label=header)
-
-            
-        self.integration_plots[ip_ID].xlim = subplot.get_xlim()
-        self.integration_plots[ip_ID].ylim = subplot.get_ylim()
-                
-        subplot.legend().set_draggable(True)
-
-        self.integration_fig.tight_layout()
-        self.integration_fig.canvas.draw()
+        self.plot_integrate(ip_ID, xlabel=xaxis_label)
         
         self.write(self.analysis_status, "Integration complete")
 
@@ -3627,7 +3668,7 @@ class Notebook(BaseNotebook):
                               self.analysis_plots[plot_ID].datagroup.datasets[key].pathname + 
                               "," for key in self.analysis_plots[plot_ID].datagroup.datasets])
 
-        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
+        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Analysis"], 
                                                           title="Save data", 
                                                           filetypes=[("csv (comma-separated-values)","*.csv")])
         
@@ -3664,7 +3705,7 @@ class Notebook(BaseNotebook):
         paired_data = np.array(list(map(list, itertools.zip_longest(*paired_data, fillvalue=-1))))
         
         
-        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
+        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Analysis"], 
                                                           title="Save data", 
                                                           filetypes=[("csv (comma-separated-values)","*.csv")])
         # Export to .csv
@@ -3705,7 +3746,7 @@ class Notebook(BaseNotebook):
             grid_x = self.overview_subplots[layer_name][output_name].lines[0]._xorig
         paired_data = np.vstack((grid_x, paired_data)).T
         
-        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["PL"], 
+        export_filename = tk.filedialog.asksaveasfilename(initialdir=self.default_dirs["Analysis"], 
                                                           title="Save data", 
                                                           filetypes=[("csv (comma-separated-values)","*.csv")])
         header = ["z"] + [f"t{i+1}" for i in range(len(paired_data[0]) - 1)]

@@ -107,11 +107,16 @@ class PlotterPopup(Popup):
         return
     
     def stage_data(self):
-        data_dirnames = tkfilebrowser.askopendirnames(title="Select datasets", 
-                                                     initialdir=os.path.join(self.nb.default_dirs["Data"],
-                                                                             self.nb.module.system_ID)
-                                                     )
-        data_dirnames = list(data_dirnames)
+
+        dialog = tkfilebrowser.FileBrowser(parent=self.toplevel, mode="opendir", multiple_selection=True,
+                                           title="Select datasets", 
+                                           initialdir=os.path.join(self.nb.default_dirs["Data"],
+                                                                   self.nb.module.system_ID),
+                                           )
+        
+        dialog._sort_by_date(reverse=True)
+        dialog.wait_window(dialog)
+        data_dirnames = list(dialog.get_result())
         
         # Screen out dirs without data
         for data_dirname in list(data_dirnames):

@@ -57,19 +57,18 @@ def dydt_multi_volts(t,y,G,PA, s, do_ss):
     rr_rs = np.zeros_like(rr_srh)
     
     # First "interface" (front surface)
-    rr_rs[0] = PA.RS[0] * (n[0] * p[0] - PA.n0[0] * PA.p0[0]) / (n[0] + p[0]) 
+    rr_rs[0] = (PA.RS[0] / G.dx[0]) * (n[0] * p[0] - PA.n0[0] * PA.p0[0]) / (n[0] + p[0]) 
     
     # Last "interface" (back surface)
-    rr_rs[-1] = PA.RS[-1] * (n[-1] * p[-1] - PA.n0[-1] * PA.p0[-1]) / (n[-1] + p[-1])
+    rr_rs[-1] = (PA.RS[-1] / G.dx[-1]) * (n[-1] * p[-1] - PA.n0[-1] * PA.p0[-1]) / (n[-1] + p[-1])
     
     # Intermediate interfaces
     for i, rbound in enumerate(G.nx_bounds[1:-1], 1):
         lbound = rbound - 1
-        rr_rs[lbound] = PA.RS[i][0] * (n[lbound] * p[lbound] - PA.n0[lbound] * PA.p0[lbound]) / (n[lbound] + p[lbound])
-        rr_rs[rbound] = PA.RS[i][1] * (n[rbound] * p[rbound] - PA.n0[rbound] * PA.p0[rbound]) / (n[rbound] + p[rbound])
+        rr_rs[lbound] = (PA.RS[i][0] / G.dx[lbound]) * (n[lbound] * p[lbound] - PA.n0[lbound] * PA.p0[lbound]) / (n[lbound] + p[lbound])
+        rr_rs[rbound] = (PA.RS[i][1] / G.dx[rbound]) * (n[rbound] * p[rbound] - PA.n0[rbound] * PA.p0[rbound]) / (n[rbound] + p[rbound])
 
-    # Assumed all recombination happens within a 1nm interface thickness
-    # In practice the velocity is scaled by the interface thickness
+    # Now scales interface thickness
     
     #Define differential equations
     dndt = (1/q)*dJn - rr_srh - rr_rad - rr_rs - rr_aug       #[m**-3 s**-1]
