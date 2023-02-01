@@ -15,6 +15,8 @@ Options:
     "Standard One-Layer"
     "Nanowire"
     "MAPI-Rubrene/DBP"
+    "PN-Junction"
+    "Si-DualBand"
 
 --tab:
     "0": Inputs
@@ -24,24 +26,24 @@ Options:
 
 from docopt import docopt
 from config import init_logging
-logger = init_logging(__name__)
 
 from Notebook.notebook import Notebook
 from Modules.Nanowire import Nanowire
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
 from Modules.module_pnJunction.central import PN_Junction
+from Modules.module_Si_dualband import Si_DualBand
 
+logger = init_logging(__name__)
 # {"Display name of module": OneD_Model derived module class}.
 MODULE_LIST = {
     "Standard One-Layer": Std_SingleLayer,
     "Nanowire": Nanowire,
     "MAPI-Rubrene/DBP": MAPI_Rubrene,
-    "PN-Junction": PN_Junction
+    "PN-Junction": PN_Junction,
+    "Si_DualBand": Si_DualBand
 }
 
-from docopt import docopt
-from config import init_logging
 logger = init_logging(__name__)
 
 
@@ -59,7 +61,7 @@ def get_cli_args():
             args["module"] = module
     except AssertionError:
         logger.info("Invalid module \"{}\"".format(module))
-        
+
     try:
         tab_id = raw_args.get("--tab")
         if tab_id is not None:
@@ -68,7 +70,7 @@ def get_cli_args():
             args["tab_id"] = tab_id
     except AssertionError:
         logger.info("Invalid tab_id \"{}\"".format(tab_id))
-    
+
     return args
 
 
