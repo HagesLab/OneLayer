@@ -5,7 +5,7 @@ Created on Wed May 12 18:01:07 2021
 @author: cfai2
 """
 from _OneD_Model import OneD_Model
-from Modules.module_pnJunction.definitions import define_layers, define_flags
+from Modules.module_Si_dualband.definitions import define_layers, define_flags
 # from Modules.module_pnJunction.initializations import PN_Junction_Initial_Conditions
 # from Modules.module_pnJunction.analysis import submodule_get_overview_analysis
 # from Modules.module_pnJunction.analysis import submodule_prep_dataset

@@ -63,13 +63,13 @@ def define_simulation_outputs(layer):
         # Electron (in each band) and hole profiles
         "N_d": Output("N", units="[cm^-3]", integrated_units="[cm^-2]",
                       xlabel="nm", xvar="position", is_edge=False,
-                      layer="Absorber", yscale='symlog', yfactors=(1e-4, 1e1)),
+                      layer=layer, yscale='symlog', yfactors=(1e-4, 1e1)),
         "N_ind": Output("N_ind", units="[cm^-3]", integrated_units="[cm^-2]",
                         xlabel="nm", xvar="position", is_edge=False,
-                        layer="Absorber", yscale='symlog', yfactors=(1e-4, 1e1)),
+                        layer=layer, yscale='symlog', yfactors=(1e-4, 1e1)),
         "P": Output("P", units="[cm^-3]", integrated_units="[cm^-2]",
                     xlabel="nm", xvar="position", is_edge=False,
-                    layer="Absorber", yscale='symlog', yfactors=(1e-4, 1e1)),
+                    layer=layer, yscale='symlog', yfactors=(1e-4, 1e1)),
     }
 
 
@@ -129,7 +129,7 @@ def define_convert_in():
         "tau_P": 1,                    # [ns]
         "Sf": (1e7) / (1e9),
         "Sb": (1e7) / (1e9),           # [cm / s] to [nm / ns]
-        "Cn": 1e33, "Cp": 1e33,        # [cm^6 / s] to [nm^6 / ns]
+        "CN": 1e33, "CP": 1e33,        # [cm^6 / s] to [nm^6 / ns]
         "Temp": 1,
         "eps_perm": 1,
         "delta_N": ((1e-7) ** 3),
@@ -149,8 +149,8 @@ def define_convert_in():
 
     # These really exist only for the convert_out - so outputs are
     # displayed in cm and s instead of nm and ns
-    convert_in["RR"] = convert_in["B"] * (convert_in["N"] * convert_in["P"])
-    convert_in["NRR"] = convert_in["N"] * 1e-9
+    convert_in["RR"] = convert_in["B"] * (convert_in["N_d"] * convert_in["P"])
+    convert_in["NRR"] = convert_in["N_d"] * 1e-9
     convert_in["PL"] = convert_in["RR"]
     convert_in["PL_d"] = convert_in["PL"]
     convert_in["PL_ind"] = convert_in["PL"]
@@ -191,8 +191,8 @@ def define_layers():
     layers = {
         "Absorber": Layer(
                 define_params(),
-                define_simulation_outputs(),
-                define_calculated_outputs(),
+                define_simulation_outputs("Absorber"),
+                define_calculated_outputs("Absorber"),
                 "[nm]",
                 convert_in,
                 iconvert_in

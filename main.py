@@ -32,16 +32,16 @@ from Modules.Nanowire import Nanowire
 from Modules.Std_SingleLayer import Std_SingleLayer
 from Modules.module_MAPI_Rubrene_DBP.central import MAPI_Rubrene
 from Modules.module_pnJunction.central import PN_Junction
-from Modules.module_Si_dualband import Si_DualBand
+from Modules.module_Si_dualband.central import Si_DualBand
 
 logger = init_logging(__name__)
 # {"Display name of module": OneD_Model derived module class}.
 MODULE_LIST = {
-    "Standard One-Layer": Std_SingleLayer,
-    "Nanowire": Nanowire,
-    "MAPI-Rubrene/DBP": MAPI_Rubrene,
-    "PN-Junction": PN_Junction,
-    "Si_DualBand": Si_DualBand
+    "0": Std_SingleLayer,
+    "1": Nanowire,
+    "2": MAPI_Rubrene,
+    "3": PN_Junction,
+    "4": Si_DualBand
 }
 
 logger = init_logging(__name__)
