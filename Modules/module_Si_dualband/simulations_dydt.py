@@ -85,7 +85,7 @@ def dydt_indirect(t, y, G, PA, do_ss=False, verbose=False):
     # Define transport equations
     dn_d_dt = (1/q) * dJn_d - rr_srh - rr_rad - rr_rs - rr_aug - rr_trap + rr_detrap
     dn_ind_dt = (1/q) * dJn_ind - rr_rad_ind + rr_trap - rr_detrap
-    dpdt = (-1/q) * dJp - rr_srh - rr_rad - rr_rs - rr_aug
+    dpdt = (-1/q) * dJp - rr_srh - rr_rad - rr_rad_ind - rr_rs - rr_aug
 
     if do_ss:
         dn_d_dt += PA.inject_N
