@@ -6,7 +6,7 @@ Created on Wed May 12 18:01:07 2021
 """
 from _OneD_Model import OneD_Model
 from Modules.module_Si_dualband.definitions import define_layers, define_flags
-# from Modules.module_pnJunction.initializations import PN_Junction_Initial_Conditions
+from Modules.module_Si_dualband.initializations import Si_dualband_Initial_Conditions
 # from Modules.module_pnJunction.analysis import submodule_get_overview_analysis
 # from Modules.module_pnJunction.analysis import submodule_prep_dataset
 # from Modules.module_pnJunction.analysis import submodule_get_timeseries
@@ -40,14 +40,11 @@ class Si_DualBand(OneD_Model):
     def calc_inits(self):
         """Calculate initial electron and hole density distribution"""
 
-        # ntype = self.layers["N-type"]
-        # buffer = self.layers["buffer"]
-        # ptype = self.layers["P-type"]
+        absorber = self.layers["Absorber"]
 
-        # pnjunction_inits = PN_Junction_Initial_Conditions(ntype, buffer, ptype)
-
-        # return pnjunction_inits.format_inits_to_dict()
-        raise NotImplementedError
+        inits = Si_dualband_Initial_Conditions(absorber)
+        print(inits.format_inits_to_dict())
+        return inits.format_inits_to_dict()
 
     def simulate(self, data_path, m, n, dt, flags,
                  hmax_, rtol, atol, init_conditions):
@@ -65,7 +62,7 @@ class Si_DualBand(OneD_Model):
                               data_dirname, file_name_base):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        # data_dict = submodule_get_overview_analysis(self.shared_layer, params, flags, total_time, 
+        # data_dict = submodule_get_overview_analysis(self.shared_layer, params, flags, total_time,
         #                                             dt, tsteps, data_dirname, file_name_base)
         # return data_dict
         raise NotImplementedError
@@ -80,7 +77,7 @@ class Si_DualBand(OneD_Model):
         # return data
         raise NotImplementedError
 
-    def get_timeseries(self, pathname, datatype, parent_data, 
+    def get_timeseries(self, pathname, datatype, parent_data,
                        total_time, dt, params, flags):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
