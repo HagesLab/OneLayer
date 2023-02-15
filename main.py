@@ -37,11 +37,11 @@ from Modules.module_Si_dualband.central import Si_DualBand
 logger = init_logging(__name__)
 # {"Display name of module": OneD_Model derived module class}.
 MODULE_LIST = {
-    "0": Std_SingleLayer,
-    "1": Nanowire,
-    "2": MAPI_Rubrene,
-    "3": PN_Junction,
-    "4": Si_DualBand
+    "Std_SingleLayer": Std_SingleLayer,
+    "Nanowire": Nanowire,
+    "MAPI_Rubrene": MAPI_Rubrene,
+    "PN_Junction": PN_Junction,
+    "Si_DualBand": Si_DualBand
 }
 
 logger = init_logging(__name__)
