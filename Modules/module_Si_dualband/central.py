@@ -8,7 +8,7 @@ from _OneD_Model import OneD_Model
 from Modules.module_Si_dualband.definitions import define_layers, define_flags
 from Modules.module_Si_dualband.initializations import Si_dualband_Initial_Conditions
 # from Modules.module_pnJunction.analysis import submodule_get_overview_analysis
-# from Modules.module_pnJunction.analysis import submodule_prep_dataset
+from Modules.module_Si_dualband.analysis import submodule_prep_dataset
 # from Modules.module_pnJunction.analysis import submodule_get_timeseries
 # from Modules.module_pnJunction.analysis import submodule_get_IC_regen
 from Modules.module_Si_dualband.simulations import OdeSiSimulation
@@ -69,11 +69,11 @@ class Si_DualBand(OneD_Model):
                      for_integrate=False, i=0, j=0, nen=False, extra_data=None):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        # layer = self.shared_layer
-        # data = submodule_prep_dataset(target_layer, layer, datatype, sim_data, params,
-        #             for_integrate, i, j, nen, extra_data)
-        # return data
-        raise NotImplementedError
+        layer = self.layers[target_layer]
+        data = submodule_prep_dataset(target_layer, layer, datatype, sim_data,
+                                      params, for_integrate, i, j, nen,
+                                      extra_data)
+        return data
 
     def get_timeseries(self, pathname, datatype, parent_data,
                        total_time, dt, params, flags):
