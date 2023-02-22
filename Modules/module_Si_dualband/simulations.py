@@ -78,15 +78,21 @@ class OdeSiSimulation():
         """
         Master function for PN_Junction module simulation.
         Problem statement:
-        Create a discretized, time and space dependent solution (N(z,t), P(z,t))
-        of a pn-junction carrier model with mapi_node_number, rubrene_node_number space steps and time_steps time steps
-        Space step size is mapi_node_width, rubrene_node_width; time step is dt
-        Initial conditions: self.init_N, self.init_P
+        Create a discretized, time and space dependent solution
+        (N_d(z,t), N_ind(z,t), P(z,t))
+        of a silicon nanosheet model with one direct (N_d)
+        and one indirect (N_ind) energy level.
+
+        This model is currently very barebones - trapping between levels
+        is a generic first order process
+        and electronic drift is practically neglected.
+
+        Initial conditions: self.init_N_d, self.init_N_ind, self.init_P
 
         Returns
         -------
         None
-            TEDs does not do anything with the return value. Other applications might find this useful however.
+
         """
 
         sim = SimulationSettings(nt, dt, hmax_,
@@ -163,6 +169,7 @@ class OdeSiSimulation():
                 self.absorber.params[param_name].value, g.nx[0],
                 self.absorber.params[param_name].is_edge))
 
+        # If we want multilayers
         # setattr(p, p_attrs[param_name],
         #         self.stitch_arrays([to_array(layer.params[param_name].value, g.nx[i], layer.params[param_name].is_edge)
         #                             for i, layer in enumerate(self.layers)], self.layers[0].params[param_name].is_edge)
