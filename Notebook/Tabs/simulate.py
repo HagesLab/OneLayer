@@ -1,13 +1,13 @@
 
+from GUI_structs import Flag
+import tkinter as tk
+from matplotlib.figure import Figure
+import matplotlib.backends.backend_tkagg as tkagg
 import numpy as np
 import matplotlib
 starting_backend = matplotlib.get_backend()
 matplotlib.use("TkAgg")
-import matplotlib.backends.backend_tkagg as tkagg
-from matplotlib.figure import Figure
-import tkinter as tk
 
-from GUI_structs import Flag
 
 def add_tab_simulate(nb):
     """Method to add the menu tab 'Simulate'
@@ -16,112 +16,114 @@ def add_tab_simulate(nb):
     nb.tab_simulate = tk.ttk.Frame(nb.notebook)
 
     tk.ttk.Label(
-        nb.tab_simulate, 
-        text="Select Init. Cond.", 
+        nb.tab_simulate,
+        text="Select Init. Cond.",
         style="Header.TLabel"
-        ).grid(row=0,column=0,columnspan=2, padx=(9,12))
+    ).grid(row=0, column=0, columnspan=2, padx=(9, 12))
 
     tk.ttk.Label(
         nb.tab_simulate,
         text="Simulation Time [ns]"
-        ).grid(row=2,column=0)
+    ).grid(row=2, column=0)
 
     nb.simtime_entry = tk.ttk.Entry(nb.tab_simulate, width=9)
-    nb.simtime_entry.grid(row=2,column=1)
+    nb.simtime_entry.grid(row=2, column=1)
 
     tk.ttk.Label(
         nb.tab_simulate,
         text="dt [ns]"
-        ).grid(row=3,column=0)
+    ).grid(row=3, column=0)
 
     nb.dt_entry = tk.ttk.Entry(nb.tab_simulate, width=9)
-    nb.dt_entry.grid(row=3,column=1)
-    
+    nb.dt_entry.grid(row=3, column=1)
+
     tk.ttk.Label(
         nb.tab_simulate,
         text="Max solver stepsize [ns]"
-        ).grid(row=4,column=0)
-    
-    nb.hmax_entry = tk.ttk.Entry(nb.tab_simulate, width=9)
-    nb.hmax_entry.grid(row=4,column=1)
+    ).grid(row=4, column=0)
 
-    nb.enter(nb.simtime_entry, "100")
+    nb.hmax_entry = tk.ttk.Entry(nb.tab_simulate, width=9)
+    nb.hmax_entry.grid(row=4, column=1)
+
+    nb.enter(nb.simtime_entry, "4500")
     nb.enter(nb.dt_entry, "0.5")
-    nb.enter(nb.hmax_entry, "4")
-    
+    nb.enter(nb.hmax_entry, "10")
+
     tk.ttk.Label(
         nb.tab_simulate,
         text="rtol"
-        ).grid(row=5,column=0)
+    ).grid(row=5, column=0)
 
     nb.rtol_entry = tk.ttk.Entry(nb.tab_simulate, width=9)
-    nb.rtol_entry.grid(row=5,column=1)
-    
+    nb.rtol_entry.grid(row=5, column=1)
+
     tk.ttk.Label(
         nb.tab_simulate,
         text="atol"
-        ).grid(row=6,column=0)
-    
+    ).grid(row=6, column=0)
+
     nb.atol_entry = tk.ttk.Entry(nb.tab_simulate, width=9)
-    nb.atol_entry.grid(row=6,column=1)
+    nb.atol_entry.grid(row=6, column=1)
 
     nb.enter(nb.rtol_entry, "1e-5")
     nb.enter(nb.atol_entry, "1e-8")
-    
-    nb.custom_sim_output_loc_flag = Flag(nb.tab_simulate, "Save data to custom location")
-    nb.custom_sim_output_loc_flag.tk_element.grid(row=7, column=0,columnspan=2)
-    nb.custom_sim_output_loc_flag.set(1)
-    
+
+    nb.custom_sim_output_loc_flag = Flag(
+        nb.tab_simulate, "Save data to custom location")
+    nb.custom_sim_output_loc_flag.tk_element.grid(row=7, column=0, columnspan=2)
+    nb.custom_sim_output_loc_flag.set(0)
+
     tk.ttk.Button(
         nb.tab_simulate,
-        text="Start Simulation(s)", 
+        text="Start Simulation(s)",
         command=nb.do_Batch
-        ).grid(row=8,column=0,columnspan=2,padx=(9,12))
+    ).grid(row=8, column=0, columnspan=2, padx=(9, 12))
 
     tk.ttk.Label(
         nb.tab_simulate,
         text="Status"
-        ).grid(row=9, column=0, columnspan=2)
+    ).grid(row=9, column=0, columnspan=2)
 
-    nb.status = tk.Text(nb.tab_simulate, width=28,height=6)
+    nb.status = tk.Text(nb.tab_simulate, width=28, height=6)
     nb.status.grid(row=10, rowspan=2, column=0, columnspan=2)
     nb.status.configure(state='disabled')
 
     tk.ttk.Separator(
         nb.tab_simulate,
-        orient="vertical", 
+        orient="vertical",
         style="Grey Bar.TSeparator"
-        ).grid(row=0,rowspan=30,column=2,sticky="ns")
+    ).grid(row=0, rowspan=30, column=2, sticky="ns")
 
     tk.ttk.Label(
-        nb.tab_simulate, 
+        nb.tab_simulate,
         text="Simulation - {}".format(nb.module.system_ID)
-        ).grid(row=0,column=3,columnspan=3)
-    
-    nb.sim_fig = Figure(figsize=(0.65 * nb.APP_WIDTH / nb.APP_DPI, 0.65 * nb.APP_HEIGHT / nb.APP_DPI))
+    ).grid(row=0, column=3, columnspan=3)
+
+    nb.sim_fig = Figure(figsize=(0.65 * nb.APP_WIDTH /
+                        nb.APP_DPI, 0.65 * nb.APP_HEIGHT / nb.APP_DPI))
     count = 1
     cdim = np.ceil(np.sqrt(nb.module.count_s_outputs()))
-    
+
     rdim = np.ceil(nb.module.count_s_outputs() / cdim)
-    
+
     nb.sim_subplots = {}
     for layer_name, layer in nb.module.layers.items():
         for s_output in layer.s_outputs:
             if s_output not in nb.sim_subplots:
                 nb.sim_subplots[s_output] = \
                     nb.sim_fig.add_subplot(
-                        int(rdim), 
-                        int(cdim), 
+                        int(rdim),
+                        int(cdim),
                         int(count))
                 nb.sim_subplots[s_output].set_title(s_output)
                 count += 1
 
     nb.sim_canvas = \
         tkagg.FigureCanvasTkAgg(nb.sim_fig, master=nb.tab_simulate)
-    nb.sim_canvas.get_tk_widget().grid(row=1,column=3,rowspan=12,columnspan=2)
-    
+    nb.sim_canvas.get_tk_widget().grid(row=1, column=3, rowspan=12, columnspan=2)
+
     nb.simfig_toolbar_frame = tk.ttk.Frame(master=nb.tab_simulate)
-    nb.simfig_toolbar_frame.grid(row=13,column=3,columnspan=2)
+    nb.simfig_toolbar_frame.grid(row=13, column=3, columnspan=2)
     tkagg.NavigationToolbar2Tk(nb.sim_canvas, nb.simfig_toolbar_frame)
 
     nb.notebook.add(nb.tab_simulate, text="Simulate")
