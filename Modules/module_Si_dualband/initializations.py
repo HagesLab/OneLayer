@@ -50,7 +50,8 @@ class Si_dualband_Initial_Conditions():
 
     def format_inits_to_dict(self):
         """Returning the calculated initial arrays
-        organized in a dictionary as per contract."""
+        organized in a dictionary as required by
+        OneD_Model template."""
         return {
             "N_d": self.init_N_d,
             "N_ind": self.init_N_ind,

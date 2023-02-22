@@ -159,6 +159,7 @@ def define_convert_in():
 
 
 def define_iconvert_in():
+    # An additional nm --> cm conversion for integrals over dz
     return {
         "N_d": 1e7,
         "N_ind": 1e7,
@@ -183,20 +184,21 @@ def define_layers():
     # Lists of conversions into and out of TEDs units (e.g. nm/s)
     # from common units (e.g. cm/s)
     # Multiply the parameter values the user enters in common units
-    # by the corresponding coefficient in this dictionary to convert into TEDs units
+    # by the corresponding coefficient in this dictionary
+    # to convert into TEDs units
     convert_in = define_convert_in()
     iconvert_in = define_iconvert_in()
 
     # we can now initialize the 2 layers with the previously defined components
     layers = {
         "Absorber": Layer(
-                define_params(),
-                define_simulation_outputs("Absorber"),
-                define_calculated_outputs("Absorber"),
-                "[nm]",
-                convert_in,
-                iconvert_in
-            ),
+            define_params(),
+            define_simulation_outputs("Absorber"),
+            define_calculated_outputs("Absorber"),
+            "[nm]",
+            convert_in,
+            iconvert_in
+        ),
     }
 
     return layers

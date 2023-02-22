@@ -11,7 +11,7 @@ from Modules.module_Si_dualband.initializations import Si_dualband_Initial_Condi
 # from Modules.module_pnJunction.analysis import submodule_prep_dataset
 # from Modules.module_pnJunction.analysis import submodule_get_timeseries
 # from Modules.module_pnJunction.analysis import submodule_get_IC_regen
-# from Modules.module_pnJunction.simulations import OdePNJunctionSimulation
+from Modules.module_Si_dualband.simulations import OdeSiSimulation
 
 q = 1.0                     # [e]
 q_C = 1.602e-19             # [C]
@@ -43,20 +43,18 @@ class Si_DualBand(OneD_Model):
         absorber = self.layers["Absorber"]
 
         inits = Si_dualband_Initial_Conditions(absorber)
-        print(inits.format_inits_to_dict())
         return inits.format_inits_to_dict()
 
     def simulate(self, data_path, m, n, dt, flags,
                  hmax_, rtol, atol, init_conditions):
         """Calls ODEINT solver."""
-        # for layer_name in self.layers:
-        #     layer = self.layers[layer_name]
-        #     for param_name, param in layer.params.items():
-        #         param.value *= layer.convert_in[param_name]
+        for layer_name in self.layers:
+            layer = self.layers[layer_name]
+            for param_name, param in layer.params.items():
+                param.value *= layer.convert_in[param_name]
 
-        # ode_junction = OdePNJunctionSimulation(self.layers, m, flags, init_conditions)
-        # ode_junction.simulate(data_path, n, dt, hmax_, rtol, atol)
-        raise NotImplementedError
+        ode_si = OdeSiSimulation(self.layers, m, flags, init_conditions)
+        ode_si.simulate(data_path, n, dt, hmax_, rtol, atol)
 
     def get_overview_analysis(self, params, flags, total_time, dt, tsteps,
                               data_dirname, file_name_base):

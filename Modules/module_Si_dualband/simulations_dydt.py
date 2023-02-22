@@ -6,7 +6,7 @@ Created on Wed May 12 18:01:07 2021
 """
 import numpy as np
 # from Modules.module_pnJunction.calculations import V_poisson
-from calculations import V_poisson
+# from calculations import V_poisson
 
 q = 1.0                     # [e]
 q_C = 1.602e-19             # [C]
@@ -14,11 +14,11 @@ kB = 8.61773e-5             # [eV / K]
 eps0 = 8.854e-12 * 1e-9     # [C/V-m] to [C/V-nm]
 
 
-def dydt_indirect(t, y, G, PA, do_ss=False, verbose=False):
+def dydt_indirect(t, y, G, PA, s, do_ss=False, verbose=False):
     # Need to tell the function which values of y correspond to n, p, and E
-    n_d = y[0:G.nx]
-    n_ind = y[G.nx:2*G.nx]
-    p = y[2*G.nx:]
+    n_d = y[0:G.nx[0]]
+    n_ind = y[G.nx[0]:2*G.nx[0]]
+    p = y[2*G.nx[0]:]
     ndp0 = n_d * p - PA.n0 * PA.p0
     n_indp0 = n_ind * p - PA.n0 * PA.p0
 
@@ -29,32 +29,33 @@ def dydt_indirect(t, y, G, PA, do_ss=False, verbose=False):
     # p_faces = ((p + np.roll(p, -1))/2)[:-1]
 
     # Flux (current) terms at all faces
-    Jn_d = np.zeros(G.nx + 1)
-    Jn_ind = np.zeros(G.nx + 1)
-    Jp = np.zeros(G.nx + 1)
+    Jn_d = np.zeros(G.nx[0] + 1)
+    Jn_ind = np.zeros(G.nx[0] + 1)
+    Jp = np.zeros(G.nx[0] + 1)
 
     # V = V_poisson(G.dx, n_d, p, PA.n0, PA.p0, PA.eps, PA.V0, PA.VL)
 
     # dVdx = (np.roll(V, -1) - V)[:-1] / G.inter_dx
 
     # [eV m**-1]
-    dEfn_d = (( kB * PA.T * (np.roll(n_d, -1) - n_d)[:-1] / G.inter_dx) -
+    dEfn_d = ((kB * PA.T[1:-1] * (np.roll(n_d, -1) - n_d)[:-1] / G.inter_dx) -
               0)  # q * n_d_faces * (dVdx + PA.dchidx))
 
-    dEfn_ind = ((kB * PA.T * (np.roll(n_ind, -1) - n_ind)[:-1] / G.inter_dx))
+    dEfn_ind = (
+        (kB * PA.T[1:-1] * (np.roll(n_ind, -1) - n_ind)[:-1] / G.inter_dx))
 
-    dEfp = ((-kB * PA.T * (np.roll(p, -1) - p)[:-1] / G.inter_dx) -
+    dEfp = ((-kB * PA.T[1:-1] * (np.roll(p, -1) - p)[:-1] / G.inter_dx) -
             0)   # q * p_faces * (dVdx + PA.dchidx + PA.dEgdx))
 
     # J at boundaries
-    Jn_d[0], Jn_d[G.nx] = 0, 0
-    Jn_ind[0], Jn_ind[G.nx] = 0, 0
-    Jp[0], Jp[G.nx] = 0, 0
+    Jn_d[0], Jn_d[G.nx[0]] = 0, 0
+    Jn_ind[0], Jn_ind[G.nx[0]] = 0, 0
+    Jp[0], Jp[G.nx[0]] = 0, 0
 
     # Define J at interior faces
-    Jn_d[1:-1] = PA.mu_n_d * dEfn_d
-    Jn_ind[1:-1] = PA.mu_n_ind * dEfn_ind
-    Jp[1:-1] = PA.mu_p * dEfp
+    Jn_d[1:-1] = PA.mu_n_d[1:-1] * dEfn_d
+    Jn_ind[1:-1] = PA.mu_n_ind[1:-1] * dEfn_ind
+    Jp[1:-1] = PA.mu_p[1:-1] * dEfp
     if verbose and t != PA.t_old:
         PA.t_old = t
         print(t)
@@ -83,13 +84,14 @@ def dydt_indirect(t, y, G, PA, do_ss=False, verbose=False):
     rr_detrap = n_ind / PA.tauE
 
     # Define transport equations
-    dn_d_dt = (1/q) * dJn_d - rr_srh - rr_rad - rr_rs - rr_aug - rr_trap + rr_detrap
+    dn_d_dt = (1/q) * dJn_d - rr_srh - rr_rad - \
+        rr_rs - rr_aug - rr_trap + rr_detrap
     dn_ind_dt = (1/q) * dJn_ind - rr_rad_ind + rr_trap - rr_detrap
     dpdt = (-1/q) * dJp - rr_srh - rr_rad - rr_rad_ind - rr_rs - rr_aug
 
     if do_ss:
-        dn_d_dt += PA.inject_N
-        dpdt += PA.inject_P
+        dn_d_dt += s.inject_N
+        dpdt += s.inject_P
     # Package it all together
     dydt = np.hstack([dn_d_dt, dn_ind_dt, dpdt])
 
