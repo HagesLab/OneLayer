@@ -57,6 +57,10 @@ def submodule_get_overview_analysis(absorber_layer, params, flags, total_time,
 
     data_dict["Absorber"]["NRR"] = calculated_outputs.nonradiative_recombination()
 
+    data_dict["Absorber"]["trap_rate"] = calculated_outputs.trap()
+
+    data_dict["Absorber"]["detrap_rate"] = calculated_outputs.detrap()
+
     # data_dict["Absorber"]["voltage"] = calculated_outputs.voltage()
     # data_dict["Absorber"]["E_field"] = calculated_outputs.E_field()
 
@@ -80,11 +84,10 @@ def submodule_get_overview_analysis(absorber_layer, params, flags, total_time,
     data_dict["Absorber"]["PL_ind"] = full_time_outputs.PL_integral(
         full_time_outputs.PL_ind())
 
-    # data_dict["Absorber"]["avg_delta_N"] = calculated_outputs.average_delta_n(
-    #     temp_N)
+    data_dict["Absorber"]["avg_delta_N"] = full_time_outputs.average_delta_n()
 
-    # data_dict["Absorber"]["tau_diff"] = tau_diff(
-    #     data_dict["Absorber"]["PL"], dt)
+    data_dict["Absorber"]["tau_diff"] = tau_diff(
+        data_dict["Absorber"]["PL"], dt)
     ############################################################################
 
     for data in data_dict["Absorber"]:

@@ -254,13 +254,11 @@ class CalculatedOutputs():
 
         return self.delta_n_d() + self.delta_n_ind()
 
-    def average_delta_n(self, temp_N):
-        get_these_params = ['N0']
-        these_params = self.get_stitched_params(get_these_params)
+    def average_delta_n(self):
         node_list = generate_shared_x_array(
             False, self.grid_x_nodes, self.total_lengths)
 
-        temp_dN = delta_n(temp_N, these_params['N0'])
+        temp_dN = self.delta_n()
         temp_dN = intg.trapz(temp_dN, x=node_list, axis=1)
         temp_dN /= sum(self.total_lengths)
 
