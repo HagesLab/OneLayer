@@ -129,7 +129,7 @@ def tau_diff(PL, dt):
                       np.roll(ln_PL, 1)[1:-1]) / (2*dt)
 
     with np.errstate(invalid='ignore', divide='ignore'):
-        dln_PLdt = np.where(dln_PLdt <= 0, 0, -(dln_PLdt ** -1))
+        dln_PLdt = np.where(dln_PLdt == 0, 0, -(dln_PLdt ** -1))
     return dln_PLdt
 
 

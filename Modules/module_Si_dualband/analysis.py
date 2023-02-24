@@ -134,20 +134,18 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
     return data
 
 
-def submodule_get_timeseries(pathname, datatype, parent_data, total_time, dt, params, flags):
+def submodule_get_timeseries(pathname, datatype, parent_data,
+                             total_time, dt, params, flags):
     """Depending on requested datatype, returns the equivalent timeseries."""
 
-    if datatype == "delta_N":
-        temp_dN = parent_data / params["MAPI"]["Total_length"]
-        return [("avg_delta_N", temp_dN)]
-
-    if datatype == "PL":
-        # try:
+    if datatype in ["delta_N", "delta_N_d", "delta_N_ind"]:
+        temp_dN = parent_data / params["Absorber"]["Total_length"]
         tdiff = tau_diff(parent_data, dt)
-        # except FloatingPointError:
-        #    print("Error: failed to calculate tau_diff - effective lifetime is near infinite")
-        #    tdiff = np.zeros_like(np.linspace(0, total_time, int(total_time/dt) + 1))
+        return [("avg_delta_N", temp_dN),
+                ("tau_diff", tdiff)]
 
+    if datatype in ["PL", "PL_d", "PL_ind"]:
+        tdiff = tau_diff(parent_data, dt)
         return [("tau_diff", tdiff)]
 
     else:

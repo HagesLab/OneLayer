@@ -9,7 +9,7 @@ from Modules.module_Si_dualband.definitions import define_layers, define_flags
 from Modules.module_Si_dualband.initializations import Si_dualband_Initial_Conditions
 # from Modules.module_pnJunction.analysis import submodule_get_overview_analysis
 from Modules.module_Si_dualband.analysis import submodule_prep_dataset
-# from Modules.module_pnJunction.analysis import submodule_get_timeseries
+from Modules.module_Si_dualband.analysis import submodule_get_timeseries
 # from Modules.module_pnJunction.analysis import submodule_get_IC_regen
 from Modules.module_Si_dualband.simulations import OdeSiSimulation
 
@@ -79,9 +79,9 @@ class Si_DualBand(OneD_Model):
                        total_time, dt, params, flags):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        # timeseries = submodule_get_timeseries(pathname, datatype, parent_data, total_time, dt, params, flags)
-        # return timeseries
-        raise NotImplementedError
+        timeseries = submodule_get_timeseries(
+            pathname, datatype, parent_data, total_time, dt, params, flags)
+        return timeseries
 
     def get_IC_regen(self, sim_data, param_dict, include_flags, grid_x):
         """Dispatched all logic to a submodule while keeping contract
