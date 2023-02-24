@@ -340,3 +340,15 @@ class CalculatedOutputs():
     def PL(self):
         PL_base = self.radiative_recombination()
         return PL_base
+
+    def PL_integral(self, PL_base):
+        integral_PL = np.zeros_like(PL_base[:, 0])
+        left = right = 0
+        for i in range(len(self.layer_names)):
+            right += len(self.grid_x_nodes[i])
+            thickness = self.total_lengths[i]
+            dx_len = self.grid_x_edges[i][1] - self.grid_x_edges[i][0]
+            integral_PL += new_integrate(PL_base[:, left:right], 0, thickness,
+                                         dx_len, thickness, False)
+
+        return integral_PL

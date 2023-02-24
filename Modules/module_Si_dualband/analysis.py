@@ -26,6 +26,7 @@ def submodule_get_overview_analysis(absorber_layer, params, flags, total_time,
     data_dict = {"Absorber": {}}
 
     convert_out = absorber_layer.convert_out
+    iconvert_out = absorber_layer.iconvert_out
     for raw_output_name in absorber_layer.s_outputs:
 
         data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base,
@@ -59,24 +60,39 @@ def submodule_get_overview_analysis(absorber_layer, params, flags, total_time,
     # data_dict["Absorber"]["voltage"] = calculated_outputs.voltage()
     # data_dict["Absorber"]["E_field"] = calculated_outputs.E_field()
 
-    #### PL ####
-    # with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
-    #         tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
-    #     temp_N = np.array(ifstream_N.root.data)
-    #     temp_P = np.array(ifstream_P.root.data)
+    ############################################################################
+    # PL
+    full_time_data = {}
+    for raw_output_name in absorber_layer.s_outputs:
 
-    # data_dict["Absorber"]["PL"] = calculated_outputs.PL(
-    #     temp_N, temp_P, do_integrate=True)
+        data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base,
+                                             raw_output_name)
+        data = u_read(data_filename)
+
+        full_time_data[raw_output_name] = np.array(data)
+
+    full_time_outputs = CalculatedOutputs(full_time_data, params)
+
+    data_dict["Absorber"]["PL"] = full_time_outputs.PL_integral(
+        full_time_outputs.PL())
+    data_dict["Absorber"]["PL_d"] = full_time_outputs.PL_integral(
+        full_time_outputs.PL_d())
+    data_dict["Absorber"]["PL_ind"] = full_time_outputs.PL_integral(
+        full_time_outputs.PL_ind())
 
     # data_dict["Absorber"]["avg_delta_N"] = calculated_outputs.average_delta_n(
     #     temp_N)
 
     # data_dict["Absorber"]["tau_diff"] = tau_diff(
     #     data_dict["Absorber"]["PL"], dt)
-    #################
+    ############################################################################
 
     for data in data_dict["Absorber"]:
         data_dict["Absorber"][data] *= convert_out[data]
+
+    data_dict["Absorber"]["PL"] *= iconvert_out["PL"]
+    data_dict["Absorber"]["PL_d"] *= iconvert_out["PL_d"]
+    data_dict["Absorber"]["PL_ind"] *= iconvert_out["PL_ind"]
 
     return data_dict
 
