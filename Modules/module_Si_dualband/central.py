@@ -12,6 +12,7 @@ from Modules.module_Si_dualband.analysis import submodule_prep_dataset
 from Modules.module_Si_dualband.analysis import submodule_get_timeseries
 # from Modules.module_pnJunction.analysis import submodule_get_IC_regen
 from Modules.module_Si_dualband.simulations import OdeSiSimulation
+from sys import maxsize
 
 q = 1.0                     # [e]
 q_C = 1.602e-19             # [C]
@@ -65,10 +66,13 @@ class Si_DualBand(OneD_Model):
         return data_dict
 
     def prep_dataset(self, datatype, target_layer, sim_data, params, flags,
-                     for_integrate=False, i=0, j=0, nen=False, extra_data=None):
+                     for_integrate=False, i=0, j=None, nen=False, extra_data=None):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
         layer = self.layers[target_layer]
+
+        if j is None:
+            j = maxsize * 2 + 1
         data = submodule_prep_dataset(target_layer, layer, datatype, sim_data,
                                       params, for_integrate, i, j, nen,
                                       extra_data)

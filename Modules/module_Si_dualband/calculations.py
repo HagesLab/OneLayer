@@ -182,7 +182,7 @@ def prep_PL(rad_rec, i, j, need_extra_node):
 
 class CalculatedOutputs():
 
-    def __init__(self, sim_outputs, params):
+    def __init__(self, sim_outputs, params, left, right, has_extra_node):
         self.sim_outputs = sim_outputs
 
         self.layer_names = ["Absorber"]
@@ -199,6 +199,12 @@ class CalculatedOutputs():
 
         self.params = params
 
+        # Truncate param arrays to match i and j set by new_integrate
+        self.left = left
+        self.right = right
+        if has_extra_node:
+            self.right += 1
+
     def get_stitched_params(self, get_these_params):
         these_params = {}
 
@@ -208,6 +214,7 @@ class CalculatedOutputs():
                                for i, layer_name in enumerate(self.layer_names)]
             these_params[p] = generate_shared_x_array(
                 False, these_params[p], total_lengths=None)
+            these_params[p] = these_params[p][self.left:self.right+1]
 
         return these_params
 

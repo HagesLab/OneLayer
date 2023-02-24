@@ -111,7 +111,8 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
         data = layer_sim_data[datatype]
 
     else:
-        calculated_outputs = CalculatedOutputs(sim_data[where_layer], params)
+        calculated_outputs = CalculatedOutputs(
+            sim_data[where_layer], params, i, j, nen)
         # TODO: might be able to dict this
         if (datatype == "total_N"):
             data = calculated_outputs.total_n()
