@@ -300,35 +300,18 @@ class CalculatedOutputs():
                                           these_params['tau_P']
                                           )
 
-    def PL(self, temp_N, temp_P, do_integrate=False):
-        get_these_params = ['B', 'N0', 'P0']
-        these_params = self.get_stitched_params(get_these_params)
+    def PL_d(self):
+        """ For more complex systems we would need to do something to the RR
+            e.g. waveguiding, FRET
+            but wrapping the raw RR will suffice here
+        """
+        PL_base = self.radiative_recombination_d()
+        return PL_base
 
-        temp_RR = radiative_recombination(
-            {"N": temp_N, "P": temp_P}, these_params)
-        if np.ndim(temp_RR) == 1:  # Coerce all cases to 2D
-            temp_RR = np.reshape(temp_RR, (1, len(temp_RR)))
-        # Integrate PL separately for each layer
-        # TODO: This for all layers at once using the variable dx grid,
-        # so we don't have to awkwardly break RR into individual layer contributions
-        # by calculating indices l and r
-        l = 0
-        r = 0
-        PL_base = np.zeros_like(temp_RR)
-        integral_PL = np.zeros_like(temp_RR[:, 0])
-        for i in range(len(self.layer_names)):
-            r += len(self.grid_x_nodes[i])
-            thickness = self.total_lengths[i]
-            dx_len = self.grid_x_edges[i][1] - self.grid_x_edges[i][0]
-            PL_base[:, l:r] = prep_PL(temp_RR[:, l:r+1], 0, to_index(thickness, dx_len, thickness),
-                                      False)
+    def PL_ind(self):
+        PL_base = self.radiative_recombination_ind()
+        return PL_base
 
-            if do_integrate:
-                integral_PL += new_integrate(PL_base[:, l:r],
-                                             0, thickness, dx_len, thickness, False)
-            l = r
-
-        if do_integrate:
-            return integral_PL
-        else:
-            return PL_base
+    def PL(self):
+        PL_base = self.radiative_recombination()
+        return PL_base

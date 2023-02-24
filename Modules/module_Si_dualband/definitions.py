@@ -103,7 +103,7 @@ def define_calculated_outputs(layer):
         "NRR": Output("SRH Rec. (direct)", units="[cm^-3 s^-1]",
                       integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",
                       is_edge=False, layer=layer),
-        "PL": Output("TRPL", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]",
+        "PL": Output("TRPL (total)", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]",
                      xlabel="ns", xvar="time", is_edge=False, layer=layer),
         "PL_d": Output("TRPL (direct)", units="[cm^-3 s^-1]",
                        integrated_units="[cm^-2 s^-1]",

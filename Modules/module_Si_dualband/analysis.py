@@ -3,8 +3,8 @@ import os
 import tables
 from scipy import integrate as intg
 from io_utils import u_read
-from Modules.module_pnJunction.calculations import radiative_recombination
-from Modules.module_pnJunction.calculations import prep_PL
+from Modules.module_Si_dualband.calculations import radiative_recombination
+from Modules.module_Si_dualband.calculations import prep_PL
 from Modules.module_Si_dualband.calculations import CalculatedOutputs, tau_diff
 
 
@@ -118,18 +118,14 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
         elif (datatype == "E_field"):
             data = calculated_outputs.E_field()
 
-        elif (datatype == "PL"):
+        elif (datatype == "PL_d"):
+            data = calculated_outputs.PL_d()
 
-            if for_integrate:
-                get_these_params = ['B', 'N0', 'P0']
-                these_params = calculated_outputs.get_stitched_params(
-                    get_these_params)
-                rad_rec = radiative_recombination(
-                    extra_data[where_layer], these_params)
-                data = prep_PL(rad_rec, i, j, nen)
-            else:
-                data = calculated_outputs.PL(
-                    sim_data[where_layer]['N'], sim_data[where_layer]['P'], do_integrate=False).flatten()
+        elif (datatype == "PL_ind"):
+            data = calculated_outputs.PL_ind()
+
+        elif (datatype == "PL"):
+            data = calculated_outputs.PL()
 
         else:
             raise NotImplementedError(
