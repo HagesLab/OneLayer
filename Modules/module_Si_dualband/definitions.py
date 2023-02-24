@@ -75,13 +75,13 @@ def define_simulation_outputs(layer):
 
 def define_calculated_outputs(layer):
     return {
-        "voltage": Output("Voltage", units="[V]", integrated_units="[V nm]",
-                          xlabel="nm", xvar="position", is_edge=False, layer=layer),
-        "E_field": Output("Electric Field", units="[V/nm]", integrated_units="[V]",
-                          xlabel="nm", xvar="position", is_edge=True, layer=layer),
+        # "voltage": Output("Voltage", units="[V]", integrated_units="[V nm]",
+        #                   xlabel="nm", xvar="position", is_edge=False, layer=layer),
+        # "E_field": Output("Electric Field", units="[V/nm]", integrated_units="[V]",
+        #                   xlabel="nm", xvar="position", is_edge=True, layer=layer),
         "total_N": Output("Total_N", units="[cm^-3]", integrated_units="[cm^-2]",
                           xlabel="nm", xvar="position", is_edge=False, layer=layer),
-        "delta_N": Output("delta_N", units="[cm^-3]", integrated_units="[cm^-2]",
+        "delta_N": Output("delta_N (total)", units="[cm^-3]", integrated_units="[cm^-2]",
                           xlabel="nm", xvar="position", is_edge=False, layer=layer),
         "delta_N_d": Output("delta_N (direct)", units="[cm^-3]",
                             integrated_units="[cm^-2]", xlabel="nm",
@@ -91,10 +91,16 @@ def define_calculated_outputs(layer):
                               xvar="position", is_edge=False, layer=layer),
         "delta_P": Output("delta_P", units="[cm^-3]", integrated_units="[cm^-2]",
                           xlabel="nm", xvar="position", is_edge=False, layer=layer),
-        "RR": Output("Radiative Rec.", units="[cm^-3 s^-1]",
+        "RR_d": Output("Rad. Rec. (direct)", units="[cm^-3 s^-1]",
+                       integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",
+                       is_edge=False, layer=layer),
+        "RR_ind": Output("Rad. Rec. (indirect)", units="[cm^-3 s^-1]",
+                         integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",
+                         is_edge=False, layer=layer),
+        "RR": Output("Rad. Rec. (total)", units="[cm^-3 s^-1]",
                      integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",
                      is_edge=False, layer=layer),
-        "NRR": Output("SRH Rec.", units="[cm^-3 s^-1]",
+        "NRR": Output("SRH Rec. (direct)", units="[cm^-3 s^-1]",
                       integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",
                       is_edge=False, layer=layer),
         "PL": Output("TRPL", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]",
@@ -142,14 +148,15 @@ def define_convert_in():
         "delta_N_d": ((1e-7) ** 3),
         "delta_N_ind": ((1e-7) ** 3),
         "P": ((1e-7) ** 3),            # [cm^-3] to [nm^-3]
-        "voltage": 1,
-        "E_field": 1,
+        # "voltage": 1,
+        # "E_field": 1,
         "tau_diff": 1,
     }
 
     # These really exist only for the convert_out - so outputs are
     # displayed in cm and s instead of nm and ns
     convert_in["RR"] = convert_in["B"] * (convert_in["N_d"] * convert_in["P"])
+    convert_in["RR_d"] = convert_in["RR_ind"] = convert_in["RR"]
     convert_in["NRR"] = convert_in["N_d"] * 1e-9
     convert_in["PL"] = convert_in["RR"]
     convert_in["PL_d"] = convert_in["PL"]
@@ -169,9 +176,11 @@ def define_iconvert_in():
         "delta_N_d": 1e7,
         "delta_N_ind": 1e7,
         "delta_P": 1e7,
-        "voltage": 1,
-        "E_field": 1,
+        # "voltage": 1,
+        # "E_field": 1,
         "RR": 1e7,
+        "RR_d": 1e7,
+        "RR_ind": 1e7,
         "NRR": 1e7,
         "PL": 1e7,
         "PL_d": 1e7,

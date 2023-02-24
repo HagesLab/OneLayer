@@ -88,14 +88,23 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
         if (datatype == "total_N"):
             data = calculated_outputs.total_n()
 
+        elif (datatype == "delta_N_d"):
+            data = calculated_outputs.delta_n_d()
+
+        elif (datatype == "delta_N_ind"):
+            data = calculated_outputs.delta_n_ind()
+
         elif (datatype == "delta_N"):
             data = calculated_outputs.delta_n()
 
         elif (datatype == "delta_P"):
             data = calculated_outputs.delta_p()
 
-        elif (datatype == "delta_T"):
-            data = calculated_outputs.delta_T()
+        elif (datatype == "RR_d"):
+            data = calculated_outputs.radiative_recombination_d()
+
+        elif (datatype == "RR_ind"):
+            data = calculated_outputs.radiative_recombination_ind()
 
         elif (datatype == "RR"):
             data = calculated_outputs.radiative_recombination()

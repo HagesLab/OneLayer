@@ -87,21 +87,19 @@ def delta_p(P, p0):
     return P - p0
 
 
-def delta_T(sim_outputs, params):
-    """Calculate above-equilibrium triplet density from T, T0"""
-    return sim_outputs["T"] - params["T0"]
-
-
-def radiative_recombination(sim_outputs, params):
-    """Calculate radiative recombination"""
-    return params['B'] * (sim_outputs['N'] * sim_outputs['P'] - params['N0'] * params['P0'])
-
-
-def nonradiative_recombination(sim_outputs, params):
-    """Calculate nonradiative recombination using SRH model
-    Assumes quasi steady state trap level occupation
+def radiative_recombination(N, P, B, n0, p0):
+    """Calculate radiative recombination
+        N - electrons, P - holes
     """
-    return (sim_outputs['N'] * sim_outputs['P'] - params['N0'] * params['P0']) / ((params['tau_N'] * sim_outputs['P']) + (params['tau_P'] * sim_outputs['N']))
+    return B * (N * P - n0 * p0)
+
+
+def nonradiative_recombination(N_d, P, n0, p0, tau_N, tau_P):
+    """Calculate nonradiative recombination using SRH model
+        Assumes quasi steady state trap level occupation
+        N_d - electrons in direct band, P - holes
+    """
+    return (N_d * P - n0 * p0) / ((tau_N * P) + (tau_P * N_d))
 
 
 def tau_diff(PL, dt):
@@ -217,12 +215,30 @@ class CalculatedOutputs():
 
         return E_field_from_V(V, self.inter_dx)
 
-    def delta_n(self):
-        """Calculate above-equilibrium electron density from N, n0"""
+    def delta_n_d(self):
+        """Calculate above-equilibrium electron density from N, n0
+            inside direct band
+        """
         get_these_params = ['N0']
         these_params = self.get_stitched_params(get_these_params)
 
-        return delta_n(self.sim_outputs['N'], these_params['N0'])
+        return delta_n(self.sim_outputs['N_d'], these_params['N0'])
+
+    def delta_n_ind(self):
+        """Calculate above-equilibrium electron density from N, n0
+            inside indirect band
+        """
+        get_these_params = ['N0']
+        these_params = self.get_stitched_params(get_these_params)
+
+        return delta_n(self.sim_outputs['N_ind'], these_params['N0'])
+
+    def delta_n(self):
+        """Calculate above-equilibrium electron density from N, n0
+            total in both bands
+        """
+
+        return self.delta_n_d() + self.delta_n_ind()
 
     def average_delta_n(self, temp_N):
         get_these_params = ['N0']
@@ -242,12 +258,33 @@ class CalculatedOutputs():
         these_params = self.get_stitched_params(get_these_params)
         return delta_p(self.sim_outputs['P'], these_params['P0'])
 
-    def radiative_recombination(self):
-        """Calculate radiative recombination."""
+    def radiative_recombination_d(self):
+        """Calculate radiative recombination (from direct band)"""
         get_these_params = ['B', 'N0', 'P0']
         these_params = self.get_stitched_params(get_these_params)
 
-        return radiative_recombination(self.sim_outputs, these_params)
+        return radiative_recombination(self.sim_outputs['N_d'],
+                                       self.sim_outputs['P'],
+                                       these_params['B'],
+                                       these_params['N0'],
+                                       these_params['P0'])
+
+    def radiative_recombination_ind(self):
+        """Calculate radiative recombination (from direct band)"""
+        get_these_params = ['B_ind', 'N0', 'P0']
+        these_params = self.get_stitched_params(get_these_params)
+
+        return radiative_recombination(self.sim_outputs['N_ind'],
+                                       self.sim_outputs['P'],
+                                       these_params['B_ind'],
+                                       these_params['N0'],
+                                       these_params['P0'])
+
+    def radiative_recombination(self):
+        """Calculate radiative recombination (from direct band)"""
+
+        return self.radiative_recombination_d() + \
+            self.radiative_recombination_ind()
 
     def nonradiative_recombination(self):
         """Calculate nonradiative recombination using SRH model
@@ -255,7 +292,13 @@ class CalculatedOutputs():
         get_these_params = ['N0', 'P0', 'tau_N', 'tau_P']
         these_params = self.get_stitched_params(get_these_params)
 
-        return nonradiative_recombination(self.sim_outputs, these_params)
+        return nonradiative_recombination(self.sim_outputs['N_d'],
+                                          self.sim_outputs['P'],
+                                          these_params['N0'],
+                                          these_params['P0'],
+                                          these_params['tau_N'],
+                                          these_params['tau_P']
+                                          )
 
     def PL(self, temp_N, temp_P, do_integrate=False):
         get_these_params = ['B', 'N0', 'P0']
