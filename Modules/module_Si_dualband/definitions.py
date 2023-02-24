@@ -92,16 +92,16 @@ def define_calculated_outputs(layer):
         "delta_P": Output("delta_P", units="[cm^-3]", integrated_units="[cm^-2]",
                           xlabel="nm", xvar="position", is_edge=False, layer=layer),
         "RR_d": Output("Rad. Rec. (direct)", units="[cm^-3 s^-1]",
-                       integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",
+                       integrated_units="[cm^-2 s^-1]", xlabel="nm", xvar="position",
                        is_edge=False, layer=layer),
         "RR_ind": Output("Rad. Rec. (indirect)", units="[cm^-3 s^-1]",
-                         integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",
+                         integrated_units="[cm^-2 s^-1]", xlabel="nm", xvar="position",
                          is_edge=False, layer=layer),
         "RR": Output("Rad. Rec. (total)", units="[cm^-3 s^-1]",
-                     integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",
+                     integrated_units="[cm^-2 s^-1]", xlabel="nm", xvar="position",
                      is_edge=False, layer=layer),
         "NRR": Output("SRH Rec. (direct)", units="[cm^-3 s^-1]",
-                      integrated_units="[cm^-3 s^-1]", xlabel="nm", xvar="position",
+                      integrated_units="[cm^-2 s^-1]", xlabel="nm", xvar="position",
                       is_edge=False, layer=layer),
         "PL": Output("TRPL (total)", units="[cm^-3 s^-1]", integrated_units="[cm^-2 s^-1]",
                      xlabel="ns", xvar="time", is_edge=False, layer=layer),
@@ -111,6 +111,12 @@ def define_calculated_outputs(layer):
         "PL_ind": Output("TRPL (indirect)", units="[cm^-3 s^-1]",
                          integrated_units="[cm^-2 s^-1]",
                          xlabel="ns", xvar="time", is_edge=False, layer=layer),
+        "trap_rate": Output("Trap rate", units="[cm^-3 s^-1]",
+                            integrated_units="[cm^-2 s^-1]",
+                            xlabel="ns", xvar="time", is_edge=False, layer=layer),
+        "detrap_rate": Output("Detrap rate", units="[cm^-3 s^-1]",
+                              integrated_units="[cm^-2 s^-1]",
+                              xlabel="ns", xvar="time", is_edge=False, layer=layer),
         "tau_diff": Output("tau_diff", units="[ns]", xlabel="ns", xvar="time",
                            is_edge=False, layer=layer, analysis_plotable=False),
         "avg_delta_N": Output("avg_delta_N", units="[cm^-3]", xlabel="ns",
@@ -158,6 +164,8 @@ def define_convert_in():
     convert_in["RR"] = convert_in["B"] * (convert_in["N_d"] * convert_in["P"])
     convert_in["RR_d"] = convert_in["RR_ind"] = convert_in["RR"]
     convert_in["NRR"] = convert_in["N_d"] * 1e-9
+    convert_in["trap_rate"] = convert_in["N_d"] * 1e-9
+    convert_in["detrap_rate"] = convert_in["N_d"] * 1e-9
     convert_in["PL"] = convert_in["RR"]
     convert_in["PL_d"] = convert_in["PL"]
     convert_in["PL_ind"] = convert_in["PL"]
@@ -181,6 +189,8 @@ def define_iconvert_in():
         "RR": 1e7,
         "RR_d": 1e7,
         "RR_ind": 1e7,
+        "trap_rate": 1e7,
+        "detrap_rate": 1e7,
         "NRR": 1e7,
         "PL": 1e7,
         "PL_d": 1e7,

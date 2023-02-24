@@ -85,6 +85,7 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
 
     else:
         calculated_outputs = CalculatedOutputs(sim_data[where_layer], params)
+        # TODO: might be able to dict this
         if (datatype == "total_N"):
             data = calculated_outputs.total_n()
 
@@ -126,6 +127,12 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
 
         elif (datatype == "PL"):
             data = calculated_outputs.PL()
+
+        elif (datatype == "trap_rate"):
+            data = calculated_outputs.trap()
+
+        elif (datatype == "detrap_rate"):
+            data = calculated_outputs.detrap()
 
         else:
             raise NotImplementedError(

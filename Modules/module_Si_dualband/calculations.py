@@ -102,14 +102,28 @@ def nonradiative_recombination(N_d, P, n0, p0, tau_N, tau_P):
     return (N_d * P - n0 * p0) / ((tau_N * P) + (tau_P * N_d))
 
 
-def tau_diff(PL, dt):
+def trap(N_d, n0, tau_C):
+    """Calculate trapping rate
+        N_d - electrons in direct band
     """
-    Calculates particle lifetime from TRPL.
+    return (N_d - n0) / tau_C
+
+
+def detrap(N_ind, tau_E):
+    """Calculate trapping rate
+        N_d - electrons in direct band
+    """
+    return (N_ind) / tau_E
+
+
+def tau_diff(y, dt):
+    """
+    Calculates differential lifetime
 
     Parameters
     ----------
-    PL : 1D ndarray
-        Time-resolved PL array.
+    y : 1D ndarray
+        Time-resolved PL or delta_N array.
     dt : float
         Time step size.
 
@@ -120,16 +134,16 @@ def tau_diff(PL, dt):
 
     """
     with np.errstate(invalid='ignore', divide='ignore'):
-        ln_PL = np.where(PL <= 0, 0, np.log(PL))
+        ln_y = np.where(y <= 0, 0, np.log(y))
 
-    dln_PLdt = np.zeros(len(ln_PL))
-    dln_PLdt[0] = (ln_PL[1] - ln_PL[0]) / dt
-    dln_PLdt[-1] = (ln_PL[-1] - ln_PL[-2]) / dt
-    dln_PLdt[1:-1] = (np.roll(ln_PL, -1)[1:-1] -
-                      np.roll(ln_PL, 1)[1:-1]) / (2*dt)
+    dln_y = np.zeros(len(ln_y))
+    dln_y[0] = (ln_y[1] - ln_y[0]) / dt
+    dln_y[-1] = (ln_y[-1] - ln_y[-2]) / dt
+    dln_y[1:-1] = (np.roll(ln_y, -1)[1:-1] -
+                   np.roll(ln_y, 1)[1:-1]) / (2*dt)
 
     with np.errstate(invalid='ignore', divide='ignore'):
-        dln_PLdt = np.where(dln_PLdt == 0, 0, -(dln_PLdt ** -1))
+        dln_PLdt = np.where(dln_y == 0, 0, -(dln_y ** -1))
     return dln_PLdt
 
 
@@ -299,6 +313,17 @@ class CalculatedOutputs():
                                           these_params['tau_N'],
                                           these_params['tau_P']
                                           )
+
+    def trap(self):
+        get_these_params = ['N0', 'tau_C']
+        these_params = self.get_stitched_params(get_these_params)
+        return trap(self.sim_outputs['N_d'], these_params['N0'],
+                    these_params['tau_C'])
+
+    def detrap(self):
+        get_these_params = ['tau_E']
+        these_params = self.get_stitched_params(get_these_params)
+        return detrap(self.sim_outputs['N_ind'], these_params['tau_E'])
 
     def PL_d(self):
         """ For more complex systems we would need to do something to the RR
