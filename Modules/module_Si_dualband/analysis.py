@@ -8,7 +8,8 @@ from Modules.module_Si_dualband.calculations import prep_PL
 from Modules.module_Si_dualband.calculations import CalculatedOutputs, tau_diff
 
 
-def submodule_get_overview_analysis(any_layer, params, flags, total_time, dt, tsteps, data_dirname, file_name_base):
+def submodule_get_overview_analysis(absorber_layer, params, flags, total_time,
+                                    dt, tsteps, data_dirname, file_name_base):
     """Calculates at a selection of sample times: N, P, (total carrier densities)
     delta_N, delta_P, (above-equilibrium carrier densities)
     internal electric field due to differences in N, P,
@@ -22,10 +23,10 @@ def submodule_get_overview_analysis(any_layer, params, flags, total_time, dt, ts
     and integrals will be over all three layers.
     """
 
-    data_dict = {"__SHARED__": {}}
+    data_dict = {"Absorber": {}}
 
-    convert_out = any_layer.convert_out
-    for raw_output_name in any_layer.s_outputs:
+    convert_out = absorber_layer.convert_out
+    for raw_output_name in absorber_layer.s_outputs:
 
         data_filename = "{}/{}-{}.h5".format(data_dirname, file_name_base,
                                              raw_output_name)
@@ -33,42 +34,49 @@ def submodule_get_overview_analysis(any_layer, params, flags, total_time, dt, ts
         for tstep in tsteps:
             data.append(u_read(data_filename, t0=tstep, single_tstep=True))
 
-        data_dict["__SHARED__"][raw_output_name] = np.array(data)
+        data_dict["Absorber"][raw_output_name] = np.array(data)
 
-    calculated_outputs = CalculatedOutputs(data_dict["__SHARED__"], params)
+    calculated_outputs = CalculatedOutputs(data_dict["Absorber"], params)
 
-    #data_dict["MAPI"]["E_field"] = calculated_outputs.E_field()
-    data_dict["__SHARED__"]["delta_N"] = calculated_outputs.delta_n()
-    data_dict["__SHARED__"]["delta_P"] = calculated_outputs.delta_p()
+    data_dict["Absorber"]["total_N"] = calculated_outputs.total_n()
 
-    data_dict["__SHARED__"]["RR"] = calculated_outputs.radiative_recombination()
-    data_dict["__SHARED__"]["NRR"] = calculated_outputs.nonradiative_recombination()
+    data_dict["Absorber"]["delta_N_d"] = calculated_outputs.delta_n_d()
 
-    data_dict["__SHARED__"]["voltage"] = calculated_outputs.voltage()
-    data_dict["__SHARED__"]["E_field"] = calculated_outputs.E_field()
+    data_dict["Absorber"]["delta_N_ind"] = calculated_outputs.delta_n_ind()
+
+    data_dict["Absorber"]["delta_N"] = calculated_outputs.delta_n()
+
+    data_dict["Absorber"]["delta_P"] = calculated_outputs.delta_p()
+
+    data_dict["Absorber"]["RR_d"] = calculated_outputs.radiative_recombination_d()
+
+    data_dict["Absorber"]["RR_ind"] = calculated_outputs.radiative_recombination_ind()
+
+    data_dict["Absorber"]["RR"] = calculated_outputs.radiative_recombination()
+
+    data_dict["Absorber"]["NRR"] = calculated_outputs.nonradiative_recombination()
+
+    # data_dict["Absorber"]["voltage"] = calculated_outputs.voltage()
+    # data_dict["Absorber"]["E_field"] = calculated_outputs.E_field()
 
     #### PL ####
-    with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
-            tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
-        temp_N = np.array(ifstream_N.root.data)
-        temp_P = np.array(ifstream_P.root.data)
+    # with tables.open_file(os.path.join(data_dirname, file_name_base + "-N.h5"), mode='r') as ifstream_N, \
+    #         tables.open_file(os.path.join(data_dirname, file_name_base + "-P.h5"), mode='r') as ifstream_P:
+    #     temp_N = np.array(ifstream_N.root.data)
+    #     temp_P = np.array(ifstream_P.root.data)
 
-    data_dict["__SHARED__"]["PL"] = calculated_outputs.PL(
-        temp_N, temp_P, do_integrate=True)
+    # data_dict["Absorber"]["PL"] = calculated_outputs.PL(
+    #     temp_N, temp_P, do_integrate=True)
 
-    data_dict["__SHARED__"]["avg_delta_N"] = calculated_outputs.average_delta_n(
-        temp_N)
+    # data_dict["Absorber"]["avg_delta_N"] = calculated_outputs.average_delta_n(
+    #     temp_N)
 
-    # try:
-    data_dict["__SHARED__"]["tau_diff"] = tau_diff(
-        data_dict["__SHARED__"]["PL"], dt)
-    # except Exception:
-    #     print("Error: failed to calculate tau_diff")
-    #     data_dict["__SHARED__"]["tau_diff"] = 0
+    # data_dict["Absorber"]["tau_diff"] = tau_diff(
+    #     data_dict["Absorber"]["PL"], dt)
     #################
 
-    for data in data_dict["__SHARED__"]:
-        data_dict["__SHARED__"][data] *= convert_out[data]
+    for data in data_dict["Absorber"]:
+        data_dict["Absorber"][data] *= convert_out[data]
 
     return data_dict
 

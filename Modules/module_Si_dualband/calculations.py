@@ -242,10 +242,10 @@ class CalculatedOutputs():
         """Calculate above-equilibrium electron density from N, n0
             inside indirect band
         """
-        get_these_params = ['N0']
-        these_params = self.get_stitched_params(get_these_params)
+        # get_these_params = ['N0']
+        # these_params = self.get_stitched_params(get_these_params)
 
-        return delta_n(self.sim_outputs['N_ind'], these_params['N0'])
+        return delta_n(self.sim_outputs['N_ind'], 0)
 
     def delta_n(self):
         """Calculate above-equilibrium electron density from N, n0
