@@ -26,7 +26,8 @@ class Si_dualband_Initial_Conditions():
             self.absorber.params["delta_N"].value
         ) * self.absorber.convert_in["N_d"]
 
-        self.init_N_ind = 0 * self.absorber.convert_in["N_ind"]
+        self.init_N_ind = self.absorber.params["delta_N_ind"].value * \
+            self.absorber.convert_in["N_ind"]
 
         self.init_P = (
             self.absorber.params["P0"].value +

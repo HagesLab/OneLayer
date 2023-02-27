@@ -51,6 +51,8 @@ def define_params():
                               valid_range=(0, np.inf)),
         "delta_N": Parameter(units="[cm^-3]", is_edge=False,
                              valid_range=(0, np.inf)),
+        "delta_N_ind": Parameter(units="[cm^-3]", is_edge=False,
+                                 valid_range=(0, np.inf)),
         "delta_P": Parameter(units="[cm^-3]", is_edge=False,
                              valid_range=(0, np.inf)),
         "Eg": Parameter(units="[eV]", is_edge=False),

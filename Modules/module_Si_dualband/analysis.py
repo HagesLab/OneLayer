@@ -138,31 +138,14 @@ def submodule_get_timeseries(pathname, datatype, parent_data,
 
 def submodule_get_IC_regen(sim_data, param_dict, include_flags, grid_x):
     """ Set delta_N and delta_P of outgoing regenerated IC file."""
-    layer_names = ['N-type', 'buffer', 'P-type']
-    l = [0] + [len(param_dict[n]['node_x']) for n in layer_names]
-    l = np.cumsum(l)
-    sim_data['N-type']['N'] = sim_data["__SHARED__"]['N'][l[0]:l[1]]
-    sim_data['N-type']['P'] = sim_data["__SHARED__"]['P'][l[0]:l[1]]
+    param_dict["Absorber"]["delta_N"] = (sim_data["Absorber"]["N_d"] - param_dict["Absorber"]["N0"]
+                                         ) if include_flags["Absorber"]['N_d'] else np.zeros(len(param_dict["Absorber"]['node_x']))
 
-    sim_data['buffer']['N'] = sim_data["__SHARED__"]['N'][l[1]:l[2]]
-    sim_data['buffer']['P'] = sim_data["__SHARED__"]['P'][l[1]:l[2]]
+    # We need this variable to preserve any carriers in the indirect band
+    param_dict["Absorber"]["delta_N_ind"] = (sim_data["Absorber"]["N_ind"]
+                                             ) if include_flags["Absorber"]['N_ind'] else np.zeros(len(param_dict["Absorber"]['node_x']))
 
-    sim_data['P-type']['N'] = sim_data["__SHARED__"]['N'][l[2]:l[3]]
-    sim_data['P-type']['P'] = sim_data["__SHARED__"]['P'][l[2]:l[3]]
-
-    param_dict["N-type"]["delta_N"] = (sim_data["N-type"]["N"] - param_dict["N-type"]["N0"]
-                                       ) if include_flags["__SHARED__"]['N'] else np.zeros(len(param_dict["N-type"]['node_x']))
-    param_dict["N-type"]["delta_P"] = (sim_data["N-type"]["P"] - param_dict["N-type"]["P0"]
-                                       ) if include_flags["__SHARED__"]['P'] else np.zeros(len(param_dict["N-type"]['node_x']))
-
-    param_dict["buffer"]["delta_N"] = (sim_data["buffer"]["N"] - param_dict["buffer"]["N0"]
-                                       ) if include_flags["__SHARED__"]['N'] else np.zeros(len(param_dict["buffer"]['node_x']))
-    param_dict["buffer"]["delta_P"] = (sim_data["buffer"]["P"] - param_dict["buffer"]["P0"]
-                                       ) if include_flags["__SHARED__"]['P'] else np.zeros(len(param_dict["buffer"]['node_x']))
-
-    param_dict["P-type"]["delta_N"] = (sim_data["P-type"]["N"] - param_dict["P-type"]["N0"]
-                                       ) if include_flags["__SHARED__"]['N'] else np.zeros(len(param_dict["P-type"]['node_x']))
-    param_dict["P-type"]["delta_P"] = (sim_data["P-type"]["P"] - param_dict["P-type"]["P0"]
-                                       ) if include_flags["__SHARED__"]['P'] else np.zeros(len(param_dict["P-type"]['node_x']))
+    param_dict["Absorber"]["delta_P"] = (sim_data["Absorber"]["P"] - param_dict["Absorber"]["P0"]
+                                         ) if include_flags["Absorber"]['P'] else np.zeros(len(param_dict["Absorber"]['node_x']))
 
     return

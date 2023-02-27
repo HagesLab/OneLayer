@@ -10,7 +10,7 @@ from Modules.module_Si_dualband.initializations import Si_dualband_Initial_Condi
 from Modules.module_Si_dualband.analysis import submodule_get_overview_analysis
 from Modules.module_Si_dualband.analysis import submodule_prep_dataset
 from Modules.module_Si_dualband.analysis import submodule_get_timeseries
-# from Modules.module_pnJunction.analysis import submodule_get_IC_regen
+from Modules.module_Si_dualband.analysis import submodule_get_IC_regen
 from Modules.module_Si_dualband.simulations import OdeSiSimulation
 from sys import maxsize
 
@@ -61,12 +61,15 @@ class Si_DualBand(OneD_Model):
                               data_dirname, file_name_base):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        data_dict = submodule_get_overview_analysis(self.layers["Absorber"], params, flags, total_time,
-                                                    dt, tsteps, data_dirname, file_name_base)
+        data_dict = submodule_get_overview_analysis(self.layers["Absorber"],
+                                                    params, flags, total_time,
+                                                    dt, tsteps, data_dirname,
+                                                    file_name_base)
         return data_dict
 
     def prep_dataset(self, datatype, target_layer, sim_data, params, flags,
-                     for_integrate=False, i=0, j=None, nen=False, extra_data=None):
+                     for_integrate=False, i=0, j=None, nen=False,
+                     extra_data=None):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
         layer = self.layers[target_layer]
@@ -89,6 +92,6 @@ class Si_DualBand(OneD_Model):
     def get_IC_regen(self, sim_data, param_dict, include_flags, grid_x):
         """Dispatched all logic to a submodule while keeping contract
         (name and arguments of method) with rest of the system for stability"""
-        # regen = submodule_get_IC_regen(sim_data, param_dict, include_flags, grid_x)
-        # return regen
-        raise NotImplementedError
+        regen = submodule_get_IC_regen(
+            sim_data, param_dict, include_flags, grid_x)
+        return regen
