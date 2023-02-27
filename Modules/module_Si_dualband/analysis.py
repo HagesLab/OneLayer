@@ -5,17 +5,15 @@ from Modules.module_Si_dualband.calculations import CalculatedOutputs, tau_diff
 
 def submodule_get_overview_analysis(absorber_layer, params, flags, total_time,
                                     dt, tsteps, data_dirname, file_name_base):
-    """Calculates at a selection of sample times: N, P, (total carrier densities)
+    """Calculates at a selection of sample times: N, P, (carrier densities)
     delta_N, delta_P, (above-equilibrium carrier densities)
     internal electric field due to differences in N, P,
     radiative recombination,
     non-radiative (SRH model) recombination,
+    and other quantities of interest
 
-    Integrates over nanowire length: PL due to
-    radiative recombination, waveguiding, and carrier regeneration.
+    Integrates over length: PL due to radiative recombination in both bands
 
-    Since all outputs are shared in this module, we will plot all layers on single plots
-    and integrals will be over all three layers.
     """
 
     data_dict = {"Absorber": {}}
@@ -95,11 +93,12 @@ def submodule_get_overview_analysis(absorber_layer, params, flags, total_time,
     return data_dict
 
 
-def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_integrate,
-                           i, j, nen, extra_data):
+def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params,
+                           i, j, nen):
     """ Provides delta_N, delta_P, electric field,
     recombination, and spatial PL values on demand."""
-    # For N, P this is just reading the data but for others we'll calculate it in situ
+    # For N, P this is just reading the data but
+    # for others we'll calculate it in situ
     layer_sim_data = sim_data[where_layer]
     data = None
     if (datatype in layer.s_outputs):
@@ -138,14 +137,16 @@ def submodule_get_timeseries(pathname, datatype, parent_data,
 
 def submodule_get_IC_regen(sim_data, param_dict, include_flags, grid_x):
     """ Set delta_N and delta_P of outgoing regenerated IC file."""
-    param_dict["Absorber"]["delta_N"] = (sim_data["Absorber"]["N_d"] - param_dict["Absorber"]["N0"]
-                                         ) if include_flags["Absorber"]['N_d'] else np.zeros(len(param_dict["Absorber"]['node_x']))
+    param_dict["Absorber"]["delta_N"] = (sim_data["Absorber"]["N_d"] -
+                                         param_dict["Absorber"]["N0"]
+                                         ) if include_flags["Absorber"]['N_d'] else np.zeros_like(grid_x)
 
     # We need this variable to preserve any carriers in the indirect band
     param_dict["Absorber"]["delta_N_ind"] = (sim_data["Absorber"]["N_ind"]
-                                             ) if include_flags["Absorber"]['N_ind'] else np.zeros(len(param_dict["Absorber"]['node_x']))
+                                             ) if include_flags["Absorber"]['N_ind'] else np.zeros_like(grid_x)
 
-    param_dict["Absorber"]["delta_P"] = (sim_data["Absorber"]["P"] - param_dict["Absorber"]["P0"]
-                                         ) if include_flags["Absorber"]['P'] else np.zeros(len(param_dict["Absorber"]['node_x']))
+    param_dict["Absorber"]["delta_P"] = (sim_data["Absorber"]["P"] -
+                                         param_dict["Absorber"]["P0"]
+                                         ) if include_flags["Absorber"]['P'] else np.zeros_like(grid_x)
 
     return

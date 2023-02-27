@@ -1,4 +1,3 @@
-
 import numpy as np
 from helper_structs import Parameter, Output, Layer
 

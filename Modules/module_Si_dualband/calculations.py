@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import solve_banded
 from scipy import integrate as intg
-from utils import generate_shared_x_array, to_array, to_index, new_integrate
+from utils import generate_shared_x_array, to_array, new_integrate
 
 q = 1.0                     # [e]
 q_C = 1.602e-19             # [C]
@@ -149,7 +149,9 @@ def tau_diff(y, dt):
 
 def prep_PL(rad_rec, i, j, need_extra_node):
     """
-    Calculates PL(x,t) given radiative recombination data plus propogation contributions.
+    Calculates PL(x,t) given radiative recombination data
+    This is a VERY simple calculation, since this model does not include
+    waveguiding
 
     Parameters
     ----------
@@ -228,7 +230,8 @@ class CalculatedOutputs():
         these_params = {}
 
         for p in get_these_params:
-            these_params[p] = [to_array(self.params[layer_name][p], len(self.grid_x_nodes[i]),
+            these_params[p] = [to_array(self.params[layer_name][p],
+                                        len(self.grid_x_nodes[i]),
                                         is_edge=False)
                                for i, layer_name in enumerate(self.layer_names)]
             these_params[p] = generate_shared_x_array(

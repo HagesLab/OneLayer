@@ -14,11 +14,6 @@ from Modules.module_Si_dualband.analysis import submodule_get_IC_regen
 from Modules.module_Si_dualband.simulations import OdeSiSimulation
 from sys import maxsize
 
-q = 1.0                     # [e]
-q_C = 1.602e-19             # [C]
-kB = 8.61773e-5             # [eV / K]
-eps0 = 8.854e-12 * 1e-9     # [C/V-m] to [C/V-nm]
-
 
 class Si_DualBand(OneD_Model):
     """ Based on a Si-H 2D material in which electrons can exist in two
@@ -70,15 +65,13 @@ class Si_DualBand(OneD_Model):
     def prep_dataset(self, datatype, target_layer, sim_data, params, flags,
                      for_integrate=False, i=0, j=None, nen=False,
                      extra_data=None):
-        """Dispatched all logic to a submodule while keeping contract
-        (name and arguments of method) with rest of the system for stability"""
+        # We didn't use all the args from Notebook, but other modules do
         layer = self.layers[target_layer]
 
         if j is None:
             j = maxsize * 2 + 1
         data = submodule_prep_dataset(target_layer, layer, datatype, sim_data,
-                                      params, for_integrate, i, j, nen,
-                                      extra_data)
+                                      params, i, j, nen)
         return data
 
     def get_timeseries(self, pathname, datatype, parent_data,
