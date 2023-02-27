@@ -1,10 +1,5 @@
 import numpy as np
-import os
-import tables
-from scipy import integrate as intg
 from io_utils import u_read
-from Modules.module_Si_dualband.calculations import radiative_recombination
-from Modules.module_Si_dualband.calculations import prep_PL
 from Modules.module_Si_dualband.calculations import CalculatedOutputs, tau_diff
 
 
@@ -113,55 +108,9 @@ def submodule_prep_dataset(where_layer, layer, datatype, sim_data, params, for_i
     else:
         calculated_outputs = CalculatedOutputs(
             sim_data[where_layer], params, i, j, nen)
-        # TODO: might be able to dict this
-        if (datatype == "total_N"):
-            data = calculated_outputs.total_n()
 
-        elif (datatype == "delta_N_d"):
-            data = calculated_outputs.delta_n_d()
-
-        elif (datatype == "delta_N_ind"):
-            data = calculated_outputs.delta_n_ind()
-
-        elif (datatype == "delta_N"):
-            data = calculated_outputs.delta_n()
-
-        elif (datatype == "delta_P"):
-            data = calculated_outputs.delta_p()
-
-        elif (datatype == "RR_d"):
-            data = calculated_outputs.radiative_recombination_d()
-
-        elif (datatype == "RR_ind"):
-            data = calculated_outputs.radiative_recombination_ind()
-
-        elif (datatype == "RR"):
-            data = calculated_outputs.radiative_recombination()
-
-        elif (datatype == "NRR"):
-            data = calculated_outputs.nonradiative_recombination()
-
-        elif (datatype == "voltage"):
-            data = calculated_outputs.voltage()
-
-        elif (datatype == "E_field"):
-            data = calculated_outputs.E_field()
-
-        elif (datatype == "PL_d"):
-            data = calculated_outputs.PL_d()
-
-        elif (datatype == "PL_ind"):
-            data = calculated_outputs.PL_ind()
-
-        elif (datatype == "PL"):
-            data = calculated_outputs.PL()
-
-        elif (datatype == "trap_rate"):
-            data = calculated_outputs.trap()
-
-        elif (datatype == "detrap_rate"):
-            data = calculated_outputs.detrap()
-
+        if datatype in calculated_outputs.calcs:
+            data = calculated_outputs.calcs[datatype]()
         else:
             raise NotImplementedError(
                 f"No calculation routine available for {datatype}")

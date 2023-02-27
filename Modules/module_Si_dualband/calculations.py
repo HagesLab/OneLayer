@@ -205,6 +205,25 @@ class CalculatedOutputs():
         if has_extra_node:
             self.right += 1
 
+        self.calcs = {"total_N": self.total_n,
+                      "delta_N_d": self.delta_n_d,
+                      "delta_N_ind": self.delta_n_ind,
+                      "delta_N": self.delta_n,
+                      "delta_P": self.delta_p,
+                      "RR_d":  self.radiative_recombination_d,
+                      "RR_ind": self.radiative_recombination_ind,
+                      "RR": self.radiative_recombination,
+                      "NRR": self.nonradiative_recombination,
+                      # "voltage": self.voltage,
+                      # "E_field": self.E_field,
+                      "PL_d": self.PL_d,
+                      "PL_ind": self.PL_ind,
+                      "PL": self.PL,
+                      "trap_rate": self.trap,
+                      "detrap_rate": self.detrap}
+
+        return
+
     def get_stitched_params(self, get_these_params):
         these_params = {}
 
@@ -221,20 +240,20 @@ class CalculatedOutputs():
     def total_n(self):
         return self.sim_outputs['N_d'] + self.sim_outputs['N_ind']
 
-    def voltage(self):
-        """Calculate voltage from N, P"""
-        get_these_params = ['N0', 'P0', 'rel_permitivity']
-        these_params = self.get_stitched_params(get_these_params)
+    # def voltage(self):
+    #     """Calculate voltage from N, P"""
+    #     get_these_params = ['N0', 'P0', 'rel_permitivity']
+    #     these_params = self.get_stitched_params(get_these_params)
 
-        return V_poisson_2D(self.dx, self.sim_outputs['N'], self.sim_outputs['P'],
-                            these_params['N0'], these_params['P0'], these_params['rel_permitivity'],
-                            V0=0, VL=0)
+    #     return V_poisson_2D(self.dx, self.sim_outputs['N'], self.sim_outputs['P'],
+    #                         these_params['N0'], these_params['P0'], these_params['rel_permitivity'],
+    #                         V0=0, VL=0)
 
-    def E_field(self):
-        """Calculate electric field from N, P"""
-        V = self.voltage()
+    # def E_field(self):
+    #     """Calculate electric field from N, P"""
+    #     V = self.voltage()
 
-        return E_field_from_V(V, self.inter_dx)
+    #     return E_field_from_V(V, self.inter_dx)
 
     def delta_n_d(self):
         """Calculate above-equilibrium electron density from N, n0
