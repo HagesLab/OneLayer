@@ -184,7 +184,7 @@ def prep_PL(rad_rec, i, j, need_extra_node):
 
 class CalculatedOutputs():
 
-    def __init__(self, sim_outputs, params, left, right, has_extra_node):
+    def __init__(self, sim_outputs, params, left=0, right=None, has_extra_node=False):
         self.sim_outputs = sim_outputs
 
         self.layer_names = ["Absorber"]
@@ -203,7 +203,10 @@ class CalculatedOutputs():
 
         # Truncate param arrays to match i and j set by new_integrate
         self.left = left
-        self.right = right
+        if right is None:
+            self.right = len(self.grid_x_nodes[0])
+        else:
+            self.right = right
         if has_extra_node:
             self.right += 1
 
