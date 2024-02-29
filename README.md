@@ -1,5 +1,7 @@
 # OneLayer
-One-layer transient PL simulations, but in runnable application form
+Our internal GUI we use to analyze individual transient carrier simulations from projects such as MetroTRPL or Bayesian-Inference-TRPL. Or, SCAPS-1D but transient. Supports custom carrier models / device stacks.
+
+Unfortunately, for lack of time, we no longer maintain this project actively. We nevertheless hope that this project is useful to anyone wanting to run transient carrier simulations.
 
 ### Installation
 
